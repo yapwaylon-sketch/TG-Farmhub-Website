@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PND Spray Tracker — TG FarmHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #1A1F1A;
+  --bg-card: #242C24;
+  --bg-hover: #2A342A;
+  --bg-input: #1E261E;
+  --border: #2E3A2E;
+  --border-light: #3A463A;
+  --text: #D0DCC0;
+  --text-muted: #7A8A7A;
+  --text-dim: #5A6A5A;
+  --white: #E8F0E0;
+  --green: #4A7C3F;
+  --green-light: #6B9E5E;
+  --green-pale: rgba(74,124,63,0.15);
+  --gold: #E8A020;
+  --gold-light: #F5C04A;
+  --gold-pale: rgba(232,160,32,0.12);
+  --red: #E86060;
+  --red-pale: rgba(232,96,96,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* TOP BAR */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px;
+  background: #161B16;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.topbar-logo {
+  width: 36px; height: 36px; background: white; border-radius: 50%;
+  padding: 4px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+}
+.topbar-logo img { width: 28px; height: 28px; object-fit: cover; object-position: center 20%; border-radius: 50%; }
+.topbar-brand { font-weight: 800; font-size: 14px; color: var(--gold-light); }
+.topbar-title {
+  font-weight: 700; font-size: 16px; color: var(--white);
+  position: absolute; left: 50%; transform: translateX(-50%);
+  white-space: nowrap;
+}
+.topbar-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-muted); font-size: 13px; font-weight: 500;
+  cursor: pointer; text-decoration: none; transition: color 0.15s;
+}
+.topbar-back:hover { color: var(--white); }
+.topbar-back svg { width: 16px; height: 16px; }
+
+/* TABS */
+.tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  background: #161B16; padding: 0 20px;
+}
+.tab-btn {
+  padding: 12px 20px; font-size: 13px; font-weight: 600;
+  color: var(--text-muted); cursor: pointer; border: none; background: none;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--gold-light); border-bottom-color: var(--gold); }
+
+/* MAIN CONTENT */
+.main { padding: 24px 20px; max-width: 1100px; margin: 0 auto; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* CARDS */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-weight: 700; font-size: 15px; color: var(--white);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+
+/* FORM */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-input, .form-select {
+  width: 100%; padding: 10px 12px; font-size: 14px;
+  font-family: inherit; color: var(--text);
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 8px; outline: none; transition: border-color 0.15s;
+}
+.form-input:focus, .form-select:focus { border-color: var(--green); }
+.form-select option { background: var(--bg-card); color: var(--text); }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 20px; font-size: 13px; font-weight: 600;
+  font-family: inherit; border-radius: 8px; border: none;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-primary {
+  background: var(--green); color: white;
+}
+.btn-primary:hover { background: var(--green-light); }
+.btn-outline {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { background: var(--bg-hover); color: var(--text); }
+
+/* TABLE */
+.data-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.data-table th {
+  text-align: left; padding: 10px 12px; font-weight: 600;
+  color: var(--text-muted); font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.5px; border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--bg-hover); }
+
+.table-wrap { overflow-x: auto; }
+
+/* INLINE EDITING */
+.inline-input, .inline-select {
+  padding: 6px 8px; font-size: 13px; font-family: inherit;
+  color: var(--text); background: var(--bg-input);
+  border: 1px solid var(--border); border-radius: 6px;
+  outline: none; transition: border-color 0.15s;
+}
+.inline-input:focus, .inline-select:focus { border-color: var(--green); }
+.inline-select option { background: var(--bg-card); color: var(--text); }
+
+/* TOGGLE */
+.toggle {
+  position: relative; width: 36px; height: 20px;
+  display: inline-block; cursor: pointer;
+}
+.toggle input { display: none; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--border);
+  border-radius: 20px; transition: background 0.2s;
+}
+.toggle-slider::after {
+  content: ""; position: absolute; left: 2px; top: 2px;
+  width: 16px; height: 16px; background: var(--text-muted);
+  border-radius: 50%; transition: all 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--green); }
+.toggle input:checked + .toggle-slider::after { left: 18px; background: white; }
+
+/* SAVE TICK */
+.save-tick {
+  color: var(--green-light); font-size: 16px; opacity: 0;
+  transition: opacity 0.3s; margin-left: 6px;
+}
+.save-tick.show { opacity: 1; }
+
+/* NOTIFICATION */
+.notification {
+  position: fixed; top: 20px; right: 20px; z-index: 1000;
+  padding: 10px 18px; border-radius: 10px;
+  font-weight: 600; font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  animation: slideIn 0.3s ease;
+  display: flex; align-items: center; gap: 8px; color: white;
+}
+.notification.success { background: var(--green); }
+.notification.warning { background: var(--gold); }
+.notification.error { background: var(--red); }
+
+@keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* EMPTY STATE */
+.empty-state {
+  padding: 30px; text-align: center; color: var(--text-dim); font-size: 13px;
+}
+
+/* FORM GRID */
+.form-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px;
+}
+.form-grid .form-group.full { grid-column: 1 / -1; }
+
+/* ADD FORM */
+.add-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; align-items: end;
+}
+.add-form .form-group { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .topbar-title { position: static; transform: none; font-size: 14px; }
+  .topbar { flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .topbar-left { order: 1; }
+  .topbar-title { order: 3; width: 100%; text-align: center; }
+  .topbar-back { order: 2; }
+  .tabs { padding: 0 10px; }
+  .tab-btn { padding: 10px 14px; font-size: 12px; }
+  .main { padding: 16px 12px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .add-form { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">
+      <img src="tgfarmhub-logo.png" alt="TG" onerror="this.parentElement.textContent='🌿'">
+    </div>
+    <span class="topbar-brand">TG FarmHub</span>
+  </div>
+  <span class="topbar-title">PND Spray Tracker</span>
+  <a class="topbar-back" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Back to Hub
+  </a>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="log">Log Spray</button>
+  <button class="tab-btn" data-tab="blocks">Manage Blocks</button>
+  <button class="tab-btn" data-tab="products">Manage Products</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- TAB 1: LOG SPRAY -->
+  <div id="tab-log" class="tab-content active">
+    <div class="card">
+      <div class="card-title">Log Spray Application</div>
+      <form id="spray-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Block</label>
+            <select id="f-block" class="form-select" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Product</label>
+            <select id="f-product" class="form-select" required></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date Completed</label>
+            <input id="f-date" type="date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Next Spray Date</label>
+            <input id="f-next-date" type="date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <input id="f-notes" type="text" class="form-input" placeholder="Optional notes">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Logged By</label>
+            <input id="f-logged-by" type="text" class="form-input" required>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <button type="submit" class="btn btn-primary">Save Spray Log</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent Logs</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Block</th><th>Product</th><th>Date Completed</th>
+              <th>Next Spray</th><th>Logged By</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="recent-logs-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: MANAGE BLOCKS -->
+  <div id="tab-blocks" class="tab-content">
+    <div class="card">
+      <div class="card-title">All Blocks</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Block Name</th><th>Date Planted</th><th>Status</th>
+              <th>Remarks</th><th>Active</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="blocks-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Add New Block</div>
+      <div class="add-form" id="add-block-form">
+        <div class="form-group">
+          <label class="form-label">Block Name</label>
+          <input id="ab-name" type="text" class="form-input" required placeholder="e.g. N17">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date Planted</label>
+          <input id="ab-date" type="date" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="ab-status" class="form-select"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Remarks</label>
+          <input id="ab-remarks" type="text" class="form-input" placeholder="Optional">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sort Order</label>
+          <input id="ab-sort" type="number" class="form-input" required placeholder="e.g. 29">
+        </div>
+        <div class="form-group">
+          <button type="button" class="btn btn-primary" onclick="addBlock()">Add Block</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: MANAGE PRODUCTS -->
+  <div id="tab-products" class="tab-content">
+    <div class="card">
+      <div class="card-title">All Products</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Product Name</th><th>Type</th><th>Default Interval (days)</th>
+              <th>Active</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="products-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Add New Product</div>
+      <div class="add-form" id="add-product-form">
+        <div class="form-group">
+          <label class="form-label">Product Name</label>
+          <input id="ap-name" type="text" class="form-input" required placeholder="e.g. Metalaxyl">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Type</label>
+          <select id="ap-type" class="form-select">
+            <option value="fungicide">Fungicide</option>
+            <option value="pesticide">Pesticide</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Default Interval (days)</label>
+          <input id="ap-interval" type="number" class="form-input" placeholder="Leave blank for manual">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sort Order</label>
+          <input id="ap-sort" type="number" class="form-input" required placeholder="e.g. 5">
+        </div>
+        <div class="form-group">
+          <button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div id="notification" class="notification" style="display:none;"></div>
+
+<script>
+// ============================================================
+// SUPABASE CONNECTION
+// ============================================================
+const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// SESSION CHECK
+// ============================================================
+let currentUser = null;
+try {
+  const sess = sessionStorage.getItem("tgfarmhub_user");
+  if (sess) currentUser = JSON.parse(sess);
+} catch (e) {}
+
+// ============================================================
+// DATA
+// ============================================================
+let blocks = [];
+let products = [];
+let statuses = [];
+let recentLogs = [];
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener("DOMContentLoaded", async () => {
+  // Set default date
+  document.getElementById("f-date").value = todayStr();
+
+  // Pre-fill logged by
+  if (currentUser && currentUser.displayName) {
+    document.getElementById("f-logged-by").value = currentUser.displayName;
+  }
+
+  // Tab switching
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // Form submit
+  document.getElementById("spray-form").addEventListener("submit", handleSpraySubmit);
+
+  // Product change → auto-calculate next spray date
+  document.getElementById("f-product").addEventListener("change", calcNextDate);
+  document.getElementById("f-date").addEventListener("change", calcNextDate);
+
+  // Load all data
+  await loadAll();
+});
+
+async function loadAll() {
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadRecentLogs()]);
+  renderBlockDropdown();
+  renderProductDropdown();
+  renderRecentLogs();
+  renderBlocksTable();
+  renderProductsTable();
+  renderStatusDropdown("ab-status");
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadStatuses() {
+  const { data, error } = await sb.from("pnd_block_statuses").select("*").order("sort_order");
+  if (error) { console.error("Load statuses error:", error); return; }
+  statuses = data;
+}
+
+async function loadBlocks() {
+  const { data, error } = await sb.from("pnd_blocks").select("*").order("sort_order");
+  if (error) { console.error("Load blocks error:", error); return; }
+  blocks = data;
+}
+
+async function loadProducts() {
+  const { data, error } = await sb.from("pnd_products").select("*").order("sort_order");
+  if (error) { console.error("Load products error:", error); return; }
+  products = data;
+}
+
+async function loadRecentLogs() {
+  const { data, error } = await sb
+    .from("pnd_spray_logs")
+    .select("*, pnd_blocks(block_name), pnd_products(product_name)")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) { console.error("Load logs error:", error); return; }
+  recentLogs = data;
+}
+
+// ============================================================
+// RENDERING — TAB 1: LOG SPRAY
+// ============================================================
+function renderBlockDropdown() {
+  const sel = document.getElementById("f-block");
+  sel.innerHTML = '<option value="">— Select Block —</option>';
+  blocks.forEach(b => {
+    sel.innerHTML += `<option value="${b.id}">${esc(b.block_name)}</option>`;
+  });
+}
+
+function renderProductDropdown() {
+  const sel = document.getElementById("f-product");
+  sel.innerHTML = '<option value="">— Select Product —</option>';
+
+  const fungicides = products.filter(p => p.product_type === "fungicide");
+  const pesticides = products.filter(p => p.product_type === "pesticide");
+
+  if (fungicides.length) {
+    let og = '<optgroup label="Fungicides">';
+    fungicides.forEach(p => { og += `<option value="${p.id}">${esc(p.product_name)}</option>`; });
+    og += '</optgroup>';
+    sel.innerHTML += og;
+  }
+  if (pesticides.length) {
+    let og = '<optgroup label="Pesticides">';
+    pesticides.forEach(p => { og += `<option value="${p.id}">${esc(p.product_name)}</option>`; });
+    og += '</optgroup>';
+    sel.innerHTML += og;
+  }
+}
+
+function calcNextDate() {
+  const productId = document.getElementById("f-product").value;
+  const dateStr = document.getElementById("f-date").value;
+  const nextEl = document.getElementById("f-next-date");
+
+  if (!productId || !dateStr) { return; }
+
+  const product = products.find(p => p.id === productId);
+  if (product && product.default_interval_days) {
+    const d = new Date(dateStr);
+    d.setDate(d.getDate() + product.default_interval_days);
+    nextEl.value = formatDate(d);
+  } else {
+    nextEl.value = "";
+  }
+}
+
+function renderRecentLogs() {
+  const tbody = document.getElementById("recent-logs-body");
+  if (!recentLogs.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No spray logs yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = recentLogs.map(log => `<tr>
+    <td>${esc(log.pnd_blocks?.block_name || "—")}</td>
+    <td>${esc(log.pnd_products?.product_name || "—")}</td>
+    <td>${log.date_completed || "—"}</td>
+    <td>${log.next_spray_date || "—"}</td>
+    <td>${esc(log.logged_by || "—")}</td>
+    <td>${esc(log.notes || "")}</td>
+  </tr>`).join("");
+}
+
+async function handleSpraySubmit(e) {
+  e.preventDefault();
+
+  const blockId = document.getElementById("f-block").value;
+  const productId = document.getElementById("f-product").value;
+  const dateCompleted = document.getElementById("f-date").value;
+  const nextSprayDate = document.getElementById("f-next-date").value || null;
+  const notes = document.getElementById("f-notes").value.trim() || null;
+  const loggedBy = document.getElementById("f-logged-by").value.trim() || null;
+
+  if (!blockId || !productId || !dateCompleted) {
+    notify("Please fill in Block, Product, and Date Completed", "warning");
+    return;
+  }
+
+  const { error } = await sb.from("pnd_spray_logs").insert({
+    block_id: blockId,
+    product_id: productId,
+    date_completed: dateCompleted,
+    next_spray_date: nextSprayDate,
+    notes: notes,
+    logged_by: loggedBy,
+  });
+
+  if (error) {
+    console.error("Insert spray log error:", error);
+    notify("Error saving spray log: " + error.message, "error");
+    return;
+  }
+
+  notify("Spray log saved successfully");
+
+  // Reset form but keep block and product selected
+  document.getElementById("f-notes").value = "";
+  document.getElementById("f-date").value = todayStr();
+  calcNextDate();
+
+  // Refresh recent logs
+  await loadRecentLogs();
+  renderRecentLogs();
+}
+
+// ============================================================
+// RENDERING — TAB 2: MANAGE BLOCKS
+// ============================================================
+function renderBlocksTable() {
+  const tbody = document.getElementById("blocks-body");
+  tbody.innerHTML = blocks.map(b => {
+    const statusOpts = statuses.map(s =>
+      `<option value="${s.id}" ${s.id === b.status_id ? "selected" : ""}>${esc(s.status_name)}</option>`
+    ).join("");
+
+    return `<tr id="block-row-${b.id}">
+      <td><strong>${esc(b.block_name)}</strong></td>
+      <td>${b.date_planted || "—"}</td>
+      <td>
+        <select class="inline-select" onchange="updateBlock('${b.id}', 'status_id', this.value)">
+          <option value="">— None —</option>
+          ${statusOpts}
+        </select>
+      </td>
+      <td>
+        <input class="inline-input" value="${esc(b.remarks || "")}" placeholder="—"
+          onchange="updateBlock('${b.id}', 'remarks', this.value)" style="width:140px;">
+      </td>
+      <td>
+        <label class="toggle">
+          <input type="checkbox" ${b.is_active ? "checked" : ""}
+            onchange="updateBlock('${b.id}', 'is_active', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+      <td><span class="save-tick" id="tick-block-${b.id}">✓</span></td>
+    </tr>`;
+  }).join("");
+}
+
+async function updateBlock(id, field, value) {
+  const update = {};
+  update[field] = value === "" && field === "status_id" ? null : value;
+
+  const { error } = await sb.from("pnd_blocks").update(update).eq("id", id);
+  if (error) {
+    console.error("Update block error:", error);
+    notify("Error updating block: " + error.message, "error");
+    return;
+  }
+
+  // Update local data
+  const block = blocks.find(b => b.id === id);
+  if (block) block[field] = update[field];
+
+  showTick("tick-block-" + id);
+}
+
+async function addBlock() {
+  const name = document.getElementById("ab-name").value.trim();
+  const date = document.getElementById("ab-date").value || null;
+  const statusId = document.getElementById("ab-status").value || null;
+  const remarks = document.getElementById("ab-remarks").value.trim() || null;
+  const sortOrder = parseInt(document.getElementById("ab-sort").value);
+
+  if (!name || isNaN(sortOrder)) {
+    notify("Block Name and Sort Order are required", "warning");
+    return;
+  }
+
+  const { error } = await sb.from("pnd_blocks").insert({
+    block_name: name,
+    date_planted: date,
+    status_id: statusId,
+    remarks: remarks,
+    sort_order: sortOrder,
+  });
+
+  if (error) {
+    console.error("Insert block error:", error);
+    notify("Error adding block: " + error.message, "error");
+    return;
+  }
+
+  notify("Block added successfully");
+  document.getElementById("ab-name").value = "";
+  document.getElementById("ab-date").value = "";
+  document.getElementById("ab-remarks").value = "";
+  document.getElementById("ab-sort").value = "";
+
+  await loadBlocks();
+  renderBlocksTable();
+  renderBlockDropdown();
+}
+
+// ============================================================
+// RENDERING — TAB 3: MANAGE PRODUCTS
+// ============================================================
+function renderProductsTable() {
+  const tbody = document.getElementById("products-body");
+  tbody.innerHTML = products.map(p => `<tr id="prod-row-${p.id}">
+    <td>
+      <input class="inline-input" value="${esc(p.product_name)}" style="width:220px;"
+        onchange="updateProduct('${p.id}', 'product_name', this.value)">
+    </td>
+    <td>
+      <select class="inline-select" onchange="updateProduct('${p.id}', 'product_type', this.value)">
+        <option value="fungicide" ${p.product_type === "fungicide" ? "selected" : ""}>Fungicide</option>
+        <option value="pesticide" ${p.product_type === "pesticide" ? "selected" : ""}>Pesticide</option>
+      </select>
+    </td>
+    <td>
+      <input class="inline-input" type="number" value="${p.default_interval_days ?? ""}" style="width:80px;"
+        placeholder="—"
+        onchange="updateProduct('${p.id}', 'default_interval_days', this.value === '' ? null : parseInt(this.value))">
+    </td>
+    <td>
+      <label class="toggle">
+        <input type="checkbox" ${p.is_active ? "checked" : ""}
+          onchange="updateProduct('${p.id}', 'is_active', this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </td>
+    <td><span class="save-tick" id="tick-prod-${p.id}">✓</span></td>
+  </tr>`).join("");
+}
+
+async function updateProduct(id, field, value) {
+  const update = {};
+  update[field] = value;
+
+  const { error } = await sb.from("pnd_products").update(update).eq("id", id);
+  if (error) {
+    console.error("Update product error:", error);
+    notify("Error updating product: " + error.message, "error");
+    return;
+  }
+
+  // Update local data
+  const prod = products.find(p => p.id === id);
+  if (prod) prod[field] = value;
+
+  // If product name or type changed, refresh the Log Spray dropdown
+  if (field === "product_name" || field === "product_type") {
+    renderProductDropdown();
+  }
+
+  showTick("tick-prod-" + id);
+}
+
+async function addProduct() {
+  const name = document.getElementById("ap-name").value.trim();
+  const type = document.getElementById("ap-type").value;
+  const intervalStr = document.getElementById("ap-interval").value;
+  const interval = intervalStr === "" ? null : parseInt(intervalStr);
+  const sortOrder = parseInt(document.getElementById("ap-sort").value);
+
+  if (!name || !type || isNaN(sortOrder)) {
+    notify("Product Name, Type, and Sort Order are required", "warning");
+    return;
+  }
+
+  const { error } = await sb.from("pnd_products").insert({
+    product_name: name,
+    product_type: type,
+    default_interval_days: interval,
+    sort_order: sortOrder,
+  });
+
+  if (error) {
+    console.error("Insert product error:", error);
+    notify("Error adding product: " + error.message, "error");
+    return;
+  }
+
+  notify("Product added successfully");
+  document.getElementById("ap-name").value = "";
+  document.getElementById("ap-interval").value = "";
+  document.getElementById("ap-sort").value = "";
+
+  await loadProducts();
+  renderProductsTable();
+  renderProductDropdown();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function renderStatusDropdown(elId) {
+  const sel = document.getElementById(elId);
+  sel.innerHTML = '<option value="">— None —</option>';
+  statuses.forEach(s => {
+    sel.innerHTML += `<option value="${s.id}">${esc(s.status_name)}</option>`;
+  });
+}
+
+function showTick(tickId) {
+  const el = document.getElementById(tickId);
+  if (!el) return;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2000);
+}
+
+function notify(msg, type) {
+  const el = document.getElementById("notification");
+  el.className = "notification " + (type || "success");
+  el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><polyline points="20 6 9 17 4 12"/></svg>' + esc(msg);
+  el.style.display = "flex";
+  setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function formatDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function esc(str) {
+  if (!str) return "";
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
