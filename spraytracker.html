@@ -643,6 +643,18 @@ function showTick(id) { const el=document.getElementById(id); if(!el)return; el.
 
 function closeModal() { document.getElementById("modal-container").innerHTML=""; }
 
+// Valid status transitions — prevent re-completing
+function allowedTransitions(current) {
+  const map = {
+    'Planned': ['In Progress','Suspended','Completed'],
+    'In Progress': ['Planned','Partially Completed','Suspended','Completed'],
+    'Partially Completed': ['In Progress','Suspended','Completed'],
+    'Suspended': ['Planned','In Progress'],
+    'Completed': [] // terminal state
+  };
+  return map[current] || [];
+}
+
 // Validation helpers
 const VALID_ERR_STYLE = 'border:1.5px solid var(--red);background:rgba(232,96,96,0.08);';
 function clearFieldError(el) { if(el) { el.style.cssText = el.dataset.origStyle||''; delete el.dataset.origStyle; } }
@@ -659,7 +671,7 @@ function validateRequired(ids) {
     const el=document.getElementById(id); if(!el) return;
     attachClearOnInput(el);
     const v = el.tagName==='SELECT'? el.value : el.value.trim();
-    if(!v || v==='0') { markFieldError(el); if(!first) first=el; }
+    if(v==='' || v===undefined || v===null) { markFieldError(el); if(!first) first=el; }
     else clearFieldError(el);
   });
   if(first) { first.scrollIntoView({behavior:'smooth',block:'center'}); notify("Please fill in all required fields","warning"); }
@@ -862,7 +874,7 @@ async function viewSprayLog(jobId) {
 // NEW JOB MODAL
 // ============================================================
 function openNewJobModal() {
-  const blockOpts = blocks.map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
+  const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
   const fung = products.filter(p=>p.is_active&&p.product_type==="fungicide");
   const pest = products.filter(p=>p.is_active&&p.product_type==="pesticide");
   let prodOpts = '<option value="">— Select —</option>';
@@ -1149,12 +1161,9 @@ function openEditJobModal(jobId) {
             <label>Current Status</label>
             <div style="display:flex;align-items:center;gap:12px;">
               <span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span>
-              <select id="ej-new-status" style="flex:1;" onchange="ejStatusChange()">
+              <select id="ej-new-status" style="flex:1;" onchange="ejStatusChange('${j.id}')">
                 <option value="">— No Change —</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Suspended">Suspended</option>
-                <option value="Partially Completed">Partially Completed</option>
-                <option value="Completed">Completed</option>
+                ${allowedTransitions(j.status).map(s=>'<option value="'+s+'">'+esc(s)+'</option>').join('')}
               </select>
             </div>
           </div>
@@ -1173,19 +1182,36 @@ function openEditJobModal(jobId) {
   njAutoCalc('ej','S'); // initial calc on open
 }
 
-function ejStatusChange() {
+function calcNextSprayDate(compDate, productId) {
+  const p = getProduct(productId);
+  if(!p || !p.default_interval_days || !compDate) return '';
+  const d = new Date(compDate);
+  d.setDate(d.getDate() + p.default_interval_days);
+  return d.toISOString().split('T')[0];
+}
+
+function ejAutoNextDate(prefix, productId) {
+  const compDate = document.getElementById(prefix+"-comp-date")?.value;
+  const next = calcNextSprayDate(compDate, productId);
+  if(next) document.getElementById(prefix+"-next-date").value = next;
+}
+
+function ejStatusChange(jobId) {
   const st = document.getElementById("ej-new-status").value;
   const el = document.getElementById("ej-status-fields");
   if(!st) { el.innerHTML=""; return; }
+  const j = jobId ? jobs.find(x=>x.id===jobId) : null;
+  const prodId = j?.product_id || '';
+  const autoNext = calcNextSprayDate(todayStr(), prodId);
   let html = '<div class="status-fields">';
   if(st==="Suspended") {
     html += '<div class="form-field"><label>Suspension Reason</label><select id="ej-susp-reason" style="width:100%;"><option value="">— Select —</option><option value="Weather">Weather</option><option value="Machine Breakdown">Machine Breakdown</option><option value="Worker Unavailable">Worker Unavailable</option></select></div>';
   } else if(st==="Partially Completed") {
     html += '<div class="form-field"><label>Tanks Completed</label><input id="ej-tanks-done" type="number" min="0" style="width:100%;"></div>';
     html += '<div class="form-field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;"><input type="checkbox" id="ej-trigger-cd" onchange="ejToggleCountdown()"> Trigger spray countdown for this block?</label></div>';
-    html += '<div id="ej-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" style="width:100%;"></div></div></div>';
+    html += '<div id="ej-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
-    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" style="width:100%;"></div></div>';
+    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="ej-aw-tank-sel" style="width:100%;" onchange="ejAwTankChange()"><option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option></select></div><div class="form-field" id="ej-aw-tank-custom-wrap" style="margin:0;display:none;"><label style="font-size:10px;">Custom (L)</label><input id="ej-aw-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="ej-aw-tanks" type="number" step="any" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="ej-aw-total" type="number" step="any" style="width:100%;font-weight:700;" oninput="ejCalcActualProduct()"></div></div></div>';
     // Pre-fill from job values
     setTimeout(()=>{
@@ -1339,8 +1365,9 @@ function jlStatusStyle(s) {
 }
 
 function jlStatusSelect(j) {
-  const statuses = ["Planned","In Progress","Partially Completed","Suspended","Completed"];
-  const opts = statuses.map(s=>`<option value="${s}" ${s===j.status?"selected":""}>${s}</option>`).join("");
+  const allowed = allowedTransitions(j.status);
+  if(!allowed.length) return `<span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span>`;
+  const opts = [j.status, ...allowed].map(s=>`<option value="${s}" ${s===j.status?"selected":""}>${s}</option>`).join("");
   return `<select class="status-sel" style="${jlStatusStyle(j.status)}" data-orig="${esc(j.status)}" onchange="jlStatusChange(this,'${j.id}')">${opts}</select>`;
 }
 
@@ -1469,11 +1496,7 @@ function openEditStatusModal(jobId, prefilledStatus) {
           <label>New Status</label>
           <select id="es-new-status" style="width:100%;" onchange="esStatusChange('${j.id}')">
             <option value="">— Select —</option>
-            <option value="Planned">Planned</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Partially Completed">Partially Completed</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Completed">Completed</option>
+            ${allowedTransitions(j.status).map(s=>'<option value="'+s+'">'+esc(s)+'</option>').join('')}
           </select>
         </div>
         <div id="es-status-fields"></div>
@@ -1496,15 +1519,17 @@ function esStatusChange(jobId) {
   const el = document.getElementById("es-status-fields");
   if(!st) { el.innerHTML=""; return; }
   const j = jobs.find(x=>x.id===jobId);
+  const prodId = j?.product_id || '';
+  const autoNext = calcNextSprayDate(todayStr(), prodId);
   let html = '<div class="status-fields">';
   if(st==="Suspended") {
     html += '<div class="form-field"><label>Suspension Reason</label><select id="es-susp-reason" style="width:100%;"><option value="">— Select —</option><option value="Weather">Weather</option><option value="Machine Breakdown">Machine Breakdown</option><option value="Worker Unavailable">Worker Unavailable</option></select></div>';
   } else if(st==="Partially Completed") {
     html += '<div class="form-field"><label>Tanks Completed</label><input id="es-tanks-done" type="number" min="0" style="width:100%;"></div>';
     html += '<div class="form-field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;"><input type="checkbox" id="es-trigger-cd" onchange="document.getElementById(\'es-cd-fields\').style.display=this.checked?\'block\':\'none\'"> Trigger spray countdown?</label></div>';
-    html += '<div id="es-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" style="width:100%;"></div></div></div>';
+    html += '<div id="es-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
-    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" style="width:100%;"></div></div>';
+    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     html += '<div class="form-field"><label>Actual Product Used</label><input id="es-actual-product" type="number" step="any" value="'+(j?.total_product_required||'')+'" style="width:100%;"></div>';
   }
   html += '</div>';
@@ -1663,15 +1688,17 @@ async function confirmInterventionDecision() {
   const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
 
   if(opt === 1) {
-    // Keep Scheduled Date — log intervention separately, don't touch schedule
+    // Keep Scheduled Date — log intervention separately, preserve existing schedule
+    const ls = latestSprays.find(s=>s.block_id===j.block_id && s.product_id===j.product_id);
+    const existingNextDate = ls?.next_spray_date || null;
     updateObj.triggers_countdown = false;
     updateObj.next_spray_date = null;
     const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
     if(error) { notify("Error: "+error.message,"error"); return; }
-    // Manually insert spray log for intervention
+    // Manually insert spray log preserving existing next_spray_date
     await sb.from("pnd_spray_logs").insert({
       block_id: j.block_id, product_id: j.product_id,
-      date_completed: compDate, next_spray_date: null,
+      date_completed: compDate, next_spray_date: existingNextDate,
       notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
       logged_by: 'intervention:job:'+jobId
     });
