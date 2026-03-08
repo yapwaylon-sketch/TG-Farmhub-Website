@@ -88,9 +88,25 @@ table { width:100%; border-collapse:collapse; }
 th { text-align:left; padding:9px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-muted); background:#1E261E; border-bottom:1px solid var(--border); }
 td { padding:10px 14px; font-size:13px; border-bottom:1px solid var(--border); color:var(--text); }
 tr:last-child td { border-bottom:none; }
-th.product-group { text-align:center; color:var(--gold-light); font-size:11px; border-left:1px solid var(--border); }
+th.product-group { text-align:center; color:#F0D060; font-size:11px; font-weight:800; border-left:2px solid rgba(255,255,255,0.15); }
 th.product-sub { text-align:center; font-size:9px; border-left:1px solid var(--border); }
 td.spray-cell { text-align:center; font-size:12px; border-left:1px solid var(--border); }
+td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
+.sum-tab { padding:7px 16px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--bg-card); color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
+.sum-tab:hover { border-color:var(--green); color:var(--text); }
+.sum-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
+.jt-toggle { display:flex; gap:0; border-radius:8px; overflow:hidden; border:1px solid var(--border); }
+.jt-btn { flex:1; padding:8px 16px; font-size:12px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:var(--bg-input); color:var(--text-muted); transition:all 0.15s; text-align:center; }
+.jt-btn.active-sched { background:rgba(74,124,63,0.2); color:var(--green-light); }
+.jt-btn.active-intv { background:rgba(232,160,32,0.2); color:#E8A020; }
+.badge-sched { background:rgba(74,124,63,0.15); color:#6B9E5E; }
+.badge-intv { background:rgba(232,160,32,0.15); color:#E8A020; }
+.intv-card { border:1px solid var(--border); border-radius:10px; padding:16px; cursor:pointer; transition:all 0.15s; background:var(--bg-input); }
+.intv-card:hover { border-color:var(--green); background:rgba(74,124,63,0.05); }
+.intv-card.selected { border-color:var(--green); background:rgba(74,124,63,0.1); }
+.intv-card-icon { font-size:24px; margin-bottom:6px; }
+.intv-card-label { font-weight:700; font-size:13px; color:var(--white); margin-bottom:4px; }
+.intv-card-sub { font-size:11px; color:var(--text-muted); line-height:1.4; }
 
 /* BADGES */
 .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:700; }
@@ -295,6 +311,7 @@ textarea { resize:vertical; }
     <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Overview of all block spray statuses</div></div>
   </div>
   <div id="summary-cards" class="cards-grid"></div>
+  <div id="summary-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 0 0;"></div>
   <div class="data-table">
     <div class="table-header">Spray Status by Block</div>
     <div class="table-wrap"><div id="summary-table-wrap"></div></div>
@@ -332,7 +349,7 @@ textarea { resize:vertical; }
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Planned Date</th><th>Block</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
+          <th>Planned Date</th><th>Block</th><th>Type</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="jobs-body"></tbody>
       </table>
@@ -403,18 +420,18 @@ textarea { resize:vertical; }
   </div>
   <div class="data-table">
     <div class="table-toolbar" id="joblogs-toolbar">
-      <select id="jl-sort" onchange="renderJobLogs()" style="min-width:120px;">
+      <select id="jl-sort" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
         <option value="date">Sort: Date</option>
         <option value="block">Sort: Block</option>
         <option value="worker">Sort: Worker</option>
       </select>
-      <select id="jl-filter-block" onchange="renderJobLogs()" style="min-width:120px;">
+      <select id="jl-filter-block" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
         <option value="">All Blocks</option>
       </select>
-      <select id="jl-filter-worker" onchange="renderJobLogs()" style="min-width:120px;">
+      <select id="jl-filter-worker" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
         <option value="">All Workers</option>
       </select>
-      <select id="jl-filter-status" onchange="renderJobLogs()" style="min-width:140px;">
+      <select id="jl-filter-status" onchange="jlPage=0;renderJobLogs()" style="min-width:140px;">
         <option value="">All Statuses</option>
         <option value="Planned">Planned</option>
         <option value="In Progress">In Progress</option>
@@ -422,18 +439,31 @@ textarea { resize:vertical; }
         <option value="Suspended">Suspended</option>
         <option value="Completed">Completed</option>
       </select>
-      <input type="date" id="jl-from" onchange="renderJobLogs()" style="width:130px;">
-      <input type="date" id="jl-to" onchange="renderJobLogs()" style="width:130px;">
+      <select id="jl-filter-type" onchange="jlPage=0;renderJobLogs()" style="min-width:110px;">
+        <option value="">All Types</option>
+        <option value="Scheduled">Scheduled</option>
+        <option value="Intervention">Intervention</option>
+      </select>
+      <input type="date" id="jl-from" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
+      <input type="date" id="jl-to" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
       <button class="btn btn-outline btn-sm" onclick="clearJobLogFilters()">Clear Filters</button>
+      <div style="flex:1;"></div>
+      <span style="font-size:11px;color:var(--text-muted);">Rows:</span>
+      <select id="jl-pagesize" onchange="jlPageSize=parseInt(this.value);jlPage=0;renderJobLogs()" style="width:65px;padding:5px 8px;font-size:11px;">
+        <option value="50">50</option>
+        <option value="100" selected>100</option>
+        <option value="200">200</option>
+      </select>
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Planned</th><th>Completed</th><th>Block</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Actual Used</th><th>Status</th><th>Actions</th>
+          <th>Planned</th><th>Completed</th><th>Block</th><th>Type</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Actual Used</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="joblogs-body"></tbody>
       </table>
     </div>
+    <div id="jl-pagination" style="padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);"></div>
   </div>
 </div>
 
@@ -487,6 +517,7 @@ let currentPage = 'summary';
 let currentReport = null;
 let reportData = [];
 let refreshTimer = null;
+let jlPage = 0, jlPageSize = 100, jlTotalCount = 0;
 
 // ============================================================
 // INIT
@@ -537,7 +568,7 @@ function navigateTo(page) {
 async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs()]); renderSummary(); }
   else if(currentPage === 'jobs') { await loadJobs(); populateJobFilters(); renderJobsTable(); }
-  else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); renderJobLogs(); }
+  else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
   else if(currentPage === 'blocks') renderBlocksPage();
   else if(currentPage === 'products') renderProductsPage();
   else if(currentPage === 'reports') initReports();
@@ -638,6 +669,9 @@ function validateRequired(ids) {
 // ============================================================
 // SUMMARY PAGE
 // ============================================================
+let summaryTab = 0;
+const PRODUCTS_PER_TAB = 2;
+
 function renderSummary() {
   const activeBlocks = blocks.filter(b=>b.is_active);
   const activeProducts = products.filter(p=>p.is_active);
@@ -663,34 +697,79 @@ function renderSummary() {
     <div class="summary-card" style="background:rgba(232,160,32,0.08);border-color:rgba(232,160,32,0.3);"><div class="sc-label">Due This Week</div><div class="sc-value" style="color:var(--gold);">${dueSoon}</div><div class="sc-sub">Within 7 days</div></div>
     <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>`;
 
-  // Build spray table
-  let html = '<table><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;">Block</th><th rowspan="2">Status</th><th rowspan="2">Age</th>';
-  activeProducts.forEach(p => { html += `<th colspan="4" class="product-group">${esc(p.product_name)}</th>`; });
+  // Build product tabs (2 products per tab)
+  const totalTabs = Math.ceil(activeProducts.length / PRODUCTS_PER_TAB);
+  if(summaryTab >= totalTabs) summaryTab = 0;
+  let tabsHtml = '';
+  for(let t=0; t<totalTabs; t++) {
+    const tabProds = activeProducts.slice(t*PRODUCTS_PER_TAB, (t+1)*PRODUCTS_PER_TAB);
+    const label = tabProds.map(p => esc(p.product_name.split('(')[0].trim())).join(' + ');
+    tabsHtml += `<button class="sum-tab${t===summaryTab?' active':''}" onclick="summaryTab=${t};renderSummaryTable()">${label}</button>`;
+  }
+  document.getElementById("summary-tabs").innerHTML = tabsHtml;
+
+  renderSummaryTable();
+}
+
+function renderSummaryTable() {
+  const activeBlocks = blocks.filter(b=>b.is_active);
+  const activeProducts = products.filter(p=>p.is_active);
+  const today = todayStr();
+  const map = {};
+  latestSprays.forEach(ls => { map[ls.block_id+"_"+ls.product_id] = ls; });
+
+  // Build active jobs lookup map
+  const activeJobStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
+  const ajMap = {};
+  jobs.filter(j=>activeJobStatuses.includes(j.status)).forEach(j => {
+    const key = j.block_id+"_"+j.product_id;
+    if(!ajMap[key]) ajMap[key] = [];
+    ajMap[key].push(j);
+  });
+
+  // Get products for current tab
+  const tabProducts = activeProducts.slice(summaryTab*PRODUCTS_PER_TAB, (summaryTab+1)*PRODUCTS_PER_TAB);
+  const prodTints = ['rgba(74,124,63,0.04)', 'rgba(232,160,32,0.04)'];
+
+  // Update active tab styling
+  document.querySelectorAll('.sum-tab').forEach((btn,i) => btn.classList.toggle('active', i===summaryTab));
+
+  let html = '<table><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th><th rowspan="2" style="min-width:70px;">Status</th><th rowspan="2" style="min-width:50px;">Age</th>';
+  tabProducts.forEach(p => { html += `<th colspan="4" class="product-group">${esc(p.product_name)}</th>`; });
   html += '</tr><tr>';
-  activeProducts.forEach(() => { html += '<th class="product-sub">Last</th><th class="product-sub">Since</th><th class="product-sub">Next</th><th class="product-sub">Left</th>'; });
+  tabProducts.forEach(() => { html += '<th class="product-sub">Last</th><th class="product-sub">Elapsed</th><th class="product-sub">Next</th><th class="product-sub">Due In (Days)</th>'; });
   html += '</tr></thead><tbody>';
 
   activeBlocks.forEach(b => {
     html += `<tr><td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
     html += `<td style="font-size:11px;">${esc(getStatusName(b.status_id))}</td>`;
     html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b.date_planted)}</td>`;
-    activeProducts.forEach(p => {
+    tabProducts.forEach((p, pi) => {
       const ls = map[b.id+"_"+p.id];
-      let bg="", textStyle="";
+      const tint = prodTints[pi] || '';
+      const divCls = pi===0 ? ' pg-divider' : '';
+      // Active job indicators
+      const cellJobs = ajMap[b.id+"_"+p.id] || [];
+      let jobIcons = '';
+      const schedJob = cellJobs.find(j=>j.job_type==='Scheduled');
+      const intvJob = cellJobs.find(j=>j.job_type==='Intervention');
+      if(schedJob) jobIcons += `<span title="Scheduled job active — Worker: ${esc(schedJob.worker_name)}, Planned: ${fmtDateDMY(schedJob.planned_date)}, Status: ${esc(schedJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">🔧</span>`;
+      if(intvJob) jobIcons += `<span title="Intervention job active — Worker: ${esc(intvJob.worker_name)}, Planned: ${fmtDateDMY(intvJob.planned_date)}, Status: ${esc(intvJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">⚡</span>`;
+
       if(!ls || !ls.next_spray_date) {
-        textStyle = "color:var(--text-dim);";
-        html += `<td class="spray-cell" style="${textStyle}">—</td><td class="spray-cell" style="${textStyle}">—</td><td class="spray-cell" style="${textStyle}">—</td><td class="spray-cell" style="${textStyle}">—</td>`;
+        const s = "color:var(--text-dim);" + (tint?"background:"+tint+";":"");
+        html += `<td class="spray-cell${divCls}" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—${jobIcons}</td>`;
       } else {
         const ds = daysDiff(ls.date_completed, today);
         const dl = daysDiff(today, ls.next_spray_date);
+        let bg = tint ? "background:"+tint+";" : "";
         if(dl<0) bg="background:rgba(232,96,96,0.15);";
         else if(dl<=7) bg="background:rgba(232,160,32,0.15);";
-        else bg="background:rgba(74,124,63,0.15);";
         const dlColor = dl<0?"color:var(--red);font-weight:700;":dl<=7?"color:var(--gold);font-weight:700;":"color:var(--green-light);";
-        html += `<td class="spray-cell" style="${bg}">${fmtDateDMY(ls.date_completed)}</td>`;
+        html += `<td class="spray-cell${divCls}" style="${bg}">${fmtDateDMY(ls.date_completed)}</td>`;
         html += `<td class="spray-cell" style="${bg}">${ds!=null?ds:"—"}</td>`;
         html += `<td class="spray-cell" style="${bg}">${fmtDateDMY(ls.next_spray_date)}</td>`;
-        html += `<td class="spray-cell" style="${bg}${dlColor}">${dl!=null?dl:"—"}</td>`;
+        html += `<td class="spray-cell" style="${bg}${dlColor}">${dl!=null?dl:"—"}${jobIcons}</td>`;
       }
     });
     html += '</tr>';
@@ -729,7 +808,7 @@ function renderJobsTable() {
 
   const tbody = document.getElementById("jobs-body");
   if(!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No active jobs. Create a new job to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No active jobs. Create a new job to get started.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(j => {
@@ -741,9 +820,11 @@ function renderJobsTable() {
     if(j.status==="Completed") {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
     }
+    const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
     return `<tr>
       <td>${fmtDateDMY(j.planned_date)}</td>
       <td style="font-weight:600;">${esc(bname)}</td>
+      <td>${typeBadge}</td>
       <td>${esc(pname)}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
@@ -758,7 +839,7 @@ function renderJobsTable() {
 async function viewSprayLog(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
-  const {data} = await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("logged_by","auto:job:"+jobId);
+  const {data} = await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").or("logged_by.eq.auto:job:"+jobId+",logged_by.eq.intervention:job:"+jobId);
   if(!data||!data.length) { notify("No auto-logged spray entry found for this job","warning"); return; }
   const log = data[0];
   const b = log.pnd_blocks?.block_name||"?";
@@ -793,10 +874,20 @@ function openNewJobModal() {
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
       <div class="modal-box" style="max-width:560px;">
         <div class="modal-header"><div class="modal-title">New Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <div class="form-row">
-          <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;" onchange="njFetchDose()"><option value="">— Select —</option>${blockOpts}</select></div>
-          <div class="form-field"><label>Product</label><select id="nj-product" style="width:100%;" onchange="njFetchDose()">${prodOpts}</select></div>
+        <div class="form-field">
+          <label>Job Type</label>
+          <div class="jt-toggle">
+            <button type="button" class="jt-btn active-sched" id="nj-jt-sched" onclick="njSetJobType('Scheduled')">Scheduled</button>
+            <button type="button" class="jt-btn" id="nj-jt-intv" onclick="njSetJobType('Intervention')">Intervention</button>
+          </div>
+          <input type="hidden" id="nj-job-type" value="Scheduled">
+          <div id="nj-intv-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);font-size:11px;color:#E8A020;line-height:1.4;">Intervention jobs are unscheduled emergency sprays. They log the application but handle the spray countdown separately on completion.</div>
         </div>
+        <div class="form-row">
+          <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;" onchange="njFetchDose();njCheckDuplicate()"><option value="">— Select —</option>${blockOpts}</select></div>
+          <div class="form-field"><label>Product</label><select id="nj-product" style="width:100%;" onchange="njFetchDose();njCheckDuplicate()">${prodOpts}</select></div>
+        </div>
+        <div id="nj-dup-warning" style="display:none;"></div>
         <div class="form-row">
           <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
           <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
@@ -821,7 +912,7 @@ function openNewJobModal() {
         <div class="form-field"><label>Logged By</label><input id="nj-logged" value="${esc(currentUser?.displayName||"")}" style="width:100%;"></div>
         <div class="modal-actions">
           <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="submitNewJob()">Create Job</button>
+          <button class="btn btn-primary" id="nj-create-btn" onclick="submitNewJob()">Create Job</button>
         </div>
       </div>
     </div>`;
@@ -936,6 +1027,53 @@ function njFetchDose() {
   njAutoCalc('nj','S');
 }
 
+function njSetJobType(type) {
+  document.getElementById("nj-job-type").value = type;
+  const sBtn = document.getElementById("nj-jt-sched");
+  const iBtn = document.getElementById("nj-jt-intv");
+  sBtn.className = 'jt-btn' + (type==='Scheduled'?' active-sched':'');
+  iBtn.className = 'jt-btn' + (type==='Intervention'?' active-intv':'');
+  document.getElementById("nj-intv-info").style.display = type==='Intervention'?'block':'none';
+  njCheckDuplicate();
+}
+
+function njCheckDuplicate() {
+  const blockId = document.getElementById("nj-block")?.value;
+  const productId = document.getElementById("nj-product")?.value;
+  const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
+  const warnEl = document.getElementById("nj-dup-warning");
+  const createBtn = document.getElementById("nj-create-btn");
+  if(!warnEl || !createBtn) return;
+
+  if(!blockId || !productId) {
+    warnEl.style.display = 'none';
+    createBtn.disabled = false;
+    return;
+  }
+
+  const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
+  const existing = jobs.find(j => j.block_id===blockId && j.product_id===productId && activeStatuses.includes(j.status));
+
+  if(!existing) {
+    warnEl.style.display = 'none';
+    createBtn.disabled = false;
+    return;
+  }
+
+  const bName = getBlock(blockId)?.block_name || '?';
+  const pName = getProduct(productId)?.product_name || '?';
+
+  if(jobType === 'Scheduled') {
+    warnEl.style.display = 'block';
+    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,96,96,0.1);border:1px solid rgba(232,96,96,0.3);font-size:12px;color:var(--red);line-height:1.5;">⚠️ An active job already exists for <b>${esc(bName)}</b> — <b>${esc(pName)}</b> (Status: ${esc(existing.status)}). Please complete or delete the existing job before creating a new scheduled job.</div>`;
+    createBtn.disabled = true;
+  } else {
+    warnEl.style.display = 'block';
+    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);font-size:12px;color:#E8A020;line-height:1.5;">ℹ️ A scheduled job exists for <b>${esc(bName)}</b> — <b>${esc(pName)}</b> (Status: ${esc(existing.status)}). This intervention will be logged separately.</div>`;
+    createBtn.disabled = false;
+  }
+}
+
 async function submitNewJob() {
   const blockId=document.getElementById("nj-block").value;
   const productId=document.getElementById("nj-product").value;
@@ -954,10 +1092,11 @@ async function submitNewJob() {
   const reqFields = ["nj-block","nj-product","nj-worker","nj-date",njTankValId,"nj-tanks","nj-dose-amt","nj-dose-per"];
   if(!validateRequired(reqFields)) return;
 
+  const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
   const {error} = await sb.from("pnd_jobs").insert({
     block_id:blockId, product_id:productId, worker_name:worker, planned_date:date,
     tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:doseAmt, dose_unit:doseUnit,
-    dose_per_litres:dosePer, notes, logged_by:logged
+    dose_per_litres:dosePer, notes, logged_by:logged, job_type:jobType
   });
   if(error) { notify("Error creating job: "+error.message,"error"); return; }
   notify("Job created successfully");
@@ -1098,7 +1237,8 @@ async function submitEditJob(jobId) {
   // Add status-specific required fields
   const newStatus = document.getElementById("ej-new-status").value;
   if(newStatus==="Suspended") baseReq.push("ej-susp-reason");
-  if(newStatus==="Completed") baseReq.push("ej-comp-date","ej-next-date");
+  if(newStatus==="Completed" && j.job_type!=='Intervention') baseReq.push("ej-comp-date","ej-next-date");
+  if(newStatus==="Completed" && j.job_type==='Intervention') baseReq.push("ej-comp-date");
   if(newStatus==="Partially Completed" && document.getElementById("ej-trigger-cd")?.checked) baseReq.push("ej-comp-date","ej-next-date");
 
   if(!validateRequired(baseReq)) return;
@@ -1139,6 +1279,12 @@ async function submitEditJob(jobId) {
     }
   }
 
+  // Intercept intervention completion — show decision prompt
+  if(newStatus==="Completed" && j.job_type==='Intervention') {
+    showInterventionDecision(jobId, update);
+    return;
+  }
+
   const {error} = await sb.from("pnd_jobs").update(update).eq("id", jobId);
   if(error) { notify("Error saving: "+error.message,"error"); return; }
   notify("Job updated successfully");
@@ -1174,8 +1320,10 @@ function clearJobLogFilters() {
   document.getElementById("jl-filter-block").value = "";
   document.getElementById("jl-filter-worker").value = "";
   document.getElementById("jl-filter-status").value = "";
+  document.getElementById("jl-filter-type").value = "";
   document.getElementById("jl-from").value = "";
   document.getElementById("jl-to").value = "";
+  jlPage = 0;
   renderJobLogs();
 }
 
@@ -1218,39 +1366,58 @@ async function jlStatusChange(sel, jobId) {
   sel.style.cssText = jlStatusStyle(origStatus);
 }
 
-function renderJobLogs() {
+async function renderJobLogs() {
   const sortBy = document.getElementById("jl-sort")?.value || "date";
   const blockF = document.getElementById("jl-filter-block")?.value || "";
   const workerF = document.getElementById("jl-filter-worker")?.value || "";
   const statusF = document.getElementById("jl-filter-status")?.value || "";
+  const typeF = document.getElementById("jl-filter-type")?.value || "";
   const fromF = document.getElementById("jl-from")?.value || "";
   const toF = document.getElementById("jl-to")?.value || "";
 
-  let filtered = jobs.filter(j => {
-    if(blockF && j.block_id !== blockF) return false;
-    if(workerF && j.worker_name !== workerF) return false;
-    if(statusF && j.status !== statusF) return false;
-    if(fromF && j.planned_date < fromF) return false;
-    if(toF && j.planned_date > toF) return false;
-    return true;
-  });
+  // Build server-side query
+  let query = sb.from("pnd_jobs").select("*", {count:"exact"});
+  if(blockF) query = query.eq("block_id", blockF);
+  if(workerF) query = query.eq("worker_name", workerF);
+  if(statusF) query = query.eq("status", statusF);
+  if(typeF) query = query.eq("job_type", typeF);
+  if(fromF) query = query.gte("planned_date", fromF);
+  if(toF) query = query.lte("planned_date", toF);
 
-  if(sortBy === "date") filtered.sort((a,b) => (b.planned_date||"").localeCompare(a.planned_date||""));
-  else if(sortBy === "block") filtered.sort((a,b) => { const an=getBlock(a.block_id)?.block_name||""; const bn=getBlock(b.block_id)?.block_name||""; return an.localeCompare(bn); });
-  else if(sortBy === "worker") filtered.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+  // Server-side sorting
+  if(sortBy === "date") query = query.order("planned_date", {ascending:false});
+  else if(sortBy === "worker") query = query.order("worker_name", {ascending:true});
+  else query = query.order("planned_date", {ascending:false});
+
+  // Pagination
+  const from = jlPage * jlPageSize;
+  const to = from + jlPageSize - 1;
+  query = query.range(from, to);
+
+  const {data, count, error} = await query;
+  if(error) { console.error("Job logs query error:", error); return; }
+  jlTotalCount = count || 0;
 
   const tbody = document.getElementById("joblogs-body");
-  if(!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No job logs found. Adjust your filters or create a new job.</td></tr>';
+  if(!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No job logs found. Adjust your filters or create a new job.</td></tr>';
+    renderJlPagination();
     return;
   }
-  tbody.innerHTML = filtered.map(j => {
+
+  // For block sort, we need client-side re-sort since block_name is in a separate table
+  let rows = data;
+  if(sortBy === "block") rows.sort((a,b) => { const an=getBlock(a.block_id)?.block_name||""; const bn=getBlock(b.block_id)?.block_name||""; return an.localeCompare(bn); });
+
+  tbody.innerHTML = rows.map(j => {
     const b = getBlock(j.block_id);
     const p = getProduct(j.product_id);
+    const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
     return `<tr>
       <td>${fmtDateDMY(j.planned_date)}</td>
       <td>${fmtDateDMY(j.completion_date)}</td>
       <td style="font-weight:600;">${esc(b?.block_name)}</td>
+      <td>${typeBadge}</td>
       <td>${esc(p?.product_name)}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
@@ -1261,6 +1428,24 @@ function renderJobLogs() {
       <td><button class="btn btn-outline btn-sm" onclick="openEditStatusModal('${j.id}')">Edit Status</button></td>
     </tr>`;
   }).join("");
+  renderJlPagination();
+}
+
+function renderJlPagination() {
+  const el = document.getElementById("jl-pagination");
+  const totalPages = Math.max(1, Math.ceil(jlTotalCount / jlPageSize));
+  if(jlTotalCount <= jlPageSize) { el.innerHTML = `<span>${jlTotalCount} rows</span>`; return; }
+  let html = `<button class="btn btn-outline btn-sm" onclick="jlGoPage(0)" ${jlPage===0?'disabled':''}>«</button>`;
+  html += `<button class="btn btn-outline btn-sm" onclick="jlGoPage(${jlPage-1})" ${jlPage===0?'disabled':''}>‹</button>`;
+  html += `<span>Page ${jlPage+1} of ${totalPages} (${jlTotalCount} rows)</span>`;
+  html += `<button class="btn btn-outline btn-sm" onclick="jlGoPage(${jlPage+1})" ${jlPage>=totalPages-1?'disabled':''}>›</button>`;
+  html += `<button class="btn btn-outline btn-sm" onclick="jlGoPage(${totalPages-1})" ${jlPage>=totalPages-1?'disabled':''}>»</button>`;
+  el.innerHTML = html;
+}
+
+async function jlGoPage(p) {
+  jlPage = Math.max(0, p);
+  await renderJobLogs();
 }
 
 function openEditStatusModal(jobId, prefilledStatus) {
@@ -1335,7 +1520,8 @@ async function submitEditStatus(jobId) {
   // Validate status-specific fields
   const reqFields = [];
   if(newStatus==="Suspended") reqFields.push("es-susp-reason");
-  if(newStatus==="Completed") reqFields.push("es-comp-date","es-next-date");
+  if(newStatus==="Completed" && j.job_type!=='Intervention') reqFields.push("es-comp-date","es-next-date");
+  if(newStatus==="Completed" && j.job_type==='Intervention') reqFields.push("es-comp-date");
   if(newStatus==="Partially Completed" && document.getElementById("es-trigger-cd")?.checked) reqFields.push("es-comp-date","es-next-date");
   if(reqFields.length && !validateRequired(reqFields)) return;
 
@@ -1364,6 +1550,12 @@ async function submitEditStatus(jobId) {
     willTriggerLog = true;
   }
 
+  // Intercept intervention completion — show decision prompt
+  if(newStatus==="Completed" && j.job_type==='Intervention') {
+    showInterventionDecision(jobId, update);
+    return;
+  }
+
   const {error} = await sb.from("pnd_jobs").update(update).eq("id", jobId);
   if(error) { notify("Error saving: "+error.message,"error"); return; }
   notify("Status updated successfully");
@@ -1375,6 +1567,159 @@ async function submitEditStatus(jobId) {
   await Promise.all([loadJobs(), loadLatestSprays()]);
   if(currentPage==='joblogs') renderJobLogs();
   if(currentPage==='jobs') renderJobsTable();
+}
+
+// ============================================================
+// INTERVENTION COMPLETION DECISION PROMPT
+// ============================================================
+async function showInterventionDecision(jobId, updateObj, afterSaveCb) {
+  const j = jobs.find(x=>x.id===jobId);
+  if(!j) return;
+  const b = getBlock(j.block_id), p = getProduct(j.product_id);
+  const bName = b?.block_name||'?', pName = p?.product_name||'?';
+
+  // Get latest spray info for context
+  const ls = latestSprays.find(s=>s.block_id===j.block_id && s.product_id===j.product_id);
+  const lastDate = ls?.date_completed ? fmtDateDMY(ls.date_completed) : 'No data';
+  const nextDate = ls?.next_spray_date ? fmtDateDMY(ls.next_spray_date) : 'Not set';
+  const today = todayStr();
+  let daysAway = '—';
+  if(ls?.next_spray_date) {
+    const d = daysDiff(today, ls.next_spray_date);
+    daysAway = d<0 ? Math.abs(d)+' days overdue' : d+' days';
+  }
+
+  const intervalDays = p?.default_interval_days;
+  const compDate = updateObj.completion_date || todayStr();
+
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)cancelInterventionDecision()">
+      <div class="modal-box" style="max-width:520px;">
+        <div class="modal-header"><div class="modal-title">Intervention Complete — What's Next?</div><button class="modal-close" onclick="cancelInterventionDecision()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div style="font-weight:600;font-size:14px;color:var(--white);margin-bottom:12px;">${esc(bName)} — ${esc(pName)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+          Last scheduled spray: <b>${lastDate}</b><br>
+          Next scheduled spray: <b>${nextDate}</b><br>
+          Days away: <b>${daysAway}</b>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+          <div class="intv-card" onclick="intvSelectOption(1,this)" data-opt="1">
+            <div class="intv-card-icon">📅</div>
+            <div class="intv-card-label">Keep Scheduled Date</div>
+            <div class="intv-card-sub">This intervention is additional. The existing spray schedule stays unchanged.</div>
+          </div>
+          <div class="intv-card" onclick="intvSelectOption(2,this)" data-opt="2">
+            <div class="intv-card-icon">🔄</div>
+            <div class="intv-card-label">Reset Schedule from Today</div>
+            <div class="intv-card-sub">This intervention replaces the scheduled spray. Next spray recalculated from completion date${intervalDays?' (+'+intervalDays+' days)':''}.</div>
+          </div>
+          <div class="intv-card" onclick="intvSelectOption(3,this)" data-opt="3">
+            <div class="intv-card-icon">✏️</div>
+            <div class="intv-card-label">Set Next Spray Date Manually</div>
+            <div class="intv-card-sub">Pick the next spray date yourself.</div>
+          </div>
+        </div>
+        <div id="intv-manual-date" style="display:none;margin-bottom:16px;">
+          <div class="form-field"><label>Next Spray Date</label><input type="date" id="intv-manual-input" style="width:100%;"></div>
+        </div>
+        <div class="modal-actions" style="justify-content:space-between;">
+          <button class="btn btn-outline" onclick="cancelInterventionDecision()">Cancel</button>
+          <button class="btn btn-primary" id="intv-confirm-btn" disabled onclick="confirmInterventionDecision()">Confirm</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Store context for confirm handler
+  window._intvCtx = { jobId, updateObj, afterSaveCb, compDate, intervalDays };
+  window._intvOption = null;
+}
+
+function intvSelectOption(opt, el) {
+  document.querySelectorAll('.intv-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  window._intvOption = opt;
+  document.getElementById("intv-confirm-btn").disabled = false;
+  document.getElementById("intv-manual-date").style.display = opt===3?'block':'none';
+}
+
+function cancelInterventionDecision() {
+  window._intvCtx = null;
+  window._intvOption = null;
+  closeModal();
+  // Refresh to revert any dropdown changes
+  if(currentPage==='joblogs') renderJobLogs();
+  if(currentPage==='jobs') renderJobsTable();
+}
+
+async function confirmInterventionDecision() {
+  const ctx = window._intvCtx;
+  const opt = window._intvOption;
+  if(!ctx || !opt) return;
+
+  const { jobId, updateObj, compDate, intervalDays } = ctx;
+  const j = jobs.find(x=>x.id===jobId);
+  if(!j) return;
+
+  const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
+
+  if(opt === 1) {
+    // Keep Scheduled Date — log intervention separately, don't touch schedule
+    updateObj.triggers_countdown = false;
+    updateObj.next_spray_date = null;
+    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
+    if(error) { notify("Error: "+error.message,"error"); return; }
+    // Manually insert spray log for intervention
+    await sb.from("pnd_spray_logs").insert({
+      block_id: j.block_id, product_id: j.product_id,
+      date_completed: compDate, next_spray_date: null,
+      notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
+      logged_by: 'intervention:job:'+jobId
+    });
+    closeModal();
+    notify("Intervention logged. Schedule unchanged.");
+  } else if(opt === 2) {
+    // Reset from completion date
+    let newNextDate = null;
+    if(intervalDays && compDate) {
+      const d = new Date(compDate);
+      d.setDate(d.getDate() + intervalDays);
+      newNextDate = d.toISOString().split('T')[0];
+    }
+    updateObj.next_spray_date = newNextDate;
+    updateObj.triggers_countdown = true;
+    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
+    if(error) { notify("Error: "+error.message,"error"); return; }
+    // Update existing scheduled active job's planned_date if any
+    const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
+    if(existingSched && newNextDate) {
+      await sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id);
+    }
+    closeModal();
+    notify("Schedule reset. Next spray: "+(newNextDate?fmtDateDMY(newNextDate):'Not set'));
+  } else if(opt === 3) {
+    // Manual date
+    const manualDate = document.getElementById("intv-manual-input")?.value;
+    if(!manualDate) { notify("Please pick a date","warning"); return; }
+    updateObj.next_spray_date = manualDate;
+    updateObj.triggers_countdown = true;
+    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
+    if(error) { notify("Error: "+error.message,"error"); return; }
+    // Update existing scheduled active job's planned_date if any
+    const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
+    if(existingSched) {
+      await sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id);
+    }
+    closeModal();
+    notify("Schedule updated. Next spray: "+fmtDateDMY(manualDate));
+  }
+
+  window._intvCtx = null;
+  window._intvOption = null;
+  await Promise.all([loadJobs(), loadLatestSprays()]);
+  if(ctx.afterSaveCb) ctx.afterSaveCb();
+  if(currentPage==='joblogs') renderJobLogs();
+  if(currentPage==='jobs') renderJobsTable();
+  if(currentPage==='summary') renderSummary();
 }
 
 function confirmDeleteJob(jobId) {
