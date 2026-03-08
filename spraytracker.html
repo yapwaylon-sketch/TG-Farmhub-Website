@@ -421,8 +421,8 @@ textarea { resize:vertical; }
   <div class="data-table">
     <div class="table-toolbar" id="joblogs-toolbar">
       <select id="jl-sort" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
-        <option value="date">Sort: Date</option>
-        <option value="block">Sort: Block</option>
+        <option value="date">Sort: Date (Newest)</option>
+        <option value="date_asc">Sort: Date (Oldest)</option>
         <option value="worker">Sort: Worker</option>
       </select>
       <select id="jl-filter-block" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
@@ -577,33 +577,44 @@ async function renderCurrentPage() {
 // ============================================================
 // DATA LOADING
 // ============================================================
+let _loadErrors = 0;
+function _handleLoad(label, data, error, target) {
+  if(error) {
+    _loadErrors++;
+    console.error(`Load ${label} failed:`, error.message);
+    if(_loadErrors <= 2) notify(`Failed to load ${label}. Check connection.`, "error", 4000);
+    return;
+  }
+  _loadErrors = 0;
+  return data;
+}
 async function loadStatuses() {
-  const {data} = await sb.from("pnd_block_statuses").select("*").order("sort_order");
-  if(data) statuses = data;
+  const {data, error} = await sb.from("pnd_block_statuses").select("*").order("sort_order");
+  const r = _handleLoad("statuses", data, error); if(r) statuses = r;
 }
 async function loadBlocks() {
-  const {data} = await sb.from("pnd_blocks").select("*").order("sort_order");
-  if(data) blocks = data;
+  const {data, error} = await sb.from("pnd_blocks").select("*").order("sort_order");
+  const r = _handleLoad("blocks", data, error); if(r) blocks = r;
 }
 async function loadProducts() {
-  const {data} = await sb.from("pnd_products").select("*").order("sort_order");
-  if(data) products = data;
+  const {data, error} = await sb.from("pnd_products").select("*").order("sort_order");
+  const r = _handleLoad("products", data, error); if(r) products = r;
 }
 async function loadWorkers() {
-  const {data} = await sb.from("workers").select("id,name").eq("active", true).order("name");
-  if(data) workers = data;
+  const {data, error} = await sb.from("workers").select("id,name").eq("active", true).order("name");
+  const r = _handleLoad("workers", data, error); if(r) workers = r;
 }
 async function loadJobs() {
-  const {data} = await sb.from("pnd_jobs").select("*").order("planned_date", {ascending:true});
-  if(data) jobs = data;
+  const {data, error} = await sb.from("pnd_jobs").select("*").order("planned_date", {ascending:true});
+  const r = _handleLoad("jobs", data, error); if(r) jobs = r;
 }
 async function loadOverrides() {
-  const {data} = await sb.from("pnd_block_product_overrides").select("*");
-  if(data) overrides = data;
+  const {data, error} = await sb.from("pnd_block_product_overrides").select("*");
+  const r = _handleLoad("overrides", data, error); if(r) overrides = r;
 }
 async function loadLatestSprays() {
-  const {data} = await sb.from("pnd_latest_sprays").select("*");
-  if(data) latestSprays = data;
+  const {data, error} = await sb.from("pnd_latest_sprays").select("*");
+  const r = _handleLoad("spray data", data, error); if(r) latestSprays = r;
 }
 
 // ============================================================
@@ -1412,7 +1423,7 @@ async function renderJobLogs() {
   if(toF) query = query.lte("planned_date", toF);
 
   // Server-side sorting
-  if(sortBy === "date") query = query.order("planned_date", {ascending:false});
+  if(sortBy === "date_asc") query = query.order("planned_date", {ascending:true});
   else if(sortBy === "worker") query = query.order("worker_name", {ascending:true});
   else query = query.order("planned_date", {ascending:false});
 
@@ -1432,11 +1443,7 @@ async function renderJobLogs() {
     return;
   }
 
-  // For block sort, we need client-side re-sort since block_name is in a separate table
-  let rows = data;
-  if(sortBy === "block") rows.sort((a,b) => { const an=getBlock(a.block_id)?.block_name||""; const bn=getBlock(b.block_id)?.block_name||""; return an.localeCompare(bn); });
-
-  tbody.innerHTML = rows.map(j => {
+  tbody.innerHTML = data.map(j => {
     const b = getBlock(j.block_id);
     const p = getProduct(j.product_id);
     const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
