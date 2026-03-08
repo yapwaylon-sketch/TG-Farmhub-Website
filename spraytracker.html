@@ -548,7 +548,7 @@ async function syncAll() {
 function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
-    await Promise.all([loadLatestSprays(), loadJobs()]);
+    await Promise.all([loadLatestSprays(), loadJobs(), loadOverrides()]);
     if(currentPage === 'summary') renderSummary();
     if(currentPage === 'jobs') renderJobsTable();
     if(currentPage === 'joblogs') renderJobLogs();
@@ -1485,6 +1485,7 @@ async function jlGoPage(p) {
 function openEditStatusModal(jobId, prefilledStatus) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
+  window._esCurrentJob = j;
   const b = getBlock(j.block_id), p = getProduct(j.product_id);
 
   document.getElementById("modal-container").innerHTML = `
@@ -1537,10 +1538,41 @@ function esStatusChange(jobId) {
     html += '<div id="es-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
     html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
-    html += '<div class="form-field"><label>Actual Product Used</label><input id="es-actual-product" type="number" step="any" value="'+(j?.total_product_required||'')+'" style="width:100%;"></div>';
+    const tankVal = j ? j.tank_size_litres : 200;
+    const isStd = [200,500,1000].includes(+tankVal);
+    html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="es-aw-tank-sel" style="width:100%;" onchange="esAwTankChange()"><option value="200"'+(+tankVal===200?' selected':'')+'>200L</option><option value="500"'+(+tankVal===500?' selected':'')+'>500L</option><option value="1000"'+(+tankVal===1000?' selected':'')+'>1000L</option><option value="custom"'+(!isStd?' selected':'')+'>Custom</option></select></div><div class="form-field" id="es-aw-tank-custom-wrap" style="margin:0;display:'+(isStd?'none':'block')+';"><label style="font-size:10px;">Custom (L)</label><input id="es-aw-tank-custom" type="number" step="any" min="1" value="'+(isStd?'':tankVal)+'" style="width:100%;" oninput="esCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="es-aw-tanks" type="number" step="any" value="'+(j?.tanks_planned||'')+'" style="width:100%;" oninput="esCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="es-aw-total" type="number" step="any" style="width:100%;font-weight:700;" oninput="esCalcActualProduct(\''+prodId+'\')"></div></div></div>';
+    setTimeout(()=>esCalcActualWater(), 50);
   }
   html += '</div>';
   el.innerHTML = html;
+}
+
+function esAwTankChange() {
+  const sel = document.getElementById("es-aw-tank-sel");
+  document.getElementById("es-aw-tank-custom-wrap").style.display = sel.value==="custom"?"block":"none";
+  esCalcActualWater();
+}
+function esGetTankSize() {
+  const sel = document.getElementById("es-aw-tank-sel");
+  if(sel) { const v=sel.value; if(v==="custom") return parseFloat(document.getElementById("es-aw-tank-custom")?.value)||0; return parseFloat(v)||0; }
+  return 0;
+}
+function esCalcActualWater() {
+  const s = esGetTankSize();
+  const p = parseFloat(document.getElementById("es-aw-tanks")?.value)||0;
+  const el = document.getElementById("es-aw-total");
+  if(s && p && el) el.value = +(s*p).toFixed(1);
+}
+function esCalcActualProduct(productId) {
+  const w = parseFloat(document.getElementById("es-aw-total")?.value)||0;
+  const p = getProduct(productId);
+  // Use the job's dose values if available, fall back to product defaults
+  const j = window._esCurrentJob;
+  const D = j ? parseFloat(j.dose_amount) : (p?.default_dose_amount||0);
+  const L = j ? parseFloat(j.dose_per_litres) : (p?.default_dose_per_litres||0);
+  if(w && D && L) {
+    document.getElementById("es-aw-total").dataset.actualProduct = ((w/L)*D).toFixed(3);
+  }
 }
 
 async function submitEditStatus(jobId) {
@@ -1576,7 +1608,8 @@ async function submitEditStatus(jobId) {
   } else if(newStatus==="Completed") {
     update.completion_date = document.getElementById("es-comp-date")?.value||todayStr();
     update.next_spray_date = document.getElementById("es-next-date")?.value||null;
-    update.actual_product_used = parseFloat(document.getElementById("es-actual-product")?.value)||null;
+    const esAwEl = document.getElementById("es-aw-total");
+    update.actual_product_used = esAwEl ? parseFloat(esAwEl.dataset.actualProduct)||null : null;
     update.tanks_completed = j.tanks_planned;
     update.triggers_countdown = true;
     willTriggerLog = true;
@@ -1822,6 +1855,7 @@ async function addBlock() {
   const sortOrder=parseInt(document.getElementById("ab-sort").value);
   if(!validateRequired(["ab-name","ab-sort"])) return;
   if(isNaN(sortOrder)) { notify("Sort Order must be a number","warning"); return; }
+  if(blocks.some(b=>b.block_name.toLowerCase()===name.toLowerCase())) { notify("A block named '"+name+"' already exists","warning"); return; }
   const {error} = await sb.from("pnd_blocks").insert({block_name:name,date_planted:date,status_id:statusId,remarks,sort_order:sortOrder});
   if(error) { notify("Error: "+error.message,"error"); return; }
   notify("Block added");
