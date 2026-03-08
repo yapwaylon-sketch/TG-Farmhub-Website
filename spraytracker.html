@@ -159,6 +159,9 @@ textarea { resize:vertical; }
 /* STATUS FIELDS */
 .status-fields { margin-top:12px; padding:12px; background:var(--bg); border-radius:8px; border:1px solid var(--border); }
 
+/* INLINE STATUS SELECT */
+.status-sel { padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; border:none; cursor:pointer; font-family:inherit; outline:none; -webkit-appearance:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237A8A7A'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 6px center; padding-right:20px; }
+
 /* ANIMATIONS */
 @keyframes fadeIn { from{opacity:0}to{opacity:1} }
 @keyframes slideIn { from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)} }
@@ -245,7 +248,7 @@ textarea { resize:vertical; }
     </div>
     <div class="nav-item" data-page="jobs" onclick="navigateTo('jobs')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="16" y1="12" x2="8" y2="12"/><line x1="16" y1="16" x2="8" y2="16"/></svg>
-      <span class="nav-label">Jobs</span>
+      <span class="nav-label">Active Jobs</span>
     </div>
     <div class="nav-item" data-page="joblogs" onclick="navigateTo('joblogs')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
@@ -301,7 +304,7 @@ textarea { resize:vertical; }
 <!-- PAGE: JOBS -->
 <div id="page-jobs" class="page">
   <div class="page-header">
-    <div><div class="page-title">Jobs</div><div class="page-subtitle">Manage spray jobs and assignments</div></div>
+    <div><div class="page-title">Active Jobs</div><div class="page-subtitle">Manage spray jobs and assignments</div></div>
     <div class="header-actions">
       <button class="btn btn-primary" onclick="openNewJobModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -734,7 +737,7 @@ function renderJobsTable() {
     const p = getProduct(j.product_id);
     const bname = b?b.block_name:"?";
     const pname = p?p.product_name:"?";
-    let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button>`;
+    let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
     if(j.status==="Completed") {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
     }
@@ -1176,6 +1179,45 @@ function clearJobLogFilters() {
   renderJobLogs();
 }
 
+function jlStatusStyle(s) {
+  const m = {
+    "Planned":"background:rgba(96,160,232,0.15);color:#60A0E8;",
+    "In Progress":"background:rgba(232,160,32,0.15);color:#E8A020;",
+    "Partially Completed":"background:rgba(232,128,32,0.15);color:#E88020;",
+    "Suspended":"background:rgba(232,96,96,0.15);color:#E86060;",
+    "Completed":"background:rgba(74,124,63,0.15);color:#6B9E5E;"
+  };
+  return m[s]||"";
+}
+
+function jlStatusSelect(j) {
+  const statuses = ["Planned","In Progress","Partially Completed","Suspended","Completed"];
+  const opts = statuses.map(s=>`<option value="${s}" ${s===j.status?"selected":""}>${s}</option>`).join("");
+  return `<select class="status-sel" style="${jlStatusStyle(j.status)}" data-orig="${esc(j.status)}" onchange="jlStatusChange(this,'${j.id}')">${opts}</select>`;
+}
+
+async function jlStatusChange(sel, jobId) {
+  const newStatus = sel.value;
+  const origStatus = sel.dataset.orig;
+  if(newStatus === origStatus) return;
+
+  // Simple statuses update directly
+  if(newStatus === "Planned" || newStatus === "In Progress") {
+    const {error} = await sb.from("pnd_jobs").update({status: newStatus}).eq("id", jobId);
+    if(error) { notify("Error: "+error.message,"error"); sel.value=origStatus; return; }
+    notify("Status updated");
+    await loadJobs();
+    renderJobLogs();
+    return;
+  }
+
+  // Complex statuses open the Edit Status modal pre-filled
+  openEditStatusModal(jobId, newStatus);
+  // Revert dropdown in case modal is closed without saving
+  sel.value = origStatus;
+  sel.style.cssText = jlStatusStyle(origStatus);
+}
+
 function renderJobLogs() {
   const sortBy = document.getElementById("jl-sort")?.value || "date";
   const blockF = document.getElementById("jl-filter-block")?.value || "";
@@ -1215,13 +1257,13 @@ function renderJobLogs() {
       <td>${j.tanks_completed}/${j.tanks_planned}</td>
       <td>${fmtNum(j.total_product_required)} ${esc(j.dose_unit)}</td>
       <td>${j.actual_product_used ? fmtNum(j.actual_product_used)+" "+esc(j.dose_unit) : "—"}</td>
-      <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+      <td>${jlStatusSelect(j)}</td>
       <td><button class="btn btn-outline btn-sm" onclick="openEditStatusModal('${j.id}')">Edit Status</button></td>
     </tr>`;
   }).join("");
 }
 
-function openEditStatusModal(jobId) {
+function openEditStatusModal(jobId, prefilledStatus) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
   const b = getBlock(j.block_id), p = getProduct(j.product_id);
@@ -1257,6 +1299,11 @@ function openEditStatusModal(jobId) {
         </div>
       </div>
     </div>`;
+  // Pre-fill status if provided (from inline dropdown)
+  if(prefilledStatus) {
+    document.getElementById("es-new-status").value = prefilledStatus;
+    esStatusChange(jobId);
+  }
 }
 
 function esStatusChange(jobId) {
