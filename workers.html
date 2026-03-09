@@ -40,19 +40,20 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 #app { display: flex; height: 100vh; }
 
 /* SIDEBAR */
-.sidebar { width: var(--sidebar-w); background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
-.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 16px; cursor: pointer; }
-.sidebar-logo { width: 36px; height: 36px; background: white; border-radius: 50%; padding: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
-.sidebar-logo img { width: 28px; height: 28px; object-fit: cover; object-position: center 20%; border-radius: 50%; }
+.sidebar { width: var(--sidebar-w); background: #161B16; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+.sidebar-brand { padding: 18px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; min-height: 90px; }
+.sidebar-logo { width: 70px; height: 70px; background: white; border-radius: 50%; padding: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.sidebar-logo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; border-radius: 50%; }
 .sidebar-brand-text { font-weight: 800; font-size: 14px; color: var(--gold-light); line-height: 1.2; }
+.sidebar-brand-sub { font-size: 11px; color: var(--text-dim); font-weight: 500; }
 .sidebar-nav { flex: 1; padding: 8px 0; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text-muted); font-size: 13px; font-weight: 500; transition: all 0.15s; border-left: 3px solid transparent; }
-.nav-item:hover { background: var(--bg-hover); color: var(--text); }
-.nav-item.active { color: var(--gold); border-left-color: var(--gold); background: var(--gold-pale); }
+.nav-item:hover { background: rgba(255,255,255,0.03); }
+.nav-item.active { color: #8FBF80; border-left-color: var(--green-light); background: var(--green-pale); }
 .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-.sidebar-footer { padding: 12px 16px; border-top: 1px solid var(--border); }
-.sidebar-user { font-size: 12px; color: var(--text-muted); }
-.sidebar-user strong { color: var(--text); }
+.sidebar-sync { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); cursor: pointer; }
+.sidebar-sync:hover { color: var(--text-muted); }
+.sidebar-sync svg { width: 14px; height: 14px; }
 
 /* MAIN */
 .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -115,6 +116,8 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 .notify-msg { padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; background: var(--green); color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.3); animation: notifyIn 0.3s ease; pointer-events: auto; }
 .notify-msg.warning { background: var(--gold); color: #1a1a1a; }
 @keyframes notifyIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
 
 /* SEARCH */
 .search-box { display: flex; align-items: center; gap: 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
@@ -129,7 +132,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 /* MOBILE */
 @media (max-width: 768px) {
   .sidebar { width: 60px; }
-  .sidebar-brand-text, .nav-label, .sidebar-footer { display: none; }
+  .sidebar-brand-text, .sidebar-brand-sub, .nav-label, .sidebar-sync, #sidebar-user { display: none; }
   .sidebar-brand { padding: 12px 10px; justify-content: center; }
   .nav-item { justify-content: center; padding: 12px 0; }
   .page { padding: 16px; }
@@ -161,11 +164,14 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
   <div class="sidebar">
     <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;color:var(--gold-light);text-decoration:none;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
-      <span class="nav-label">TG FarmHub</span>
+      TG FarmHub
     </a>
     <div class="sidebar-brand">
       <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="TG"></div>
-      <span class="sidebar-brand-text">Worker Management</span>
+      <div>
+        <div class="sidebar-brand-text">Worker Management</div>
+        <div class="sidebar-brand-sub">Ladang PND</div>
+      </div>
     </div>
     <div class="sidebar-nav">
       <div class="nav-item active" data-page="workers" onclick="navigateTo('workers')">
@@ -189,10 +195,20 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
         <span class="nav-label">Roles</span>
       </div>
     </div>
-    <div class="sidebar-footer">
-      <div class="sidebar-user">Logged in as<br><strong id="sidebar-user-name">—</strong></div>
-      <button class="btn btn-outline" onclick="openChangePin()" style="width:100%;margin-top:6px;font-size:11px;padding:6px;">Change PIN</button>
-      <button class="btn btn-outline" onclick="doLogout()" style="width:100%;margin-top:4px;font-size:11px;padding:6px;">Logout</button>
+    <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+      <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
+      <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Change PIN
+      </button>
+      <button onclick="sessionStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="nav-label">Logout</span>
+      </button>
+    </div>
+    <div class="sidebar-sync" onclick="syncAll()">
+      <svg id="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      <span id="sync-text">Synced just now</span>
     </div>
   </div>
 
@@ -882,12 +898,30 @@ function tryRestoreSession() {
 
 function doLogout() { currentUser = null; clearInactivityTimer(); sessionStorage.removeItem("tgfarmhub_user"); window.location.href = "index.html"; }
 
+async function syncAll() {
+  const icon = document.getElementById("sync-icon");
+  const txt = document.getElementById("sync-text");
+  if (icon) icon.classList.add("spin");
+  if (txt) txt.textContent = "Syncing...";
+  try {
+    await loadAllData();
+    if (currentPage === "workers") renderWorkerList();
+    else if (currentPage === "payroll") renderPayrollPage();
+    else if (currentPage === "summary") renderSummaryPage();
+    else if (currentPage === "tasks") renderTaskTypes();
+    else if (currentPage === "roles") renderRoles();
+  } catch(e) {}
+  if (icon) icon.classList.remove("spin");
+  if (txt) txt.textContent = "Synced just now";
+}
+
 function showApp() {
   var tgl = document.getElementById("tg-loading"); if (tgl) tgl.remove();
   document.getElementById("login-screen").style.display = "none";
   startInactivityTimer();
   document.getElementById("app").style.display = "flex";
-  document.getElementById("sidebar-user-name").textContent = currentUser.displayName;
+  const ui = document.getElementById("sidebar-user-info");
+  if (ui && currentUser.displayName) ui.textContent = currentUser.displayName;
   navigateTo("workers");
 }
 
