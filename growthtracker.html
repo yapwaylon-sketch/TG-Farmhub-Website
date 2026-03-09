@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Growth Tracker — TG FarmHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
+<style>
+/* Row colour coding */
+.row-overdue td { background: rgba(232,96,96,0.06); }
+.row-approaching td { background: rgba(232,160,32,0.06); }
+.row-no-induction td { opacity: 0.7; }
+
+.td-overdue { color: var(--red) !important; font-weight: 700; }
+.td-approaching { color: var(--gold-light) !important; font-weight: 700; }
+
+/* Filter bar */
+.filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+.filter-bar select { min-width:160px; }
+.filter-btn { padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; transition:all 0.15s; }
+.filter-btn:hover { border-color:var(--border-light); color:var(--text); }
+.filter-btn.active { border-color:var(--gold); background:var(--gold-pale); color:var(--gold-light); }
+
+/* Sortable headers */
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--green-light); }
+
+/* Empty state */
+.empty-state { padding:40px; text-align:center; color:var(--text-dim); font-size:14px; }
+
+/* Spin */
+.spin { animation:spin 1s linear infinite; }
+
+/* Badge status */
+.badge-status { background:var(--bg-hover); color:var(--text-muted); }
+
+/* Table scroll for many columns */
+.table-wrap { overflow-x:auto; }
+
+/* Summary cards — 3 columns for overview */
+.cards-3 { grid-template-columns: repeat(3,1fr); }
+
+/* Print */
+@media print {
+  .filter-bar { display:none!important; }
+  .page { display:none!important; }
+  .page.active { display:block!important; }
+}
+
+tr:last-child td { border-bottom:none; }
+</style>
+</head>
+<body>
+<div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<div id="app">
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;color:var(--gold-light);text-decoration:none;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
+    TG FarmHub
+  </a>
+  <div class="sidebar-brand">
+    <div class="sidebar-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4A7C3F" stroke-width="2" style="width:90%;height:90%;"><path d="M17 8C8 10 5.9 16.09 3.82 21.34"/><path d="M5.9 16.09c2.11-4.45 7.1-9.09 11.1-8.09"/><path d="M12 12c-1 4-4 8-4 8"/></svg>
+    </div>
+    <div>
+      <div class="sidebar-brand-text">Growth Tracker</div>
+      <div class="sidebar-brand-sub">Ladang PND</div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" data-page="overview" onclick="navigateTo('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="nav-label">Growth Overview</span>
+    </div>
+    <div class="nav-item" data-page="settings" onclick="navigateTo('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="nav-label">Settings</span>
+    </div>
+  </div>
+  <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+    <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
+    <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Change PIN
+    </button>
+    <button onclick="sessionStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-label">Logout</span>
+    </button>
+  </div>
+  <div class="sidebar-sync" onclick="syncAll()">
+    <svg id="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    <span id="sync-text">Synced just now</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+<!-- PAGE: GROWTH OVERVIEW -->
+<div id="page-overview" class="page active">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Growth Overview</div>
+      <div class="page-subtitle">Monitor block growth, induction, and harvest schedules</div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="cards-grid cards-3" style="grid-template-columns:repeat(3,1fr);">
+    <div class="summary-card">
+      <div class="sc-label">Total Active Blocks</div>
+      <div class="sc-value" id="card-total" style="color:var(--white);">—</div>
+      <div class="sc-sub">Block crops being tracked</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Approaching Harvest</div>
+      <div class="sc-value" id="card-approaching" style="color:var(--gold-light);">—</div>
+      <div class="sc-sub">Within 30 days</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Overdue Harvest</div>
+      <div class="sc-value" id="card-overdue" style="color:var(--red);">—</div>
+      <div class="sc-sub">Past expected harvest date</div>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <select id="filter-status" onchange="onFilterStatus()">
+      <option value="all">All Statuses</option>
+    </select>
+    <select id="filter-variety" onchange="onFilterVariety()">
+      <option value="all">All Varieties</option>
+    </select>
+    <button id="btn-harvest30" class="filter-btn" onclick="toggleHarvest30()">Harvest within 30 days</button>
+  </div>
+
+  <!-- Growth Table -->
+  <div class="data-table">
+    <div class="table-header">Block Growth Status</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" onclick="sortGrowth('block_name')">Block Name<span id="sort-block_name"></span></th>
+            <th class="sortable" onclick="sortGrowth('variety_name')">Variety<span id="sort-variety_name"></span></th>
+            <th class="sortable" onclick="sortGrowth('quantity')">Plants<span id="sort-quantity"></span></th>
+            <th class="sortable" onclick="sortGrowth('date_planted')">Date Planted<span id="sort-date_planted"></span></th>
+            <th class="sortable" onclick="sortGrowth('dap')">DAP (Days)<span id="sort-dap"></span></th>
+            <th class="sortable" onclick="sortGrowth('months')">Months<span id="sort-months"></span></th>
+            <th class="sortable" onclick="sortGrowth('status_name')">Status<span id="sort-status_name"></span></th>
+            <th class="sortable" onclick="sortGrowth('date_induced_start')">Induce Start<span id="sort-date_induced_start"></span></th>
+            <th class="sortable" onclick="sortGrowth('date_induced_end')">Induce End<span id="sort-date_induced_end"></span></th>
+            <th class="sortable" onclick="sortGrowth('harvest_days')">Harvest Days<span id="sort-harvest_days"></span></th>
+            <th>Harvest Window</th>
+            <th class="sortable" onclick="sortGrowth('days_to_harvest')">Days to Harvest<span id="sort-days_to_harvest"></span></th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="growth-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: SETTINGS -->
+<div id="page-settings" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Harvest Defaults</div>
+      <div class="page-subtitle">Set default days from induction to harvest per variety</div>
+    </div>
+  </div>
+  <div id="settings-permission-guard">
+    <div class="data-table">
+      <div class="table-header">Variety Harvest Day Defaults</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Variety Name</th>
+              <th>Crop</th>
+              <th>Default Harvest Days</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="settings-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- MODALS -->
+<div id="modal-container"></div>
+
+<script>
+// ============================================================
+// SESSION
+// ============================================================
+let currentUser = null;
+try { const s = sessionStorage.getItem("tgfarmhub_user"); if(s) currentUser = JSON.parse(s); } catch(e){}
+if(!currentUser) { location.href = "index.html"; }
+
+// ============================================================
+// GLOBAL DATA
+// ============================================================
+let blocks = [], blockCrops = [], varieties = [], statuses = [], growthRecords = [];
+let currentPage = 'overview';
+let sortField = 'block_name', sortDir = 'asc';
+let filterStatus = 'all', filterVariety = 'all', filterHarvest30 = false;
+let refreshTimer = null;
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener("DOMContentLoaded", async () => {
+  if(!currentUser) return;
+  injectUserBadge(currentUser);
+  await loadAll();
+  renderCurrentPage();
+  document.getElementById("tg-loading").style.display = "none";
+  startAutoRefresh();
+  startInactivityTimer();
+});
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadAll() {
+  await Promise.all([loadBlocks(), loadBlockCrops(), loadVarieties(), loadStatuses(), loadGrowthRecords()]);
+}
+
+async function loadBlocks() {
+  const {data} = await sb.from("pnd_blocks").select("*").eq("is_active", true).order("name");
+  blocks = data || [];
+}
+
+async function loadBlockCrops() {
+  const {data} = await sb.from("block_crops").select("*, crop_varieties(id, name, crop_id, harvest_days_from_induction, crops(name))").order("created_at");
+  blockCrops = data || [];
+}
+
+async function loadVarieties() {
+  const {data} = await sb.from("crop_varieties").select("*, crops(name)").eq("archived", false).order("name");
+  varieties = data || [];
+}
+
+async function loadStatuses() {
+  const {data} = await sb.from("crop_statuses").select("*").order("sort_order");
+  statuses = data || [];
+}
+
+async function loadGrowthRecords() {
+  const {data} = await sb.from("growth_records").select("*");
+  growthRecords = data || [];
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-" + page));
+  renderCurrentPage();
+}
+
+function renderCurrentPage() {
+  if(currentPage === 'overview') renderOverview();
+  else if(currentPage === 'settings') renderSettings();
+}
+
+// ============================================================
+// SYNC
+// ============================================================
+async function syncAll() {
+  const icon = document.getElementById("sync-icon");
+  icon.classList.add("spin");
+  await loadAll();
+  renderCurrentPage();
+  icon.classList.remove("spin");
+  document.getElementById("sync-text").textContent = "Synced just now";
+}
+
+function startAutoRefresh() {
+  if(refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    await loadAll();
+    if(currentPage === 'overview') renderOverview();
+  }, 60000);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function getBlock(id) { return blocks.find(b => b.id === id); }
+function getVariety(id) { return varieties.find(v => v.id === id); }
+function getStatusName(id) { const s = statuses.find(x => x.id === id); return s ? s.name : "—"; }
+function getGrowthRecord(blockCropId) { return growthRecords.find(g => g.block_crop_id === blockCropId); }
+
+function calcDAP(datePlanted) {
+  if(!datePlanted) return null;
+  const d = new Date(datePlanted + "T00:00:00");
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((today - d) / 86400000);
+}
+
+function calcMonths(dap) {
+  if(dap == null) return "—";
+  return (dap / 30.44).toFixed(1);
+}
+
+function harvestWindowStr(gr) {
+  if(!gr || !gr.date_induced_start || !gr.harvest_days) return "—";
+  const start = new Date(gr.date_induced_start + "T00:00:00");
+  start.setDate(start.getDate() + gr.harvest_days);
+  let result = fmtDate(start.toISOString().split("T")[0]);
+  if(gr.date_induced_end) {
+    const end = new Date(gr.date_induced_end + "T00:00:00");
+    end.setDate(end.getDate() + gr.harvest_days);
+    result += " — " + fmtDate(end.toISOString().split("T")[0]);
+  }
+  return result;
+}
+
+function daysToHarvest(gr) {
+  if(!gr || !gr.date_induced_start || !gr.harvest_days) return null;
+  const harvestStart = new Date(gr.date_induced_start + "T00:00:00");
+  harvestStart.setDate(harvestStart.getDate() + gr.harvest_days);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((harvestStart - today) / 86400000);
+}
+
+// ============================================================
+// BUILD ROWS DATA — joins all tables
+// ============================================================
+function buildGrowthData() {
+  let rows = [];
+  blockCrops.forEach(bc => {
+    const block = getBlock(bc.block_id);
+    if(!block) return;
+    const variety = bc.crop_varieties;
+    const gr = getGrowthRecord(bc.id);
+    const dap = calcDAP(bc.date_planted);
+    const dth = daysToHarvest(gr);
+
+    rows.push({
+      block_name: block.name,
+      block_id: block.id,
+      block_crop_id: bc.id,
+      variety_name: variety ? variety.name : "—",
+      crop_name: variety && variety.crops ? variety.crops.name : "—",
+      variety_id: bc.variety_id,
+      quantity: bc.quantity,
+      date_planted: bc.date_planted,
+      dap: dap,
+      months: dap != null ? parseFloat((dap / 30.44).toFixed(1)) : null,
+      status_name: getStatusName(bc.status_id),
+      status_id: bc.status_id,
+      date_induced_start: gr ? gr.date_induced_start : null,
+      date_induced_end: gr ? gr.date_induced_end : null,
+      harvest_days: gr ? gr.harvest_days : (variety ? variety.harvest_days_from_induction : null),
+      harvest_window: gr ? harvestWindowStr(gr) : "—",
+      days_to_harvest: dth,
+      remarks: block.remarks || "",
+      growth_record: gr,
+      variety_obj: variety
+    });
+  });
+  return rows;
+}
+
+// ============================================================
+// FILTER
+// ============================================================
+function applyFilters(rows) {
+  if(filterStatus !== 'all') rows = rows.filter(r => r.status_name === filterStatus);
+  if(filterVariety !== 'all') rows = rows.filter(r => r.variety_id === filterVariety);
+  if(filterHarvest30) rows = rows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
+  return rows;
+}
+
+// ============================================================
+// SORT
+// ============================================================
+function sortGrowth(field) {
+  if(sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+  else { sortField = field; sortDir = 'asc'; }
+  renderOverview();
+}
+
+function sortRows(rows) {
+  return rows.sort((a, b) => {
+    let va = a[sortField], vb = b[sortField];
+    if(va == null && vb == null) return 0;
+    if(va == null) return 1;
+    if(vb == null) return -1;
+    if(typeof va === 'string') { va = va.toLowerCase(); vb = (vb || "").toLowerCase(); }
+    if(va < vb) return sortDir === 'asc' ? -1 : 1;
+    if(va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+function sortIcon(field) {
+  if(sortField !== field) return '';
+  return sortDir === 'asc' ? ' &#9650;' : ' &#9660;';
+}
+
+function updateSortIndicators() {
+  const fields = ['block_name','variety_name','quantity','date_planted','dap','months','status_name',
+                  'date_induced_start','date_induced_end','harvest_days','days_to_harvest'];
+  fields.forEach(f => {
+    const el = document.getElementById("sort-" + f);
+    if(el) el.innerHTML = (sortField === f ? (sortDir === 'asc' ? ' &#9650;' : ' &#9660;') : '');
+  });
+}
+
+// ============================================================
+// RENDER OVERVIEW
+// ============================================================
+function renderOverview() {
+  const allRows = buildGrowthData();
+
+  // Populate filter dropdowns (use all rows before filtering)
+  populateFilters(allRows);
+
+  // Apply filters
+  let rows = applyFilters([...allRows]);
+
+  // Sort
+  rows = sortRows(rows);
+
+  // Update sort indicators
+  updateSortIndicators();
+
+  // Summary cards — always based on all rows (unfiltered)
+  const totalBlocks = allRows.length;
+  const approaching = allRows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30).length;
+  const overdue = allRows.filter(r => r.days_to_harvest != null && r.days_to_harvest < 0).length;
+
+  document.getElementById("card-total").textContent = totalBlocks;
+  document.getElementById("card-approaching").textContent = approaching;
+  document.getElementById("card-overdue").textContent = overdue;
+
+  // Table
+  const tbody = document.getElementById("growth-body");
+  if(!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No blocks match the current filters</td></tr>';
+    return;
+  }
+
+  const canEdit = currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.growthtracker && currentUser.permissions.growthtracker.manageGrowth);
+
+  tbody.innerHTML = rows.map(r => {
+    // Row colour coding
+    let rowClass = '';
+    if(r.days_to_harvest != null && r.days_to_harvest < 0) rowClass = 'row-overdue';
+    else if(r.days_to_harvest != null && r.days_to_harvest <= 30) rowClass = 'row-approaching';
+    else if(!r.date_induced_start) rowClass = 'row-no-induction';
+
+    const dthClass = r.days_to_harvest != null && r.days_to_harvest < 0
+      ? 'td-overdue'
+      : (r.days_to_harvest != null && r.days_to_harvest <= 30 ? 'td-approaching' : '');
+
+    const varietyDisplay = esc(r.crop_name + ' - ' + r.variety_name);
+    const quantityDisplay = r.quantity != null ? Number(r.quantity).toLocaleString() : '—';
+    const dapDisplay = r.dap != null ? r.dap : '—';
+    const monthsDisplay = r.months != null ? r.months : '—';
+    const dthDisplay = r.days_to_harvest != null ? r.days_to_harvest : '—';
+
+    return '<tr class="' + rowClass + '">' +
+      '<td class="td-bold">' + esc(r.block_name) + '</td>' +
+      '<td>' + varietyDisplay + '</td>' +
+      '<td>' + quantityDisplay + '</td>' +
+      '<td>' + fmtDate(r.date_planted) + '</td>' +
+      '<td>' + dapDisplay + '</td>' +
+      '<td>' + monthsDisplay + '</td>' +
+      '<td><span class="badge badge-status">' + esc(r.status_name) + '</span></td>' +
+      '<td>' + fmtDate(r.date_induced_start) + '</td>' +
+      '<td>' + fmtDate(r.date_induced_end) + '</td>' +
+      '<td>' + (r.harvest_days != null ? r.harvest_days : '—') + '</td>' +
+      '<td>' + esc(r.harvest_window) + '</td>' +
+      '<td class="' + dthClass + '">' + dthDisplay + '</td>' +
+      '<td>' + esc(r.remarks) + '</td>' +
+      (canEdit ? '<td><button class="btn btn-sm btn-outline" onclick="openInductionModal(\'' + r.block_crop_id + '\')">Edit</button></td>' : '<td></td>') +
+    '</tr>';
+  }).join("");
+}
+
+function populateFilters(rows) {
+  // Status filter
+  const statusSel = document.getElementById("filter-status");
+  const curStatus = filterStatus;
+  const uniqueStatuses = [...new Set(rows.map(r => r.status_name))].filter(Boolean).sort();
+  statusSel.innerHTML = '<option value="all">All Statuses</option>' +
+    uniqueStatuses.map(s => '<option value="' + esc(s) + '"' + (curStatus === s ? ' selected' : '') + '>' + esc(s) + '</option>').join("");
+  statusSel.value = (curStatus !== 'all' && uniqueStatuses.includes(curStatus)) ? curStatus : 'all';
+
+  // Variety filter
+  const varSel = document.getElementById("filter-variety");
+  const curVar = filterVariety;
+  varSel.innerHTML = '<option value="all">All Varieties</option>' +
+    varieties.map(v => {
+      const label = (v.crops ? v.crops.name + ' - ' : '') + v.name;
+      return '<option value="' + v.id + '"' + (curVar === v.id ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join("");
+  if(curVar !== 'all') varSel.value = curVar;
+}
+
+// ============================================================
+// FILTER HANDLERS
+// ============================================================
+function onFilterStatus() {
+  filterStatus = document.getElementById("filter-status").value;
+  renderOverview();
+}
+
+function onFilterVariety() {
+  filterVariety = document.getElementById("filter-variety").value;
+  renderOverview();
+}
+
+function toggleHarvest30() {
+  filterHarvest30 = !filterHarvest30;
+  const btn = document.getElementById("btn-harvest30");
+  btn.classList.toggle("active", filterHarvest30);
+  renderOverview();
+}
+
+// ============================================================
+// INDUCTION MODAL
+// ============================================================
+function openInductionModal(blockCropId) {
+  const bc = blockCrops.find(x => x.id === blockCropId);
+  if(!bc) return;
+  const block = getBlock(bc.block_id);
+  const variety = bc.crop_varieties;
+  const gr = getGrowthRecord(blockCropId);
+  const defaultDays = variety ? variety.harvest_days_from_induction : '';
+  const cropVarietyLabel = (variety && variety.crops ? variety.crops.name + ' - ' : '') + (variety ? variety.name : '');
+
+  const container = document.getElementById("modal-container");
+  container.innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal-box" style="max-width:450px;">' +
+        '<div class="modal-header">' +
+          '<div class="modal-title">Induction — ' + esc(block.name) + '</div>' +
+          '<button class="modal-close" onclick="closeModal()">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">' + esc(cropVarietyLabel) + ' | Default: ' + (defaultDays || '—') + ' days</div>' +
+        '<div class="form-field">' +
+          '<label>Induction Start Date</label>' +
+          '<input type="date" id="ind-start" value="' + (gr && gr.date_induced_start ? gr.date_induced_start : '') + '" style="width:100%;">' +
+        '</div>' +
+        '<div class="form-field">' +
+          '<label>Induction End Date</label>' +
+          '<input type="date" id="ind-end" value="' + (gr && gr.date_induced_end ? gr.date_induced_end : '') + '" style="width:100%;">' +
+        '</div>' +
+        '<div class="form-field">' +
+          '<label>Harvest Days (from induction)</label>' +
+          '<input type="number" id="ind-days" value="' + (gr && gr.harvest_days ? gr.harvest_days : (defaultDays || '')) + '" placeholder="' + (defaultDays || 'e.g. 140') + '" style="width:100%;">' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          (gr ? '<button class="btn btn-danger" onclick="clearInduction(\'' + blockCropId + '\')">Clear</button><div style="flex:1;"></div>' : '') +
+          '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="saveInduction(\'' + blockCropId + '\')">Save</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function closeModal() {
+  document.getElementById("modal-container").innerHTML = "";
+}
+
+async function saveInduction(blockCropId) {
+  const startDate = document.getElementById("ind-start").value || null;
+  const endDate = document.getElementById("ind-end").value || null;
+  const days = document.getElementById("ind-days").value;
+  const harvestDays = days ? parseInt(days) : null;
+
+  if(startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    notify("End date must be after start date", "warning");
+    return;
+  }
+
+  const gr = getGrowthRecord(blockCropId);
+
+  if(gr) {
+    // Update existing
+    const {error} = await sb.from("growth_records").update({
+      date_induced_start: startDate,
+      date_induced_end: endDate,
+      harvest_days: harvestDays
+    }).eq("id", gr.id);
+    if(error) { notify("Error: " + error.message, "error"); return; }
+  } else {
+    // Insert new
+    const {error} = await sb.from("growth_records").insert({
+      block_crop_id: blockCropId,
+      date_induced_start: startDate,
+      date_induced_end: endDate,
+      harvest_days: harvestDays
+    });
+    if(error) { notify("Error: " + error.message, "error"); return; }
+  }
+
+  notify("Induction data saved");
+  closeModal();
+  await loadGrowthRecords();
+  renderOverview();
+}
+
+async function clearInduction(blockCropId) {
+  const gr = getGrowthRecord(blockCropId);
+  if(!gr) return;
+  if(!confirm("Clear induction data for this block?")) return;
+
+  const {error} = await sb.from("growth_records").delete().eq("id", gr.id);
+  if(error) { notify("Error: " + error.message, "error"); return; }
+
+  notify("Induction data cleared");
+  closeModal();
+  await loadGrowthRecords();
+  renderOverview();
+}
+
+// ============================================================
+// SETTINGS PAGE
+// ============================================================
+function renderSettings() {
+  const canManage = currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.growthtracker && currentUser.permissions.growthtracker.manageGrowth);
+
+  const guard = document.getElementById("settings-permission-guard");
+  if(!canManage) {
+    guard.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-dim);font-size:14px;">You do not have permission to manage harvest defaults.</div>';
+    return;
+  }
+
+  // Restore table if it was replaced by the permission message
+  if(!document.getElementById("settings-body")) {
+    guard.innerHTML =
+      '<div class="data-table">' +
+        '<div class="table-header">Variety Harvest Day Defaults</div>' +
+        '<div class="table-wrap">' +
+          '<table>' +
+            '<thead><tr>' +
+              '<th>Variety Name</th>' +
+              '<th>Crop</th>' +
+              '<th>Default Harvest Days</th>' +
+              '<th></th>' +
+            '</tr></thead>' +
+            '<tbody id="settings-body"></tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+  }
+
+  const tbody = document.getElementById("settings-body");
+  if(!tbody) return;
+
+  tbody.innerHTML = varieties.map(v => {
+    const cropName = v.crops ? v.crops.name : "—";
+    return '<tr>' +
+      '<td class="td-bold">' + esc(cropName + ' - ' + v.name) + '</td>' +
+      '<td>' + esc(cropName) + '</td>' +
+      '<td>' +
+        '<input class="inline-input" type="number" value="' + (v.harvest_days_from_induction != null ? v.harvest_days_from_induction : '') + '" style="width:80px;" onchange="updateHarvestDefault(\'' + v.id + '\', this.value)">' +
+        ' days' +
+      '</td>' +
+      '<td><span class="save-tick" id="tick-v-' + v.id + '">&#10003;</span></td>' +
+    '</tr>';
+  }).join("");
+}
+
+async function updateHarvestDefault(varietyId, value) {
+  const days = value ? parseInt(value) : null;
+  const {error} = await sb.from("crop_varieties").update({harvest_days_from_induction: days}).eq("id", varietyId);
+  if(error) { notify("Error: " + error.message, "error"); return; }
+  const v = varieties.find(x => x.id === varietyId);
+  if(v) v.harvest_days_from_induction = days;
+  showTick("tick-v-" + varietyId);
+}
+</script>
+</body>
+</html>
