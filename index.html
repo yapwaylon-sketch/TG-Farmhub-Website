@@ -258,6 +258,39 @@ body {
   .user-table th, .user-table td { padding: 8px 8px; }
   .user-actions { flex-direction: column; gap: 4px; }
 }
+
+/* ===== SHARED UTILITY ===== */
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-danger { background: var(--red); color: white; border: none; }
+.btn-danger:hover { background: #d04040; }
+.save-tick { color: var(--green-light); font-size: 16px; opacity: 0; transition: opacity 0.3s; margin-left: 6px; }
+.inline-input { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: inherit; }
+.inline-input:focus { outline: none; border-color: var(--gold); }
+.inline-select { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: inherit; }
+.inline-select:focus { outline: none; border-color: var(--gold); }
+.toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: 0.2s; }
+.toggle-slider::before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+.toggle input:checked + .toggle-slider { background: var(--green); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+/* ===== FARM CONFIG ===== */
+.fc-tab { flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; background: var(--bg-input); color: var(--text-muted); transition: all 0.15s; }
+.fc-tab.active { background: var(--green); color: white; }
+.fc-tab:hover:not(.active) { background: var(--bg-hover); }
+.crop-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.crop-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.crop-header:hover { background: var(--bg-hover); }
+.crop-name { font-weight: 700; font-size: 15px; color: var(--white); flex: 1; }
+.crop-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(74,124,63,0.15); color: #6B9E5E; }
+.variety-list { padding: 0 16px 14px; }
+.variety-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+.variety-item:hover { background: var(--bg-hover); }
+.block-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; padding: 14px 16px; }
+.block-card.incomplete { border-left: 3px solid #E8A020; }
+.block-crops-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.block-crop-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 12px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -306,6 +339,7 @@ body {
 
   <div class="hub-nav">
     <div class="hub-nav-item active" data-page="modules" onclick="showHubPage('modules')">Modules</div>
+    <div class="hub-nav-item farm-config-nav" data-page="farmconfig" onclick="showHubPage('farmconfig')">Farm Configuration</div>
     <div class="hub-nav-item admin-only" data-page="users" onclick="showHubPage('users')">User Management</div>
   </div>
 
@@ -329,6 +363,48 @@ body {
         </thead>
         <tbody id="users-tbody"></tbody>
       </table>
+    </div>
+
+    <!-- FARM CONFIGURATION PAGE -->
+    <div class="hub-page" id="hubpage-farmconfig">
+      <div class="section-header">
+        <h2>Farm Configuration</h2>
+      </div>
+
+      <!-- Tab toggle -->
+      <div style="display:flex;gap:0;margin-bottom:20px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+        <button class="fc-tab active" data-tab="crops" onclick="switchFarmTab('crops')">Crop Management</button>
+        <button class="fc-tab" data-tab="blocks" onclick="switchFarmTab('blocks')">Block Management</button>
+      </div>
+
+      <!-- CROP MANAGEMENT TAB -->
+      <div id="fc-crops" class="fc-panel">
+        <div id="crop-list"></div>
+        <div style="margin-top:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--white);">Add New Crop</div>
+          <div style="display:flex;gap:12px;align-items:end;">
+            <div class="form-field" style="margin:0;flex:1;"><label>Crop Name</label><input id="fc-crop-name" placeholder="e.g. Pineapples" style="width:100%;"></div>
+            <button class="btn btn-primary" onclick="addCrop()">Add Crop</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOCK MANAGEMENT TAB -->
+      <div id="fc-blocks" class="fc-panel" style="display:none;">
+        <div id="fc-block-reminder" style="display:none;padding:10px 16px;background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.25);border-radius:8px;margin-bottom:16px;font-size:12px;color:#E8A020;">
+          <strong>Reminder:</strong> Some blocks are missing crop type or quantity assignments.
+        </div>
+        <div id="fc-block-list"></div>
+        <div style="margin-top:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--white);">Add New Block</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;">
+            <div class="form-field" style="margin:0;"><label>Block Name</label><input id="fc-block-name" placeholder="e.g. N17" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><label>Remarks</label><input id="fc-block-remarks" placeholder="Optional" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><label>Sort Order</label><input id="fc-block-sort" type="number" placeholder="e.g. 29" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="fcAddBlock()" style="width:100%;">Add Block</button></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -439,8 +515,19 @@ const MODULES = [
     permissions: [
       { key: "view", label: "View spray logs & block status" },
       { key: "log", label: "Log completed spray applications" },
-      { key: "manageBlocks", label: "Add / edit blocks and statuses" },
       { key: "manageProducts", label: "Add / edit spray products" },
+    ]
+  },
+  {
+    key: "farmconfig",
+    name: "Farm Configuration",
+    icon: "🌾",
+    desc: "Manage farm blocks, crop types, and varieties",
+    url: null,
+    active: true,
+    hubPage: true,
+    permissions: [
+      { key: "manageFarm", label: "Add / edit blocks, crops, and varieties" },
     ]
   },
   {
@@ -718,18 +805,30 @@ function showHub() {
     el.style.display = currentUser.role === "admin" ? "" : "none";
   });
 
+  // Farm config visibility — admin or users with manageFarm permission
+  const canFarm = currentUser.role === "admin" || hasPermission("farmconfig", "manageFarm");
+  document.querySelectorAll(".farm-config-nav").forEach(el => {
+    el.style.display = canFarm ? "" : "none";
+  });
+
   showHubPage("modules");
   renderModuleCards();
   if (currentUser.role === "admin") renderUsers();
 }
 
-function showHubPage(page) {
+async function showHubPage(page) {
   document.querySelectorAll(".hub-page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".hub-nav-item").forEach(n => n.classList.remove("active"));
   const pageEl = document.getElementById("hubpage-" + page);
   const navEl = document.querySelector('.hub-nav-item[data-page="' + page + '"]');
   if (pageEl) pageEl.classList.add("active");
   if (navEl) navEl.classList.add("active");
+  if (page === "farmconfig") {
+    await loadFarmConfig();
+    await loadFcBlocks();
+    renderCropList();
+    renderBlockList();
+  }
 }
 
 // ============================================================
@@ -742,6 +841,9 @@ function renderModuleCards() {
     const clickable = m.active && hasAccess;
     const badgeClass = m.active ? "badge-active" : "badge-soon";
     const badgeText = m.active ? "Active" : "Coming Soon";
+
+    // Skip hub-page entries (they are not module cards)
+    if (m.hubPage) return "";
 
     // Hide coming-soon modules from non-admin users who have no access
     if (!m.active && currentUser.role !== "admin") return "";
@@ -1039,6 +1141,332 @@ async function init() {
 }
 
 init();
+
+// ============================================================
+// FARM CONFIG — HELPERS
+// ============================================================
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showTick(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 1500);
+}
+
+// ============================================================
+// FARM CONFIG — DATA
+// ============================================================
+let fcCrops = [], fcVarieties = [], fcCropStatuses = [], fcBlockCrops = [], fcBlocks = [];
+
+async function loadFarmConfig() {
+  const [c, v, s, bc] = await Promise.all([
+    sb.from("crops").select("*").order("name"),
+    sb.from("crop_varieties").select("*").order("name"),
+    sb.from("crop_statuses").select("*").order("sort_order"),
+    sb.from("block_crops").select("*"),
+  ]);
+  if (c.data) fcCrops = c.data;
+  if (v.data) fcVarieties = v.data;
+  if (s.data) fcCropStatuses = s.data;
+  if (bc.data) fcBlockCrops = bc.data;
+}
+
+async function loadFcBlocks() {
+  const { data } = await sb.from("pnd_blocks").select("*").order("sort_order");
+  if (data) fcBlocks = data;
+}
+
+// ============================================================
+// FARM CONFIG — TAB SWITCH
+// ============================================================
+function switchFarmTab(tab) {
+  document.querySelectorAll('.fc-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('fc-crops').style.display = tab === 'crops' ? '' : 'none';
+  document.getElementById('fc-blocks').style.display = tab === 'blocks' ? '' : 'none';
+}
+
+// ============================================================
+// FARM CONFIG — CROP MANAGEMENT
+// ============================================================
+function renderCropList() {
+  const container = document.getElementById('crop-list');
+  if (!container) return;
+  const activeCrops = fcCrops.filter(c => !c.archived);
+  const archivedCrops = fcCrops.filter(c => c.archived);
+
+  container.innerHTML = activeCrops.map(crop => {
+    const varieties = fcVarieties.filter(v => v.crop_id === crop.id && !v.archived);
+    const archivedVarieties = fcVarieties.filter(v => v.crop_id === crop.id && v.archived);
+    const statuses = fcCropStatuses.filter(s => s.crop_id === crop.id);
+    return `
+    <div class="crop-card" id="crop-${crop.id}">
+      <div class="crop-header" onclick="toggleCropExpand('${crop.id}')">
+        <span class="crop-chevron" id="crop-chev-${crop.id}">▶</span>
+        <span class="crop-name">${esc(crop.name)}</span>
+        <span class="crop-badge">${varieties.length} varieties</span>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();editCropName('${crop.id}','${esc(crop.name)}')" style="font-size:10px;">Edit</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();archiveCrop('${crop.id}')" style="font-size:10px;color:var(--gold);">Archive</button>
+      </div>
+      <div class="variety-list" id="crop-expand-${crop.id}" style="display:none;">
+        ${varieties.map(v => `
+          <div class="variety-item">
+            <span style="flex:1;color:var(--text);">${esc(crop.name)} — ${esc(v.name)}</span>
+            <button class="btn btn-outline btn-sm" onclick="editVarietyName('${v.id}','${esc(v.name)}')" style="font-size:10px;">Edit</button>
+            <button class="btn btn-outline btn-sm" onclick="archiveVariety('${v.id}')" style="font-size:10px;color:var(--gold);">Archive</button>
+          </div>
+        `).join('')}
+        ${archivedVarieties.length ? `<div style="margin-top:8px;font-size:11px;color:var(--text-dim);">Archived: ${archivedVarieties.map(v => `<span style="margin-right:8px;">${esc(v.name)} <a href="#" onclick="event.preventDefault();restoreVariety('${v.id}')" style="color:var(--green-light);font-size:10px;">Restore</a></span>`).join('')}</div>` : ''}
+
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">STATUSES FOR ${esc(crop.name).toUpperCase()}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            ${statuses.map(s => `<span style="padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;background:var(--green-pale);color:var(--green-light);">${esc(s.name)} <a href="#" onclick="event.preventDefault();deleteCropStatus('${s.id}')" style="color:var(--red);font-size:10px;margin-left:4px;">×</a></span>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="cs-name-${crop.id}" placeholder="New status name" style="flex:1;padding:6px 8px;font-size:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;">
+            <button class="btn btn-primary btn-sm" onclick="addCropStatus('${crop.id}')">Add</button>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:end;">
+          <input id="var-name-${crop.id}" placeholder="New variety name" style="flex:1;padding:6px 8px;font-size:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;">
+          <button class="btn btn-primary btn-sm" onclick="addVariety('${crop.id}')">Add Variety</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + (archivedCrops.length ? `<div style="margin-top:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;"><div style="font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:6px;">ARCHIVED CROPS</div>${archivedCrops.map(c => `<span style="font-size:12px;margin-right:12px;">${esc(c.name)} <a href="#" onclick="event.preventDefault();restoreCrop('${c.id}')" style="color:var(--green-light);font-size:10px;">Restore</a></span>`).join('')}</div>` : '');
+}
+
+function toggleCropExpand(cropId) {
+  const el = document.getElementById('crop-expand-' + cropId);
+  const chev = document.getElementById('crop-chev-' + cropId);
+  const visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : '';
+  chev.textContent = visible ? '▶' : '▼';
+}
+
+async function addCrop() {
+  const name = document.getElementById('fc-crop-name').value.trim();
+  if (!name) { notify('Crop name required', 'warning'); return; }
+  if (fcCrops.some(c => c.name.toLowerCase() === name.toLowerCase() && !c.archived)) { notify('Crop already exists', 'warning'); return; }
+  const { error } = await sb.from('crops').insert({ name });
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  document.getElementById('fc-crop-name').value = '';
+  notify(name + ' added');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function editCropName(id, oldName) {
+  const name = prompt('Edit crop name:', oldName);
+  if (!name || name === oldName) return;
+  const { error } = await sb.from('crops').update({ name }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Crop renamed');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function archiveCrop(id) {
+  const crop = fcCrops.find(c => c.id === id);
+  if (!confirm('Archive "' + crop.name + '"? It will be hidden from dropdowns.')) return;
+  const { error } = await sb.from('crops').update({ archived: true }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify(crop.name + ' archived');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function restoreCrop(id) {
+  const { error } = await sb.from('crops').update({ archived: false }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Crop restored');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function addVariety(cropId) {
+  const name = document.getElementById('var-name-' + cropId).value.trim();
+  if (!name) { notify('Variety name required', 'warning'); return; }
+  const { error } = await sb.from('crop_varieties').insert({ crop_id: cropId, name });
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  document.getElementById('var-name-' + cropId).value = '';
+  notify(name + ' added');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function editVarietyName(id, oldName) {
+  const name = prompt('Edit variety name:', oldName);
+  if (!name || name === oldName) return;
+  const { error } = await sb.from('crop_varieties').update({ name }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Variety renamed');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function archiveVariety(id) {
+  const assigned = fcBlockCrops.some(bc => bc.variety_id === id);
+  if (assigned) {
+    if (!confirm("This variety is assigned to blocks. Archive it? (Existing assignments stay, but it won't appear in new dropdowns.)")) return;
+  }
+  const { error } = await sb.from('crop_varieties').update({ archived: true }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Variety archived');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function restoreVariety(id) {
+  const { error } = await sb.from('crop_varieties').update({ archived: false }).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Variety restored');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function addCropStatus(cropId) {
+  const input = document.getElementById('cs-name-' + cropId);
+  const name = input.value.trim();
+  if (!name) { notify('Status name required', 'warning'); return; }
+  const existing = fcCropStatuses.filter(s => s.crop_id === cropId);
+  const sortOrder = existing.length ? Math.max(...existing.map(s => s.sort_order)) + 1 : 1;
+  const { error } = await sb.from('crop_statuses').insert({ crop_id: cropId, name, sort_order: sortOrder });
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  input.value = '';
+  notify('Status added');
+  await loadFarmConfig(); renderCropList();
+}
+
+async function deleteCropStatus(id) {
+  const inUse = fcBlockCrops.some(bc => bc.status_id === id);
+  if (inUse) { notify('Cannot delete — status is in use by blocks', 'warning'); return; }
+  if (!confirm('Delete this status?')) return;
+  const { error } = await sb.from('crop_statuses').delete().eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Status removed');
+  await loadFarmConfig(); renderCropList();
+}
+
+// ============================================================
+// FARM CONFIG — BLOCK MANAGEMENT
+// ============================================================
+function renderBlockList() {
+  const container = document.getElementById('fc-block-list');
+  const reminder = document.getElementById('fc-block-reminder');
+  if (!container || !reminder) return;
+
+  const activeVarieties = fcVarieties.filter(v => !v.archived);
+  const varietyOpts = activeVarieties.map(v => {
+    const crop = fcCrops.find(c => c.id === v.crop_id);
+    return `<option value="${v.id}">${esc(crop ? crop.name : '?')} — ${esc(v.name)}</option>`;
+  }).join('');
+
+  const incompleteCount = fcBlocks.filter(b => {
+    const bcrops = fcBlockCrops.filter(bc => bc.block_id === b.id);
+    return bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0);
+  }).length;
+  reminder.style.display = incompleteCount > 0 ? '' : 'none';
+  if (incompleteCount > 0) reminder.innerHTML = `<strong>Reminder:</strong> ${incompleteCount} block(s) missing crop type or quantity assignments.`;
+
+  container.innerHTML = fcBlocks.map(b => {
+    const bcrops = fcBlockCrops.filter(bc => bc.block_id === b.id);
+    const hasMissing = bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0);
+
+    return `<div class="block-card${hasMissing ? ' incomplete' : ''}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input class="inline-input" value="${esc(b.block_name)}" style="width:120px;font-weight:700;" onchange="fcUpdateBlock('${b.id}','block_name',this.value)">
+        <input class="inline-input" value="${esc(b.remarks || '')}" placeholder="Remarks" style="width:160px;" onchange="fcUpdateBlock('${b.id}','remarks',this.value)">
+        <label class="toggle" style="margin-left:auto;"><input type="checkbox" ${b.is_active ? 'checked' : ''} onchange="fcUpdateBlock('${b.id}','is_active',this.checked)"><span class="toggle-slider"></span></label>
+        <span style="font-size:11px;color:var(--text-dim);">${b.is_active ? 'Active' : 'Inactive'}</span>
+        <span class="save-tick" id="fc-tick-${b.id}">&#10003;</span>
+      </div>
+      <div class="block-crops-list">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">CROP ASSIGNMENTS</div>
+        ${bcrops.length ? bcrops.map(bc => {
+          const variety = fcVarieties.find(v => v.id === bc.variety_id);
+          const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
+          const cropStatuses = crop ? fcCropStatuses.filter(s => s.crop_id === crop.id) : [];
+          const statusOpts = cropStatuses.map(s => `<option value="${s.id}" ${s.id === bc.status_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+          const daysAge = bc.date_planted ? Math.floor((new Date() - new Date(bc.date_planted)) / (1000 * 60 * 60 * 24)) : null;
+          const monthsAge = daysAge !== null ? (daysAge / 30.44).toFixed(1) : null;
+          return `<div class="block-crop-row">
+            <span style="font-weight:600;min-width:140px;color:var(--text);">${esc((crop ? crop.name : '?') + ' — ' + (variety ? variety.name : '?'))}</span>
+            <input type="date" class="inline-input" value="${bc.date_planted || ''}" style="width:140px;" onchange="fcUpdateBlockCrop('${bc.id}','date_planted',this.value||null)">
+            <input type="number" class="inline-input" value="${bc.quantity !== null ? bc.quantity : ''}" placeholder="Qty" style="width:80px;" onchange="fcUpdateBlockCrop('${bc.id}','quantity',this.value===''?null:parseInt(this.value))">
+            <select class="inline-select" onchange="fcUpdateBlockCrop('${bc.id}','status_id',this.value||null)"><option value="">— Status —</option>${statusOpts}</select>
+            ${daysAge !== null ? `<span style="font-size:11px;color:var(--text-dim);">${daysAge}d (${monthsAge}mo)</span>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="fcRemoveBlockCrop('${bc.id}','${b.id}')" style="font-size:10px;">&#10005;</button>
+            <span class="save-tick" id="fc-tick-bc-${bc.id}">&#10003;</span>
+          </div>`;
+        }).join('') : `<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">No crops assigned yet</div>`}
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+          <select id="fc-add-var-${b.id}" style="min-width:180px;padding:6px 8px;font-size:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;">${varietyOpts}</select>
+          <button class="btn btn-primary btn-sm" onclick="fcAddBlockCrop('${b.id}')">Assign Crop</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function fcUpdateBlock(id, field, value) {
+  const upd = {};
+  if (field === 'block_name') {
+    const name = value.trim();
+    if (!name) { notify('Block name required', 'warning'); return; }
+    if (fcBlocks.some(b => b.id !== id && b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
+    upd.block_name = name;
+  } else {
+    upd[field] = value === "" ? null : value;
+  }
+  const { error } = await sb.from('pnd_blocks').update(upd).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
+  showTick('fc-tick-' + id);
+}
+
+async function fcAddBlock() {
+  const name = document.getElementById('fc-block-name').value.trim();
+  const remarks = document.getElementById('fc-block-remarks').value.trim() || null;
+  const sortOrder = parseInt(document.getElementById('fc-block-sort').value);
+  if (!name) { notify('Block name required', 'warning'); return; }
+  if (isNaN(sortOrder)) { notify('Sort order must be a number', 'warning'); return; }
+  if (fcBlocks.some(b => b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
+  const { error } = await sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder });
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  document.getElementById('fc-block-name').value = '';
+  document.getElementById('fc-block-remarks').value = '';
+  document.getElementById('fc-block-sort').value = '';
+  notify('Block added');
+  await loadFcBlocks(); await loadFarmConfig(); renderBlockList();
+}
+
+async function fcUpdateBlockCrop(id, field, value) {
+  const upd = {}; upd[field] = value;
+  const { error } = await sb.from('block_crops').update(upd).eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const bc = fcBlockCrops.find(x => x.id === id); if (bc) bc[field] = value;
+  showTick('fc-tick-bc-' + id);
+  if (field === 'date_planted') renderBlockList();
+}
+
+async function fcAddBlockCrop(blockId) {
+  const sel = document.getElementById('fc-add-var-' + blockId);
+  const varietyId = sel.value;
+  if (!varietyId) { notify('Select a variety', 'warning'); return; }
+  if (fcBlockCrops.some(bc => bc.block_id === blockId && bc.variety_id === varietyId)) { notify('This variety is already assigned to this block', 'warning'); return; }
+  const { error } = await sb.from('block_crops').insert({ block_id: blockId, variety_id: varietyId });
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Crop assigned');
+  await loadFarmConfig(); renderBlockList();
+}
+
+async function fcRemoveBlockCrop(id, blockId) {
+  if (!confirm('Remove this crop assignment?')) return;
+  const { error } = await sb.from('block_crops').delete().eq('id', id);
+  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  notify('Removed');
+  await loadFarmConfig(); renderBlockList();
+}
 </script>
 
 <!-- CHANGE PIN MODAL -->

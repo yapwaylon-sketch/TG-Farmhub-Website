@@ -270,10 +270,6 @@ textarea { resize:vertical; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
       <span class="nav-label">Job Logs</span>
     </div>
-    <div class="nav-item" data-page="blocks" onclick="navigateTo('blocks')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-      <span class="nav-label">Manage Blocks</span>
-    </div>
     <div class="nav-item" data-page="products" onclick="navigateTo('products')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/></svg>
       <span class="nav-label">Manage Products</span>
@@ -357,32 +353,6 @@ textarea { resize:vertical; }
   </div>
 </div>
 
-<!-- PAGE: BLOCKS -->
-<div id="page-blocks" class="page">
-  <div class="page-header">
-    <div><div class="page-title">Manage Blocks</div><div class="page-subtitle">Edit block details, statuses, and dosage overrides</div></div>
-  </div>
-  <div class="data-table" style="margin-bottom:18px;">
-    <div class="table-header">All Blocks</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Block Name</th><th>Date Planted</th><th>Status</th><th>Remarks</th><th>Active</th><th></th><th></th></tr></thead>
-        <tbody id="blocks-body"></tbody>
-      </table>
-    </div>
-  </div>
-  <div class="data-table">
-    <div class="table-header">Add New Block</div>
-    <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;">
-      <div class="form-field" style="margin:0;"><label>Block Name</label><input id="ab-name" placeholder="e.g. N17" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Date Planted</label><input id="ab-date" type="date" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Status</label><select id="ab-status" style="width:100%;"></select></div>
-      <div class="form-field" style="margin:0;"><label>Remarks</label><input id="ab-remarks" placeholder="Optional" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Sort Order</label><input id="ab-sort" type="number" placeholder="e.g. 29" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="addBlock()" style="width:100%;">Add Block</button></div>
-    </div>
-  </div>
-</div>
 
 <!-- PAGE: PRODUCTS -->
 <div id="page-products" class="page">
@@ -569,7 +539,6 @@ async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs()]); renderSummary(); }
   else if(currentPage === 'jobs') { await loadJobs(); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
-  else if(currentPage === 'blocks') renderBlocksPage();
   else if(currentPage === 'products') renderProductsPage();
   else if(currentPage === 'reports') initReports();
 }
@@ -1816,52 +1785,9 @@ async function executeDeleteJob(jobId) {
 }
 
 // ============================================================
-// BLOCKS PAGE
+// BLOCKS PAGE (removed — blocks are managed in Admin Hub)
+// Override functions below are retained for future use
 // ============================================================
-function renderBlocksPage() {
-  const tbody = document.getElementById("blocks-body");
-  const statusOpts = statuses.map(s=>`<option value="${s.id}">${esc(s.status_name)}</option>`).join("");
-  tbody.innerHTML = blocks.map(b => {
-    const selOpts = statuses.map(s=>`<option value="${s.id}" ${s.id===b.status_id?"selected":""}>${esc(s.status_name)}</option>`).join("");
-    return `<tr>
-      <td style="font-weight:600;">${esc(b.block_name)}</td>
-      <td>${b.date_planted||"—"}</td>
-      <td><select class="inline-select" onchange="updateBlock('${b.id}','status_id',this.value)"><option value="">— None —</option>${selOpts}</select></td>
-      <td><input class="inline-input" value="${esc(b.remarks||"")}" style="width:120px;" onchange="updateBlock('${b.id}','remarks',this.value)"></td>
-      <td><label class="toggle"><input type="checkbox" ${b.is_active?"checked":""} onchange="updateBlock('${b.id}','is_active',this.checked)"><span class="toggle-slider"></span></label></td>
-      <td><span class="save-tick" id="tick-b-${b.id}">✓</span></td>
-      <td><span class="override-toggle" onclick="toggleOverrides('${b.id}',this)">▶ Overrides</span></td>
-    </tr>
-    <tr id="ov-row-${b.id}" style="display:none;"><td colspan="7"><div class="override-section" id="ov-${b.id}"></div></td></tr>`;
-  }).join("");
-  // Populate add-block status dropdown
-  const abSel = document.getElementById("ab-status");
-  abSel.innerHTML = '<option value="">— None —</option>'+statusOpts;
-}
-
-async function updateBlock(id, field, value) {
-  const upd = {}; upd[field] = (value==="" && field==="status_id")?null:value;
-  const {error} = await sb.from("pnd_blocks").update(upd).eq("id",id);
-  if(error) { notify("Error: "+error.message,"error"); return; }
-  const bl = blocks.find(b=>b.id===id); if(bl) bl[field]=upd[field];
-  showTick("tick-b-"+id);
-}
-
-async function addBlock() {
-  const name=document.getElementById("ab-name").value.trim();
-  const date=document.getElementById("ab-date").value||null;
-  const statusId=document.getElementById("ab-status").value||null;
-  const remarks=document.getElementById("ab-remarks").value.trim()||null;
-  const sortOrder=parseInt(document.getElementById("ab-sort").value);
-  if(!validateRequired(["ab-name","ab-sort"])) return;
-  if(isNaN(sortOrder)) { notify("Sort Order must be a number","warning"); return; }
-  if(blocks.some(b=>b.block_name.toLowerCase()===name.toLowerCase())) { notify("A block named '"+name+"' already exists","warning"); return; }
-  const {error} = await sb.from("pnd_blocks").insert({block_name:name,date_planted:date,status_id:statusId,remarks,sort_order:sortOrder});
-  if(error) { notify("Error: "+error.message,"error"); return; }
-  notify("Block added");
-  document.getElementById("ab-name").value=""; document.getElementById("ab-date").value=""; document.getElementById("ab-remarks").value=""; document.getElementById("ab-sort").value="";
-  await loadBlocks(); renderBlocksPage();
-}
 
 function toggleOverrides(blockId, el) {
   const row = document.getElementById("ov-row-"+blockId);
