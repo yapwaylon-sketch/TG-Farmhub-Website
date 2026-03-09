@@ -8,178 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg: #1A1F1A;
-  --bg-card: #242C24;
-  --bg-hover: #2A342A;
-  --bg-input: #1E261E;
-  --border: #2E3A2E;
-  --border-light: #3A463A;
-  --text: #D0DCC0;
-  --text-muted: #7A8A7A;
-  --text-dim: #5A6A5A;
-  --white: #E8F0E0;
-  --green: #4A7C3F;
-  --green-light: #6B9E5E;
-  --green-pale: rgba(74,124,63,0.15);
-  --gold: #E8A020;
-  --gold-light: #F5C04A;
-  --gold-pale: rgba(232,160,32,0.12);
-  --red: #E86060;
-  --red-pale: rgba(232,96,96,0.12);
-  --good: #6BC460;
-  --good-bg: rgba(60,180,50,0.12);
-  --low: #F5C04A;
-  --low-bg: rgba(245,192,74,0.12);
-  --critical: #E86060;
-  --critical-bg: rgba(232,96,96,0.12);
-  --sidebar-w: 220px;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  height: 100vh;
-  overflow: hidden;
-}
-
-#app {
-  display: flex;
-  height: 100vh;
-}
-
-/* SCROLLBAR */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
-
-/* SIDEBAR */
-.sidebar {
-  width: var(--sidebar-w);
-  background: #161B16;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  transition: width 0.2s ease;
-  overflow: hidden;
-}
-
-.sidebar-brand {
-  padding: 18px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  min-height: 90px;
-}
-
-.sidebar-logo {
-  width: 70px; height: 70px; border-radius: 50%;
-  background: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; flex-shrink: 0;
-  overflow: hidden;
-  padding: 4px;
-}
-
-.sidebar-brand-text { font-weight: 800; font-size: 15px; color: var(--gold-light); line-height: 1.2; }
-.sidebar-brand-sub { font-size: 11px; color: var(--text-dim); font-weight: 500; }
-
-.sidebar-nav { padding: 12px 0; flex: 1; }
-
-.nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px; cursor: pointer;
-  border-left: 3px solid transparent;
-  color: var(--text-muted); font-weight: 500; font-size: 13px;
-  transition: all 0.15s; white-space: nowrap;
-}
-
-.nav-item:hover { background: rgba(255,255,255,0.03); }
-.nav-item.active {
-  border-left-color: var(--green-light);
-  background: var(--green-pale);
-  color: #8FBF80; font-weight: 700;
-}
-
-.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-
-.sidebar-sync {
-  padding: 12px 16px; border-top: 1px solid var(--border);
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--text-dim); cursor: pointer;
-}
-
-.sidebar-sync:hover { color: var(--text-muted); }
-.sidebar-sync svg { width: 14px; height: 14px; }
-
-/* MAIN */
-.main-content {
-  flex: 1; overflow: auto; padding: 24px 28px;
-}
-
-/* PAGE HEADER */
-.page-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-  flex-wrap: wrap; gap: 12px;
-}
-
-.page-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 24px; font-weight: 700; color: var(--white);
-}
-
-.page-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* BUTTONS */
-.btn {
-  padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700;
-  border: none; cursor: pointer; font-family: inherit;
-  display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.btn:hover { filter: brightness(1.1); }
-.btn svg { width: 14px; height: 14px; }
-.btn-primary { background: var(--green); color: white; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-.btn-outline:hover { border-color: var(--border-light); background: rgba(255,255,255,0.03); }
-.btn-danger { background: var(--red-pale); color: var(--red); border: 1px solid rgba(232,96,96,0.25); }
-
-.btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
-
-/* SUMMARY CARDS */
-.cards-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px;
-}
-
-@media (max-width: 900px) { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
-
-.summary-card {
-  background: var(--bg-card); border-radius: 10px; padding: 16px; border: 1px solid var(--border);
-  transition: border-color 0.2s, transform 0.15s;
-}
-.summary-card[onclick]:hover {
-  border-color: var(--gold); transform: translateY(-2px);
-}
-
-.summary-card .sc-label {
-  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: 0.05em; font-weight: 700; margin-bottom: 4px;
-}
-
-.summary-card .sc-value { font-size: 24px; font-weight: 800; }
-.summary-card .sc-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-
 /* ALERT BANNER */
 .alert-banner {
   background: var(--gold-pale); border: 1px solid rgba(232,160,32,0.25);
@@ -190,74 +18,13 @@ body {
 
 .alert-banner svg { width: 18px; height: 18px; color: var(--gold); flex-shrink: 0; }
 
-/* TABLE */
-.data-table {
-  background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border); overflow: hidden;
-}
-
-.table-header {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-  font-weight: 700; font-size: 14px;
-}
-
-.table-toolbar {
-  padding: 12px 14px; display: flex; gap: 10px; align-items: center;
-  border-bottom: 1px solid var(--border); flex-wrap: wrap;
-}
-
-table { width: 100%; border-collapse: collapse; }
-
-th {
-  text-align: left; padding: 9px 16px; font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
-  background: #1E261E; border-bottom: 1px solid var(--border);
-}
-
-td {
-  padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text);
-}
-
-tr.clickable { cursor: pointer; transition: background 0.1s; }
-tr.clickable:hover { background: var(--bg-hover); }
-
-.td-bold { font-weight: 600; color: var(--white); }
-.td-gold { color: var(--gold-light); font-size: 12px; }
-
-/* BADGES */
-.badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
-}
-
-.badge-in { background: var(--good-bg); color: var(--good); }
-.badge-out { background: var(--critical-bg); color: var(--critical); }
-.badge-good { background: var(--good-bg); color: var(--good); }
-.badge-low { background: var(--low-bg); color: var(--low); }
-.badge-critical { background: var(--critical-bg); color: var(--critical); }
-
 /* SEARCH & INPUTS */
 .search-wrap { position: relative; flex: 1; min-width: 200px; }
 .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-dim); }
 .search-wrap input { padding-left: 32px; }
 
-input, select, textarea {
-  padding: 9px 12px; border-radius: 8px; font-size: 13px; font-family: inherit;
-  border: 1px solid var(--border); background: var(--bg-input); color: var(--text);
-  outline: none; transition: border-color 0.15s;
-}
-
-input:focus, select:focus, textarea:focus { border-color: var(--green); }
-select { cursor: pointer; min-width: 140px; }
-textarea { resize: vertical; }
-
-.form-field { margin-bottom: 14px; }
-.form-field label {
-  display: block; font-size: 11px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px;
-}
-
-.form-row { display: flex; gap: 12px; }
-.form-row .form-field { flex: 1; }
+/* Keep inventory-specific select min-width override */
+select { min-width: 140px; }
 
 /* INFO PILLS */
 .info-pills { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
@@ -324,37 +91,6 @@ textarea { resize: vertical; }
 
 .chart-title { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 20px; }
 
-/* MODAL */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 999; backdrop-filter: blur(4px);
-  animation: fadeIn 0.2s ease;
-}
-
-.modal-box {
-  background: var(--bg-card); border-radius: 14px; padding: 28px;
-  width: 90vw; max-width: 500px; max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4); border: 1px solid var(--border);
-}
-
-.modal-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-}
-
-.modal-title {
-  font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; color: var(--white);
-}
-
-.modal-close {
-  background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px;
-}
-
-.modal-close:hover { color: var(--text); }
-.modal-close svg { width: 18px; height: 18px; }
-
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
 /* TYPE TOGGLE */
 .type-toggle { display: flex; gap: 8px; }
 .type-option {
@@ -401,31 +137,11 @@ textarea { resize: vertical; }
 .back-link:hover { color: var(--text); }
 .back-link svg { width: 16px; height: 16px; }
 
-/* NOTIFICATION */
-.notification {
-  position: fixed; top: 20px; right: 20px; z-index: 1000;
-  padding: 10px 18px; border-radius: 10px;
-  font-weight: 600; font-size: 13px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  animation: slideIn 0.3s ease;
-  display: flex; align-items: center; gap: 8px; color: white;
-}
-
-.notification.success { background: var(--green); }
-.notification.warning { background: var(--gold); }
-
 .empty-state {
   padding: 40px; text-align: center; color: var(--text-dim); font-size: 14px;
 }
 
-/* PAGE HIDDEN */
-.page { display: none; }
-.page.active { display: block; }
-
-/* ANIMATIONS */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* ANIMATIONS (inventory-specific only) */
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 .blink-dot {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
@@ -693,9 +409,6 @@ textarea { resize: vertical; }
 
   <!-- MAIN CONTENT -->
   <div class="main-content">
-
-    <!-- NOTIFICATION -->
-    <div id="notification" class="notification" style="display:none;"></div>
 
     <!-- ===== DASHBOARD ===== -->
     <div id="page-dashboard" class="page active">
@@ -1320,6 +1033,8 @@ textarea { resize: vertical; }
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
 <script>
 // ============================================================
 // CONFIGURATION
@@ -1351,12 +1066,8 @@ const CONFIG = {
 };
 
 // ============================================================
-// SUPABASE CONNECTION
+// SUPABASE CONNECTION — credentials and sb client provided by shared.js
 // ============================================================
-const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA"; // REPLACE with your anon key from Supabase Settings > API
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
 // DATA (loaded from Supabase on startup)
@@ -1438,12 +1149,6 @@ async function syncNow() {
 // ============================================================
 // SUPABASE CRUD HELPERS
 // ============================================================
-async function dbNextId(prefix) {
-  const { data, error } = await sb.rpc("next_id", { p_prefix: prefix });
-  if (error) { console.error("ID gen error:", error); return prefix + Date.now(); }
-  return data;
-}
-
 async function dbInsertProduct(p) {
   const { error } = await sb.from("products").insert({
     id: p.id, name: p.name, category: p.category, subcategory: p.subcategory || "",
@@ -1531,16 +1236,7 @@ async function dbDeleteSupplier(id) {
 
 
 
-// Inactivity auto-logout
-var inactivityTimer = null;
-var INACTIVITY_TIMEOUT = 30 * 60 * 1000;
-function startInactivityTimer() {
-  clearInactivityTimer();
-  var reset = function() { clearTimeout(inactivityTimer); inactivityTimer = setTimeout(function() { notify("Session expired due to inactivity", "warning"); setTimeout(function() { doLogout(); }, 1500); }, INACTIVITY_TIMEOUT); };
-  ["mousemove","keydown","click","scroll","touchstart"].forEach(function(e) { document.addEventListener(e, reset, {passive:true}); });
-  reset();
-}
-function clearInactivityTimer() { if (inactivityTimer) clearTimeout(inactivityTimer); }
+// Inactivity timer — provided by shared.js
 
 let currentPage = "dashboard";
 let selectedProductId = null;
@@ -1617,7 +1313,7 @@ function showApp() {
   navigateTo("dashboard");
   updateUserDisplay();
   applyPermissions();
-  injectUserBadge();
+  injectUserBadge(currentUser);
 }
 
 function updateUserDisplay() {
@@ -1693,26 +1389,13 @@ function getStockStatus(p) {
   return "good";
 }
 
-function formatDate(d) {
-  const dt = new Date(d + "T00:00:00");
-  return dt.toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
-}
-
-function formatDateShort(d) {
-  const dt = new Date(d + "T00:00:00");
-  return dt.toLocaleDateString("en-GB", { day:"numeric", month:"short" });
-}
+// formatDate → fmtDateNice (from shared.js)
+// formatDateShort → fmtDateShort (from shared.js)
+// notify → from shared.js
+// formatRM → from shared.js
 
 function genId(prefix) { return prefix + String(Date.now()).slice(-6); } // fallback only
 // Use await dbNextId(prefix) for database IDs
-
-function notify(msg, type) {
-  const el = document.getElementById("notification");
-  el.className = "notification " + (type || "success");
-  el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><polyline points="20 6 9 17 4 12"/></svg>' + msg;
-  el.style.display = "flex";
-  setTimeout(() => { el.style.display = "none"; }, 3000);
-}
 
 // ============================================================
 // NAVIGATION
@@ -1730,7 +1413,7 @@ function navigateTo(page) {
   if (page === "analytics") renderAnalytics();
   if (page === "suppliers") renderSuppliers();
   if (page === "reports") initReportsPage();
-  injectUserBadge();
+  injectUserBadge(currentUser);
 }
 
 function jumpToProducts(category, status) {
@@ -1739,21 +1422,7 @@ function jumpToProducts(category, status) {
   navigateTo("products");
 }
 
-function injectUserBadge() {
-  const container = document.getElementById("sidebar-user-info");
-  if (!container) return;
-  if (!currentUser) { container.innerHTML = ""; return; }
-  const initials = currentUser.displayName.split(" ").map(w=>w[0]).join("").substring(0,2).toUpperCase();
-  const roleBg = currentUser.role === "admin" ? "var(--gold-pale)" : "rgba(46,160,67,0.15)";
-  const roleColor = currentUser.role === "admin" ? "var(--gold)" : "var(--good)";
-  const roleLabel = currentUser.role === "admin" ? "Admin" : "Staff";
-  container.innerHTML = `
-    <div style="width:30px;height:30px;border-radius:50%;background:var(--gold-pale);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gold);flex-shrink:0;">${initials}</div>
-    <div class="nav-label">
-      <div style="font-size:12px;font-weight:700;color:var(--white);line-height:1.2;">${currentUser.displayName}</div>
-      <div style="font-size:9px;font-weight:600;color:${roleColor};background:${roleBg};display:inline-block;padding:1px 6px;border-radius:8px;margin-top:2px;">${roleLabel}</div>
-    </div>`;
-}
+// injectUserBadge(currentUser) — from shared.js
 
 function toggleAIGroup(idx) {
   const sub = document.getElementById("ai-sub-" + idx);
@@ -1775,7 +1444,7 @@ function openJournal(productId) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   document.querySelector('.nav-item[data-page="products"]').classList.add("active");
   renderJournal();
-  injectUserBadge();
+  injectUserBadge(currentUser);
 }
 
 function toggleSidebar() {
@@ -1973,7 +1642,7 @@ function renderDashboard() {
     const p = products.find(pr => pr.id === t.productId);
     const txnValue = t.totalCost > 0 ? t.totalCost : (t.type === "out" ? t.quantity * getProductAvgCost(t.productId) : 0);
     return `<tr class="clickable" onclick="openJournal('${t.productId}')">
-      <td>${formatDateShort(t.date)}</td>
+      <td>${fmtDateShort(t.date)}</td>
       <td class="td-bold">${t.productName}</td>
       <td><span class="badge badge-${t.type}">${t.type==="in"?"▼ IN":"▲ OUT"}</span></td>
       <td style="font-weight:600;">${p ? packQty(t.quantity, p) : t.quantity}</td>
@@ -2189,7 +1858,7 @@ function renderJournal() {
         <div style="flex:1;">
           <div class="je-type ${typeClass}">${typeLabel}</div>
           <div class="je-detail">${detailLine}</div>
-          <div class="je-meta">${formatDate(t.date)}${t.type==="check" && t.takenBy?" · Checked by "+t.takenBy:""} · Recorded by ${t.recordedBy}${t.type!=="check" && t.notes?" · "+t.notes:""}</div>
+          <div class="je-meta">${fmtDateNice(t.date)}${t.type==="check" && t.takenBy?" · Checked by "+t.takenBy:""} · Recorded by ${t.recordedBy}${t.type!=="check" && t.notes?" · "+t.notes:""}</div>
         </div>
         <div class="je-qty ${typeClass}">${qtyLabel} ${packLabel(p)}</div>
         ${editBtns}
@@ -2298,7 +1967,7 @@ function renderAnalytics() {
 // ============================================================
 // MODALS
 // ============================================================
-function closeModal(id) { document.getElementById(id).style.display = "none"; }
+// closeModal(id) — from shared.js
 
 function openTransactionModal(preProductId) {
   txnPreselectedProduct = preProductId || null;
@@ -2818,9 +2487,7 @@ function getProductStockValue(productId) {
   return p.currentStock * getProductAvgCost(productId);
 }
 
-function formatRM(val) {
-  return "RM " + val.toLocaleString("en-MY", {minimumFractionDigits:2, maximumFractionDigits:2});
-}
+// formatRM — from shared.js
 
 function populateSupplierCheckboxes(selectedIds) {
   const container = document.getElementById("prod-suppliers-list");

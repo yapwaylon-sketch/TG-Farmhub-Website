@@ -7,119 +7,48 @@
 <title>Worker Management — TG FarmHub</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
 <style>
-:root {
-  --bg: #1A1F1A;
-  --bg-card: #242C24;
-  --bg-hover: #2A342A;
-  --bg-input: #1E261E;
-  --border: #2E3A2E;
-  --border-light: #3A463A;
-  --text: #D0DCC0;
-  --text-muted: #7A8A7A;
-  --text-dim: #5A6A5A;
-  --white: #E8F0E0;
-  --green: #4A7C3F;
-  --green-light: #6B9E5E;
-  --green-pale: rgba(74,124,63,0.15);
-  --gold: #E8A020;
-  --gold-light: #F5C04A;
-  --gold-pale: rgba(232,160,32,0.12);
-  --red: #E86060;
-  --red-pale: rgba(232,96,96,0.12);
-  --good: #6BC460;
-  --good-bg: rgba(60,180,50,0.12);
-  --low: #F5C04A;
-  --critical: #E86060;
-  --critical-bg: rgba(232,96,96,0.12);
-  --sidebar-w: 220px;
-}
+/* Workers-specific overrides */
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; height: 100vh; overflow: hidden; }
-#app { display: flex; height: 100vh; }
-
-/* SIDEBAR */
-.sidebar { width: var(--sidebar-w); background: #161B16; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
-.sidebar-brand { padding: 18px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; min-height: 90px; }
-.sidebar-logo { width: 70px; height: 70px; background: white; border-radius: 50%; padding: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
-.sidebar-logo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; border-radius: 50%; }
-.sidebar-brand-text { font-weight: 800; font-size: 14px; color: var(--gold-light); line-height: 1.2; }
-.sidebar-brand-sub { font-size: 11px; color: var(--text-dim); font-weight: 500; }
-.sidebar-nav { flex: 1; padding: 8px 0; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text-muted); font-size: 13px; font-weight: 500; transition: all 0.15s; border-left: 3px solid transparent; }
-.nav-item:hover { background: rgba(255,255,255,0.03); }
-.nav-item.active { color: #8FBF80; border-left-color: var(--green-light); background: var(--green-pale); }
-.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-.sidebar-sync { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); cursor: pointer; }
-.sidebar-sync:hover { color: var(--text-muted); }
-.sidebar-sync svg { width: 14px; height: 14px; }
-
-/* MAIN */
-.main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-.page { display: none; flex: 1; padding: 24px; overflow-y: auto; }
-.page.active { display: block; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-.page-title { font-size: 20px; font-weight: 700; color: var(--white); }
-
-/* BUTTONS */
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; transition: all 0.15s; }
+/* Gold primary button (overrides shared.css green) */
 .btn-primary { background: var(--gold); color: #1a1a1a; }
 .btn-primary:hover { background: var(--gold-light); }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
-.btn-sm { padding: 4px 10px; font-size: 11px; }
 .btn-danger { background: var(--critical-bg); color: var(--critical); border: 1px solid transparent; }
 .btn-danger:hover { border-color: var(--critical); }
 
-/* CARDS */
+/* MAIN layout (workers uses .main not .main-content) */
+.main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.page { display: none; flex: 1; padding: 24px; overflow-y: auto; }
+.page.active { display: block; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--white); }
+
+/* CARD */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+/* STAT CARDS (module-specific, different from shared .summary-card) */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
 .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-value { font-size: 24px; font-weight: 800; color: var(--white); margin-top: 4px; }
 .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
-/* TABLE */
+/* DATA TABLE — workers uses this as a plain <table> element, not a card wrapper */
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
-.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+.data-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: transparent; }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; color: var(--text); }
 .data-table tr:hover { background: var(--bg-hover); }
 
-/* BADGES */
-.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-.badge-active { background: var(--good-bg); color: var(--good); }
-.badge-inactive { background: var(--critical-bg); color: var(--critical); }
+/* BADGES — workers-specific variants */
 .badge-m { background: rgba(74,124,200,0.15); color: #7AA0D0; }
 .badge-f { background: rgba(200,100,150,0.15); color: #D080A0; }
 
-/* MODAL */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 90vw; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.modal-title { font-size: 18px; font-weight: 700; color: var(--white); }
-.modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
-.modal-close:hover { background: var(--bg-hover); color: var(--white); }
-.modal-close svg { width: 18px; height: 18px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-
-/* FORMS */
-.form-field { margin-bottom: 14px; }
-.form-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-.form-field input, .form-field select, .form-field textarea { width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-size: 13px; font-family: inherit; }
-.form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--gold); }
-.form-row { display: flex; gap: 12px; }
-.form-row .form-field { flex: 1; }
-
-/* NOTIFICATION */
-#notify-bar { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-.notify-msg { padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; background: var(--green); color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.3); animation: notifyIn 0.3s ease; pointer-events: auto; }
-.notify-msg.warning { background: var(--gold); color: #1a1a1a; }
-@keyframes notifyIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* SPIN animation */
 .spin { animation: spin 1s linear infinite; }
 
-/* SEARCH */
+/* SEARCH BOX */
 .search-box { display: flex; align-items: center; gap: 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
 .search-box input { background: none; border: none; color: var(--white); font-size: 13px; font-family: inherit; flex: 1; outline: none; }
 .search-box svg { width: 16px; height: 16px; color: var(--text-dim); flex-shrink: 0; }
@@ -129,7 +58,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
 .empty-state p { font-size: 14px; }
 
-/* MOBILE */
+/* MOBILE — workers-specific collapsing sidebar */
 @media (max-width: 768px) {
   .sidebar { width: 60px; }
   .sidebar-brand-text, .sidebar-brand-sub, .nav-label, .sidebar-sync, #sidebar-user { display: none; }
@@ -145,7 +74,6 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 </head>
 <body>
 <div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
-<div id="notify-bar"></div>
 
 <!-- LOGIN (fallback if no session) -->
 <div id="login-screen" style="display:none;justify-content:center;align-items:center;height:100vh;width:100vw;background:var(--bg);">
@@ -709,24 +637,9 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); colo
 
 <script>
 // ============================================================
-// CONFIG
+// CONFIG — Supabase, inactivity timer, notify, fmtDate, dbNextId,
+//           closeModal, doLogout all provided by shared.js
 // ============================================================
-const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-
-// Inactivity auto-logout
-var inactivityTimer = null;
-var INACTIVITY_TIMEOUT = 30 * 60 * 1000;
-function startInactivityTimer() {
-  clearInactivityTimer();
-  var reset = function() { clearTimeout(inactivityTimer); inactivityTimer = setTimeout(function() { notify("Session expired due to inactivity", "warning"); setTimeout(function() { doLogout(); }, 1500); }, INACTIVITY_TIMEOUT); };
-  ["mousemove","keydown","click","scroll","touchstart"].forEach(function(e) { document.addEventListener(e, reset, {passive:true}); });
-  reset();
-}
-function clearInactivityTimer() { if (inactivityTimer) clearTimeout(inactivityTimer); }
 
 const OT_DIVISOR = 9.5; // OT formula: (pay_rate / 9.5) × ot_hours
 
@@ -754,26 +667,9 @@ let currentPeriodId = null;
 let users = [];
 
 // ============================================================
-// HELPERS
+// HELPERS — notify, closeModal, fmtNum2, fmtDate, dbNextId
+//            are all provided by shared.js
 // ============================================================
-function notify(msg, type) {
-  const bar = document.getElementById("notify-bar");
-  const el = document.createElement("div");
-  el.className = "notify-msg" + (type === "warning" ? " warning" : "");
-  el.textContent = msg;
-  bar.appendChild(el);
-  setTimeout(() => { el.style.transition = "opacity 0.3s"; el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, 3000);
-}
-function closeModal(id) { document.getElementById(id).style.display = "none"; }
-function fmt(n) { return (n || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-function fmtDate(d) {
-  if (!d) return '—';
-  const parts = String(d).split('-');
-  if (parts.length !== 3) return d;
-  return parts[2] + '/' + parts[1] + '/' + parts[0];
-}
-
 function calcTenure(joinDate) {
   if (!joinDate) return '—';
   const start = new Date(joinDate);
@@ -815,13 +711,6 @@ function getTotalService(workerId) {
   if (months > 0) return months + 'm';
   if (totalDays > 0) return totalDays + 'd';
   return 'New';
-}
-
-async function dbNextId(prefix) {
-  try {
-    const { data } = await sb.rpc("next_id", { p_prefix: prefix });
-    return data;
-  } catch(e) { return prefix + String(Date.now()).slice(-6); }
 }
 
 // Audit log — writes to audit_log table + appends to record's notes field
@@ -896,8 +785,6 @@ function tryRestoreSession() {
   return false;
 }
 
-function doLogout() { currentUser = null; clearInactivityTimer(); sessionStorage.removeItem("tgfarmhub_user"); window.location.href = "index.html"; }
-
 async function syncAll() {
   const icon = document.getElementById("sync-icon");
   const txt = document.getElementById("sync-text");
@@ -920,8 +807,7 @@ function showApp() {
   document.getElementById("login-screen").style.display = "none";
   startInactivityTimer();
   document.getElementById("app").style.display = "flex";
-  const ui = document.getElementById("sidebar-user-info");
-  if (ui && currentUser.displayName) ui.textContent = currentUser.displayName;
+  injectUserBadge(currentUser);
   navigateTo("workers");
 }
 
@@ -1006,7 +892,7 @@ function renderWorkerList() {
     <div class="stat-card"><div class="stat-label">Total Workers</div><div class="stat-value">${workers.length}</div></div>
     <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:var(--good);">${active.length}</div></div>
     <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:var(--critical);">${workers.length - active.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Avg Pay Rate</div><div class="stat-value">RM ${active.length ? fmt(active.reduce((s,w) => s + (parseFloat(w.pay_rate)||0), 0) / active.length) : "0.00"}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Pay Rate</div><div class="stat-value">RM ${active.length ? fmtNum2(active.reduce((s,w) => s + (parseFloat(w.pay_rate)||0), 0) / active.length) : "0.00"}</div></div>
   `;
 
   // Sort indicators
@@ -1026,10 +912,10 @@ function renderWorkerList() {
     <tr onclick="openWorkerProfile('${w.id}')" style="cursor:pointer;">
       <td style="font-weight:600;">${w.name}</td>
       <td>${w.gender ? '<span class="badge badge-' + w.gender.toLowerCase() + '">' + w.gender + '</span>' : '—'}</td>
-      <td>RM ${fmt(w.pay_rate)}</td>
+      <td>RM ${fmtNum2(w.pay_rate)}</td>
       <td style="color:var(--text-muted);">${w.role || '—'}</td>
       <td style="font-size:11px;color:var(--text-muted);">${getWorkerTenure(w.id)}</td>
-      <td>${loanBal > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmt(loanBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td>${loanBal > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmtNum2(loanBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td><span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span></td>
       <td style="text-align:right;" onclick="event.stopPropagation();">
         <button class="btn btn-outline btn-sm" onclick="openEditWorker('${w.id}')">Edit</button>
@@ -1307,7 +1193,7 @@ function renderTaskTypes() {
     <tr>
       <td style="font-weight:600;">${t.name}</td>
       <td>${t.pay_mode === "quantity" ? "Qty x Rate" : "Lump Sum"}</td>
-      <td>${t.pay_mode === "quantity" ? "RM " + fmt(t.default_rate) : "—"}</td>
+      <td>${t.pay_mode === "quantity" ? "RM " + fmtNum2(t.default_rate) : "—"}</td>
       <td>${t.unit || "—"}</td>
       <td>${t.is_default ? '<span style="color:var(--text-dim);">Yes</span>' : 'Custom'}</td>
       <td style="text-align:right;">
@@ -1725,9 +1611,9 @@ function renderPayrollEntries() {
   // Summary bar — 3 numbers
   if (payrollEntries.length > 0) {
     html += '<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-bottom:16px;">';
-    html += '<div class="stat-card"><div class="stat-label">Total Salary (Gross)</div><div class="stat-value" style="font-size:18px;color:var(--white);">RM ' + fmt(totalSalary) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Salary to be Paid (Net)</div><div class="stat-value" style="font-size:18px;color:var(--gold);">RM ' + fmt(salaryToPay) + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Balance to Pay</div><div class="stat-value" style="font-size:18px;color:' + (balanceToPay > 0 ? 'var(--critical)' : 'var(--good)') + ';">RM ' + fmt(balanceToPay) + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Total Salary (Gross)</div><div class="stat-value" style="font-size:18px;color:var(--white);">RM ' + fmtNum2(totalSalary) + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Salary to be Paid (Net)</div><div class="stat-value" style="font-size:18px;color:var(--gold);">RM ' + fmtNum2(salaryToPay) + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Balance to Pay</div><div class="stat-value" style="font-size:18px;color:' + (balanceToPay > 0 ? 'var(--critical)' : 'var(--good)') + ';">RM ' + fmtNum2(balanceToPay) + '</div></div>';
     html += '</div>';
   }
 
@@ -1743,12 +1629,12 @@ function renderPayrollEntries() {
       html += '<tr>';
       html += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + '</td>';
       html += '<td>' + (pe.days_worked || 0) + '</td>';
-      html += '<td>RM ' + fmt(pe.daily_wage) + '</td>';
-      html += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmt(pe.ot_pay) : '—') + '</td>';
-      html += '<td>RM ' + fmt(pe.responsibility_total || 0) + '</td>';
-      html += '<td>RM ' + fmt(pe.task_total) + '</td>';
-      html += '<td style="color:var(--critical);">RM ' + fmt(pe.total_deductions) + '</td>';
-      html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmt(pe.final_pay) + '</td>';
+      html += '<td>RM ' + fmtNum2(pe.daily_wage) + '</td>';
+      html += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmtNum2(pe.ot_pay) : '—') + '</td>';
+      html += '<td>RM ' + fmtNum2(pe.responsibility_total || 0) + '</td>';
+      html += '<td>RM ' + fmtNum2(pe.task_total) + '</td>';
+      html += '<td style="color:var(--critical);">RM ' + fmtNum2(pe.total_deductions) + '</td>';
+      html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(pe.final_pay) + '</td>';
       html += '<td><span class="badge ' + (isPaid ? 'badge-active' : 'badge-inactive') + '" style="cursor:pointer;" onclick="togglePaymentStatus(\'' + pe.id + '\')">' + (isPaid ? 'Paid' : 'Unpaid') + '</span></td>';
       html += '<td style="text-align:right;white-space:nowrap;" class="no-print"><button class="btn btn-outline btn-sm" onclick="openPaySlip(\'' + pe.id + '\')" style="margin-right:4px;">Slip</button><button class="btn btn-outline btn-sm" onclick="openPayrollEntry(\'' + pe.id + '\')" ' + (isClosed ? 'disabled' : '') + '>Edit</button></td>';
       html += '</tr>';
@@ -1757,12 +1643,12 @@ function renderPayrollEntries() {
     // Totals row
     html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
     html += '<td style="color:var(--gold);">TOTAL</td><td></td>';
-    html += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
-    html += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
-    html += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
-    html += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
-    html += '<td style="color:var(--critical);">RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
-    html += '<td style="text-align:right;color:var(--gold);">RM ' + fmt(salaryToPay) + '</td>';
+    html += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
+    html += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
+    html += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
+    html += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
+    html += '<td style="color:var(--critical);">RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
+    html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(salaryToPay) + '</td>';
     html += '<td></td><td class="no-print"></td>';
     html += '</tr>';
 
@@ -1813,9 +1699,9 @@ function printPayrollList() {
   printHtml += '<p>Payroll Report — ' + periodLabel + '</p>';
   printHtml += '<p>Generated: ' + new Date().toLocaleDateString("en-GB") + '</p>';
   printHtml += '<div class="summary">';
-  printHtml += '<div>Total Salary (Gross): <span>RM ' + fmt(totalSalary) + '</span></div>';
-  printHtml += '<div>Salary to be Paid (Net): <span>RM ' + fmt(salaryToPay) + '</span></div>';
-  printHtml += '<div>Balance to Pay: <span>RM ' + fmt(balanceToPay) + '</span></div>';
+  printHtml += '<div>Total Salary (Gross): <span>RM ' + fmtNum2(totalSalary) + '</span></div>';
+  printHtml += '<div>Salary to be Paid (Net): <span>RM ' + fmtNum2(salaryToPay) + '</span></div>';
+  printHtml += '<div>Balance to Pay: <span>RM ' + fmtNum2(balanceToPay) + '</span></div>';
   printHtml += '</div>';
   printHtml += '<table><thead><tr><th>Worker</th><th>Days</th><th>Base Wage</th><th>OT</th><th>Resp.</th><th>Contract</th><th>Deductions</th><th style="text-align:right;">Net Pay</th><th>Status</th></tr></thead><tbody>';
 
@@ -1825,23 +1711,23 @@ function printPayrollList() {
     printHtml += '<tr>';
     printHtml += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + '</td>';
     printHtml += '<td>' + (pe.days_worked || 0) + '</td>';
-    printHtml += '<td>RM ' + fmt(pe.daily_wage) + '</td>';
-    printHtml += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmt(pe.ot_pay) : '—') + '</td>';
-    printHtml += '<td>RM ' + fmt(pe.responsibility_total || 0) + '</td>';
-    printHtml += '<td>RM ' + fmt(pe.task_total) + '</td>';
-    printHtml += '<td>RM ' + fmt(pe.total_deductions) + '</td>';
-    printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmt(pe.final_pay) + '</td>';
+    printHtml += '<td>RM ' + fmtNum2(pe.daily_wage) + '</td>';
+    printHtml += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmtNum2(pe.ot_pay) : '—') + '</td>';
+    printHtml += '<td>RM ' + fmtNum2(pe.responsibility_total || 0) + '</td>';
+    printHtml += '<td>RM ' + fmtNum2(pe.task_total) + '</td>';
+    printHtml += '<td>RM ' + fmtNum2(pe.total_deductions) + '</td>';
+    printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmtNum2(pe.final_pay) + '</td>';
     printHtml += '<td class="' + (isPaid ? 'paid' : 'unpaid') + '">' + (isPaid ? 'Paid' : 'Unpaid') + '</td>';
     printHtml += '</tr>';
   }
 
   printHtml += '<tr class="total-row"><td>TOTAL</td><td></td>';
-  printHtml += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmt(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
-  printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmt(salaryToPay) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
+  printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmtNum2(salaryToPay) + '</td>';
   printHtml += '<td></td></tr>';
   printHtml += '</tbody></table></body></html>';
 
@@ -1941,7 +1827,7 @@ function renderPeTasks() {
     html += '<div style="font-size:12px;">' + t.name + '</div>';
     html += '<input type="number" step="1" value="' + (d.quantity || '') + '" id="ptq-' + t.id + '" oninput="onTaskInput(\'' + t.id + '\')" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;">';
     html += '<input type="number" step="0.50" value="' + (d.rate || '') + '" id="ptr-' + t.id + '" oninput="onTaskInput(\'' + t.id + '\')" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--white);font-size:12px;">';
-    html += '<div style="text-align:right;font-weight:600;color:var(--gold);font-size:12px;" id="ptt-' + t.id + '">RM ' + fmt(d.total) + '</div>';
+    html += '<div style="text-align:right;font-weight:600;color:var(--gold);font-size:12px;" id="ptt-' + t.id + '">RM ' + fmtNum2(d.total) + '</div>';
     html += '</div>';
   }
   grid.innerHTML = html;
@@ -1955,7 +1841,7 @@ function onTaskInput(taskId) {
   peTaskData[taskId].quantity = qty;
   peTaskData[taskId].rate = rate;
   peTaskData[taskId].total = total;
-  document.getElementById("ptt-" + taskId).textContent = "RM " + fmt(total);
+  document.getElementById("ptt-" + taskId).textContent = "RM " + fmtNum2(total);
   calcPayroll();
 }
 
@@ -1967,31 +1853,31 @@ function calcPayroll() {
   const dailyWage = payRate * days;
   const otPay = (payRate / OT_DIVISOR) * otHours;
 
-  document.getElementById("pe-dailywage").value = "RM " + fmt(dailyWage);
-  document.getElementById("pe-otpay").value = "RM " + fmt(otPay);
+  document.getElementById("pe-dailywage").value = "RM " + fmtNum2(dailyWage);
+  document.getElementById("pe-otpay").value = "RM " + fmtNum2(otPay);
 
   // Responsibilities — sum all dynamic rows
   const respTotal = peRespData.reduce((s, r) => s + (r.rate || 0), 0);
-  document.getElementById("pe-resptotal").textContent = fmt(respTotal);
+  document.getElementById("pe-resptotal").textContent = fmtNum2(respTotal);
 
   // Contract (tasks)
   let taskTotal = 0;
   for (const tid in peTaskData) { taskTotal += peTaskData[tid].total || 0; }
-  document.getElementById("pe-tasktotal").textContent = fmt(taskTotal);
+  document.getElementById("pe-tasktotal").textContent = fmtNum2(taskTotal);
 
   // Deductions
   const dAdv = parseFloat(document.getElementById("pe-dadv").value) || 0;
   const dShop = parseFloat(document.getElementById("pe-dshop").value) || 0;
   const dOther = parseFloat(document.getElementById("pe-dother").value) || 0;
   const totalDeduct = dAdv + dShop + dOther;
-  document.getElementById("pe-deducttotal").textContent = fmt(totalDeduct);
+  document.getElementById("pe-deducttotal").textContent = fmtNum2(totalDeduct);
 
   // Totals
   const totalPay = dailyWage + otPay + respTotal + taskTotal;
   const finalPay = totalPay - totalDeduct;
-  document.getElementById("pe-totalpay").textContent = "RM " + fmt(totalPay);
-  document.getElementById("pe-deductsummary").textContent = "- RM " + fmt(totalDeduct);
-  document.getElementById("pe-finalpay").textContent = "RM " + fmt(finalPay);
+  document.getElementById("pe-totalpay").textContent = "RM " + fmtNum2(totalPay);
+  document.getElementById("pe-deductsummary").textContent = "- RM " + fmtNum2(totalDeduct);
+  document.getElementById("pe-finalpay").textContent = "RM " + fmtNum2(finalPay);
 }
 
 async function savePayrollEntry() {
@@ -2024,9 +1910,9 @@ async function savePayrollEntry() {
   if (pe.days_worked != days) changes.push("days " + (pe.days_worked||0) + " → " + days);
   if (pe.pay_rate != payRate) changes.push("rate " + (pe.pay_rate||0) + " → " + payRate);
   if (pe.ot_hours != otHours) changes.push("OT " + (pe.ot_hours||0) + "h → " + otHours + "h");
-  if (pe.total_deductions != totalDeduct) changes.push("deductions " + fmt(pe.total_deductions||0) + " → " + fmt(totalDeduct));
-  if (pe.task_total != taskTotal) changes.push("contract " + fmt(pe.task_total||0) + " → " + fmt(taskTotal));
-  if (pe.final_pay != finalPay) changes.push("final " + fmt(pe.final_pay||0) + " → " + fmt(finalPay));
+  if (pe.total_deductions != totalDeduct) changes.push("deductions " + fmtNum2(pe.total_deductions||0) + " → " + fmtNum2(totalDeduct));
+  if (pe.task_total != taskTotal) changes.push("contract " + fmtNum2(pe.task_total||0) + " → " + fmtNum2(taskTotal));
+  if (pe.final_pay != finalPay) changes.push("final " + fmtNum2(pe.final_pay||0) + " → " + fmtNum2(finalPay));
 
   // Update payroll entry
   const updateData = {
@@ -2122,30 +2008,30 @@ function openPaySlip(peId) {
   // Earnings — Base Pay
   html += '<div class="slip-section-title">Earnings</div>';
   html += '<table><thead><tr><th>Description</th><th style="text-align:center;">Details</th><th style="text-align:right;">Amount (RM)</th></tr></thead><tbody>';
-  html += '<tr><td>Base Daily Wage</td><td style="text-align:center;">' + (pe.days_worked || 0) + ' days × RM ' + fmt(pe.pay_rate) + '/day</td><td style="text-align:right;">' + fmt(pe.daily_wage) + '</td></tr>';
+  html += '<tr><td>Base Daily Wage</td><td style="text-align:center;">' + (pe.days_worked || 0) + ' days × RM ' + fmtNum2(pe.pay_rate) + '/day</td><td style="text-align:right;">' + fmtNum2(pe.daily_wage) + '</td></tr>';
 
   if ((pe.ot_hours || 0) > 0) {
-    html += '<tr><td>Overtime</td><td style="text-align:center;">' + pe.ot_hours + ' hours × RM ' + fmt((pe.pay_rate || 0) / OT_DIVISOR) + '/hr</td><td style="text-align:right;">' + fmt(pe.ot_pay) + '</td></tr>';
+    html += '<tr><td>Overtime</td><td style="text-align:center;">' + pe.ot_hours + ' hours × RM ' + fmtNum2((pe.pay_rate || 0) / OT_DIVISOR) + '/hr</td><td style="text-align:right;">' + fmtNum2(pe.ot_pay) + '</td></tr>';
   }
 
   // Responsibilities from payroll_responsibilities table
   const entryResps = payrollResponsibilities.filter(pr => pr.payroll_entry_id === peId);
   if (entryResps.length > 0) {
     for (const pr of entryResps) {
-      html += '<tr><td>Other Responsibility: ' + pr.responsibility_name + '</td><td style="text-align:center;"></td><td style="text-align:right;">' + fmt(pr.rate) + '</td></tr>';
+      html += '<tr><td>Other Responsibility: ' + pr.responsibility_name + '</td><td style="text-align:center;"></td><td style="text-align:right;">' + fmtNum2(pr.rate) + '</td></tr>';
     }
   }
 
   // Contract earnings (renamed from task-based)
   if (workerTasks.length > 0) {
     for (const te of workerTasks) {
-      const detail = (te.quantity && te.rate) ? (te.quantity + ' × RM ' + fmt(te.rate)) : '';
-      html += '<tr><td>Contract: ' + (te.task_name || te.task_type_id) + '</td><td style="text-align:center;">' + detail + '</td><td style="text-align:right;">' + fmt(te.total) + '</td></tr>';
+      const detail = (te.quantity && te.rate) ? (te.quantity + ' × RM ' + fmtNum2(te.rate)) : '';
+      html += '<tr><td>Contract: ' + (te.task_name || te.task_type_id) + '</td><td style="text-align:center;">' + detail + '</td><td style="text-align:right;">' + fmtNum2(te.total) + '</td></tr>';
     }
   }
 
   const totalEarnings = parseFloat(pe.total_pay) || 0;
-  html += '<tr class="slip-total-row"><td colspan="2" style="text-align:right;">Total Earnings</td><td style="text-align:right;">RM ' + fmt(totalEarnings) + '</td></tr>';
+  html += '<tr class="slip-total-row"><td colspan="2" style="text-align:right;">Total Earnings</td><td style="text-align:right;">RM ' + fmtNum2(totalEarnings) + '</td></tr>';
   html += '</tbody></table>';
 
   // Deductions
@@ -2153,17 +2039,17 @@ function openPaySlip(peId) {
   if (hasDeductions) {
     html += '<div class="slip-section-title">Deductions</div>';
     html += '<table><thead><tr><th>Description</th><th style="text-align:right;">Amount (RM)</th></tr></thead><tbody>';
-    if ((pe.deduct_advance || 0) > 0) html += '<tr><td>Salary Advance</td><td style="text-align:right;">' + fmt(pe.deduct_advance) + '</td></tr>';
-    if ((pe.deduct_loan || 0) > 0) html += '<tr><td>Loan Repayment</td><td style="text-align:right;">' + fmt(pe.deduct_loan) + '</td></tr>';
-    if ((pe.deduct_shop || 0) > 0) html += '<tr><td>Shop / Store</td><td style="text-align:right;">' + fmt(pe.deduct_shop) + '</td></tr>';
-    if ((pe.deduct_other || 0) > 0) html += '<tr><td>Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="text-align:right;">' + fmt(pe.deduct_other) + '</td></tr>';
-    html += '<tr class="slip-total-row"><td style="text-align:right;">Total Deductions</td><td style="text-align:right;">RM ' + fmt(pe.total_deductions) + '</td></tr>';
+    if ((pe.deduct_advance || 0) > 0) html += '<tr><td>Salary Advance</td><td style="text-align:right;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
+    if ((pe.deduct_loan || 0) > 0) html += '<tr><td>Loan Repayment</td><td style="text-align:right;">' + fmtNum2(pe.deduct_loan) + '</td></tr>';
+    if ((pe.deduct_shop || 0) > 0) html += '<tr><td>Shop / Store</td><td style="text-align:right;">' + fmtNum2(pe.deduct_shop) + '</td></tr>';
+    if ((pe.deduct_other || 0) > 0) html += '<tr><td>Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="text-align:right;">' + fmtNum2(pe.deduct_other) + '</td></tr>';
+    html += '<tr class="slip-total-row"><td style="text-align:right;">Total Deductions</td><td style="text-align:right;">RM ' + fmtNum2(pe.total_deductions) + '</td></tr>';
     html += '</tbody></table>';
   }
 
   // Final pay
   html += '<table style="margin-top:8px;"><tbody>';
-  html += '<tr class="slip-final"><td>NET PAY</td><td style="text-align:right;">RM ' + fmt(pe.final_pay) + '</td></tr>';
+  html += '<tr class="slip-final"><td>NET PAY</td><td style="text-align:right;">RM ' + fmtNum2(pe.final_pay) + '</td></tr>';
   html += '</tbody></table>';
 
   // Footer
@@ -2215,7 +2101,7 @@ async function renderWorkerProfile() {
         <div>
           <div style="font-size:22px;font-weight:700;color:var(--white);">${w.name}</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-            ${w.role || '\u2014'} \u00b7 RM ${fmt(w.pay_rate)}/day \u00b7 
+            ${w.role || '\u2014'} \u00b7 RM ${fmtNum2(w.pay_rate)}/day \u00b7 
             <span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span>
           </div>
         </div>
@@ -2240,7 +2126,7 @@ async function renderWorkerProfile() {
     detailsHtml += '<div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Employment Info</div>';
     detailsHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">';
     detailsHtml += detailRow("Role", w.role || "\u2014");
-    detailsHtml += detailRow("Current Pay Rate", "RM " + fmt(w.pay_rate) + " / day");
+    detailsHtml += detailRow("Current Pay Rate", "RM " + fmtNum2(w.pay_rate) + " / day");
     detailsHtml += detailRow("First Joined", fmtDate(w.join_date));
     detailsHtml += detailRow("Status", w.active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>');
     detailsHtml += detailRow("Current Stint", currentStint ? fmtDate(currentStint.start_date) + " \u2014 Present (<strong style=\"color:var(--gold-light);\">" + getWorkerTenure(w.id) + "</strong>)" : "\u2014");
@@ -2250,7 +2136,7 @@ async function renderWorkerProfile() {
     // Financial Info
     detailsHtml += '<div><div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Financial Info</div>';
     detailsHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">';
-    detailsHtml += detailRow("Outstanding Loans", loanBal > 0 ? '<strong style="color:var(--critical);">RM ' + fmt(loanBal) + '</strong>' : '<span style="color:var(--good);">No outstanding loans</span>');
+    detailsHtml += detailRow("Outstanding Loans", loanBal > 0 ? '<strong style="color:var(--critical);">RM ' + fmtNum2(loanBal) + '</strong>' : '<span style="color:var(--good);">No outstanding loans</span>');
     detailsHtml += '</div></div>';
 
     document.getElementById("profile-details").innerHTML = detailsHtml;
@@ -2285,7 +2171,7 @@ function renderProfileLoans() {
   });
 
   const totalOutstanding = wLoans.filter(l => l.status === 'active').reduce((s, l) => s + (parseFloat(l.balance) || 0), 0);
-  loanTotalEl.textContent = "RM " + fmt(totalOutstanding);
+  loanTotalEl.textContent = "RM " + fmtNum2(totalOutstanding);
 
   if (wLoans.length === 0) {
     container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:12px 0;">No loans on record</div>';
@@ -2307,9 +2193,9 @@ function renderProfileLoans() {
     html += '</div></div>';
 
     html += '<div style="display:flex;gap:16px;font-size:12px;margin-bottom:8px;flex-wrap:wrap;">';
-    html += '<span>Issued: <strong>RM ' + fmt(l.amount) + '</strong></span>';
-    html += '<span>Repaid: <strong style="color:var(--good);">RM ' + fmt(l.total_repaid) + '</strong></span>';
-    html += '<span>Balance: <strong style="color:' + (isActive ? 'var(--critical)' : 'var(--good)') + ';">RM ' + fmt(l.balance) + '</strong></span>';
+    html += '<span>Issued: <strong>RM ' + fmtNum2(l.amount) + '</strong></span>';
+    html += '<span>Repaid: <strong style="color:var(--good);">RM ' + fmtNum2(l.total_repaid) + '</strong></span>';
+    html += '<span>Balance: <strong style="color:' + (isActive ? 'var(--critical)' : 'var(--good)') + ';">RM ' + fmtNum2(l.balance) + '</strong></span>';
     html += '<span style="color:var(--text-dim);">' + fmtDate(l.date_issued) + (l.notes ? ' · ' + l.notes : '') + '</span>';
     html += '</div>';
 
@@ -2321,7 +2207,7 @@ function renderProfileLoans() {
       html += '<div style="padding-left:8px;">';
       repayments.forEach(r => {
         html += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">';
-        html += '<span>' + fmtDate(r.date) + '</span><span style="color:var(--good);font-weight:600;">RM ' + fmt(r.amount) + '</span>';
+        html += '<span>' + fmtDate(r.date) + '</span><span style="color:var(--good);font-weight:600;">RM ' + fmtNum2(r.amount) + '</span>';
         if (r.notes) html += '<span style="color:var(--text-dim);">' + r.notes + '</span>';
         if (isAdmin) html += '<span style="display:flex;gap:4px;"><button class="btn btn-outline" style="font-size:9px;padding:1px 6px;" onclick="editRepayment(\'' + r.id + '\',\'' + l.id + '\')">Edit</button><button class="btn btn-danger" style="font-size:9px;padding:1px 6px;" onclick="deleteRepayment(\'' + r.id + '\',\'' + l.id + '\')">Del</button></span>';
         html += '</div>';
@@ -2383,23 +2269,23 @@ async function renderProfilePayHistory() {
     totalBase += base; totalOT += ot; totalResp += resp; totalContract += contract; totalDeduct += deduct; totalNet += net;
     html += '<tr><td style="font-weight:600;">' + pLabel + '</td>';
     html += '<td>' + (pe.days_worked || 0) + '</td>';
-    html += '<td>RM ' + fmt(pe.pay_rate) + '</td>';
-    html += '<td>RM ' + fmt(base) + '</td>';
-    html += '<td>RM ' + fmt(ot) + '</td>';
-    html += '<td>RM ' + fmt(resp) + '</td>';
-    html += '<td>RM ' + fmt(contract) + '</td>';
-    html += '<td style="color:var(--critical);">RM ' + fmt(deduct) + '</td>';
-    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmt(net) + '</td></tr>';
+    html += '<td>RM ' + fmtNum2(pe.pay_rate) + '</td>';
+    html += '<td>RM ' + fmtNum2(base) + '</td>';
+    html += '<td>RM ' + fmtNum2(ot) + '</td>';
+    html += '<td>RM ' + fmtNum2(resp) + '</td>';
+    html += '<td>RM ' + fmtNum2(contract) + '</td>';
+    html += '<td style="color:var(--critical);">RM ' + fmtNum2(deduct) + '</td>';
+    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(net) + '</td></tr>';
   }
 
   html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
   html += '<td colspan="3" style="color:var(--gold);">' + selectedYear + ' TOTAL</td>';
-  html += '<td>RM ' + fmt(totalBase) + '</td>';
-  html += '<td>RM ' + fmt(totalOT) + '</td>';
-  html += '<td>RM ' + fmt(totalResp) + '</td>';
-  html += '<td>RM ' + fmt(totalContract) + '</td>';
-  html += '<td style="color:var(--critical);">RM ' + fmt(totalDeduct) + '</td>';
-  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmt(totalNet) + '</td></tr></tbody></table>';
+  html += '<td>RM ' + fmtNum2(totalBase) + '</td>';
+  html += '<td>RM ' + fmtNum2(totalOT) + '</td>';
+  html += '<td>RM ' + fmtNum2(totalResp) + '</td>';
+  html += '<td>RM ' + fmtNum2(totalContract) + '</td>';
+  html += '<td style="color:var(--critical);">RM ' + fmtNum2(totalDeduct) + '</td>';
+  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(totalNet) + '</td></tr></tbody></table>';
   document.getElementById("profile-payhistory").innerHTML = html;
 }
 
@@ -2435,7 +2321,7 @@ async function saveNewLoan() {
     const { error } = await sb.from("worker_loans").update({ purpose: purpose, amount: amount, date_issued: date_issued, notes: notes, balance: Math.max(0, newBalance), status: newStatus }).eq("id", editId);
     if (error) { notify("Error: " + error.message, "warning"); return; }
     loan.purpose = purpose; loan.amount = amount; loan.date_issued = date_issued; loan.notes = notes; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
-    await auditLog("worker_loans", editId, "update", "Edited loan: " + purpose + " RM " + fmt(amount));
+    await auditLog("worker_loans", editId, "update", "Edited loan: " + purpose + " RM " + fmtNum2(amount));
     notify("Loan updated");
   } else {
     const newId = await dbNextId("WL");
@@ -2443,8 +2329,8 @@ async function saveNewLoan() {
     const { error } = await sb.from("worker_loans").insert(data);
     if (error) { notify("Error: " + error.message, "warning"); return; }
     workerLoans.unshift(data);
-    await auditLog("worker_loans", newId, "create", "New loan: " + purpose + " RM " + fmt(amount));
-    notify("Loan issued: " + purpose + " RM " + fmt(amount));
+    await auditLog("worker_loans", newId, "create", "New loan: " + purpose + " RM " + fmtNum2(amount));
+    notify("Loan issued: " + purpose + " RM " + fmtNum2(amount));
   }
 
   document.getElementById("loan-modal").dataset.editId = "";
@@ -2458,7 +2344,7 @@ function openRepaymentModal(loanId) {
   if (document.getElementById("repay-modal").dataset) document.getElementById("repay-modal").dataset.editId = "";
   document.getElementById("repay-loan-id").value = loanId;
   document.getElementById("repay-modal-title").textContent = "Repayment — " + l.purpose;
-  document.getElementById("repay-balance").textContent = "RM " + fmt(l.balance);
+  document.getElementById("repay-balance").textContent = "RM " + fmtNum2(l.balance);
   document.getElementById("repay-amount").value = "";
   document.getElementById("repay-date").value = new Date().toISOString().slice(0, 10);
   document.getElementById("repay-notes").value = "";
@@ -2490,11 +2376,11 @@ async function saveRepayment() {
     var newStatus = newBalance <= 0 ? "settled" : "active";
     await sb.from("worker_loans").update({ total_repaid: totalRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId);
     loan.total_repaid = totalRepaid; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
-    await auditLog("loan_repayments", editId, "update", "Edited repayment to RM " + fmt(amount));
+    await auditLog("loan_repayments", editId, "update", "Edited repayment to RM " + fmtNum2(amount));
     notify("Repayment updated");
   } else {
     // NEW repayment
-    if (amount > parseFloat(loan.balance)) { notify("Amount exceeds outstanding balance (RM " + fmt(loan.balance) + ")", "warning"); return; }
+    if (amount > parseFloat(loan.balance)) { notify("Amount exceeds outstanding balance (RM " + fmtNum2(loan.balance) + ")", "warning"); return; }
     const repayId = await dbNextId("LR");
     const repayData = { id: repayId, loan_id: loanId, worker_id: profileWorkerId, amount, date, notes };
     const { error: rErr } = await sb.from("loan_repayments").insert(repayData);
@@ -2505,8 +2391,8 @@ async function saveRepayment() {
     const newStatus = newBalance <= 0 ? "settled" : "active";
     await sb.from("worker_loans").update({ total_repaid: newRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId);
     loan.total_repaid = newRepaid; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
-    await auditLog("loan_repayments", repayId, "create", "Repayment RM " + fmt(amount) + " on " + loan.purpose + ". Balance: RM " + fmt(loan.balance));
-    notify("Repayment recorded: RM " + fmt(amount) + (newStatus === "settled" ? " \u2014 Loan settled!" : ""));
+    await auditLog("loan_repayments", repayId, "create", "Repayment RM " + fmtNum2(amount) + " on " + loan.purpose + ". Balance: RM " + fmtNum2(loan.balance));
+    notify("Repayment recorded: RM " + fmtNum2(amount) + (newStatus === "settled" ? " \u2014 Loan settled!" : ""));
   }
 
   if (document.getElementById("repay-modal").dataset) document.getElementById("repay-modal").dataset.editId = "";
@@ -2531,7 +2417,7 @@ function openEditLoanModal(loanId) {
 async function deleteLoan(loanId) {
   var loan = workerLoans.find(function(x) { return x.id === loanId; });
   if (!loan) return;
-  if (!confirm('Delete loan "' + loan.purpose + '" (RM ' + fmt(loan.amount) + ')?\nThis will also delete all repayments.')) return;
+  if (!confirm('Delete loan "' + loan.purpose + '" (RM ' + fmtNum2(loan.amount) + ')?\nThis will also delete all repayments.')) return;
   await sb.from("loan_repayments").delete().eq("loan_id", loanId);
   loanRepayments = loanRepayments.filter(function(r) { return r.loan_id !== loanId; });
   await sb.from("worker_loans").delete().eq("id", loanId);
@@ -2552,7 +2438,7 @@ function editRepayment(repayId, loanId) {
   var loan = workerLoans.find(function(x) { return x.id === loanId; });
   if (loan) {
     document.getElementById("repay-modal-title").textContent = "Edit Repayment \u2014 " + loan.purpose;
-    document.getElementById("repay-balance").textContent = "RM " + fmt(parseFloat(loan.balance) + parseFloat(r.amount));
+    document.getElementById("repay-balance").textContent = "RM " + fmtNum2(parseFloat(loan.balance) + parseFloat(r.amount));
   }
   document.getElementById("repay-modal").style.display = "flex";
 }
@@ -2560,7 +2446,7 @@ function editRepayment(repayId, loanId) {
 async function deleteRepayment(repayId, loanId) {
   var r = loanRepayments.find(function(x) { return x.id === repayId; });
   if (!r) return;
-  if (!confirm("Delete repayment of RM " + fmt(r.amount) + "?")) return;
+  if (!confirm("Delete repayment of RM " + fmtNum2(r.amount) + "?")) return;
   await sb.from("loan_repayments").delete().eq("id", repayId);
   loanRepayments = loanRepayments.filter(function(x) { return x.id !== repayId; });
   var loan = workerLoans.find(function(x) { return x.id === loanId; });
@@ -2662,13 +2548,13 @@ async function renderSummary() {
   // Stats cards
   document.getElementById("summary-stats").innerHTML = `
     <div class="stat-card"><div class="stat-label">Periods</div><div class="stat-value">${periodsInRange.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Total Gross</div><div class="stat-value" style="color:var(--white);">RM ${fmt(totalGross)}</div></div>
-    <div class="stat-card"><div class="stat-label">Total Deductions</div><div class="stat-value" style="color:var(--critical);">RM ${fmt(totalDeduct)}</div></div>
-    <div class="stat-card"><div class="stat-label">Total Net Pay</div><div class="stat-value" style="color:var(--gold);">RM ${fmt(totalFinal)}</div></div>
-    <div class="stat-card"><div class="stat-label">Base Wage</div><div class="stat-value" style="font-size:16px;">RM ${fmt(totalBase)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalBase/totalGross*100) : 0}% of gross</div></div>
-    <div class="stat-card"><div class="stat-label">Overtime</div><div class="stat-value" style="font-size:16px;">RM ${fmt(totalOT)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalOT/totalGross*100) : 0}% of gross</div></div>
-    <div class="stat-card"><div class="stat-label">Responsibilities</div><div class="stat-value" style="font-size:16px;">RM ${fmt(totalResp)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalResp/totalGross*100) : 0}% of gross</div></div>
-    <div class="stat-card"><div class="stat-label">Contract</div><div class="stat-value" style="font-size:16px;">RM ${fmt(totalContract)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalContract/totalGross*100) : 0}% of gross</div></div>
+    <div class="stat-card"><div class="stat-label">Total Gross</div><div class="stat-value" style="color:var(--white);">RM ${fmtNum2(totalGross)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Deductions</div><div class="stat-value" style="color:var(--critical);">RM ${fmtNum2(totalDeduct)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Net Pay</div><div class="stat-value" style="color:var(--gold);">RM ${fmtNum2(totalFinal)}</div></div>
+    <div class="stat-card"><div class="stat-label">Base Wage</div><div class="stat-value" style="font-size:16px;">RM ${fmtNum2(totalBase)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalBase/totalGross*100) : 0}% of gross</div></div>
+    <div class="stat-card"><div class="stat-label">Overtime</div><div class="stat-value" style="font-size:16px;">RM ${fmtNum2(totalOT)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalOT/totalGross*100) : 0}% of gross</div></div>
+    <div class="stat-card"><div class="stat-label">Responsibilities</div><div class="stat-value" style="font-size:16px;">RM ${fmtNum2(totalResp)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalResp/totalGross*100) : 0}% of gross</div></div>
+    <div class="stat-card"><div class="stat-label">Contract</div><div class="stat-value" style="font-size:16px;">RM ${fmtNum2(totalContract)}</div><div class="stat-sub">${totalGross > 0 ? Math.round(totalContract/totalGross*100) : 0}% of gross</div></div>
   `;
 
   // === CHARTS ===
@@ -2768,25 +2654,25 @@ function renderSummaryWorkerProfile(workerId, entries, resps, tasks, periods) {
     html += '<tr>';
     html += '<td style="font-weight:600;">' + MONTH_NAMES[p.month].slice(0,3) + ' ' + p.year + '</td>';
     html += '<td>' + (pe.days_worked || 0) + '</td>';
-    html += '<td>RM ' + fmt(pe.pay_rate) + '</td>';
-    html += '<td>RM ' + fmt(base) + '</td>';
-    html += '<td>RM ' + fmt(ot) + '</td>';
-    html += '<td>RM ' + fmt(resp) + '</td>';
-    html += '<td>RM ' + fmt(contract) + '</td>';
-    html += '<td style="color:var(--critical);">RM ' + fmt(deduct) + '</td>';
-    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmt(net) + '</td>';
+    html += '<td>RM ' + fmtNum2(pe.pay_rate) + '</td>';
+    html += '<td>RM ' + fmtNum2(base) + '</td>';
+    html += '<td>RM ' + fmtNum2(ot) + '</td>';
+    html += '<td>RM ' + fmtNum2(resp) + '</td>';
+    html += '<td>RM ' + fmtNum2(contract) + '</td>';
+    html += '<td style="color:var(--critical);">RM ' + fmtNum2(deduct) + '</td>';
+    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(net) + '</td>';
     html += '</tr>';
   }
 
   // YTD total row
   html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
   html += '<td colspan="3" style="color:var(--gold);">TOTAL</td>';
-  html += '<td>RM ' + fmt(ytdBase) + '</td>';
-  html += '<td>RM ' + fmt(ytdOT) + '</td>';
-  html += '<td>RM ' + fmt(ytdResp) + '</td>';
-  html += '<td>RM ' + fmt(ytdContract) + '</td>';
-  html += '<td style="color:var(--critical);">RM ' + fmt(ytdDeduct) + '</td>';
-  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmt(ytdNet) + '</td>';
+  html += '<td>RM ' + fmtNum2(ytdBase) + '</td>';
+  html += '<td>RM ' + fmtNum2(ytdOT) + '</td>';
+  html += '<td>RM ' + fmtNum2(ytdResp) + '</td>';
+  html += '<td>RM ' + fmtNum2(ytdContract) + '</td>';
+  html += '<td style="color:var(--critical);">RM ' + fmtNum2(ytdDeduct) + '</td>';
+  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(ytdNet) + '</td>';
   html += '</tr>';
   html += '</tbody></table>';
 
@@ -2818,13 +2704,13 @@ function renderAllWorkersSummary(entries, periods) {
     html += '<tr>';
     html += '<td style="font-weight:600;">' + MONTH_NAMES[p.month] + ' ' + p.year + '</td>';
     html += '<td>' + pEntries.length + '</td>';
-    html += '<td>RM ' + fmt(base) + '</td>';
-    html += '<td>RM ' + fmt(ot) + '</td>';
-    html += '<td>RM ' + fmt(resp) + '</td>';
-    html += '<td>RM ' + fmt(contract) + '</td>';
-    html += '<td style="font-weight:600;">RM ' + fmt(gross) + '</td>';
-    html += '<td style="color:var(--critical);">RM ' + fmt(deduct) + '</td>';
-    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmt(net) + '</td>';
+    html += '<td>RM ' + fmtNum2(base) + '</td>';
+    html += '<td>RM ' + fmtNum2(ot) + '</td>';
+    html += '<td>RM ' + fmtNum2(resp) + '</td>';
+    html += '<td>RM ' + fmtNum2(contract) + '</td>';
+    html += '<td style="font-weight:600;">RM ' + fmtNum2(gross) + '</td>';
+    html += '<td style="color:var(--critical);">RM ' + fmtNum2(deduct) + '</td>';
+    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(net) + '</td>';
     html += '</tr>';
   }
 
@@ -2832,13 +2718,13 @@ function renderAllWorkersSummary(entries, periods) {
   const grandGross = grandBase + grandOT + grandResp + grandContract;
   html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
   html += '<td style="color:var(--gold);">YEAR TOTAL</td><td></td>';
-  html += '<td>RM ' + fmt(grandBase) + '</td>';
-  html += '<td>RM ' + fmt(grandOT) + '</td>';
-  html += '<td>RM ' + fmt(grandResp) + '</td>';
-  html += '<td>RM ' + fmt(grandContract) + '</td>';
-  html += '<td>RM ' + fmt(grandGross) + '</td>';
-  html += '<td style="color:var(--critical);">RM ' + fmt(grandDeduct) + '</td>';
-  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmt(grandNet) + '</td>';
+  html += '<td>RM ' + fmtNum2(grandBase) + '</td>';
+  html += '<td>RM ' + fmtNum2(grandOT) + '</td>';
+  html += '<td>RM ' + fmtNum2(grandResp) + '</td>';
+  html += '<td>RM ' + fmtNum2(grandContract) + '</td>';
+  html += '<td>RM ' + fmtNum2(grandGross) + '</td>';
+  html += '<td style="color:var(--critical);">RM ' + fmtNum2(grandDeduct) + '</td>';
+  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(grandNet) + '</td>';
   html += '</tr>';
   html += '</tbody></table>';
 

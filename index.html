@@ -7,41 +7,11 @@
 <title>TG FarmHub — Home of Sarawak Gold</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
 <style>
-:root {
-  --bg: #1A1F1A;
-  --bg-card: #242C24;
-  --bg-hover: #2A342A;
-  --bg-input: #1E261E;
-  --border: #2E3A2E;
-  --border-light: #3A463A;
-  --text: #D0DCC0;
-  --text-muted: #7A8A7A;
-  --text-dim: #5A6A5A;
-  --white: #E8F0E0;
-  --green: #4A7C3F;
-  --green-light: #6B9E5E;
-  --green-pale: rgba(74,124,63,0.15);
-  --gold: #E8A020;
-  --gold-light: #F5C04A;
-  --gold-pale: rgba(232,160,32,0.12);
-  --red: #E86060;
-  --red-pale: rgba(232,96,96,0.12);
-  --good: #6BC460;
-  --good-bg: rgba(60,180,50,0.12);
-  --critical: #E86060;
-  --critical-bg: rgba(232,96,96,0.12);
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.5;
-  min-height: 100vh;
-}
+/* index.html body override — no fixed height, scrollable */
+body { height: auto; min-height: 100vh; overflow: auto; }
 
 /* ===== LOGIN ===== */
 #login-screen {
@@ -73,15 +43,9 @@ body {
 }
 .login-field input:focus { outline: none; border-color: var(--gold); }
 
-/* ===== BUTTONS ===== */
-.btn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
-  border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
-  border: none; font-family: inherit; transition: all 0.15s;
-}
+/* ===== BUTTONS — index.html overrides (gold theme for hub/login) ===== */
 .btn-primary { background: var(--gold); color: #1a1a1a; }
 .btn-primary:hover { background: var(--gold-light); }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
 
 /* ===== HUB LAYOUT ===== */
@@ -167,36 +131,8 @@ body {
 .user-table tr:hover { background: var(--bg-hover); }
 .user-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
-/* ===== MODAL ===== */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
-  justify-content: center; align-items: center; z-index: 1000;
-}
-.modal-box {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-  padding: 28px; width: 90vw; max-width: 560px; max-height: 90vh; overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-}
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.modal-title { font-size: 18px; font-weight: 700; color: var(--white); }
-.modal-close {
-  background: none; border: none; color: var(--text-muted); cursor: pointer;
-  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-  border-radius: 8px; transition: all 0.15s;
-}
-.modal-close:hover { background: var(--bg-hover); color: var(--white); }
-.modal-close svg { width: 18px; height: 18px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-
-.form-field { margin-bottom: 14px; }
-.form-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
-.form-field input, .form-field select {
-  width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--white); font-size: 13px; font-family: inherit;
-}
-.form-field input:focus, .form-field select:focus { outline: none; border-color: var(--gold); }
-.form-row { display: flex; gap: 12px; }
-.form-row .form-field { flex: 1; }
+/* form-field focus override for gold theme */
+.form-field input:focus, .form-field select:focus { border-color: var(--gold); }
 
 /* ===== PERMISSIONS PANEL ===== */
 .perm-section-title {
@@ -230,18 +166,6 @@ body {
 .perm-item input[type="checkbox"] { accent-color: var(--gold); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .perm-item label { font-size: 12px; color: var(--text); cursor: pointer; }
 
-/* ===== NOTIFICATION ===== */
-#notify-bar {
-  position: fixed; top: 16px; right: 16px; z-index: 9999;
-  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-}
-.notify-msg {
-  padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
-  background: var(--green); color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  animation: notifyIn 0.3s ease; pointer-events: auto;
-}
-.notify-msg.warning { background: var(--gold); color: #1a1a1a; }
-@keyframes notifyIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
@@ -259,21 +183,11 @@ body {
   .user-actions { flex-direction: column; gap: 4px; }
 }
 
-/* ===== SHARED UTILITY ===== */
-.btn-sm { padding: 4px 10px; font-size: 11px; }
+/* ===== SHARED UTILITY — index.html specific overrides ===== */
 .btn-danger { background: var(--red); color: white; border: none; }
 .btn-danger:hover { background: #d04040; }
-.save-tick { color: var(--green-light); font-size: 16px; opacity: 0; transition: opacity 0.3s; margin-left: 6px; }
-.inline-input { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: inherit; }
-.inline-input:focus { outline: none; border-color: var(--gold); }
-.inline-select { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: inherit; }
-.inline-select:focus { outline: none; border-color: var(--gold); }
-.toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
-.toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: 0.2s; }
-.toggle-slider::before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
-.toggle input:checked + .toggle-slider { background: var(--green); }
-.toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+/* inline-input/select focus: gold theme override */
+.inline-input:focus, .inline-select:focus { border-color: var(--gold); }
 
 /* ===== FARM CONFIG ===== */
 .fc-tab { flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; background: var(--bg-input); color: var(--text-muted); transition: all 0.15s; }
@@ -295,8 +209,6 @@ body {
 </head>
 <body>
 <div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
-
-<div id="notify-bar"></div>
 
 <!-- ===== LOGIN SCREEN ===== -->
 <div id="login-screen">
@@ -462,14 +374,6 @@ body {
 
 <script>
 // ============================================================
-// CONFIGURATION
-// ============================================================
-const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ============================================================
 // MODULE DEFINITIONS — add new modules here in the future
 // ============================================================
 const MODULES = [
@@ -554,15 +458,6 @@ let currentUser = null;
 // ============================================================
 // HELPERS
 // ============================================================
-function notify(msg, type) {
-  const bar = document.getElementById("notify-bar");
-  const el = document.createElement("div");
-  el.className = "notify-msg" + (type === "warning" ? " warning" : "");
-  el.textContent = msg;
-  bar.appendChild(el);
-  setTimeout(() => { el.style.transition = "opacity 0.3s"; el.style.opacity = "0"; setTimeout(() => el.remove(), 300); }, 3000);
-}
-
 function closeModal(id) { document.getElementById(id).style.display = "none"; }
 
 function mapUserFromDb(row) {
@@ -594,19 +489,11 @@ function hasModuleAccess(moduleKey) {
   return hasPermission(moduleKey, "view");
 }
 
-async function dbNextId(prefix) {
-  const { data, error } = await sb.rpc("next_id", { p_prefix: prefix });
-  if (error) { console.error("next_id error:", error); return prefix + "000"; }
-  return data;
-}
-
 // ============================================================
 // LOGIN / AUTH + SECURITY
 // ============================================================
 let loginAttempts = 0;
 let lockoutUntil = 0;
-let inactivityTimer = null;
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 async function loadUsers() {
   const { data, error } = await sb.from("users").select("*");
@@ -623,6 +510,7 @@ async function hashPin(pin) {
 }
 
 async function doLogin() {
+  if (!checkLoginRateLimit()) return;
   // Check lockout
   const now = Date.now();
   if (now < lockoutUntil) {
@@ -653,6 +541,7 @@ async function doLogin() {
 
   // Success
   loginAttempts = 0;
+  clearLoginAttempts();
   currentUser = user;
   storeSession(user);
 
@@ -666,6 +555,7 @@ async function doLogin() {
 }
 
 function handleFailedLogin() {
+  recordFailedLogin();
   loginAttempts++;
   if (loginAttempts >= 15) {
     lockoutUntil = Date.now() + 30 * 60 * 1000;
@@ -767,26 +657,6 @@ function doLogout() {
   clearInactivityTimer();
   sessionStorage.removeItem("tgfarmhub_user");
   location.reload();
-}
-
-// Inactivity auto-logout
-function startInactivityTimer() {
-  clearInactivityTimer();
-  const resetTimer = () => {
-    clearTimeout(inactivityTimer);
-    inactivityTimer = setTimeout(() => {
-      notify("Session expired due to inactivity", "warning");
-      setTimeout(() => doLogout(), 1500);
-    }, INACTIVITY_TIMEOUT);
-  };
-  ["mousemove", "keydown", "click", "scroll", "touchstart"].forEach(evt => {
-    document.addEventListener(evt, resetTimer, { passive: true });
-  });
-  resetTimer();
-}
-
-function clearInactivityTimer() {
-  if (inactivityTimer) clearTimeout(inactivityTimer);
 }
 
 // ============================================================
@@ -1141,23 +1011,6 @@ async function init() {
 }
 
 init();
-
-// ============================================================
-// FARM CONFIG — HELPERS
-// ============================================================
-function esc(s) {
-  if (!s) return '';
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function showTick(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.opacity = '1';
-  setTimeout(() => { el.style.opacity = '0'; }, 1500);
-}
 
 // ============================================================
 // FARM CONFIG — DATA
