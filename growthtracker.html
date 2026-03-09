@@ -227,8 +227,13 @@ let refreshTimer = null;
 document.addEventListener("DOMContentLoaded", async () => {
   if(!currentUser) return;
   injectUserBadge(currentUser);
-  await loadAll();
-  renderCurrentPage();
+  try {
+    await loadAll();
+    renderCurrentPage();
+  } catch(e) {
+    console.error("Init error:", e);
+    notify("Failed to load data: " + e.message, "error");
+  }
   document.getElementById("tg-loading").style.display = "none";
   startAutoRefresh();
   startInactivityTimer();
@@ -242,27 +247,32 @@ async function loadAll() {
 }
 
 async function loadBlocks() {
-  const {data} = await sb.from("pnd_blocks").select("*").eq("is_active", true).order("name");
+  const {data, error} = await sb.from("pnd_blocks").select("*").order("name");
+  if(error) console.error("loadBlocks error:", error);
   blocks = data || [];
 }
 
 async function loadBlockCrops() {
-  const {data} = await sb.from("block_crops").select("*, crop_varieties(id, name, crop_id, harvest_days_from_induction, crops(name))").order("created_at");
+  const {data, error} = await sb.from("block_crops").select("*, crop_varieties(id, name, crop_id, harvest_days_from_induction, crops(name))").order("created_at");
+  if(error) console.error("loadBlockCrops error:", error);
   blockCrops = data || [];
 }
 
 async function loadVarieties() {
-  const {data} = await sb.from("crop_varieties").select("*, crops(name)").eq("archived", false).order("name");
+  const {data, error} = await sb.from("crop_varieties").select("*, crops(name)").eq("archived", false).order("name");
+  if(error) console.error("loadVarieties error:", error);
   varieties = data || [];
 }
 
 async function loadStatuses() {
-  const {data} = await sb.from("crop_statuses").select("*").order("sort_order");
+  const {data, error} = await sb.from("crop_statuses").select("*").order("sort_order");
+  if(error) console.error("loadStatuses error:", error);
   statuses = data || [];
 }
 
 async function loadGrowthRecords() {
-  const {data} = await sb.from("growth_records").select("*");
+  const {data, error} = await sb.from("growth_records").select("*");
+  if(error) console.error("loadGrowthRecords error:", error);
   growthRecords = data || [];
 }
 
