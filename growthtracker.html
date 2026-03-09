@@ -35,8 +35,16 @@ th.sortable:hover { color:var(--green-light); }
 /* Spin */
 .spin { animation:spin 1s linear infinite; }
 
-/* Badge status */
+/* Badge status — per-status colours */
 .badge-status { background:var(--bg-hover); color:var(--text-muted); }
+.badge-growing { background:rgba(74,124,63,0.2); color:#6ECB63; }
+.badge-induced { background:rgba(100,149,237,0.2); color:#6495ED; }
+.badge-suckers { background:rgba(186,135,89,0.2); color:#C4956A; }
+.badge-to-replant { background:rgba(232,96,96,0.15); color:#E86060; }
+.badge-to-induce { background:rgba(232,160,32,0.2); color:#E8A020; }
+.badge-tunggu-buah { background:rgba(160,120,230,0.2); color:#A078E6; }
+.badge-abandoned { background:rgba(128,128,128,0.2); color:#888; }
+.badge-harvesting { background:rgba(34,197,94,0.2); color:#22C55E; }
 
 /* Table scroll for many columns */
 .table-wrap { overflow-x:auto; }
@@ -229,6 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   injectUserBadge(currentUser);
   try {
     await loadAll();
+    populateFilters();
     renderCurrentPage();
   } catch(e) {
     console.error("Init error:", e);
@@ -298,6 +307,7 @@ async function syncAll() {
   const icon = document.getElementById("sync-icon");
   icon.classList.add("spin");
   await loadAll();
+  populateFilters();
   renderCurrentPage();
   icon.classList.remove("spin");
   document.getElementById("sync-text").textContent = "Synced just now";
@@ -307,6 +317,7 @@ function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
     await loadAll();
+    populateFilters();
     if(currentPage === 'overview') renderOverview();
   }, 60000);
 }
@@ -317,6 +328,19 @@ function startAutoRefresh() {
 function getBlock(id) { return blocks.find(b => b.id === id); }
 function getVariety(id) { return varieties.find(v => v.id === id); }
 function getStatusName(id) { const s = statuses.find(x => x.id === id); return s ? s.name : "—"; }
+function statusBadgeClass(name) {
+  const map = {
+    'growing': 'badge-growing',
+    'induced': 'badge-induced',
+    'suckers': 'badge-suckers',
+    'to replant': 'badge-to-replant',
+    'to induce': 'badge-to-induce',
+    'tunggu buah': 'badge-tunggu-buah',
+    'abandoned': 'badge-abandoned',
+    'harvesting': 'badge-harvesting'
+  };
+  return map[(name || '').toLowerCase()] || 'badge-status';
+}
 function getGrowthRecord(blockCropId) { return growthRecords.find(g => g.block_crop_id === blockCropId); }
 
 function calcDAP(datePlanted) {
@@ -443,9 +467,6 @@ function updateSortIndicators() {
 function renderOverview() {
   const allRows = buildGrowthData();
 
-  // Populate filter dropdowns (use all rows before filtering)
-  populateFilters(allRows);
-
   // Apply filters
   let rows = applyFilters([...allRows]);
 
@@ -497,7 +518,7 @@ function renderOverview() {
       '<td>' + fmtDate(r.date_planted) + '</td>' +
       '<td>' + dapDisplay + '</td>' +
       '<td>' + monthsDisplay + '</td>' +
-      '<td><span class="badge badge-status">' + esc(r.status_name) + '</span></td>' +
+      '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
       '<td>' + fmtDate(r.date_induced_start) + '</td>' +
       '<td>' + fmtDate(r.date_induced_end) + '</td>' +
       '<td>' + (r.harvest_days != null ? r.harvest_days : '—') + '</td>' +
@@ -509,24 +530,22 @@ function renderOverview() {
   }).join("");
 }
 
-function populateFilters(rows) {
+function populateFilters() {
+  const allRows = buildGrowthData();
+
   // Status filter
   const statusSel = document.getElementById("filter-status");
-  const curStatus = filterStatus;
-  const uniqueStatuses = [...new Set(rows.map(r => r.status_name))].filter(Boolean).sort();
+  const uniqueStatuses = [...new Set(allRows.map(r => r.status_name))].filter(Boolean).sort();
   statusSel.innerHTML = '<option value="all">All Statuses</option>' +
-    uniqueStatuses.map(s => '<option value="' + esc(s) + '"' + (curStatus === s ? ' selected' : '') + '>' + esc(s) + '</option>').join("");
-  statusSel.value = (curStatus !== 'all' && uniqueStatuses.includes(curStatus)) ? curStatus : 'all';
+    uniqueStatuses.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join("");
 
   // Variety filter
   const varSel = document.getElementById("filter-variety");
-  const curVar = filterVariety;
   varSel.innerHTML = '<option value="all">All Varieties</option>' +
     varieties.map(v => {
       const label = (v.crops ? v.crops.name + ' - ' : '') + v.name;
-      return '<option value="' + v.id + '"' + (curVar === v.id ? ' selected' : '') + '>' + esc(label) + '</option>';
+      return '<option value="' + v.id + '">' + esc(label) + '</option>';
     }).join("");
-  if(curVar !== 'all') varSel.value = curVar;
 }
 
 // ============================================================
