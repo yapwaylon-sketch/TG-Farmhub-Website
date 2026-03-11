@@ -1,2 +1,6 @@
 # Local Netlify folder
 .netlify
+
+# Sub-projects (separate Netlify deploys, same Supabase DB)
+TG Nanas Growth TV/
+TG Weather Monitoring Website/

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TG FarmHub — Home of Sarawak Gold</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
 <style>
@@ -322,8 +322,8 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 </div>
 
 <!-- ===== USER MODAL ===== -->
-<div id="user-modal" class="modal-overlay" style="display:none;" onclick="closeModal('user-modal')">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:580px;">
+<div id="user-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:580px;">
     <div class="modal-header">
       <h3 class="modal-title" id="user-modal-title">Add User</h3>
       <button class="modal-close" onclick="closeModal('user-modal')">
@@ -508,9 +508,9 @@ let loginAttempts = 0;
 let lockoutUntil = 0;
 
 async function loadUsers() {
-  const { data, error } = await sb.from("users").select("*");
-  if (error) { console.error("Load users error:", error); return; }
-  users = (data || []).map(mapUserFromDb);
+  const data = await sbQuery(sb.from("users").select("*"));
+  if (!data) return;
+  users = data.map(mapUserFromDb);
 }
 
 // Simple hash function for PINs (SHA-256 via SubtleCrypto)
@@ -603,8 +603,8 @@ async function submitNewPin() {
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
 
   const hashed = await hashPin(pin1);
-  const { error } = await sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id);
-  if (error) { notify("Error updating PIN", "warning"); return; }
+  const result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  if (result === null) return;
 
   currentUser.pinHash = hashed;
   currentUser.pin = "";
@@ -657,8 +657,8 @@ async function submitChangePin() {
   if (!pin1 || pin1.length !== 6 || !/^\d{6}$/.test(pin1)) { notify("New PIN must be exactly 6 digits", "warning"); return; }
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
   var hashed = await hashPin(pin1);
-  var err = await sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id);
-  if (err.error) { notify("Error updating PIN", "warning"); return; }
+  var result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  if (result === null) return;
   currentUser.pinHash = hashed; currentUser.pin = ""; currentUser.forcePinUpdate = false;
   document.getElementById("change-pin-modal").style.display = "none";
   notify("PIN updated successfully!");
@@ -941,12 +941,12 @@ async function saveUser() {
       updateData.force_pin_update = false;
     }
 
-    const { error } = await sb.from("users").update(updateData).eq("id", editId);
-    if (error) { console.error("Update user error:", error); notify("Database error", "warning"); return; }
+    const result = await sbQuery(sb.from("users").update(updateData).eq("id", editId));
+    if (result === null) return;
 
     // Cascade display name to transactions
     if (oldDisplayName !== displayName) {
-      await sb.from("transactions").update({ recorded_by: displayName }).eq("recorded_by", oldDisplayName);
+      await sbQuery(sb.from("transactions").update({ recorded_by: displayName }).eq("recorded_by", oldDisplayName));
     }
 
     // Refresh if editing self
@@ -965,10 +965,10 @@ async function saveUser() {
 
     const newId = await dbNextId("U");
     const pinHash = await hashPin(pin);
-    const { error } = await sb.from("users").insert({
+    const insertResult = await sbQuery(sb.from("users").insert({
       id: newId, username, pin: "", pin_hash: pinHash, display_name: displayName, role, permissions, force_pin_update: false
-    });
-    if (error) { console.error("Insert user error:", error); notify("Database error", "warning"); return; }
+    }));
+    if (insertResult === null) return;
 
     users.push({ id: newId, username, pin, displayName, role, permissions });
     notify(displayName + " added");
@@ -984,8 +984,8 @@ async function deleteUser(userId) {
   if (!u) return;
   if (!confirm('Delete user "' + u.displayName + '"?\n\nThis cannot be undone.')) return;
 
-  const { error } = await sb.from("users").delete().eq("id", userId);
-  if (error) { console.error("Delete user error:", error); notify("Database error", "warning"); return; }
+  const delResult = await sbQuery(sb.from("users").delete().eq("id", userId));
+  if (delResult === null) return;
 
   users = users.filter(x => x.id !== userId);
   notify(u.displayName + " deleted");
@@ -1031,19 +1031,19 @@ let fcCrops = [], fcVarieties = [], fcCropStatuses = [], fcBlockCrops = [], fcBl
 
 async function loadFarmConfig() {
   const [c, v, s, bc] = await Promise.all([
-    sb.from("crops").select("*").order("name"),
-    sb.from("crop_varieties").select("*").order("name"),
-    sb.from("crop_statuses").select("*").order("sort_order"),
-    sb.from("block_crops").select("*"),
+    sbQuery(sb.from("crops").select("*").order("name")),
+    sbQuery(sb.from("crop_varieties").select("*").order("name")),
+    sbQuery(sb.from("crop_statuses").select("*").order("sort_order")),
+    sbQuery(sb.from("block_crops").select("*").eq("is_current", true)),
   ]);
-  if (c.data) fcCrops = c.data;
-  if (v.data) fcVarieties = v.data;
-  if (s.data) fcCropStatuses = s.data;
-  if (bc.data) fcBlockCrops = bc.data;
+  if (c) fcCrops = c;
+  if (v) fcVarieties = v;
+  if (s) fcCropStatuses = s;
+  if (bc) fcBlockCrops = bc;
 }
 
 async function loadFcBlocks() {
-  const { data } = await sb.from("pnd_blocks").select("*").order("sort_order");
+  const data = await sbQuery(sb.from("pnd_blocks").select("*").order("sort_order"));
   if (data) fcBlocks = data;
 }
 
@@ -1082,6 +1082,18 @@ function renderCropList() {
         ${varieties.map(v => `
           <div class="variety-item">
             <span style="flex:1;color:var(--text);">${esc(crop.name)} — ${esc(v.name)}</span>
+            <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);">
+              <span>Plant to Induce:</span>
+              <input type="number" class="inline-input" value="${v.days_to_induce != null ? v.days_to_induce : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" onchange="updateVarietyDaysToInduce('${v.id}', this.value)">
+              <span>days</span>
+              <span class="save-tick" id="tick-vdi-${v.id}">&#10003;</span>
+            </span>
+            <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);">
+              <span>Induce to Harvest:</span>
+              <input type="number" class="inline-input" value="${v.harvest_days_from_induction != null ? v.harvest_days_from_induction : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" onchange="updateVarietyHarvestDays('${v.id}', this.value)">
+              <span>days</span>
+              <span class="save-tick" id="tick-vhd-${v.id}">&#10003;</span>
+            </span>
             <button class="btn btn-outline btn-sm" onclick="editVarietyName('${v.id}','${esc(v.name)}')" style="font-size:10px;">Edit</button>
             <button class="btn btn-outline btn-sm" onclick="archiveVariety('${v.id}')" style="font-size:10px;color:var(--gold);">Archive</button>
           </div>
@@ -1120,8 +1132,8 @@ async function addCrop() {
   const name = document.getElementById('fc-crop-name').value.trim();
   if (!name) { notify('Crop name required', 'warning'); return; }
   if (fcCrops.some(c => c.name.toLowerCase() === name.toLowerCase() && !c.archived)) { notify('Crop already exists', 'warning'); return; }
-  const { error } = await sb.from('crops').insert({ name });
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crops').insert({ name }));
+  if (result === null) return;
   document.getElementById('fc-crop-name').value = '';
   notify(name + ' added');
   await loadFarmConfig(); renderCropList();
@@ -1130,8 +1142,8 @@ async function addCrop() {
 async function editCropName(id, oldName) {
   const name = prompt('Edit crop name:', oldName);
   if (!name || name === oldName) return;
-  const { error } = await sb.from('crops').update({ name }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crops').update({ name }).eq('id', id));
+  if (result === null) return;
   notify('Crop renamed');
   await loadFarmConfig(); renderCropList();
 }
@@ -1139,15 +1151,15 @@ async function editCropName(id, oldName) {
 async function archiveCrop(id) {
   const crop = fcCrops.find(c => c.id === id);
   if (!confirm('Archive "' + crop.name + '"? It will be hidden from dropdowns.')) return;
-  const { error } = await sb.from('crops').update({ archived: true }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crops').update({ archived: true }).eq('id', id));
+  if (result === null) return;
   notify(crop.name + ' archived');
   await loadFarmConfig(); renderCropList();
 }
 
 async function restoreCrop(id) {
-  const { error } = await sb.from('crops').update({ archived: false }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crops').update({ archived: false }).eq('id', id));
+  if (result === null) return;
   notify('Crop restored');
   await loadFarmConfig(); renderCropList();
 }
@@ -1155,18 +1167,36 @@ async function restoreCrop(id) {
 async function addVariety(cropId) {
   const name = document.getElementById('var-name-' + cropId).value.trim();
   if (!name) { notify('Variety name required', 'warning'); return; }
-  const { error } = await sb.from('crop_varieties').insert({ crop_id: cropId, name });
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_varieties').insert({ crop_id: cropId, name }));
+  if (result === null) return;
   document.getElementById('var-name-' + cropId).value = '';
   notify(name + ' added');
   await loadFarmConfig(); renderCropList();
 }
 
+async function updateVarietyDaysToInduce(id, value) {
+  const days = value ? parseInt(value) : null;
+  const result = await sbQuery(sb.from('crop_varieties').update({ days_to_induce: days }).eq('id', id));
+  if (result === null) return;
+  const v = fcVarieties.find(x => x.id === id);
+  if (v) v.days_to_induce = days;
+  showTick('tick-vdi-' + id);
+}
+
+async function updateVarietyHarvestDays(id, value) {
+  const days = value ? parseInt(value) : null;
+  const result = await sbQuery(sb.from('crop_varieties').update({ harvest_days_from_induction: days }).eq('id', id));
+  if (result === null) return;
+  const v = fcVarieties.find(x => x.id === id);
+  if (v) v.harvest_days_from_induction = days;
+  showTick('tick-vhd-' + id);
+}
+
 async function editVarietyName(id, oldName) {
   const name = prompt('Edit variety name:', oldName);
   if (!name || name === oldName) return;
-  const { error } = await sb.from('crop_varieties').update({ name }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_varieties').update({ name }).eq('id', id));
+  if (result === null) return;
   notify('Variety renamed');
   await loadFarmConfig(); renderCropList();
 }
@@ -1176,15 +1206,15 @@ async function archiveVariety(id) {
   if (assigned) {
     if (!confirm("This variety is assigned to blocks. Archive it? (Existing assignments stay, but it won't appear in new dropdowns.)")) return;
   }
-  const { error } = await sb.from('crop_varieties').update({ archived: true }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_varieties').update({ archived: true }).eq('id', id));
+  if (result === null) return;
   notify('Variety archived');
   await loadFarmConfig(); renderCropList();
 }
 
 async function restoreVariety(id) {
-  const { error } = await sb.from('crop_varieties').update({ archived: false }).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_varieties').update({ archived: false }).eq('id', id));
+  if (result === null) return;
   notify('Variety restored');
   await loadFarmConfig(); renderCropList();
 }
@@ -1195,8 +1225,8 @@ async function addCropStatus(cropId) {
   if (!name) { notify('Status name required', 'warning'); return; }
   const existing = fcCropStatuses.filter(s => s.crop_id === cropId);
   const sortOrder = existing.length ? Math.max(...existing.map(s => s.sort_order)) + 1 : 1;
-  const { error } = await sb.from('crop_statuses').insert({ crop_id: cropId, name, sort_order: sortOrder });
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_statuses').insert({ crop_id: cropId, name, sort_order: sortOrder }));
+  if (result === null) return;
   input.value = '';
   notify('Status added');
   await loadFarmConfig(); renderCropList();
@@ -1206,8 +1236,8 @@ async function deleteCropStatus(id) {
   const inUse = fcBlockCrops.some(bc => bc.status_id === id);
   if (inUse) { notify('Cannot delete — status is in use by blocks', 'warning'); return; }
   if (!confirm('Delete this status?')) return;
-  const { error } = await sb.from('crop_statuses').delete().eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('crop_statuses').delete().eq('id', id));
+  if (result === null) return;
   notify('Status removed');
   await loadFarmConfig(); renderCropList();
 }
@@ -1239,8 +1269,8 @@ function renderBlockList() {
 
     return `<div class="block-card${hasMissing ? ' incomplete' : ''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <input class="inline-input" value="${esc(b.block_name)}" style="width:120px;font-weight:700;" onchange="fcUpdateBlock('${b.id}','block_name',this.value)">
-        <input class="inline-input" value="${esc(b.remarks || '')}" placeholder="Remarks" style="width:160px;" onchange="fcUpdateBlock('${b.id}','remarks',this.value)">
+        <span style="font-weight:700;font-size:14px;color:var(--white);min-width:120px;">${esc(b.block_name)}</span>
+        <span style="font-size:12px;color:var(--text-muted);">${esc(b.remarks || '')}</span>
         <label class="toggle" style="margin-left:auto;"><input type="checkbox" ${b.is_active ? 'checked' : ''} onchange="fcUpdateBlock('${b.id}','is_active',this.checked)"><span class="toggle-slider"></span></label>
         <span style="font-size:11px;color:var(--text-dim);">${b.is_active ? 'Active' : 'Inactive'}</span>
         <span class="save-tick" id="fc-tick-${b.id}">&#10003;</span>
@@ -1252,39 +1282,52 @@ function renderBlockList() {
           const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
           const cropStatuses = crop ? fcCropStatuses.filter(s => s.crop_id === crop.id) : [];
           const statusOpts = cropStatuses.map(s => `<option value="${s.id}" ${s.id === bc.status_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-          const daysAge = bc.date_planted ? Math.floor((new Date() - new Date(bc.date_planted)) / (1000 * 60 * 60 * 24)) : null;
-          const monthsAge = daysAge !== null ? (daysAge / 30.44).toFixed(1) : null;
+          const ageStr = fcAgeFromPlanted(bc.date_planted);
+          const currentStatus = cropStatuses.find(s => s.id === bc.status_id);
+          const isToReplant = currentStatus && currentStatus.name.toLowerCase() === 'to replant';
           return `<div class="block-crop-row">
             <span style="font-weight:600;min-width:140px;color:var(--text);">${esc((crop ? crop.name : '?') + ' — ' + (variety ? variety.name : '?'))}</span>
-            <input type="date" class="inline-input" value="${bc.date_planted || ''}" style="width:140px;" onchange="fcUpdateBlockCrop('${bc.id}','date_planted',this.value||null)">
-            <input type="number" class="inline-input" value="${bc.quantity !== null ? bc.quantity : ''}" placeholder="Qty" style="width:80px;" onchange="fcUpdateBlockCrop('${bc.id}','quantity',this.value===''?null:parseInt(this.value))">
-            <select class="inline-select" onchange="fcUpdateBlockCrop('${bc.id}','status_id',this.value||null)"><option value="">— Status —</option>${statusOpts}</select>
-            ${daysAge !== null ? `<span style="font-size:11px;color:var(--text-dim);">${daysAge}d (${monthsAge}mo)</span>` : ''}
+            <input type="date" class="inline-input" id="fc-dp-${bc.id}" value="${bc.date_planted || ''}" style="width:140px;">
+            <input type="number" class="inline-input" id="fc-qty-${bc.id}" value="${bc.quantity !== null ? bc.quantity : ''}" placeholder="Qty" style="width:80px;">
+            <select class="inline-select" id="fc-st-${bc.id}" onchange="fcOnStatusChange('${bc.id}',this.value)"><option value="">— Status —</option>${statusOpts}</select>
+            ${ageStr ? `<span style="font-size:11px;color:var(--text-dim);white-space:nowrap;">${ageStr}</span>` : ''}
+            <button class="btn btn-primary btn-sm" onclick="fcSaveBlockCrop('${bc.id}')" style="font-size:10px;">Save</button>
+            ${isToReplant ? `<button class="btn btn-sm" onclick="fcOpenNewCycleModal('${bc.id}','${b.id}')" style="font-size:10px;background:var(--gold-pale);color:var(--gold);border:1px solid var(--gold);font-weight:700;">New Cycle</button>` : ''}
             <button class="btn btn-danger btn-sm" onclick="fcRemoveBlockCrop('${bc.id}','${b.id}')" style="font-size:10px;">&#10005;</button>
             <span class="save-tick" id="fc-tick-bc-${bc.id}">&#10003;</span>
           </div>`;
         }).join('') : `<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">No crops assigned yet</div>`}
-        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-          <select id="fc-add-var-${b.id}" style="min-width:180px;padding:6px 8px;font-size:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;">${varietyOpts}</select>
-          <button class="btn btn-primary btn-sm" onclick="fcAddBlockCrop('${b.id}')">Assign Crop</button>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="fcOpenAddCropModal('${b.id}')">+ Add Crop</button>
+          <button class="btn btn-outline btn-sm" onclick="fcViewHistory('${b.id}')" style="font-size:10px;">View History</button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
 
+function fcAgeFromPlanted(dp) {
+  if(!dp) return "";
+  const planted=new Date(dp), today=new Date();
+  let y=today.getFullYear()-planted.getFullYear();
+  let m=today.getMonth()-planted.getMonth();
+  let d=today.getDate()-planted.getDate();
+  if(d<0){ m--; d+=new Date(today.getFullYear(),today.getMonth(),0).getDate(); }
+  if(m<0){ y--; m+=12; }
+  if(y<0) return "";
+  let parts=[];
+  if(y>0) parts.push(y+"Y");
+  if(m>0) parts.push(m+"M");
+  parts.push(d+"D");
+  return parts.join(" ");
+}
+
+
 async function fcUpdateBlock(id, field, value) {
   const upd = {};
-  if (field === 'block_name') {
-    const name = value.trim();
-    if (!name) { notify('Block name required', 'warning'); return; }
-    if (fcBlocks.some(b => b.id !== id && b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
-    upd.block_name = name;
-  } else {
-    upd[field] = value === "" ? null : value;
-  }
-  const { error } = await sb.from('pnd_blocks').update(upd).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  upd[field] = value === "" ? null : value;
+  const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id));
+  if (result === null) return;
   const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
   showTick('fc-tick-' + id);
 }
@@ -1296,8 +1339,8 @@ async function fcAddBlock() {
   if (!name) { notify('Block name required', 'warning'); return; }
   if (isNaN(sortOrder)) { notify('Sort order must be a number', 'warning'); return; }
   if (fcBlocks.some(b => b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
-  const { error } = await sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder });
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder }));
+  if (result === null) return;
   document.getElementById('fc-block-name').value = '';
   document.getElementById('fc-block-remarks').value = '';
   document.getElementById('fc-block-sort').value = '';
@@ -1305,32 +1348,397 @@ async function fcAddBlock() {
   await loadFcBlocks(); await loadFarmConfig(); renderBlockList();
 }
 
-async function fcUpdateBlockCrop(id, field, value) {
-  const upd = {}; upd[field] = value;
-  const { error } = await sb.from('block_crops').update(upd).eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
-  const bc = fcBlockCrops.find(x => x.id === id); if (bc) bc[field] = value;
+async function fcSaveBlockCrop(id) {
+  const dpEl = document.getElementById('fc-dp-' + id);
+  const qtyEl = document.getElementById('fc-qty-' + id);
+  const stEl = document.getElementById('fc-st-' + id);
+  if(!dpEl || !qtyEl || !stEl) return;
+  const upd = {
+    date_planted: dpEl.value || null,
+    quantity: qtyEl.value === '' ? null : parseInt(qtyEl.value),
+    status_id: stEl.value || null
+  };
+  const bcResult = await sbQuery(sb.from('block_crops').update(upd).eq('id', id));
+  if (bcResult === null) return;
+  const bc = fcBlockCrops.find(x => x.id === id); if (bc) Object.assign(bc, upd);
+
+  // Upsert target_induce_date in growth_records when date_planted changes
+  if(upd.date_planted) {
+    const variety = fcVarieties.find(v => v.id === (bc ? bc.variety_id : null));
+    const daysToInduce = variety ? variety.days_to_induce : null;
+    let targetInduceDate = null;
+    if(daysToInduce) {
+      const d = new Date(upd.date_planted + 'T00:00:00');
+      d.setDate(d.getDate() + daysToInduce);
+      targetInduceDate = d.toISOString().split('T')[0];
+    }
+    const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', id).limit(1));
+    if(existing && existing.length > 0) {
+      await sbQuery(sb.from('growth_records').update({ target_induce_date: targetInduceDate }).eq('id', existing[0].id));
+    } else if(targetInduceDate) {
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: id, target_induce_date: targetInduceDate }));
+    }
+  }
+
   showTick('fc-tick-bc-' + id);
-  if (field === 'date_planted') renderBlockList();
+  notify('Saved');
 }
 
-async function fcAddBlockCrop(blockId) {
-  const sel = document.getElementById('fc-add-var-' + blockId);
-  const varietyId = sel.value;
-  if (!varietyId) { notify('Select a variety', 'warning'); return; }
-  if (fcBlockCrops.some(bc => bc.block_id === blockId && bc.variety_id === varietyId)) { notify('This variety is already assigned to this block', 'warning'); return; }
-  const { error } = await sb.from('block_crops').insert({ block_id: blockId, variety_id: varietyId });
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
-  notify('Crop assigned');
+// When status changes to an "induced" status, prompt for induction dates
+function fcOnStatusChange(bcId, statusId) {
+  if(!statusId) return;
+  const status = fcCropStatuses.find(s => s.id === statusId);
+  if(!status) return;
+  const name = (status.name || '').toLowerCase();
+  if(name === 'induced' || name === 'to induce') {
+    fcOpenInductionPrompt(bcId, status.name);
+  }
+}
+
+function fcOpenInductionPrompt(bcId, statusName) {
+  const bc = fcBlockCrops.find(x => x.id === bcId);
+  if(!bc) return;
+  const block = fcBlocks.find(b => b.id === bc.block_id);
+  const variety = fcVarieties.find(v => v.id === bc.variety_id);
+  const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
+  const blockName = block ? block.block_name : '?';
+  const cropLabel = (crop ? crop.name : '?') + ' — ' + (variety ? variety.name : '?');
+
+  // Check if modal-container exists, if not create one
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  const today = new Date().toISOString().split('T')[0];
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:420px;max-width:90vw;position:relative;">' +
+        '<button onclick="fcCloseInductionPrompt()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:4px;">Induction Details — ' + esc(blockName) + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">' + esc(cropLabel) + ' | Status: ' + esc(statusName) + '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Induction Start Date</label>' +
+          '<input type="date" id="fc-ind-start" value="' + today + '" class="inline-input" style="width:100%;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Induction End Date (optional)</label>' +
+          '<input type="date" id="fc-ind-end" value="" class="inline-input" style="width:100%;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Harvest Days (from induction start)</label>' +
+          '<input type="number" id="fc-ind-days" value="' + (variety && variety.harvest_days_from_induction ? variety.harvest_days_from_induction : '140') + '" placeholder="e.g. 140" class="inline-input" style="width:100%;">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+          '<button class="btn btn-outline" onclick="fcCloseInductionPrompt()">Skip</button>' +
+          '<button class="btn btn-primary" onclick="fcSaveInductionFromConfig(\'' + bcId + '\')">Save Induction</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function fcCloseInductionPrompt() {
+  const mc = document.getElementById('fc-modal-container');
+  if(mc) mc.innerHTML = '';
+}
+
+async function fcSaveInductionFromConfig(bcId) {
+  const startDate = document.getElementById('fc-ind-start').value || null;
+  const endDate = document.getElementById('fc-ind-end').value || null;
+  const days = document.getElementById('fc-ind-days').value;
+  const harvestDays = days ? parseInt(days) : null;
+
+  if(startDate && endDate && new Date(endDate) < new Date(startDate)) {
+    notify('End date must be after start date', 'warning');
+    return;
+  }
+
+  // Calculate target harvest dates
+  let targetHarvestStart = null, targetHarvestEnd = null;
+  if(startDate && harvestDays) {
+    const hs = new Date(startDate + 'T00:00:00');
+    hs.setDate(hs.getDate() + harvestDays);
+    targetHarvestStart = hs.toISOString().split('T')[0];
+  }
+  if(endDate && harvestDays) {
+    const he = new Date(endDate + 'T00:00:00');
+    he.setDate(he.getDate() + harvestDays);
+    targetHarvestEnd = he.toISOString().split('T')[0];
+  }
+
+  // Check if growth_record already exists for this block_crop
+  const grData = {
+    date_induced_start: startDate, date_induced_end: endDate, harvest_days: harvestDays,
+    target_harvest_start: targetHarvestStart, target_harvest_end: targetHarvestEnd
+  };
+  const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', bcId).limit(1));
+  if(existing && existing.length > 0) {
+    const grResult = await sbQuery(sb.from('growth_records').update(grData).eq('id', existing[0].id));
+    if(grResult === null) return;
+  } else {
+    grData.block_crop_id = bcId;
+    const grResult = await sbQuery(sb.from('growth_records').insert(grData));
+    if(grResult === null) return;
+  }
+
+  // Also save the status_id on block_crops so it persists
+  const stEl = document.getElementById('fc-st-' + bcId);
+  if(stEl && stEl.value) {
+    await sbQuery(sb.from('block_crops').update({ status_id: stEl.value }).eq('id', bcId));
+    const bc = fcBlockCrops.find(x => x.id === bcId); if(bc) bc.status_id = stEl.value;
+  }
+
+  notify('Induction details saved');
+  fcCloseInductionPrompt();
+}
+
+function fcOpenAddCropModal(blockId) {
+  const block = fcBlocks.find(b => b.id === blockId);
+  const blockName = block ? block.block_name : '?';
+  const activeVarieties = fcVarieties.filter(v => !v.archived);
+  const varOpts = activeVarieties.map(v => {
+    const crop = fcCrops.find(c => c.id === v.crop_id);
+    return '<option value="' + v.id + '">' + esc((crop ? crop.name : '?') + ' — ' + v.name) + '</option>';
+  }).join('');
+
+  // Get date_planted from existing crops in this block (use first one)
+  const existingBc = fcBlockCrops.find(bc => bc.block_id === blockId && bc.date_planted);
+  const defaultDate = existingBc ? existingBc.date_planted : '';
+
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:420px;max-width:90vw;position:relative;">' +
+        '<button onclick="fcCloseAddCropModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:16px;">Add Crop — ' + esc(blockName) + '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Crop / Variety</label>' +
+          '<select id="fc-ac-variety" class="inline-select" style="width:100%;">' + varOpts + '</select>' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Quantity (plants)</label>' +
+          '<input type="number" id="fc-ac-qty" class="inline-input" placeholder="e.g. 5000" style="width:100%;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Date Planted</label>' +
+          '<input type="date" id="fc-ac-date" class="inline-input" value="' + defaultDate + '" style="width:100%;">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+          '<button class="btn btn-outline" onclick="fcCloseAddCropModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="fcDoAddCrop(\'' + blockId + '\')">Add Crop</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function fcCloseAddCropModal() {
+  const mc = document.getElementById('fc-modal-container');
+  if(mc) mc.innerHTML = '';
+}
+
+async function fcDoAddCrop(blockId) {
+  const varietyId = document.getElementById('fc-ac-variety').value;
+  const qty = document.getElementById('fc-ac-qty').value;
+  const datePlanted = document.getElementById('fc-ac-date').value || null;
+  if(!varietyId) { notify('Select a variety', 'warning'); return; }
+  if(fcBlockCrops.some(bc => bc.block_id === blockId && bc.variety_id === varietyId)) { notify('This variety is already assigned to this block', 'warning'); return; }
+  const insertData = { block_id: blockId, variety_id: varietyId };
+  if(qty) insertData.quantity = parseInt(qty);
+  if(datePlanted) insertData.date_planted = datePlanted;
+  const inserted = await sbQuery(sb.from('block_crops').insert(insertData).select('id').single());
+  if(inserted === null) return;
+
+  // Create growth_record with target_induce_date if date_planted is set
+  if(datePlanted && inserted) {
+    const variety = fcVarieties.find(v => v.id === varietyId);
+    const daysToInduce = variety ? variety.days_to_induce : null;
+    if(daysToInduce) {
+      const d = new Date(datePlanted + 'T00:00:00');
+      d.setDate(d.getDate() + daysToInduce);
+      const targetInduceDate = d.toISOString().split('T')[0];
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }));
+    }
+  }
+
+  notify('Crop added');
+  fcCloseAddCropModal();
   await loadFarmConfig(); renderBlockList();
 }
 
 async function fcRemoveBlockCrop(id, blockId) {
   if (!confirm('Remove this crop assignment?')) return;
-  const { error } = await sb.from('block_crops').delete().eq('id', id);
-  if (error) { notify('Error: ' + error.message, 'warning'); return; }
+  const result = await sbQuery(sb.from('block_crops').delete().eq('id', id));
+  if (result === null) return;
   notify('Removed');
   await loadFarmConfig(); renderBlockList();
+}
+
+// ============================================================
+// FARM CONFIG — NEW CYCLE (REPLANTING)
+// ============================================================
+function fcOpenNewCycleModal(bcId, blockId) {
+  const bc = fcBlockCrops.find(x => x.id === bcId);
+  if(!bc) return;
+  const block = fcBlocks.find(b => b.id === blockId);
+  const blockName = block ? block.block_name : '?';
+  const currentVariety = fcVarieties.find(v => v.id === bc.variety_id);
+  const activeVarieties = fcVarieties.filter(v => !v.archived);
+  const varOpts = activeVarieties.map(v => {
+    const crop = fcCrops.find(c => c.id === v.crop_id);
+    const selected = v.id === bc.variety_id ? 'selected' : '';
+    return '<option value="' + v.id + '" ' + selected + '>' + esc((crop ? crop.name : '?') + ' — ' + v.name) + '</option>';
+  }).join('');
+
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:420px;max-width:90vw;position:relative;">' +
+        '<button onclick="fcCloseNewCycleModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:4px;">Start New Cycle — ' + esc(blockName) + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Previous: ' + esc(currentVariety ? currentVariety.name : '?') + ' (planted ' + (bc.date_planted || 'N/A') + ')</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Variety for New Cycle</label>' +
+          '<select id="fc-nc-variety" class="inline-select" style="width:100%;">' + varOpts + '</select>' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Quantity (plants)</label>' +
+          '<input type="number" id="fc-nc-qty" class="inline-input" placeholder="e.g. 5000" style="width:100%;">' +
+        '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Date Planted</label>' +
+          '<input type="date" id="fc-nc-date" class="inline-input" style="width:100%;">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+          '<button class="btn btn-outline" onclick="fcCloseNewCycleModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="fcDoNewCycle(\'' + bcId + '\',\'' + blockId + '\')">Start New Cycle</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function fcCloseNewCycleModal() {
+  const mc = document.getElementById('fc-modal-container');
+  if(mc) mc.innerHTML = '';
+}
+
+async function fcDoNewCycle(oldBcId, blockId) {
+  const varietyId = document.getElementById('fc-nc-variety').value;
+  const qty = document.getElementById('fc-nc-qty').value;
+  const datePlanted = document.getElementById('fc-nc-date').value || null;
+  if(!varietyId) { notify('Select a variety', 'warning'); return; }
+  if(!datePlanted) { notify('Date planted is required for new cycle', 'warning'); return; }
+
+  // 1. Mark old block_crop as not current
+  const closeResult = await sbQuery(sb.from('block_crops').update({ is_current: false }).eq('id', oldBcId));
+  if(closeResult === null) return;
+
+  // 2. Find next cycle number for this block + variety
+  const existing = await sbQuery(sb.from('block_crops').select('cycle').eq('block_id', blockId).eq('variety_id', varietyId).order('cycle', { ascending: false }).limit(1));
+  const nextCycle = (existing && existing.length > 0) ? existing[0].cycle + 1 : 1;
+
+  // 3. Find "Growing" status for this variety's crop
+  const variety = fcVarieties.find(v => v.id === varietyId);
+  const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
+  const growingStatus = crop ? fcCropStatuses.find(s => s.crop_id === crop.id && s.name.toLowerCase() === 'growing') : null;
+
+  // 4. Create new block_crop
+  const insertData = {
+    block_id: blockId,
+    variety_id: varietyId,
+    date_planted: datePlanted,
+    cycle: nextCycle,
+    is_current: true
+  };
+  if(qty) insertData.quantity = parseInt(qty);
+  if(growingStatus) insertData.status_id = growingStatus.id;
+
+  const inserted = await sbQuery(sb.from('block_crops').insert(insertData).select('id').single());
+  if(inserted === null) {
+    // Rollback: re-activate old block_crop
+    await sbQuery(sb.from('block_crops').update({ is_current: true }).eq('id', oldBcId));
+    notify('Failed to create new cycle', 'error');
+    return;
+  }
+
+  // 5. Create growth_record with target_induce_date
+  const daysToInduce = variety ? variety.days_to_induce : null;
+  if(daysToInduce) {
+    const d = new Date(datePlanted + 'T00:00:00');
+    d.setDate(d.getDate() + daysToInduce);
+    const targetInduceDate = d.toISOString().split('T')[0];
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }));
+  } else {
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id }));
+  }
+
+  notify('New cycle started — Cycle ' + nextCycle);
+  fcCloseNewCycleModal();
+  await loadFarmConfig(); renderBlockList();
+}
+
+// ============================================================
+// FARM CONFIG — VIEW HISTORY
+// ============================================================
+async function fcViewHistory(blockId) {
+  const block = fcBlocks.find(b => b.id === blockId);
+  const blockName = block ? block.block_name : '?';
+
+  // Load ALL block_crops for this block (including non-current)
+  const allBc = await sbQuery(sb.from('block_crops').select('*, crop_varieties(name, crops(name))').eq('block_id', blockId).order('cycle', { ascending: false }));
+  if(!allBc || allBc.length === 0) { notify('No planting history for this block', 'warning'); return; }
+
+  // Load growth_records for these block_crops
+  const bcIds = allBc.map(bc => bc.id);
+  const grData = await sbQuery(sb.from('growth_records').select('*').in('block_crop_id', bcIds));
+  const grMap = {};
+  if(grData) grData.forEach(g => { grMap[g.block_crop_id] = g; });
+
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  const rows = allBc.map(bc => {
+    const gr = grMap[bc.id] || {};
+    const variety = bc.crop_varieties;
+    const cropName = variety && variety.crops ? variety.crops.name : '?';
+    const varName = variety ? variety.name : '?';
+    const status = fcCropStatuses.find(s => s.id === bc.status_id);
+    const statusName = status ? status.name : '—';
+    const isCurrent = bc.is_current;
+    const badge = isCurrent ? '<span style="background:var(--green-pale);color:var(--green-light);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">Current</span>' : '<span style="background:var(--bg-hover);color:var(--text-dim);padding:2px 8px;border-radius:6px;font-size:10px;">Closed</span>';
+    return '<tr>' +
+      '<td style="font-weight:700;color:var(--white);">Cycle ' + bc.cycle + '</td>' +
+      '<td>' + badge + '</td>' +
+      '<td>' + esc(cropName + ' — ' + varName) + '</td>' +
+      '<td>' + (bc.date_planted || '—') + '</td>' +
+      '<td>' + (bc.quantity ? bc.quantity.toLocaleString() : '—') + '</td>' +
+      '<td>' + esc(statusName) + '</td>' +
+      '<td style="font-size:11px;">' + (gr.date_induced_start || '—') + '</td>' +
+      '<td style="font-size:11px;">' + (gr.target_harvest_start ? gr.target_harvest_start + (gr.target_harvest_end ? ' — ' + gr.target_harvest_end : '') : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:700px;max-width:95vw;max-height:80vh;overflow-y:auto;position:relative;">' +
+        '<button onclick="fcCloseNewCycleModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:16px;">Planting History — ' + esc(blockName) + '</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+          '<thead><tr style="border-bottom:2px solid var(--border);">' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Cycle</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;"></th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Variety</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Planted</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Qty</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Status</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Induced</th>' +
+            '<th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-size:11px;">Harvest Window</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
 }
 </script>
 

@@ -330,6 +330,7 @@ select { min-width: 140px; }
 </head>
 <body>
 <div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <div id="app">
   <!-- LOGIN SCREEN -->
@@ -368,7 +369,7 @@ select { min-width: 140px; }
         
       </div>
     </div>
-    <div class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Module navigation">
       <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         <span class="nav-label">Dashboard</span>
@@ -389,7 +390,7 @@ select { min-width: 140px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         <span class="nav-label">Reports</span>
       </div>
-    </div>
+    </nav>
     <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
       <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;"></div>
       <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
@@ -408,7 +409,7 @@ select { min-width: 140px; }
   </div>
 
   <!-- MAIN CONTENT -->
-  <div class="main-content">
+  <div class="main-content" role="main" id="main-content">
 
     <!-- ===== DASHBOARD ===== -->
     <div id="page-dashboard" class="page active">
@@ -1032,7 +1033,7 @@ select { min-width: 140px; }
 </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
 <script>
@@ -1104,32 +1105,23 @@ function mapTxnFromDb(row) {
 // SUPABASE DATA LOADING
 // ============================================================
 async function loadAllData() {
-  try {
-    const [uRes, pRes, sRes, wRes, tRes] = await Promise.all([
-      sb.from("users").select("*"),
-      sb.from("products").select("*"),
-      sb.from("suppliers").select("*"),
-      sb.from("workers").select("*"),
-      sb.from("transactions").select("*").order("date", { ascending: false }),
-    ]);
+  const [uData, pData, sData, wData, tData] = await Promise.all([
+    sbQuery(sb.from("users").select("*")),
+    sbQuery(sb.from("products").select("*")),
+    sbQuery(sb.from("suppliers").select("*")),
+    sbQuery(sb.from("workers").select("*")),
+    sbQuery(sb.from("transactions").select("*").order("date", { ascending: false })),
+  ]);
 
-    if (uRes.error) throw uRes.error;
-    if (pRes.error) throw pRes.error;
-    if (sRes.error) throw sRes.error;
-    if (wRes.error) throw wRes.error;
-    if (tRes.error) throw tRes.error;
+  if (!uData || !pData || !sData || !wData || !tData) return;
 
-    users = uRes.data.map(mapUserFromDb);
-    products = pRes.data.map(mapProductFromDb);
-    suppliers = sRes.data.map(mapSupplierFromDb);
-    workers = wRes.data.map(mapWorkerFromDb);
-    transactions = tRes.data.map(mapTxnFromDb);
-    dbReady = true;
-    console.log("✅ Data loaded from Supabase:", { users: users.length, products: products.length, suppliers: suppliers.length, workers: workers.length, transactions: transactions.length });
-  } catch (err) {
-    console.error("❌ Failed to load data:", err);
-    notify("Failed to connect to database. Please check your connection.", "warning");
-  }
+  users = uData.map(mapUserFromDb);
+  products = pData.map(mapProductFromDb);
+  suppliers = sData.map(mapSupplierFromDb);
+  workers = wData.map(mapWorkerFromDb);
+  transactions = tData.map(mapTxnFromDb);
+  dbReady = true;
+  console.log("✅ Data loaded from Supabase:", { users: users.length, products: products.length, suppliers: suppliers.length, workers: workers.length, transactions: transactions.length });
 }
 
 async function syncNow() {
@@ -1150,87 +1142,78 @@ async function syncNow() {
 // SUPABASE CRUD HELPERS
 // ============================================================
 async function dbInsertProduct(p) {
-  const { error } = await sb.from("products").insert({
+  var result = await sbQuery(sb.from("products").insert({
     id: p.id, name: p.name, category: p.category, subcategory: p.subcategory || "",
     active_ingredient: p.activeIngredient, formulation: p.formulation,
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
-  });
-  if (error) { console.error("Insert product error:", error); notify("Database error saving product", "warning"); }
-  return !error;
+  }));
+  return result !== null;
 }
 
 async function dbUpdateProduct(p) {
-  const { error } = await sb.from("products").update({
+  var result = await sbQuery(sb.from("products").update({
     name: p.name, category: p.category, subcategory: p.subcategory || "",
     active_ingredient: p.activeIngredient, formulation: p.formulation,
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
-  }).eq("id", p.id);
-  if (error) { console.error("Update product error:", error); notify("Database error updating product", "warning"); }
-  return !error;
+  }).eq("id", p.id));
+  return result !== null;
 }
 
 async function dbUpdateProductStock(productId, newStock) {
-  const { error } = await sb.from("products").update({ current_stock: newStock }).eq("id", productId);
-  if (error) console.error("Stock update error:", error);
-  return !error;
+  var result = await sbQuery(sb.from("products").update({ current_stock: newStock }).eq("id", productId));
+  return result !== null;
 }
 
 async function dbInsertTransaction(t) {
-  const { error } = await sb.from("transactions").insert({
+  var result = await sbQuery(sb.from("transactions").insert({
     id: t.id, date: t.date, product_id: t.productId, product_name: t.productName,
     type: t.type, quantity: t.quantity, supplier: t.supplier || "",
     taken_by: t.takenBy || "", invoice_no: t.invoiceNo || "",
     recorded_by: t.recordedBy, unit_cost: t.unitCost || 0,
     total_cost: t.totalCost || 0, notes: t.notes || ""
-  });
-  if (error) { console.error("Insert txn error:", error); notify("Database error saving transaction", "warning"); }
-  return !error;
+  }));
+  return result !== null;
 }
 
 async function dbUpdateTransaction(t) {
-  const { error } = await sb.from("transactions").update({
+  var result = await sbQuery(sb.from("transactions").update({
     date: t.date, product_id: t.productId, product_name: t.productName,
     type: t.type, quantity: t.quantity, supplier: t.supplier || "",
     taken_by: t.takenBy || "", invoice_no: t.invoiceNo || "",
     recorded_by: t.recordedBy, unit_cost: t.unitCost || 0,
     total_cost: t.totalCost || 0, notes: t.notes || ""
-  }).eq("id", t.id);
-  if (error) { console.error("Update txn error:", error); notify("Database error updating transaction", "warning"); }
-  return !error;
+  }).eq("id", t.id));
+  return result !== null;
 }
 
 async function dbDeleteTransaction(id) {
-  const { error } = await sb.from("transactions").delete().eq("id", id);
-  if (error) { console.error("Delete txn error:", error); notify("Database error deleting transaction", "warning"); }
-  return !error;
+  var result = await sbQuery(sb.from("transactions").delete().eq("id", id));
+  return result !== null;
 }
 
 async function dbInsertSupplier(s) {
-  const { error } = await sb.from("suppliers").insert({
+  var result = await sbQuery(sb.from("suppliers").insert({
     id: s.id, name: s.name, contact: s.contact || "", phone: s.phone || "",
     email: s.email || "", notes: s.notes || "", product_ids: s.productIds || []
-  });
-  if (error) { console.error("Insert supplier error:", error); notify("Database error saving supplier", "warning"); }
-  return !error;
+  }));
+  return result !== null;
 }
 
 async function dbUpdateSupplier(s) {
-  const { error } = await sb.from("suppliers").update({
+  var result = await sbQuery(sb.from("suppliers").update({
     name: s.name, contact: s.contact || "", phone: s.phone || "",
     email: s.email || "", notes: s.notes || "", product_ids: s.productIds || []
-  }).eq("id", s.id);
-  if (error) { console.error("Update supplier error:", error); notify("Database error updating supplier", "warning"); }
-  return !error;
+  }).eq("id", s.id));
+  return result !== null;
 }
 
 async function dbDeleteSupplier(id) {
-  const { error } = await sb.from("suppliers").delete().eq("id", id);
-  if (error) console.error("Delete supplier error:", error);
-  return !error;
+  var result = await sbQuery(sb.from("suppliers").delete().eq("id", id));
+  return result !== null;
 }
 
 
@@ -2579,8 +2562,8 @@ function clearProductImage() {
 async function uploadProductImage(productId, file) {
   const ext = file.name.split(".").pop().toLowerCase();
   const path = `product-images/${productId}.${ext}`;
-  const { data, error } = await sb.storage.from("product-images").upload(path, file, { upsert: true, contentType: file.type });
-  if (error) { console.error("Image upload error:", error); notify("Failed to upload image", "warning"); return ""; }
+  var data = await sbQuery(sb.storage.from("product-images").upload(path, file, { upsert: true, contentType: file.type }));
+  if (!data) return "";
   const { data: urlData } = sb.storage.from("product-images").getPublicUrl(path);
   return urlData.publicUrl + "?t=" + Date.now();
 }
@@ -2991,8 +2974,8 @@ async function submitChangePin() {
   if (!pin1 || pin1.length !== 6 || !/^\d{6}$/.test(pin1)) { notify("New PIN must be exactly 6 digits", "warning"); return; }
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
   var hashed = await hashPinLocal(pin1);
-  var res = await sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id);
-  if (res.error) { notify("Error updating PIN", "warning"); return; }
+  var res = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  if (!res) return;
   document.getElementById("change-pin-modal").style.display = "none";
   notify("PIN updated successfully!");
 }

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Worker Management — TG FarmHub</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
 <style>
@@ -74,6 +74,7 @@
 </head>
 <body>
 <div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- LOGIN (fallback if no session) -->
 <div id="login-screen" style="display:none;justify-content:center;align-items:center;height:100vh;width:100vw;background:var(--bg);">
@@ -101,7 +102,7 @@
         <div class="sidebar-brand-sub">Ladang PND</div>
       </div>
     </div>
-    <div class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Module navigation">
       <div class="nav-item active" data-page="workers" onclick="navigateTo('workers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span class="nav-label">Workers</span>
@@ -122,7 +123,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         <span class="nav-label">Roles</span>
       </div>
-    </div>
+    </nav>
     <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
       <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
       <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
@@ -141,7 +142,7 @@
   </div>
 
   <!-- PAGES -->
-  <div class="main">
+  <div class="main" role="main" id="main-content">
     <!-- WORKERS PAGE -->
     <div id="page-workers" class="page active">
       <div class="page-header">
@@ -720,15 +721,13 @@ async function auditLog(tableName, recordId, action, changes, inlineTarget) {
   const changesStr = typeof changes === "string" ? changes : "";
 
   // 1. Write to audit_log table
-  try {
-    await sb.from("audit_log").insert({
-      table_name: tableName,
-      record_id: recordId,
-      action: action,
-      changes: changesStr,
-      changed_by: who,
-    });
-  } catch(e) { console.error("Audit log write failed:", e); }
+  await sbQuery(sb.from("audit_log").insert({
+    table_name: tableName,
+    record_id: recordId,
+    action: action,
+    changes: changesStr,
+    changed_by: who,
+  }));
 
   // 2. Append to inline notes on the record (if target provided)
   if (inlineTarget && changesStr) {
@@ -755,7 +754,7 @@ function diffChanges(oldObj, newObj, fields) {
 // AUTH
 // ============================================================
 async function loadUsers() {
-  const { data } = await sb.from("users").select("*");
+  const data = await sbQuery(sb.from("users").select("*"));
   users = (data || []).map(r => ({ id: r.id, username: r.username, pin: r.pin, displayName: r.display_name, role: r.role, permissions: r.permissions || {} }));
 }
 
@@ -838,8 +837,8 @@ function getWorkerLoanBalance(workerId) {
 // ============================================================
 async function loadAllData() {
   async function safeLoad(query) {
-    try { const { data } = await query; return data || []; }
-    catch(e) { console.warn("Table load failed:", e.message); return []; }
+    var data = await sbQuery(query);
+    return data || [];
   }
 
   const [w, tt, rt, pp, wr, tu, wl, lr, es] = await Promise.all([
@@ -1016,20 +1015,20 @@ async function saveWorker() {
     const old = workers.find(w => w.id === editId);
     const changesStr = old ? diffChanges(old, data, ["name", "gender", "pay_rate", "role", "phone", "ic_number", "active"]) : "";
 
-    const { error } = await sb.from("workers").update(data).eq("id", editId);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("workers").update(data).eq("id", editId));
+    if (result === null) return;
     const idx = workers.findIndex(w => w.id === editId);
     if (idx >= 0) {
       const oldName = workers[idx].name;
       Object.assign(workers[idx], data);
       // Cascade rename worker name to payroll entries
       if (oldName !== name) {
-        await sb.from("payroll_entries").update({ worker_name: name }).eq("worker_name", oldName);
+        await sbQuery(sb.from("payroll_entries").update({ worker_name: name }).eq("worker_name", oldName));
         payrollEntries.filter(pe => pe.worker_name === oldName).forEach(pe => { pe.worker_name = name; });
       }
       if (changesStr) {
         await auditLog("workers", editId, "update", changesStr, workers[idx]);
-        await sb.from("workers").update({ notes: workers[idx].notes }).eq("id", editId);
+        await sbQuery(sb.from("workers").update({ notes: workers[idx].notes }).eq("id", editId));
       }
     }
     notify(name + " updated" + (changesStr ? " — " + changesStr : ""));
@@ -1037,15 +1036,15 @@ async function saveWorker() {
     const newId = await dbNextId("W");
     data.id = newId;
     data.created_at = new Date().toISOString();
-    const { error } = await sb.from("workers").insert(data);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("workers").insert(data));
+    if (result === null) return;
     workers.push(data);
     await auditLog("workers", data.id, "create", "New worker: " + name + ", rate RM " + pay_rate);
     // Create initial employment stint
     if (active && join_date) {
       const stintId = await dbNextId("ES");
       const stintData = { id: stintId, worker_id: newId, start_date: join_date, end_date: null, is_current: true, leave_reason: "" };
-      await sb.from("employment_stints").insert(stintData);
+      await sbQuery(sb.from("employment_stints").insert(stintData));
       employmentStints.unshift(stintData);
     }
     notify(name + " added");
@@ -1056,7 +1055,7 @@ async function saveWorker() {
     if (!workerRoles.some(r => r.name.toLowerCase() === role.toLowerCase())) {
       const roleId = await dbNextId("WR");
       const roleData = { id: roleId, name: role, sort_order: workerRoles.length + 1, is_default: false };
-      await sb.from("worker_roles").insert(roleData);
+      await sbQuery(sb.from("worker_roles").insert(roleData));
       workerRoles.push(roleData);
     }
   }
@@ -1094,22 +1093,22 @@ async function confirmDeactivate() {
   if (!w || !endDate) { notify("Date is required", "warning"); return; }
 
   // Update worker status
-  const { error } = await sb.from("workers").update({ active: false }).eq("id", id);
-  if (error) { notify("Error", "warning"); return; }
+  var result = await sbQuery(sb.from("workers").update({ active: false }).eq("id", id));
+  if (result === null) return;
   w.active = false;
 
   // Close current stint
   const current = getCurrentStint(id);
   if (current) {
     const leaveReason = reason + (notes ? ' — ' + notes : '');
-    await sb.from("employment_stints").update({ end_date: endDate, is_current: false, leave_reason: leaveReason }).eq("id", current.id);
+    await sbQuery(sb.from("employment_stints").update({ end_date: endDate, is_current: false, leave_reason: leaveReason }).eq("id", current.id));
     current.end_date = endDate;
     current.is_current = false;
     current.leave_reason = leaveReason;
   }
 
   await auditLog("workers", id, "deactivate", "Deactivated on " + endDate + (reason ? ". Reason: " + reason : ""), w);
-  await sb.from("workers").update({ notes: w.notes }).eq("id", id);
+  await sbQuery(sb.from("workers").update({ notes: w.notes }).eq("id", id));
 
   closeModal("deactivate-modal");
   notify(w.name + " deactivated");
@@ -1124,18 +1123,18 @@ async function confirmReactivate() {
   if (!w || !startDate) { notify("Date is required", "warning"); return; }
 
   // Update worker status
-  const { error } = await sb.from("workers").update({ active: true }).eq("id", id);
-  if (error) { notify("Error", "warning"); return; }
+  var result = await sbQuery(sb.from("workers").update({ active: true }).eq("id", id));
+  if (result === null) return;
   w.active = true;
 
   // Create new stint
   const stintId = await dbNextId("ES");
   const stintData = { id: stintId, worker_id: id, start_date: startDate, end_date: null, is_current: true, leave_reason: "" };
-  await sb.from("employment_stints").insert(stintData);
+  await sbQuery(sb.from("employment_stints").insert(stintData));
   employmentStints.unshift(stintData);
 
   await auditLog("workers", id, "reactivate", "Reactivated on " + startDate, w);
-  await sb.from("workers").update({ notes: w.notes }).eq("id", id);
+  await sbQuery(sb.from("workers").update({ notes: w.notes }).eq("id", id));
 
   closeModal("reactivate-modal");
   notify(w.name + " reactivated — new stint started");
@@ -1274,13 +1273,13 @@ async function saveTaskType() {
     const old = taskTypes.find(t => t.id === editId);
     const oldName = old ? old.name : "";
     const oldUnit = old ? old.unit : "";
-    const { error } = await sb.from("task_types").update(data).eq("id", editId);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("task_types").update(data).eq("id", editId));
+    if (result === null) return;
     const idx = taskTypes.findIndex(t => t.id === editId);
     if (idx >= 0) Object.assign(taskTypes[idx], data);
     // Cascade rename task name to task_entries
     if (oldName && oldName !== name) {
-      await sb.from("task_entries").update({ task_name: name }).eq("task_name", oldName);
+      await sbQuery(sb.from("task_entries").update({ task_name: name }).eq("task_name", oldName));
       taskEntries.filter(te => te.task_name === oldName).forEach(te => { te.task_name = name; });
     }
     notify(name + " updated" + (oldName !== name ? " — renamed from " + oldName + " (updated in all records)" : ""));
@@ -1290,8 +1289,8 @@ async function saveTaskType() {
     data.is_default = false;
     data.active = true;
     data.sort_order = taskTypes.length + 1;
-    const { error } = await sb.from("task_types").insert(data);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("task_types").insert(data));
+    if (result === null) return;
     taskTypes.push(data);
     notify(name + " added");
   }
@@ -1301,7 +1300,7 @@ async function saveTaskType() {
     if (!taskUnits.some(u => u.name.toLowerCase() === unit.toLowerCase())) {
       const unitId = await dbNextId("TU");
       const unitData = { id: unitId, name: unit, sort_order: taskUnits.length + 1, is_default: false };
-      await sb.from("task_units").insert(unitData);
+      await sbQuery(sb.from("task_units").insert(unitData));
       taskUnits.push(unitData);
     }
   }
@@ -1314,8 +1313,8 @@ async function deleteTaskType(id) {
   const t = taskTypes.find(x => x.id === id);
   if (!t || t.is_default) return;
   if (!confirm('Delete task type "' + t.name + '"?')) return;
-  const { error } = await sb.from("task_types").delete().eq("id", id);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("task_types").delete().eq("id", id));
+  if (result === null) return;
   taskTypes = taskTypes.filter(x => x.id !== id);
   notify(t.name + " deleted");
   renderTaskTypes();
@@ -1362,20 +1361,19 @@ async function saveRole() {
     const oldName = r.name;
     if (oldName !== name) {
       // Cascade rename to all workers with this role
-      const { error: wErr } = await sb.from("workers").update({ role: name }).eq("role", oldName);
-      if (wErr) { console.error("Cascade role error:", wErr); }
+      await sbQuery(sb.from("workers").update({ role: name }).eq("role", oldName));
       workers.filter(w => w.role === oldName).forEach(w => { w.role = name; });
     }
-    const { error } = await sb.from("worker_roles").update({ name }).eq("id", editId);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("worker_roles").update({ name }).eq("id", editId));
+    if (result === null) return;
     r.name = name;
     notify(name + " updated" + (oldName !== name ? " — renamed from " + oldName : ""));
   } else {
     if (workerRoles.some(r => r.name.toLowerCase() === name.toLowerCase())) { notify("Role already exists", "warning"); return; }
     const newId = await dbNextId("WR");
     const data = { id: newId, name, sort_order: workerRoles.length + 1, is_default: false };
-    const { error } = await sb.from("worker_roles").insert(data);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("worker_roles").insert(data));
+    if (result === null) return;
     workerRoles.push(data);
     notify(name + " added");
   }
@@ -1389,8 +1387,8 @@ async function deleteRole(id) {
   const count = workers.filter(w => w.role === r.name).length;
   if (count > 0) { notify("Cannot delete — " + count + " worker(s) have this role. Reassign them first.", "warning"); return; }
   if (!confirm('Delete role "' + r.name + '"?')) return;
-  const { error } = await sb.from("worker_roles").delete().eq("id", id);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("worker_roles").delete().eq("id", id));
+  if (result === null) return;
   workerRoles = workerRoles.filter(x => x.id !== id);
   notify(r.name + " deleted");
   renderRoles();
@@ -1454,8 +1452,8 @@ async function confirmAddWorker() {
     responsibility_total: 0, deduct_advance: 0, deduct_loan: 0, deduct_shop: 0, deduct_other: 0,
     total_deductions: 0, task_total: 0, total_pay: 0, final_pay: 0,
   };
-  const { error } = await sb.from("payroll_entries").insert(entry);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("payroll_entries").insert(entry));
+  if (result === null) return;
   payrollEntries.push(entry);
   closeModal("addworker-modal");
   notify(w.name + " added to period");
@@ -1467,11 +1465,11 @@ async function confirmAddWorker() {
 // ============================================================
 async function getCarryForwardRate(worker) {
   // Look for most recent payroll entry for this worker
-  const { data } = await sb.from("payroll_entries")
+  var data = await sbQuery(sb.from("payroll_entries")
     .select("pay_rate, period_id")
     .eq("worker_id", worker.id)
     .order("period_id", { ascending: false })
-    .limit(1);
+    .limit(1));
   if (data && data.length > 0 && data[0].pay_rate > 0) {
     return parseFloat(data[0].pay_rate);
   }
@@ -1555,8 +1553,8 @@ function renderPayrollPage() {
 
 async function createPeriod(year, month) {
   const id = "PP-" + year + "-" + String(month).padStart(2, "0");
-  const { error } = await sb.from("payroll_periods").insert({ id, year, month, status: "open" });
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("payroll_periods").insert({ id, year, month, status: "open" }));
+  if (result === null) return;
   payrollPeriods.unshift({ id, year, month, status: "open" });
   notify("Period " + year + "-" + String(month).padStart(2, "0") + " created");
   renderPayrollPage();
@@ -1569,14 +1567,14 @@ async function loadPayrollPeriod() {
   if (!periodId) { document.getElementById("payroll-content").innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Select a payroll period</p></div>'; return; }
   currentPeriodId = periodId;
 
-  const [peRes, teRes, prRes] = await Promise.all([
-    sb.from("payroll_entries").select("*").eq("period_id", periodId),
-    sb.from("task_entries").select("*").eq("period_id", periodId),
-    sb.from("payroll_responsibilities").select("*").eq("period_id", periodId),
+  const [peData, teData, prData] = await Promise.all([
+    sbQuery(sb.from("payroll_entries").select("*").eq("period_id", periodId)),
+    sbQuery(sb.from("task_entries").select("*").eq("period_id", periodId)),
+    sbQuery(sb.from("payroll_responsibilities").select("*").eq("period_id", periodId)),
   ]);
-  payrollEntries = peRes.data || [];
-  taskEntries = teRes.data || [];
-  payrollResponsibilities = prRes.data || [];
+  payrollEntries = peData || [];
+  taskEntries = teData || [];
+  payrollResponsibilities = prData || [];
 
   renderPayrollEntries();
 }
@@ -1665,8 +1663,8 @@ async function togglePaymentStatus(peId) {
   const newStatus = (pe.payment_status || "unpaid") === "paid" ? "unpaid" : "paid";
   const paidAt = newStatus === "paid" ? new Date().toISOString() : null;
 
-  const { error } = await sb.from("payroll_entries").update({ payment_status: newStatus, paid_at: paidAt }).eq("id", peId);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("payroll_entries").update({ payment_status: newStatus, paid_at: paidAt }).eq("id", peId));
+  if (result === null) return;
 
   pe.payment_status = newStatus;
   pe.paid_at = paidAt;
@@ -1761,8 +1759,8 @@ async function initPayrollForAll() {
     });
   }
 
-  const { error } = await sb.from("payroll_entries").insert(entries);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("payroll_entries").insert(entries));
+  if (result === null) return;
   payrollEntries.push(...entries);
   notify(toCreate.length + " workers initialized");
   renderPayrollEntries();
@@ -1925,19 +1923,19 @@ async function savePayrollEntry() {
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await sb.from("payroll_entries").update(updateData).eq("id", peId);
-  if (error) { notify("Error: " + error.message, "warning"); return; }
+  var result = await sbQuery(sb.from("payroll_entries").update(updateData).eq("id", peId));
+  if (result === null) return;
   Object.assign(pe, updateData);
 
   // Sync pay rate to worker profile
   const w = workers.find(x => x.id === pe.worker_id);
   if (w && w.pay_rate != payRate) {
-    await sb.from("workers").update({ pay_rate: payRate }).eq("id", w.id);
+    await sbQuery(sb.from("workers").update({ pay_rate: payRate }).eq("id", w.id));
     w.pay_rate = payRate;
   }
 
   // Save responsibilities (delete old, insert new)
-  await sb.from("payroll_responsibilities").delete().eq("payroll_entry_id", peId);
+  await sbQuery(sb.from("payroll_responsibilities").delete().eq("payroll_entry_id", peId));
   payrollResponsibilities = payrollResponsibilities.filter(pr => pr.payroll_entry_id !== peId);
   for (let i = 0; i < peRespData.length; i++) {
     const rd = peRespData[i];
@@ -1947,7 +1945,7 @@ async function savePayrollEntry() {
       id: prId, payroll_entry_id: peId, period_id: currentPeriodId,
       worker_id: pe.worker_id, responsibility_name: rd.name, rate: rd.rate || 0,
     };
-    await sb.from("payroll_responsibilities").insert(prData);
+    await sbQuery(sb.from("payroll_responsibilities").insert(prData));
     payrollResponsibilities.push(prData);
   }
 
@@ -1961,7 +1959,7 @@ async function savePayrollEntry() {
       worker_id: pe.worker_id, task_type_id: tid, task_name: t ? t.name : tid,
       quantity: d.quantity || 0, rate: d.rate || 0, total: d.total || 0,
     };
-    await sb.from("task_entries").upsert(teData, { onConflict: "period_id,worker_id,task_type_id" });
+    await sbQuery(sb.from("task_entries").upsert(teData, { onConflict: "period_id,worker_id,task_type_id" }));
     const existIdx = taskEntries.findIndex(te => te.id === teId);
     if (existIdx >= 0) Object.assign(taskEntries[existIdx], teData);
     else taskEntries.push(teData);
@@ -2221,7 +2219,7 @@ function renderProfileLoans() {
 }
 
 async function renderProfilePayHistory() {
-  const { data: entries } = await sb.from("payroll_entries").select("*").eq("worker_id", profileWorkerId).order("period_id", { ascending: true });
+  const entries = await sbQuery(sb.from("payroll_entries").select("*").eq("worker_id", profileWorkerId).order("period_id", { ascending: true }));
 
   // Populate year dropdown
   const yearSel = document.getElementById("profile-pay-year");
@@ -2318,16 +2316,16 @@ async function saveNewLoan() {
     var totalRepaid = parseFloat(loan.total_repaid) || 0;
     var newBalance = amount - totalRepaid;
     var newStatus = newBalance <= 0 ? "settled" : "active";
-    const { error } = await sb.from("worker_loans").update({ purpose: purpose, amount: amount, date_issued: date_issued, notes: notes, balance: Math.max(0, newBalance), status: newStatus }).eq("id", editId);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("worker_loans").update({ purpose: purpose, amount: amount, date_issued: date_issued, notes: notes, balance: Math.max(0, newBalance), status: newStatus }).eq("id", editId));
+    if (result === null) return;
     loan.purpose = purpose; loan.amount = amount; loan.date_issued = date_issued; loan.notes = notes; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
     await auditLog("worker_loans", editId, "update", "Edited loan: " + purpose + " RM " + fmtNum2(amount));
     notify("Loan updated");
   } else {
     const newId = await dbNextId("WL");
     const data = { id: newId, worker_id: profileWorkerId, purpose, amount, date_issued, total_repaid: 0, balance: amount, status: "active", notes };
-    const { error } = await sb.from("worker_loans").insert(data);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("worker_loans").insert(data));
+    if (result === null) return;
     workerLoans.unshift(data);
     await auditLog("worker_loans", newId, "create", "New loan: " + purpose + " RM " + fmtNum2(amount));
     notify("Loan issued: " + purpose + " RM " + fmtNum2(amount));
@@ -2367,14 +2365,14 @@ async function saveRepayment() {
   if (editId) {
     // EDIT existing repayment
     var oldRepay = loanRepayments.find(function(x) { return x.id === editId; });
-    const { error } = await sb.from("loan_repayments").update({ amount: amount, date: date, notes: notes }).eq("id", editId);
-    if (error) { notify("Error: " + error.message, "warning"); return; }
+    var result = await sbQuery(sb.from("loan_repayments").update({ amount: amount, date: date, notes: notes }).eq("id", editId));
+    if (result === null) return;
     if (oldRepay) { oldRepay.amount = amount; oldRepay.date = date; oldRepay.notes = notes; }
     // Recalculate loan balance
     var totalRepaid = loanRepayments.filter(function(x) { return x.loan_id === loanId; }).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
     var newBalance = parseFloat(loan.amount) - totalRepaid;
     var newStatus = newBalance <= 0 ? "settled" : "active";
-    await sb.from("worker_loans").update({ total_repaid: totalRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId);
+    await sbQuery(sb.from("worker_loans").update({ total_repaid: totalRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId));
     loan.total_repaid = totalRepaid; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
     await auditLog("loan_repayments", editId, "update", "Edited repayment to RM " + fmtNum2(amount));
     notify("Repayment updated");
@@ -2383,13 +2381,13 @@ async function saveRepayment() {
     if (amount > parseFloat(loan.balance)) { notify("Amount exceeds outstanding balance (RM " + fmtNum2(loan.balance) + ")", "warning"); return; }
     const repayId = await dbNextId("LR");
     const repayData = { id: repayId, loan_id: loanId, worker_id: profileWorkerId, amount, date, notes };
-    const { error: rErr } = await sb.from("loan_repayments").insert(repayData);
-    if (rErr) { notify("Error: " + rErr.message, "warning"); return; }
+    var result = await sbQuery(sb.from("loan_repayments").insert(repayData));
+    if (result === null) return;
     loanRepayments.unshift(repayData);
     const newRepaid = (parseFloat(loan.total_repaid) || 0) + amount;
     const newBalance = parseFloat(loan.amount) - newRepaid;
     const newStatus = newBalance <= 0 ? "settled" : "active";
-    await sb.from("worker_loans").update({ total_repaid: newRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId);
+    await sbQuery(sb.from("worker_loans").update({ total_repaid: newRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId));
     loan.total_repaid = newRepaid; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
     await auditLog("loan_repayments", repayId, "create", "Repayment RM " + fmtNum2(amount) + " on " + loan.purpose + ". Balance: RM " + fmtNum2(loan.balance));
     notify("Repayment recorded: RM " + fmtNum2(amount) + (newStatus === "settled" ? " \u2014 Loan settled!" : ""));
@@ -2418,9 +2416,9 @@ async function deleteLoan(loanId) {
   var loan = workerLoans.find(function(x) { return x.id === loanId; });
   if (!loan) return;
   if (!confirm('Delete loan "' + loan.purpose + '" (RM ' + fmtNum2(loan.amount) + ')?\nThis will also delete all repayments.')) return;
-  await sb.from("loan_repayments").delete().eq("loan_id", loanId);
+  await sbQuery(sb.from("loan_repayments").delete().eq("loan_id", loanId));
   loanRepayments = loanRepayments.filter(function(r) { return r.loan_id !== loanId; });
-  await sb.from("worker_loans").delete().eq("id", loanId);
+  await sbQuery(sb.from("worker_loans").delete().eq("id", loanId));
   workerLoans = workerLoans.filter(function(x) { return x.id !== loanId; });
   await auditLog("worker_loans", loanId, "delete", "Deleted loan: " + loan.purpose);
   notify("Loan deleted");
@@ -2447,14 +2445,14 @@ async function deleteRepayment(repayId, loanId) {
   var r = loanRepayments.find(function(x) { return x.id === repayId; });
   if (!r) return;
   if (!confirm("Delete repayment of RM " + fmtNum2(r.amount) + "?")) return;
-  await sb.from("loan_repayments").delete().eq("id", repayId);
+  await sbQuery(sb.from("loan_repayments").delete().eq("id", repayId));
   loanRepayments = loanRepayments.filter(function(x) { return x.id !== repayId; });
   var loan = workerLoans.find(function(x) { return x.id === loanId; });
   if (loan) {
     var totalRepaid = loanRepayments.filter(function(x) { return x.loan_id === loanId; }).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
     var newBalance = parseFloat(loan.amount) - totalRepaid;
     var newStatus = newBalance <= 0 ? "settled" : "active";
-    await sb.from("worker_loans").update({ total_repaid: totalRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId);
+    await sbQuery(sb.from("worker_loans").update({ total_repaid: totalRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loanId));
     loan.total_repaid = totalRepaid; loan.balance = Math.max(0, newBalance); loan.status = newStatus;
   }
   notify("Repayment deleted \u2014 balance recalculated");
@@ -2518,9 +2516,9 @@ async function renderSummary() {
 
   // Load all payroll entries for these periods
   const periodIds = periodsInRange.map(p => p.id);
-  const { data: allEntries } = await sb.from("payroll_entries").select("*").in("period_id", periodIds);
-  const { data: allResps } = await sb.from("payroll_responsibilities").select("*").in("period_id", periodIds);
-  const { data: allTasks } = await sb.from("task_entries").select("*").in("period_id", periodIds);
+  const allEntries = await sbQuery(sb.from("payroll_entries").select("*").in("period_id", periodIds));
+  const allResps = await sbQuery(sb.from("payroll_responsibilities").select("*").in("period_id", periodIds));
+  const allTasks = await sbQuery(sb.from("task_entries").select("*").in("period_id", periodIds));
 
   let entries = allEntries || [];
   const resps = allResps || [];
@@ -2820,8 +2818,8 @@ async function submitChangePin() {
   if (!pin1 || pin1.length !== 6 || !/^\d{6}$/.test(pin1)) { notify("New PIN must be exactly 6 digits", "warning"); return; }
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
   var hashed = await hashPinLocal(pin1);
-  var res = await sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id);
-  if (res.error) { notify("Error updating PIN", "warning"); return; }
+  var res = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  if (res === null) return;
   document.getElementById("change-pin-modal").style.display = "none";
   notify("PIN updated successfully!");
 }

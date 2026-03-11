@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PND Spray Tracker — TG FarmHub</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
 <style>
@@ -46,6 +46,17 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
 .badge-partial { background:rgba(232,128,32,0.15); color:#E88020; }
 .badge-suspended { background:rgba(232,96,96,0.15); color:#E86060; }
 .badge-completed { background:rgba(74,124,63,0.15); color:#6B9E5E; }
+
+/* Block status badges (matching Growth Tracker) */
+.badge-growing { background:rgba(74,124,63,0.2); color:#6ECB63; }
+.badge-induced { background:rgba(100,149,237,0.2); color:#6495ED; }
+.badge-suckers { background:rgba(186,135,89,0.2); color:#C4956A; }
+.badge-to-replant { background:rgba(232,96,96,0.15); color:#E86060; }
+.badge-to-induce { background:rgba(232,160,32,0.2); color:#E8A020; }
+.badge-tunggu-buah { background:rgba(160,120,230,0.2); color:#A078E6; }
+.badge-abandoned { background:rgba(128,128,128,0.2); color:#888; }
+.badge-harvesting { background:rgba(34,197,94,0.2); color:#22C55E; }
+.badge-block-status { background:var(--bg-hover); color:var(--text-muted); }
 
 /* Empty state */
 .empty-state { padding:40px; text-align:center; color:var(--text-dim); font-size:14px; }
@@ -91,6 +102,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
 </head>
 <body>
 <div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <div id="app">
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
@@ -99,15 +111,13 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
     TG FarmHub
   </a>
   <div class="sidebar-brand">
-    <div class="sidebar-logo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#4A7C3F" stroke-width="2" style="width:90%;height:90%;"><path d="M17 8C8 10 5.9 16.09 3.82 21.34"/><path d="M5.9 16.09c2.11-4.45 7.1-9.09 11.1-8.09"/><path d="M12 12c-1 4-4 8-4 8"/></svg>
-    </div>
+    <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="TG" style="width:90%;height:90%;object-fit:contain;"></div>
     <div>
       <div class="sidebar-brand-text">PND Spray Tracker</div>
       <div class="sidebar-brand-sub">Ladang PND</div>
     </div>
   </div>
-  <div class="sidebar-nav">
+  <nav class="sidebar-nav" aria-label="Module navigation">
     <div class="nav-item active" data-page="summary" onclick="navigateTo('summary')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span class="nav-label">Summary</span>
@@ -128,7 +138,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       <span class="nav-label">Reports</span>
     </div>
-  </div>
+  </nav>
   <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
     <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
     <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
@@ -147,7 +157,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
 </div>
 
 <!-- MAIN CONTENT -->
-<div class="main-content">
+<div class="main-content" role="main" id="main-content">
 
 <!-- PAGE: SUMMARY -->
 <div id="page-summary" class="page active">
@@ -399,44 +409,33 @@ async function renderCurrentPage() {
 // ============================================================
 // DATA LOADING
 // ============================================================
-let _loadErrors = 0;
-function _handleLoad(label, data, error, target) {
-  if(error) {
-    _loadErrors++;
-    console.error(`Load ${label} failed:`, error.message);
-    if(_loadErrors <= 2) notify(`Failed to load ${label}. Check connection.`, "error", 4000);
-    return;
-  }
-  _loadErrors = 0;
-  return data;
-}
 async function loadStatuses() {
-  const {data, error} = await sb.from("pnd_block_statuses").select("*").order("sort_order");
-  const r = _handleLoad("statuses", data, error); if(r) statuses = r;
+  const data = await sbQuery(sb.from("pnd_block_statuses").select("*").order("sort_order"));
+  if(data) statuses = data;
 }
 async function loadBlocks() {
-  const {data, error} = await sb.from("pnd_blocks").select("*").order("sort_order");
-  const r = _handleLoad("blocks", data, error); if(r) blocks = r;
+  const data = await sbQuery(sb.from("pnd_blocks").select("*").order("sort_order"));
+  if(data) blocks = data;
 }
 async function loadProducts() {
-  const {data, error} = await sb.from("pnd_products").select("*").order("sort_order");
-  const r = _handleLoad("products", data, error); if(r) products = r;
+  const data = await sbQuery(sb.from("pnd_products").select("*").order("sort_order"));
+  if(data) products = data;
 }
 async function loadWorkers() {
-  const {data, error} = await sb.from("workers").select("id,name").eq("active", true).order("name");
-  const r = _handleLoad("workers", data, error); if(r) workers = r;
+  const data = await sbQuery(sb.from("workers").select("id,name").eq("active", true).order("name"));
+  if(data) workers = data;
 }
 async function loadJobs() {
-  const {data, error} = await sb.from("pnd_jobs").select("*").order("planned_date", {ascending:true});
-  const r = _handleLoad("jobs", data, error); if(r) jobs = r;
+  const data = await sbQuery(sb.from("pnd_jobs").select("*").order("planned_date", {ascending:true}));
+  if(data) jobs = data;
 }
 async function loadOverrides() {
-  const {data, error} = await sb.from("pnd_block_product_overrides").select("*");
-  const r = _handleLoad("overrides", data, error); if(r) overrides = r;
+  const data = await sbQuery(sb.from("pnd_block_product_overrides").select("*"));
+  if(data) overrides = data;
 }
 async function loadLatestSprays() {
-  const {data, error} = await sb.from("pnd_latest_sprays").select("*");
-  const r = _handleLoad("spray data", data, error); if(r) latestSprays = r;
+  const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
+  if(data) latestSprays = data;
 }
 
 // ============================================================
@@ -447,15 +446,25 @@ function daysDiff(from, to) { if(!from||!to) return null; return Math.floor((new
 function monthsFromPlant(dp) {
   if(!dp) return "";
   const planted=new Date(dp), today=new Date();
-  let m=(today.getFullYear()-planted.getFullYear())*12+(today.getMonth()-planted.getMonth());
+  let y=today.getFullYear()-planted.getFullYear();
+  let m=today.getMonth()-planted.getMonth();
   let d=today.getDate()-planted.getDate();
   if(d<0){ m--; d+=new Date(today.getFullYear(),today.getMonth(),0).getDate(); }
-  if(m<0) return "";
-  return m+"m "+d+"d";
+  if(m<0){ y--; m+=12; }
+  if(y<0) return "";
+  let parts=[];
+  if(y>0) parts.push(y+"Y");
+  if(m>0) parts.push(m+"M");
+  parts.push(d+"D");
+  return parts.join(" ");
 }
 function getBlock(id) { return blocks.find(b=>b.id===id); }
 function getProduct(id) { return products.find(p=>p.id===id); }
 function getStatusName(id) { const s=statuses.find(x=>x.id===id); return s?s.status_name:"—"; }
+function blockStatusBadgeClass(name) {
+  const map={'growing':'badge-growing','induced':'badge-induced','suckers':'badge-suckers','to replant':'badge-to-replant','to induce':'badge-to-induce','tunggu buah':'badge-tunggu-buah','abandoned':'badge-abandoned','harvesting':'badge-harvesting'};
+  return map[(name||'').toLowerCase()]||'badge-block-status';
+}
 function statusBadgeClass(s) {
   const m={"Planned":"badge-planned","In Progress":"badge-inprogress","Partially Completed":"badge-partial","Suspended":"badge-suspended","Completed":"badge-completed"};
   return m[s]||"badge-planned";
@@ -552,7 +561,8 @@ function renderSummaryTable() {
 
   activeBlocks.forEach(b => {
     html += `<tr><td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
-    html += `<td style="font-size:11px;">${esc(getStatusName(b.status_id))}</td>`;
+    const sName = getStatusName(b.status_id);
+    html += `<td><span class="badge ${blockStatusBadgeClass(sName)}">${esc(sName)}</span></td>`;
     html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b.date_planted)}</td>`;
     tabProducts.forEach((p, pi) => {
       const ls = map[b.id+"_"+p.id];
@@ -649,13 +659,13 @@ function renderJobsTable() {
 async function viewSprayLog(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
-  const {data} = await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").or("logged_by.eq.auto:job:"+jobId+",logged_by.eq.intervention:job:"+jobId);
+  const data = await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").or("logged_by.eq.auto:job:"+jobId+",logged_by.eq.intervention:job:"+jobId));
   if(!data||!data.length) { notify("No auto-logged spray entry found for this job","warning"); return; }
   const log = data[0];
   const b = log.pnd_blocks?.block_name||"?";
   const p = log.pnd_products?.product_name||"?";
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:400px;">
         <div class="modal-header"><div class="modal-title">Spray Log Entry</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-field"><label>Block</label><div>${esc(b)}</div></div>
@@ -681,7 +691,7 @@ function openNewJobModal() {
   const workerOpts = workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
 
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:560px;">
         <div class="modal-header"><div class="modal-title">New Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-field">
@@ -903,12 +913,12 @@ async function submitNewJob() {
   if(!validateRequired(reqFields)) return;
 
   const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
-  const {error} = await sb.from("pnd_jobs").insert({
+  const result = await sbQuery(sb.from("pnd_jobs").insert({
     block_id:blockId, product_id:productId, worker_name:worker, planned_date:date,
     tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:doseAmt, dose_unit:doseUnit,
     dose_per_litres:dosePer, notes, logged_by:logged, job_type:jobType
-  });
-  if(error) { notify("Error creating job: "+error.message,"error"); return; }
+  }));
+  if(result===null) return;
   notify("Job created successfully");
   closeModal();
   await loadJobs();
@@ -925,7 +935,7 @@ function openEditJobModal(jobId) {
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
 
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:560px;">
         <div class="modal-header"><div class="modal-title">Edit Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-row">
@@ -1109,8 +1119,8 @@ async function submitEditJob(jobId) {
     return;
   }
 
-  const {error} = await sb.from("pnd_jobs").update(update).eq("id", jobId);
-  if(error) { notify("Error saving: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId));
+  if(result===null) return;
   notify("Job updated successfully");
   if(willTriggerLog) {
     const b=getBlock(j.block_id), p=getProduct(j.product_id);
@@ -1176,8 +1186,8 @@ async function jlStatusChange(sel, jobId) {
 
   // Simple statuses update directly
   if(newStatus === "Planned" || newStatus === "In Progress") {
-    const {error} = await sb.from("pnd_jobs").update({status: newStatus}).eq("id", jobId);
-    if(error) { notify("Error: "+error.message,"error"); sel.value=origStatus; return; }
+    const result = await sbQuery(sb.from("pnd_jobs").update({status: newStatus}).eq("id", jobId));
+    if(result===null) { sel.value=origStatus; return; }
     notify("Status updated");
     await loadJobs();
     renderJobLogs();
@@ -1219,9 +1229,10 @@ async function renderJobLogs() {
   const to = from + jlPageSize - 1;
   query = query.range(from, to);
 
-  const {data, count, error} = await query;
-  if(error) { console.error("Job logs query error:", error); return; }
-  jlTotalCount = count || 0;
+  const result = await query;
+  if(result.error) { console.error("Job logs query error:", result.error); notify(result.error.message || "Error loading job logs", "error"); return; }
+  const data = result.data;
+  jlTotalCount = result.count || 0;
 
   const tbody = document.getElementById("joblogs-body");
   if(!data || !data.length) {
@@ -1276,7 +1287,7 @@ function openEditStatusModal(jobId, prefilledStatus) {
   const b = getBlock(j.block_id), p = getProduct(j.product_id);
 
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:480px;">
         <div class="modal-header"><div class="modal-title">Edit Status</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-row" style="margin-bottom:12px;">
@@ -1408,8 +1419,8 @@ async function submitEditStatus(jobId) {
     return;
   }
 
-  const {error} = await sb.from("pnd_jobs").update(update).eq("id", jobId);
-  if(error) { notify("Error saving: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId));
+  if(result===null) return;
   notify("Status updated successfully");
   if(willTriggerLog) {
     const b=getBlock(j.block_id), p=getProduct(j.product_id);
@@ -1445,7 +1456,7 @@ async function showInterventionDecision(jobId, updateObj, afterSaveCb) {
   const compDate = updateObj.completion_date || todayStr();
 
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)cancelInterventionDecision()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:520px;">
         <div class="modal-header"><div class="modal-title">Intervention Complete — What's Next?</div><button class="modal-close" onclick="cancelInterventionDecision()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div style="font-weight:600;font-size:14px;color:var(--white);margin-bottom:12px;">${esc(bName)} — ${esc(pName)}</div>
@@ -1520,15 +1531,15 @@ async function confirmInterventionDecision() {
     const existingNextDate = ls?.next_spray_date || null;
     updateObj.triggers_countdown = false;
     updateObj.next_spray_date = null;
-    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
-    if(error) { notify("Error: "+error.message,"error"); return; }
+    const result = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    if(result===null) return;
     // Manually insert spray log preserving existing next_spray_date
-    await sb.from("pnd_spray_logs").insert({
+    await sbQuery(sb.from("pnd_spray_logs").insert({
       block_id: j.block_id, product_id: j.product_id,
       date_completed: compDate, next_spray_date: existingNextDate,
       notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
       logged_by: 'intervention:job:'+jobId
-    });
+    }));
     closeModal();
     notify("Intervention logged. Schedule unchanged.");
   } else if(opt === 2) {
@@ -1541,12 +1552,12 @@ async function confirmInterventionDecision() {
     }
     updateObj.next_spray_date = newNextDate;
     updateObj.triggers_countdown = true;
-    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
-    if(error) { notify("Error: "+error.message,"error"); return; }
+    const result2 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    if(result2===null) return;
     // Update existing scheduled active job's planned_date if any
     const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
     if(existingSched && newNextDate) {
-      await sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id);
+      await sbQuery(sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id));
     }
     closeModal();
     notify("Schedule reset. Next spray: "+(newNextDate?fmtDateShort(newNextDate):'Not set'));
@@ -1556,12 +1567,12 @@ async function confirmInterventionDecision() {
     if(!manualDate) { notify("Please pick a date","warning"); return; }
     updateObj.next_spray_date = manualDate;
     updateObj.triggers_countdown = true;
-    const {error} = await sb.from("pnd_jobs").update(updateObj).eq("id", jobId);
-    if(error) { notify("Error: "+error.message,"error"); return; }
+    const result3 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    if(result3===null) return;
     // Update existing scheduled active job's planned_date if any
     const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
     if(existingSched) {
-      await sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id);
+      await sbQuery(sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id));
     }
     closeModal();
     notify("Schedule updated. Next spray: "+fmtDateShort(manualDate));
@@ -1579,8 +1590,9 @@ async function confirmInterventionDecision() {
 function confirmDeleteJob(jobId) {
   closeModal();
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:420px;text-align:center;">
+        <div class="modal-header" style="justify-content:flex-end;"><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
         <div class="modal-title" style="margin-bottom:12px;">Delete Job?</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">Are you sure you want to delete this job? This action cannot be undone. You will need to recreate the job if needed.</p>
@@ -1593,8 +1605,8 @@ function confirmDeleteJob(jobId) {
 }
 
 async function executeDeleteJob(jobId) {
-  const {error} = await sb.from("pnd_jobs").delete().eq("id", jobId);
-  if(error) { notify("Error deleting job: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_jobs").delete().eq("id", jobId));
+  if(result===null) return;
   closeModal();
   notify("Job deleted successfully");
   await loadJobs();
@@ -1671,15 +1683,15 @@ async function addOverride(blockId) {
   const unit=document.getElementById("ov-unit-"+blockId).value;
   const per=parseInt(document.getElementById("ov-per-"+blockId).value);
   if(!productId||!amt||!per) { notify("Fill all override fields","warning"); return; }
-  const {error} = await sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per},{onConflict:"block_id,product_id"});
-  if(error) { notify("Error: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per},{onConflict:"block_id,product_id"}));
+  if(result===null) return;
   notify("Override saved");
   await loadOverrides(); renderOverridesSection();
 }
 
 async function deleteOverride(id, blockId) {
-  const {error} = await sb.from("pnd_block_product_overrides").delete().eq("id",id);
-  if(error) { notify("Error: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_block_product_overrides").delete().eq("id",id));
+  if(result===null) return;
   notify("Override removed");
   await loadOverrides(); renderOverridesSection();
 }
@@ -1710,8 +1722,8 @@ function renderProductsPage() {
 
 async function updateProduct(id, field, value) {
   const upd={}; upd[field]=value;
-  const {error} = await sb.from("pnd_products").update(upd).eq("id",id);
-  if(error) { notify("Error: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_products").update(upd).eq("id",id));
+  if(result===null) return;
   const pr=products.find(p=>p.id===id); if(pr) pr[field]=value;
   showTick("tick-p-"+id);
 }
@@ -1726,8 +1738,8 @@ async function addProduct() {
   const sortOrder=parseInt(document.getElementById("ap-sort").value);
   if(!validateRequired(["ap-name","ap-type","ap-sort"])) return;
   if(isNaN(sortOrder)) { notify("Sort Order must be a number","warning"); return; }
-  const {error} = await sb.from("pnd_products").insert({product_name:name,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder});
-  if(error) { notify("Error: "+error.message,"error"); return; }
+  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder}));
+  if(result===null) return;
   notify("Product added");
   ["ap-name","ap-interval","ap-dose-amt","ap-dose-per","ap-sort"].forEach(id=>document.getElementById(id).value="");
   await loadProducts(); renderProductsPage();
@@ -1795,34 +1807,39 @@ async function generateReport() {
 
   if(id===1) {
     const blockId=document.getElementById("rf-block").value;
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("block_id",blockId).order("date_completed",{ascending:false});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("block_id",blockId).order("date_completed",{ascending:false}));
+    if(!data) return;
     cols=["Date Completed","Product","Next Spray Date","Interval (days)","Notes","Logged By"];
-    rows=(data||[]).map(r=>[fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",r.notes||"",r.logged_by||""]);
+    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",r.notes||"",r.logged_by||""]);
   } else if(id===2) {
     const cbs=document.querySelectorAll(".rf-blocks-cb:checked");
     const ids=[...cbs].map(c=>c.value);
     if(!ids.length){notify("Select at least one block","warning");return;}
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids).order("date_completed",{ascending:false});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids).order("date_completed",{ascending:false}));
+    if(!data) return;
     cols=["Block","Date Completed","Product","Next Spray Date","Notes","Logged By"];
-    rows=(data||[]).map(r=>[r.pnd_blocks?.block_name,fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    rows=data.map(r=>[r.pnd_blocks?.block_name,fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
   } else if(id===3) {
     const prodId=document.getElementById("rf-product").value;
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("product_id",prodId).order("date_completed",{ascending:false});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("product_id",prodId).order("date_completed",{ascending:false}));
+    if(!data) return;
     cols=["Date Completed","Block","Next Spray Date","Notes","Logged By"];
-    rows=(data||[]).map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
   } else if(id===4) {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
+    if(!data) return;
     cols=["Date Completed","Block","Product","Next Spray Date","Notes","Logged By"];
-    rows=(data||[]).map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
   } else if(id===5) {
     const m=parseInt(document.getElementById("rf-month").value), y=parseInt(document.getElementById("rf-year").value);
     const from=y+"-"+String(m).padStart(2,"0")+"-01";
     const lastDay=new Date(y,m,0).getDate();
     const to=y+"-"+String(m).padStart(2,"0")+"-"+lastDay;
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
+    if(!data) return;
     cols=["Date Completed","Block","Product","Next Spray Date","Notes","Logged By"];
-    rows=(data||[]).map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
   } else if(id===6) {
     const map={};
     latestSprays.forEach(ls=>{if(ls.next_spray_date && ls.next_spray_date<today) map[ls.block_id+"_"+ls.product_id]=ls;});
@@ -1834,10 +1851,11 @@ async function generateReport() {
     }).sort((a,b)=>(b[4]||0)-(a[4]||0));
   } else if(id===7) {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    const {data}=await sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:true});
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:true}));
+    if(!data) return;
     cols=["Block","Product","Default Interval","Actual Interval","Status"];
     const grouped={};
-    (data||[]).forEach(r=>{const k=r.block_id+"_"+r.product_id; if(!grouped[k]) grouped[k]=[]; grouped[k].push(r);});
+    data.forEach(r=>{const k=r.block_id+"_"+r.product_id; if(!grouped[k]) grouped[k]=[]; grouped[k].push(r);});
     rows=[];
     Object.entries(grouped).forEach(([k,logs])=>{
       if(logs.length<2) return;

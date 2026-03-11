@@ -75,6 +75,100 @@ function notify(msg, type, duration) {
   }, duration);
 }
 
+// ============================================================
+// Supabase Error Handler Wrapper
+// ============================================================
+
+// Wraps a Supabase query with try-catch, error notification, and optional loading state.
+// Usage: var data = await sbQuery(sb.from('table').select('*'), 'Loading items...');
+// Returns: data on success, null on error (error already shown to user).
+async function sbQuery(queryPromise, loadingMsg) {
+  var spinner = null;
+  if (loadingMsg) spinner = showLoading(loadingMsg);
+  try {
+    var result = await queryPromise;
+    if (spinner) hideLoading(spinner);
+    if (result.error) {
+      console.error("Supabase error:", result.error);
+      notify(result.error.message || "Database error", "error", 5000);
+      return null;
+    }
+    return result.data;
+  } catch(e) {
+    if (spinner) hideLoading(spinner);
+    console.error("Network error:", e);
+    notify("Connection error — please check your internet", "error", 5000);
+    return null;
+  }
+}
+
+// ============================================================
+// Loading Indicator
+// ============================================================
+
+// Shows a loading overlay. Returns the element so it can be removed later.
+function showLoading(msg) {
+  var el = document.createElement("div");
+  el.className = "loading-overlay";
+  el.innerHTML = '<div class="loading-spinner"></div><div class="loading-text">' + esc(msg || "Loading...") + '</div>';
+  document.body.appendChild(el);
+  return el;
+}
+
+function hideLoading(el) {
+  if (el && el.parentNode) {
+    el.style.opacity = "0";
+    setTimeout(function() { el.remove(); }, 200);
+  }
+}
+
+// Button loading state — disables button and shows spinner text
+function btnLoading(btn, loading, originalText) {
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+  } else {
+    btn.disabled = false;
+    btn.textContent = originalText || btn.dataset.origText || "Save";
+    delete btn.dataset.origText;
+  }
+}
+
+// ============================================================
+// Modal Focus Trap (accessibility)
+// ============================================================
+
+function trapFocus(modalEl) {
+  if (!modalEl) return;
+  var focusable = modalEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusable.length) return;
+  var first = focusable[0];
+  var last = focusable[focusable.length - 1];
+  first.focus();
+  modalEl._trapHandler = function(e) {
+    if (e.key === "Escape") {
+      modalEl.style.display = "none";
+      return;
+    }
+    if (e.key !== "Tab") return;
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  modalEl.addEventListener("keydown", modalEl._trapHandler);
+}
+
+function releaseFocus(modalEl) {
+  if (modalEl && modalEl._trapHandler) {
+    modalEl.removeEventListener("keydown", modalEl._trapHandler);
+    delete modalEl._trapHandler;
+  }
+}
+
 // Generate next ID via DB function
 async function dbNextId(prefix) {
   try {

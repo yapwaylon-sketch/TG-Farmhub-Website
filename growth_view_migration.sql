@@ -1,0 +1,4 @@
+-- DEPRECATED: Superseded by cycle_migration.sql which recreates this view
+-- with a WHERE EXISTS filter for is_current cycle support.
+-- DO NOT RUN THIS FILE — it will strip the cycle filter from the view.
+-- The current view definition lives in cycle_migration.sql (Section 3).
