@@ -69,7 +69,7 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 ### Active (Built)
 1. **Inventory Management** — Stock in/out, suppliers, reports, stock checks
 2. **Worker Management** — Profiles, monthly payroll, task-based pay, deductions
-3. **PND Spray Tracker** — Spray job system, product management, logs, intervention logic
+3. **PND Spray Tracker** — Spray job system, product management (with ingredient/formulation lookups), batch job delete, logs, intervention logic
 4. **Growth Tracker** — Read-only dashboard: block growth monitoring, plant counts by variety/status, target dates, harvest windows
 5. **Farm Configuration** — Centralized crop & block management, all data entry lives here
 6. **TV Display (Growth)** — `display-growth.html`, read-only, token auth (`?token=pnd2026`)
@@ -126,6 +126,17 @@ Growing → To Induce → Induced → Suckers → To Replant → *(Start New Cyc
 | `target_dates_migration.sql` | Added target_induce_date, target_harvest_start, target_harvest_end to growth_records |
 | `growth_view_migration.sql` | **DEPRECATED** — superseded by cycle_migration.sql. DO NOT RUN. |
 | `cycle_migration.sql` | Added `cycle`, `is_current` to block_crops; updated view with WHERE EXISTS filter for current cycle |
+| `products_lookup_migration.sql` | Created `pnd_ingredients` and `pnd_formulations` lookup tables, migrated text columns to FK |
+| `products_fields_migration.sql` | Added fields to `pnd_products` (type, registration_no, group_no, default doses, interval) |
+| `product_ingredients_junction_migration.sql` | Many-to-many `pnd_product_ingredients` junction table; products can have 2-3 active ingredients |
+| `job_products_migration.sql` | Many-to-many `pnd_job_products` junction table; jobs can have multiple products (tank mix) |
+| `pnd_wipe_data.sql` | Wipe all PND data (preserves table structure), FK-safe order |
+| `products_fields_migration.sql` | Added `active_ingredient` and `formulation` text columns to pnd_products (interim step) |
+| `products_lookup_migration.sql` | Created `pnd_ingredients` + `pnd_formulations` lookup tables, migrated text→FK, dropped text columns, added RLS |
+| `pnd_wipe_data.sql` | Utility: wipes all PND Spray Tracker data (preserves table structure) |
+| `product_ingredients_junction_migration.sql` | Many-to-many: `pnd_product_ingredients` junction table, migrated from single `ingredient_id` FK on `pnd_products` |
+| `salary_advances_migration.sql` | Created `salary_advances` table for tracking mid-month salary advances, with indexes and RLS |
+| `salary_advance_categories_migration.sql` | Added `category` column to salary_advances (Canteen/Cigarettes/Salary Advance/Overpayment), `cash_handed` to payroll_entries |
 
 ### How to run SQL migrations
 ```bash
@@ -173,6 +184,11 @@ rm -rf node_modules package-lock.json package.json
 - All data entry for growth/blocks in Farm Config; Growth Tracker is read-only
 - Target dates stored in DB, not calculated client-side (consistency across pages)
 - `pnd_blocks` uses column `block_name` (NOT `name`)
+- `pnd_products` uses `formulation_id` FK → `pnd_formulations`; ingredients are many-to-many via `pnd_product_ingredients` junction table
+- **Multi-product jobs (tank mix)**: `pnd_job_products` junction table stores all products in a job. Primary product also stored on `pnd_jobs` for backward compat. Dose fields (amount/unit/per_litres) stored per-product in junction table. Products are set at job creation and read-only in edit modal.
+- **Spray log multi-product**: DB trigger handles primary product on completion; JS manually inserts spray logs for additional products in the mix
+- Formulation and Type are read-only once set on a product (cannot be changed)
+- All Supabase mutation queries (insert/update/delete/upsert) must chain `.select()` before `sbQuery()` — Supabase v2 returns empty data without it
 - Filter dropdowns: populate on data load only, NOT on every render (prevents state reset)
 - TV displays: same Netlify site, URL token auth (`?token=pnd2026`), read-only
 
@@ -218,6 +234,7 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Loading states**: Added `showLoading()`/`hideLoading()`/`btnLoading()` in shared.js + CSS (2026-03-11)
 - [x] **Accessibility**: Added focus-visible, skip links, `role="main"`, `<nav>` with aria-label, focus trap for modals (2026-03-11)
 - [x] **Adopt `sbQuery()`**: Migrated all Supabase calls across all 5 modules (103 total calls) (2026-03-11)
+- [x] **`.select()` on mutations**: Added `.select()` to all insert/update/delete/upsert calls in index.html + spraytracker.html (2026-03-13)
 - [ ] **Offline resilience** / retry logic with exponential backoff
 - [ ] **Module CSS extraction**: Extract inline CSS to `.inventory.css`, `.workers.css`, etc. for caching
 - [ ] Optimistic locking for concurrent edits

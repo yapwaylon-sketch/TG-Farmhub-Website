@@ -312,7 +312,6 @@ body { height: auto; min-height: 100vh; overflow: auto; }
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;">
             <div class="form-field" style="margin:0;"><label>Block Name</label><input id="fc-block-name" placeholder="e.g. N17" style="width:100%;"></div>
             <div class="form-field" style="margin:0;"><label>Remarks</label><input id="fc-block-remarks" placeholder="Optional" style="width:100%;"></div>
-            <div class="form-field" style="margin:0;"><label>Sort Order</label><input id="fc-block-sort" type="number" placeholder="e.g. 29" style="width:100%;"></div>
             <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="fcAddBlock()" style="width:100%;">Add Block</button></div>
           </div>
         </div>
@@ -603,7 +602,7 @@ async function submitNewPin() {
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
 
   const hashed = await hashPin(pin1);
-  const result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  const result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id).select());
   if (result === null) return;
 
   currentUser.pinHash = hashed;
@@ -657,7 +656,7 @@ async function submitChangePin() {
   if (!pin1 || pin1.length !== 6 || !/^\d{6}$/.test(pin1)) { notify("New PIN must be exactly 6 digits", "warning"); return; }
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
   var hashed = await hashPin(pin1);
-  var result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  var result = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id).select());
   if (result === null) return;
   currentUser.pinHash = hashed; currentUser.pin = ""; currentUser.forcePinUpdate = false;
   document.getElementById("change-pin-modal").style.display = "none";
@@ -941,12 +940,12 @@ async function saveUser() {
       updateData.force_pin_update = false;
     }
 
-    const result = await sbQuery(sb.from("users").update(updateData).eq("id", editId));
+    const result = await sbQuery(sb.from("users").update(updateData).eq("id", editId).select());
     if (result === null) return;
 
     // Cascade display name to transactions
     if (oldDisplayName !== displayName) {
-      await sbQuery(sb.from("transactions").update({ recorded_by: displayName }).eq("recorded_by", oldDisplayName));
+      await sbQuery(sb.from("transactions").update({ recorded_by: displayName }).eq("recorded_by", oldDisplayName).select());
     }
 
     // Refresh if editing self
@@ -967,7 +966,7 @@ async function saveUser() {
     const pinHash = await hashPin(pin);
     const insertResult = await sbQuery(sb.from("users").insert({
       id: newId, username, pin: "", pin_hash: pinHash, display_name: displayName, role, permissions, force_pin_update: false
-    }));
+    }).select());
     if (insertResult === null) return;
 
     users.push({ id: newId, username, pin, displayName, role, permissions });
@@ -984,7 +983,7 @@ async function deleteUser(userId) {
   if (!u) return;
   if (!confirm('Delete user "' + u.displayName + '"?\n\nThis cannot be undone.')) return;
 
-  const delResult = await sbQuery(sb.from("users").delete().eq("id", userId));
+  const delResult = await sbQuery(sb.from("users").delete().eq("id", userId).select());
   if (delResult === null) return;
 
   users = users.filter(x => x.id !== userId);
@@ -1132,7 +1131,7 @@ async function addCrop() {
   const name = document.getElementById('fc-crop-name').value.trim();
   if (!name) { notify('Crop name required', 'warning'); return; }
   if (fcCrops.some(c => c.name.toLowerCase() === name.toLowerCase() && !c.archived)) { notify('Crop already exists', 'warning'); return; }
-  const result = await sbQuery(sb.from('crops').insert({ name }));
+  const result = await sbQuery(sb.from('crops').insert({ name }).select());
   if (result === null) return;
   document.getElementById('fc-crop-name').value = '';
   notify(name + ' added');
@@ -1142,7 +1141,7 @@ async function addCrop() {
 async function editCropName(id, oldName) {
   const name = prompt('Edit crop name:', oldName);
   if (!name || name === oldName) return;
-  const result = await sbQuery(sb.from('crops').update({ name }).eq('id', id));
+  const result = await sbQuery(sb.from('crops').update({ name }).eq('id', id).select());
   if (result === null) return;
   notify('Crop renamed');
   await loadFarmConfig(); renderCropList();
@@ -1151,14 +1150,14 @@ async function editCropName(id, oldName) {
 async function archiveCrop(id) {
   const crop = fcCrops.find(c => c.id === id);
   if (!confirm('Archive "' + crop.name + '"? It will be hidden from dropdowns.')) return;
-  const result = await sbQuery(sb.from('crops').update({ archived: true }).eq('id', id));
+  const result = await sbQuery(sb.from('crops').update({ archived: true }).eq('id', id).select());
   if (result === null) return;
   notify(crop.name + ' archived');
   await loadFarmConfig(); renderCropList();
 }
 
 async function restoreCrop(id) {
-  const result = await sbQuery(sb.from('crops').update({ archived: false }).eq('id', id));
+  const result = await sbQuery(sb.from('crops').update({ archived: false }).eq('id', id).select());
   if (result === null) return;
   notify('Crop restored');
   await loadFarmConfig(); renderCropList();
@@ -1167,7 +1166,7 @@ async function restoreCrop(id) {
 async function addVariety(cropId) {
   const name = document.getElementById('var-name-' + cropId).value.trim();
   if (!name) { notify('Variety name required', 'warning'); return; }
-  const result = await sbQuery(sb.from('crop_varieties').insert({ crop_id: cropId, name }));
+  const result = await sbQuery(sb.from('crop_varieties').insert({ crop_id: cropId, name }).select());
   if (result === null) return;
   document.getElementById('var-name-' + cropId).value = '';
   notify(name + ' added');
@@ -1176,7 +1175,7 @@ async function addVariety(cropId) {
 
 async function updateVarietyDaysToInduce(id, value) {
   const days = value ? parseInt(value) : null;
-  const result = await sbQuery(sb.from('crop_varieties').update({ days_to_induce: days }).eq('id', id));
+  const result = await sbQuery(sb.from('crop_varieties').update({ days_to_induce: days }).eq('id', id).select());
   if (result === null) return;
   const v = fcVarieties.find(x => x.id === id);
   if (v) v.days_to_induce = days;
@@ -1185,7 +1184,7 @@ async function updateVarietyDaysToInduce(id, value) {
 
 async function updateVarietyHarvestDays(id, value) {
   const days = value ? parseInt(value) : null;
-  const result = await sbQuery(sb.from('crop_varieties').update({ harvest_days_from_induction: days }).eq('id', id));
+  const result = await sbQuery(sb.from('crop_varieties').update({ harvest_days_from_induction: days }).eq('id', id).select());
   if (result === null) return;
   const v = fcVarieties.find(x => x.id === id);
   if (v) v.harvest_days_from_induction = days;
@@ -1195,7 +1194,7 @@ async function updateVarietyHarvestDays(id, value) {
 async function editVarietyName(id, oldName) {
   const name = prompt('Edit variety name:', oldName);
   if (!name || name === oldName) return;
-  const result = await sbQuery(sb.from('crop_varieties').update({ name }).eq('id', id));
+  const result = await sbQuery(sb.from('crop_varieties').update({ name }).eq('id', id).select());
   if (result === null) return;
   notify('Variety renamed');
   await loadFarmConfig(); renderCropList();
@@ -1206,14 +1205,14 @@ async function archiveVariety(id) {
   if (assigned) {
     if (!confirm("This variety is assigned to blocks. Archive it? (Existing assignments stay, but it won't appear in new dropdowns.)")) return;
   }
-  const result = await sbQuery(sb.from('crop_varieties').update({ archived: true }).eq('id', id));
+  const result = await sbQuery(sb.from('crop_varieties').update({ archived: true }).eq('id', id).select());
   if (result === null) return;
   notify('Variety archived');
   await loadFarmConfig(); renderCropList();
 }
 
 async function restoreVariety(id) {
-  const result = await sbQuery(sb.from('crop_varieties').update({ archived: false }).eq('id', id));
+  const result = await sbQuery(sb.from('crop_varieties').update({ archived: false }).eq('id', id).select());
   if (result === null) return;
   notify('Variety restored');
   await loadFarmConfig(); renderCropList();
@@ -1225,7 +1224,7 @@ async function addCropStatus(cropId) {
   if (!name) { notify('Status name required', 'warning'); return; }
   const existing = fcCropStatuses.filter(s => s.crop_id === cropId);
   const sortOrder = existing.length ? Math.max(...existing.map(s => s.sort_order)) + 1 : 1;
-  const result = await sbQuery(sb.from('crop_statuses').insert({ crop_id: cropId, name, sort_order: sortOrder }));
+  const result = await sbQuery(sb.from('crop_statuses').insert({ crop_id: cropId, name, sort_order: sortOrder }).select());
   if (result === null) return;
   input.value = '';
   notify('Status added');
@@ -1236,7 +1235,7 @@ async function deleteCropStatus(id) {
   const inUse = fcBlockCrops.some(bc => bc.status_id === id);
   if (inUse) { notify('Cannot delete — status is in use by blocks', 'warning'); return; }
   if (!confirm('Delete this status?')) return;
-  const result = await sbQuery(sb.from('crop_statuses').delete().eq('id', id));
+  const result = await sbQuery(sb.from('crop_statuses').delete().eq('id', id).select());
   if (result === null) return;
   notify('Status removed');
   await loadFarmConfig(); renderCropList();
@@ -1273,6 +1272,7 @@ function renderBlockList() {
         <span style="font-size:12px;color:var(--text-muted);">${esc(b.remarks || '')}</span>
         <label class="toggle" style="margin-left:auto;"><input type="checkbox" ${b.is_active ? 'checked' : ''} onchange="fcUpdateBlock('${b.id}','is_active',this.checked)"><span class="toggle-slider"></span></label>
         <span style="font-size:11px;color:var(--text-dim);">${b.is_active ? 'Active' : 'Inactive'}</span>
+        <button class="btn btn-danger btn-sm" onclick="fcDeleteBlock('${b.id}')" title="Delete block" style="font-size:10px;padding:4px 8px;">Delete</button>
         <span class="save-tick" id="fc-tick-${b.id}">&#10003;</span>
       </div>
       <div class="block-crops-list">
@@ -1326,7 +1326,7 @@ function fcAgeFromPlanted(dp) {
 async function fcUpdateBlock(id, field, value) {
   const upd = {};
   upd[field] = value === "" ? null : value;
-  const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id));
+  const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
   if (result === null) return;
   const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
   showTick('fc-tick-' + id);
@@ -1335,16 +1335,76 @@ async function fcUpdateBlock(id, field, value) {
 async function fcAddBlock() {
   const name = document.getElementById('fc-block-name').value.trim();
   const remarks = document.getElementById('fc-block-remarks').value.trim() || null;
-  const sortOrder = parseInt(document.getElementById('fc-block-sort').value);
+  const sortOrder = fcBlocks.length ? Math.max(...fcBlocks.map(b => b.sort_order || 0)) + 1 : 1;
   if (!name) { notify('Block name required', 'warning'); return; }
-  if (isNaN(sortOrder)) { notify('Sort order must be a number', 'warning'); return; }
   if (fcBlocks.some(b => b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
-  const result = await sbQuery(sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder }));
+  const result = await sbQuery(sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder }).select());
   if (result === null) return;
   document.getElementById('fc-block-name').value = '';
   document.getElementById('fc-block-remarks').value = '';
-  document.getElementById('fc-block-sort').value = '';
   notify('Block added');
+  await loadFcBlocks(); await loadFarmConfig(); renderBlockList();
+}
+
+async function fcDeleteBlock(blockId) {
+  const block = fcBlocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  // Check for related data
+  const reasons = [];
+  const [bcCount, jobCount, logCount] = await Promise.all([
+    sbQuery(sb.from('block_crops').select('id').eq('block_id', blockId)),
+    sbQuery(sb.from('pnd_jobs').select('id').eq('block_id', blockId)),
+    sbQuery(sb.from('pnd_spray_logs').select('id').eq('block_id', blockId))
+  ]);
+
+  if (bcCount && bcCount.length > 0) reasons.push(bcCount.length + ' crop assignment(s)');
+  if (jobCount && jobCount.length > 0) reasons.push(jobCount.length + ' spray job(s)');
+  if (logCount && logCount.length > 0) reasons.push(logCount.length + ' spray log(s)');
+
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  if (reasons.length > 0) {
+    mc.innerHTML = `
+      <div class="modal-overlay" onclick="if(event.target===this)fcCloseDeleteModal()">
+        <div class="modal-box" style="max-width:420px;">
+          <div class="modal-header"><div class="modal-title">Cannot Delete Block</div><button class="modal-close" onclick="fcCloseDeleteModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+          <div style="padding:16px;">
+            <p><strong>${esc(block.block_name)}</strong> cannot be deleted because it has:</p>
+            <ul style="margin:12px 0;padding-left:20px;">${reasons.map(r => '<li>' + r + '</li>').join('')}</ul>
+            <p style="font-size:13px;color:var(--text-muted);">Remove all related data first, or set the block to Inactive instead.</p>
+          </div>
+          <div class="modal-actions"><button class="btn btn-outline" onclick="fcCloseDeleteModal()">OK</button></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Safe to delete — confirm first
+  mc.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)fcCloseDeleteModal()">
+      <div class="modal-box" style="max-width:400px;">
+        <div class="modal-header"><div class="modal-title">Delete Block</div><button class="modal-close" onclick="fcCloseDeleteModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p style="padding:16px;">Delete <strong>${esc(block.block_name)}</strong>? This cannot be undone.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="fcCloseDeleteModal()">Cancel</button>
+          <button class="btn btn-danger" onclick="fcExecuteDeleteBlock('${blockId}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fcCloseDeleteModal() {
+  const mc = document.getElementById('fc-modal-container');
+  if(mc) mc.innerHTML = '';
+}
+
+async function fcExecuteDeleteBlock(blockId) {
+  const result = await sbQuery(sb.from('pnd_blocks').delete().eq('id', blockId).select());
+  if (result === null) return;
+  fcCloseDeleteModal();
+  notify('Block deleted');
   await loadFcBlocks(); await loadFarmConfig(); renderBlockList();
 }
 
@@ -1358,7 +1418,7 @@ async function fcSaveBlockCrop(id) {
     quantity: qtyEl.value === '' ? null : parseInt(qtyEl.value),
     status_id: stEl.value || null
   };
-  const bcResult = await sbQuery(sb.from('block_crops').update(upd).eq('id', id));
+  const bcResult = await sbQuery(sb.from('block_crops').update(upd).eq('id', id).select());
   if (bcResult === null) return;
   const bc = fcBlockCrops.find(x => x.id === id); if (bc) Object.assign(bc, upd);
 
@@ -1374,9 +1434,9 @@ async function fcSaveBlockCrop(id) {
     }
     const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', id).limit(1));
     if(existing && existing.length > 0) {
-      await sbQuery(sb.from('growth_records').update({ target_induce_date: targetInduceDate }).eq('id', existing[0].id));
+      await sbQuery(sb.from('growth_records').update({ target_induce_date: targetInduceDate }).eq('id', existing[0].id).select());
     } else if(targetInduceDate) {
-      await sbQuery(sb.from('growth_records').insert({ block_crop_id: id, target_induce_date: targetInduceDate }));
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: id, target_induce_date: targetInduceDate }).select());
     }
   }
 
@@ -1471,18 +1531,18 @@ async function fcSaveInductionFromConfig(bcId) {
   };
   const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', bcId).limit(1));
   if(existing && existing.length > 0) {
-    const grResult = await sbQuery(sb.from('growth_records').update(grData).eq('id', existing[0].id));
+    const grResult = await sbQuery(sb.from('growth_records').update(grData).eq('id', existing[0].id).select());
     if(grResult === null) return;
   } else {
     grData.block_crop_id = bcId;
-    const grResult = await sbQuery(sb.from('growth_records').insert(grData));
+    const grResult = await sbQuery(sb.from('growth_records').insert(grData).select());
     if(grResult === null) return;
   }
 
   // Also save the status_id on block_crops so it persists
   const stEl = document.getElementById('fc-st-' + bcId);
   if(stEl && stEl.value) {
-    await sbQuery(sb.from('block_crops').update({ status_id: stEl.value }).eq('id', bcId));
+    await sbQuery(sb.from('block_crops').update({ status_id: stEl.value }).eq('id', bcId).select());
     const bc = fcBlockCrops.find(x => x.id === bcId); if(bc) bc.status_id = stEl.value;
   }
 
@@ -1545,6 +1605,10 @@ async function fcDoAddCrop(blockId) {
   const insertData = { block_id: blockId, variety_id: varietyId };
   if(qty) insertData.quantity = parseInt(qty);
   if(datePlanted) insertData.date_planted = datePlanted;
+  const variety = fcVarieties.find(v => v.id === varietyId);
+  const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
+  const growingStatus = crop ? fcCropStatuses.find(s => s.crop_id === crop.id && s.name.toLowerCase() === 'growing') : null;
+  if(growingStatus) insertData.status_id = growingStatus.id;
   const inserted = await sbQuery(sb.from('block_crops').insert(insertData).select('id').single());
   if(inserted === null) return;
 
@@ -1556,7 +1620,7 @@ async function fcDoAddCrop(blockId) {
       const d = new Date(datePlanted + 'T00:00:00');
       d.setDate(d.getDate() + daysToInduce);
       const targetInduceDate = d.toISOString().split('T')[0];
-      await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }));
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }).select());
     }
   }
 
@@ -1567,7 +1631,7 @@ async function fcDoAddCrop(blockId) {
 
 async function fcRemoveBlockCrop(id, blockId) {
   if (!confirm('Remove this crop assignment?')) return;
-  const result = await sbQuery(sb.from('block_crops').delete().eq('id', id));
+  const result = await sbQuery(sb.from('block_crops').delete().eq('id', id).select());
   if (result === null) return;
   notify('Removed');
   await loadFarmConfig(); renderBlockList();
@@ -1631,7 +1695,7 @@ async function fcDoNewCycle(oldBcId, blockId) {
   if(!datePlanted) { notify('Date planted is required for new cycle', 'warning'); return; }
 
   // 1. Mark old block_crop as not current
-  const closeResult = await sbQuery(sb.from('block_crops').update({ is_current: false }).eq('id', oldBcId));
+  const closeResult = await sbQuery(sb.from('block_crops').update({ is_current: false }).eq('id', oldBcId).select());
   if(closeResult === null) return;
 
   // 2. Find next cycle number for this block + variety
@@ -1657,7 +1721,7 @@ async function fcDoNewCycle(oldBcId, blockId) {
   const inserted = await sbQuery(sb.from('block_crops').insert(insertData).select('id').single());
   if(inserted === null) {
     // Rollback: re-activate old block_crop
-    await sbQuery(sb.from('block_crops').update({ is_current: true }).eq('id', oldBcId));
+    await sbQuery(sb.from('block_crops').update({ is_current: true }).eq('id', oldBcId).select());
     notify('Failed to create new cycle', 'error');
     return;
   }
@@ -1668,9 +1732,9 @@ async function fcDoNewCycle(oldBcId, blockId) {
     const d = new Date(datePlanted + 'T00:00:00');
     d.setDate(d.getDate() + daysToInduce);
     const targetInduceDate = d.toISOString().split('T')[0];
-    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }));
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }).select());
   } else {
-    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id }));
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id }).select());
   }
 
   notify('New cycle started — Cycle ' + nextCycle);

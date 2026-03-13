@@ -201,10 +201,16 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
       <input type="date" id="jobs-filter-from" onchange="renderJobsTable()" placeholder="From" style="width:130px;">
       <input type="date" id="jobs-filter-to" onchange="renderJobsTable()" placeholder="To" style="width:130px;">
     </div>
+    <div id="batch-bar" style="display:none;padding:10px 16px;background:var(--bg-danger,#3a1c1c);border:1px solid var(--danger,#e04040);border-radius:8px;margin-bottom:8px;display:none;align-items:center;gap:12px;">
+      <span id="batch-count" style="font-weight:600;color:var(--danger,#e04040);">0 selected</span>
+      <button class="btn btn-danger btn-sm" onclick="confirmBatchDelete()">Delete Selected</button>
+      <button class="btn btn-outline btn-sm" onclick="clearSelection()">Clear</button>
+    </div>
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Planned Date</th><th>Block</th><th>Type</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
+          <th style="width:36px;text-align:center;"><input type="checkbox" id="jobs-select-all" onchange="toggleSelectAll(this.checked)" title="Select all"></th>
+          <th>Planned Date</th><th>Block</th><th>Type</th><th>Product</th><th>Active Ingredient</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="jobs-body"></tbody>
       </table>
@@ -222,21 +228,32 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
     <div class="table-header">All Products</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Product Name</th><th>Type</th><th>Interval (days)</th><th>Default Dose</th><th>Active</th><th></th></tr></thead>
+        <thead><tr><th>Product Name</th><th>Active Ingredient</th><th>Formulation</th><th>Type</th><th>Interval (days)</th><th>Default Dose</th><th>Active</th><th></th><th></th></tr></thead>
         <tbody id="products-body"></tbody>
       </table>
     </div>
   </div>
   <div class="data-table">
     <div class="table-header">Add New Product</div>
-    <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;align-items:end;">
+    <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end;">
       <div class="form-field" style="margin:0;"><label>Product Name</label><input id="ap-name" placeholder="e.g. Metalaxyl" style="width:100%;"></div>
+      <div class="form-field" style="margin:0;grid-column:span 2;"><label>Active Ingredient(s) <span style="color:var(--danger);font-size:10px;">*required</span></label>
+        <div id="ap-ingredient-list" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select id="ap-ingredient-sel" style="flex:1;min-width:0;"><option value="">— Select ingredient —</option></select>
+          <button class="btn btn-primary btn-sm" type="button" onclick="apAddSelectedIngredient()" style="white-space:nowrap;padding:6px 12px;font-size:13px;font-weight:700;">+ Add</button>
+        </div>
+        <div id="ap-ingredient-new-wrap" style="display:none;margin-top:6px;"><input id="ap-ingredient-new" placeholder="New ingredient name" style="width:100%;"><div style="display:flex;gap:4px;margin-top:4px;"><button class="btn btn-primary btn-sm" onclick="apAddNewIngredient()">Add</button><button class="btn btn-outline btn-sm" onclick="cancelNewIngredient()">Cancel</button></div></div>
+      </div>
+      <div class="form-field" style="margin:0;"><label>Formulation</label>
+        <select id="ap-formulation" style="width:100%;" onchange="if(this.value==='__new__'){this.style.display='none';document.getElementById('ap-formulation-new-wrap').style.display='block';}"><option value="">— Select —</option></select>
+        <div id="ap-formulation-new-wrap" style="display:none;margin-top:6px;"><input id="ap-formulation-new" placeholder="New formulation name" style="width:100%;"><button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="cancelNewFormulation()">Cancel</button></div>
+      </div>
       <div class="form-field" style="margin:0;"><label>Type</label><select id="ap-type" style="width:100%;"><option value="fungicide">Fungicide</option><option value="pesticide">Pesticide</option></select></div>
       <div class="form-field" style="margin:0;"><label>Interval (days)</label><input id="ap-interval" type="number" placeholder="—" style="width:100%;"></div>
       <div class="form-field" style="margin:0;"><label>Dose Amount</label><input id="ap-dose-amt" type="number" step="0.001" placeholder="e.g. 250" style="width:100%;"></div>
       <div class="form-field" style="margin:0;"><label>Dose Unit</label><select id="ap-dose-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
-      <div class="form-field" style="margin:0;"><label>Per Litres</label><input id="ap-dose-per" type="number" placeholder="e.g. 100" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Sort Order</label><input id="ap-sort" type="number" placeholder="e.g. 5" style="width:100%;"></div>
+      <div class="form-field" style="margin:0;"><label>Litres</label><input id="ap-dose-per" type="number" placeholder="e.g. 100" style="width:100%;"></div>
       <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="addProduct()" style="width:100%;">Add Product</button></div>
     </div>
   </div>
@@ -294,7 +311,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Planned</th><th>Completed</th><th>Block</th><th>Type</th><th>Product</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Actual Used</th><th>Status</th><th>Actions</th>
+          <th>Planned</th><th>Completed</th><th>Block</th><th>Type</th><th>Product</th><th>Active Ingredient</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Actual Used</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="joblogs-body"></tbody>
       </table>
@@ -345,6 +362,7 @@ if(!currentUser) { location.href = "index.html"; }
 // GLOBAL DATA
 // ============================================================
 let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], latestSprays=[], sprayLogs=[];
+let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
 let currentPage = 'summary';
 let currentReport = null;
 let reportData = [];
@@ -366,7 +384,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts()]);
 }
 
 async function syncAll() {
@@ -402,7 +420,7 @@ async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs()]); renderSummary(); }
   else if(currentPage === 'jobs') { await loadJobs(); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
-  else if(currentPage === 'products') { renderProductsPage(); renderOverridesSection(); }
+  else if(currentPage === 'products') { await Promise.all([loadIngredients(), loadFormulations(), loadProductIngredients()]); renderProductsPage(); populateAddProductDropdowns(); renderOverridesSection(); }
   else if(currentPage === 'reports') initReports();
 }
 
@@ -418,7 +436,7 @@ async function loadBlocks() {
   if(data) blocks = data;
 }
 async function loadProducts() {
-  const data = await sbQuery(sb.from("pnd_products").select("*").order("sort_order"));
+  const data = await sbQuery(sb.from("pnd_products").select("*,pnd_formulations(id,name)").order("sort_order"));
   if(data) products = data;
 }
 async function loadWorkers() {
@@ -432,6 +450,28 @@ async function loadJobs() {
 async function loadOverrides() {
   const data = await sbQuery(sb.from("pnd_block_product_overrides").select("*"));
   if(data) overrides = data;
+}
+async function loadIngredients() {
+  const data = await sbQuery(sb.from("pnd_ingredients").select("*").order("name"));
+  if(data) ingredients = data;
+}
+async function loadFormulations() {
+  const data = await sbQuery(sb.from("pnd_formulations").select("*").order("name"));
+  if(data) formulations = data;
+}
+async function loadProductIngredients() {
+  const data = await sbQuery(sb.from("pnd_product_ingredients").select("*,pnd_ingredients(id,name)"));
+  if(data) productIngredients = data;
+}
+function getProductIngredients(productId) {
+  return productIngredients.filter(pi => pi.product_id === productId).map(pi => pi.pnd_ingredients);
+}
+async function loadJobProducts() {
+  const data = await sbQuery(sb.from("pnd_job_products").select("*"));
+  if(data) jobProducts = data;
+}
+function getJobProducts(jobId) {
+  return jobProducts.filter(jp => jp.job_id === jobId);
 }
 async function loadLatestSprays() {
   const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
@@ -610,6 +650,40 @@ function populateJobFilters() {
   bs.value = cur;
 }
 
+// Multi-product display helpers for job tables
+function njJobProductNames(j) {
+  const jps = getJobProducts(j.id);
+  if(jps.length > 1) {
+    return jps.map(jp => { const p=getProduct(jp.product_id); return '<div style="font-size:12px;">'+esc(p?.product_name||'?')+'</div>'; }).join('');
+  }
+  const p = getProduct(j.product_id);
+  return esc(p?.product_name||'?');
+}
+
+function njJobAIs(j) {
+  const jps = getJobProducts(j.id);
+  const prodIds = jps.length ? jps.map(jp=>jp.product_id) : [j.product_id];
+  const allAIs = [];
+  prodIds.forEach(pid => {
+    const p = getProduct(pid);
+    if(p) getProductIngredients(p.id).forEach(i => { if(!allAIs.includes(i.name)) allAIs.push(i.name); });
+  });
+  return allAIs.length ? allAIs.map(n=>esc(n)).join(', ') : '—';
+}
+
+function njJobTotals(j) {
+  const jps = getJobProducts(j.id);
+  const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
+  if(jps.length > 1) {
+    return jps.map(jp => {
+      const p = getProduct(jp.product_id);
+      const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+      return '<div style="font-size:11px;white-space:nowrap;">' + esc(p?.product_name||'?') + ': <b>' + fmtNum(total) + ' ' + esc(jp.dose_unit||'') + '</b></div>';
+    }).join('');
+  }
+  return fmtNum(j.total_product_required) + ' ' + esc(j.dose_unit||'');
+}
+
 function renderJobsTable() {
   const statusF = document.getElementById("jobs-filter-status").value;
   const blockF = document.getElementById("jobs-filter-block").value;
@@ -628,7 +702,8 @@ function renderJobsTable() {
 
   const tbody = document.getElementById("jobs-body");
   if(!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No active jobs. Create a new job to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No active jobs. Create a new job to get started.</td></tr>';
+    updateBatchBar();
     return;
   }
   tbody.innerHTML = filtered.map(j => {
@@ -641,19 +716,23 @@ function renderJobsTable() {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
     }
     const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
+    const checked = selectedJobIds.has(j.id) ? 'checked' : '';
     return `<tr>
+      <td style="text-align:center;"><input type="checkbox" class="job-cb" data-id="${j.id}" ${checked} onchange="onJobCheckChange()"></td>
       <td>${fmtDateShort(j.planned_date)}</td>
       <td style="font-weight:600;">${esc(bname)}</td>
       <td>${typeBadge}</td>
-      <td>${esc(pname)}</td>
+      <td>${njJobProductNames(j)}</td>
+      <td style="font-size:11px;color:#8fcf80;">${njJobAIs(j)}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
       <td>${j.tanks_completed}/${j.tanks_planned}</td>
-      <td>${fmtNum(j.total_product_required)} ${esc(j.dose_unit)}</td>
+      <td>${njJobTotals(j)}</td>
       <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
       <td>${actionsHtml}</td>
     </tr>`;
   }).join("");
+  updateBatchBar();
 }
 
 async function viewSprayLog(jobId) {
@@ -681,18 +760,28 @@ async function viewSprayLog(jobId) {
 // ============================================================
 // NEW JOB MODAL
 // ============================================================
+// Multi-product state for new job
+let njProducts = []; // [{id, productId, doseAmt, doseUnit, dosePer}]
+let njNextId = 0;
+
+function njBuildProdOpts(excludeIds) {
+  const fung = products.filter(p=>p.is_active&&p.product_type==="fungicide"&&!excludeIds.includes(p.id));
+  const pest = products.filter(p=>p.is_active&&p.product_type==="pesticide"&&!excludeIds.includes(p.id));
+  let opts = '<option value="">— Select Product —</option>';
+  if(fung.length) opts += '<optgroup label="Fungicides">'+fung.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>';
+  if(pest.length) opts += '<optgroup label="Pesticides">'+pest.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>';
+  return opts;
+}
+
 function openNewJobModal() {
+  njProducts = [];
+  njNextId = 0;
   const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
-  const fung = products.filter(p=>p.is_active&&p.product_type==="fungicide");
-  const pest = products.filter(p=>p.is_active&&p.product_type==="pesticide");
-  let prodOpts = '<option value="">— Select —</option>';
-  if(fung.length) { prodOpts += '<optgroup label="Fungicides">'+fung.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>'; }
-  if(pest.length) { prodOpts += '<optgroup label="Pesticides">'+pest.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>'; }
   const workerOpts = workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
 
   document.getElementById("modal-container").innerHTML = `
     <div class="modal-overlay">
-      <div class="modal-box" style="max-width:560px;">
+      <div class="modal-box" style="max-width:600px;">
         <div class="modal-header"><div class="modal-title">New Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-field">
           <label>Job Type</label>
@@ -703,31 +792,35 @@ function openNewJobModal() {
           <input type="hidden" id="nj-job-type" value="Scheduled">
           <div id="nj-intv-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);font-size:11px;color:#E8A020;line-height:1.4;">Intervention jobs are unscheduled emergency sprays. They log the application but handle the spray countdown separately on completion.</div>
         </div>
-        <div class="form-row">
-          <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;" onchange="njFetchDose();njCheckDuplicate()"><option value="">— Select —</option>${blockOpts}</select></div>
-          <div class="form-field"><label>Product</label><select id="nj-product" style="width:100%;" onchange="njFetchDose();njCheckDuplicate()">${prodOpts}</select></div>
-        </div>
+        <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;" onchange="njRefreshAllDoses()"><option value="">— Select —</option>${blockOpts}</select></div>
         <div id="nj-dup-warning" style="display:none;"></div>
-        <div class="form-row">
+
+        <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Products & Spray Formula</span></div>
+        <div id="nj-products-list"></div>
+        <div id="nj-add-product-row" style="padding:4px 0;">
+          <select id="nj-add-product-sel" style="width:calc(100% - 80px);">${njBuildProdOpts([])}</select>
+          <button class="btn btn-primary btn-sm" onclick="njAddProduct()" style="margin-left:6px;padding:6px 14px;">+ Add</button>
+        </div>
+
+        <div class="form-row" style="margin-top:12px;">
           <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
           <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
         </div>
-        <div class="form-row">
-          <div class="form-field"><label>Dose Amount</label><input id="nj-dose-amt" type="number" step="0.001" style="width:100%;"></div>
-          <div class="form-field"><label>Dose Unit</label><select id="nj-dose-unit" style="width:100%;"><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
-          <div class="form-field"><label>Per Litres</label><input id="nj-dose-per" type="number" min="1" style="width:100%;"></div>
-        </div>
+
+        <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(232,160,32,0.08);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold-light);">Tank & Water</span></div>
         <div class="form-row">
           <div class="form-field"><label>Tank Size</label>
             <select id="nj-tank-sel" style="width:100%;" onchange="njTankChange()">
               <option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option>
             </select>
           </div>
-          <div class="form-field" id="nj-tank-custom-wrap" style="display:none;"><label>Custom Litres</label><input id="nj-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="njAutoCalc('nj','S')"></div>
-          <div class="form-field"><label>Tanks Planned</label><input id="nj-tanks" type="number" step="any" min="0.1" value="1" style="width:100%;" oninput="njAutoCalc('nj','P')"></div>
+          <div class="form-field" id="nj-tank-custom-wrap" style="display:none;"><label>Custom Litres</label><input id="nj-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="njCalcAllTotals()"></div>
+          <div class="form-field"><label>Tanks Planned</label><input id="nj-tanks" type="number" step="any" min="0.1" value="1" style="width:100%;" oninput="njCalcAllTotals()"></div>
         </div>
-        <div class="form-field"><label>Total Litres of Water</label><input id="nj-water" type="number" step="any" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" oninput="njAutoCalc('nj','W')"></div>
-        <div class="form-field"><label>Total Product Required</label><input id="nj-total" type="number" step="any" class="calc-input" style="width:100%;font-size:18px;font-weight:800;color:var(--gold-light);background:var(--gold-pale);text-align:center;padding:12px;" oninput="njAutoCalc('nj','T')"></div>
+        <div class="form-field"><label>Total Litres of Water</label><input id="nj-water" type="number" step="any" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" readonly></div>
+
+        <div id="nj-totals-breakdown" style="margin:8px 0;"></div>
+
         <div class="form-field"><label>Notes</label><textarea id="nj-notes" rows="2" style="width:100%;" placeholder="Optional"></textarea></div>
         <div class="form-field"><label>Logged By</label><input id="nj-logged" value="${esc(currentUser?.displayName||"")}" style="width:100%;"></div>
         <div class="modal-actions">
@@ -738,10 +831,106 @@ function openNewJobModal() {
     </div>`;
 }
 
+function njAddProduct() {
+  const sel = document.getElementById("nj-add-product-sel");
+  const productId = sel.value;
+  if(!productId) { notify("Select a product first","warning"); return; }
+  if(njProducts.some(p=>p.productId===productId)) { notify("Product already added","warning"); return; }
+
+  const p = getProduct(productId);
+  const blockId = document.getElementById("nj-block")?.value || '';
+  const ov = overrides.find(o=>o.block_id===blockId && o.product_id===productId);
+  const doseAmt = ov ? ov.dose_amount : (p?.default_dose_amount || '');
+  const doseUnit = ov ? ov.dose_unit : (p?.default_dose_unit || 'g');
+  const dosePer = ov ? ov.dose_per_litres : (p?.default_dose_per_litres || '');
+
+  const rowId = njNextId++;
+  njProducts.push({ id:rowId, productId, doseAmt:parseFloat(doseAmt)||0, doseUnit, dosePer:parseInt(dosePer)||0 });
+  njRenderProducts();
+  njCalcAllTotals();
+  njCheckDuplicate();
+}
+
+function njRemoveProduct(rowId) {
+  njProducts = njProducts.filter(p=>p.id!==rowId);
+  njRenderProducts();
+  njCalcAllTotals();
+  njCheckDuplicate();
+}
+
+function njRenderProducts() {
+  const container = document.getElementById("nj-products-list");
+  if(!container) return;
+  const usedIds = njProducts.map(p=>p.productId);
+
+  container.innerHTML = njProducts.map(row => {
+    const p = getProduct(row.productId);
+    const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
+    return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div>
+          <span style="font-weight:700;font-size:13px;">${esc(p?.product_name||'?')}</span>
+          ${ais?'<span style="font-size:11px;color:#8fcf80;margin-left:8px;">'+esc(ais)+'</span>':''}
+        </div>
+        <span style="cursor:pointer;color:var(--danger);font-size:18px;font-weight:700;line-height:1;padding:0 4px;" onclick="njRemoveProduct(${row.id})" title="Remove">&times;</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:end;">
+        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Dose</label><input type="number" step="0.001" value="${row.doseAmt||''}" style="width:100%;" onchange="njUpdateProductField(${row.id},'doseAmt',parseFloat(this.value)||0);njCalcAllTotals()"></div>
+        <div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><select style="width:100%;" onchange="njUpdateProductField(${row.id},'doseUnit',this.value);njCalcAllTotals()"><option value="g" ${row.doseUnit==='g'?'selected':''}>g</option><option value="ml" ${row.doseUnit==='ml'?'selected':''}>ml</option><option value="kg" ${row.doseUnit==='kg'?'selected':''}>kg</option><option value="L" ${row.doseUnit==='L'?'selected':''}>L</option></select></div>
+        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">per Litres</label><input type="number" min="1" value="${row.dosePer||''}" style="width:100%;" onchange="njUpdateProductField(${row.id},'dosePer',parseInt(this.value)||0);njCalcAllTotals()"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Refresh the "add product" dropdown excluding already-added
+  const addSel = document.getElementById("nj-add-product-sel");
+  if(addSel) addSel.innerHTML = njBuildProdOpts(usedIds);
+}
+
+function njUpdateProductField(rowId, field, value) {
+  const row = njProducts.find(p=>p.id===rowId);
+  if(row) row[field] = value;
+}
+
+function njRefreshAllDoses() {
+  const blockId = document.getElementById("nj-block")?.value || '';
+  njProducts.forEach(row => {
+    const ov = overrides.find(o=>o.block_id===blockId && o.product_id===row.productId);
+    const p = getProduct(row.productId);
+    row.doseAmt = ov ? parseFloat(ov.dose_amount)||0 : (parseFloat(p?.default_dose_amount)||0);
+    row.doseUnit = ov ? ov.dose_unit : (p?.default_dose_unit || 'g');
+    row.dosePer = ov ? parseInt(ov.dose_per_litres)||0 : (parseInt(p?.default_dose_per_litres)||0);
+  });
+  njRenderProducts();
+  njCalcAllTotals();
+  njCheckDuplicate();
+}
+
+function njCalcAllTotals() {
+  const S = getTankSize('nj');
+  const P = getVal('nj-tanks');
+  const W = S * P;
+  setVal('nj-water', W || 0);
+
+  const breakdown = document.getElementById("nj-totals-breakdown");
+  if(!breakdown) return;
+  if(!njProducts.length || !W) { breakdown.innerHTML = ''; return; }
+
+  breakdown.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Product Required</div>' +
+    njProducts.map(row => {
+      const p = getProduct(row.productId);
+      const total = (row.doseAmt && row.dosePer) ? (W / row.dosePer) * row.doseAmt : 0;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;margin-bottom:3px;background:var(--gold-pale);border-radius:6px;">
+        <span style="font-size:13px;font-weight:600;color:var(--white);">${esc(p?.product_name||'?')}</span>
+        <span style="font-size:16px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total) : '—'} ${esc(row.doseUnit)}</span>
+      </div>`;
+    }).join('');
+}
+
 function njTankChange() {
   const sel = document.getElementById("nj-tank-sel").value;
   document.getElementById("nj-tank-custom-wrap").style.display = sel==="custom"?"block":"none";
-  njAutoCalc('nj','S');
+  njCalcAllTotals();
 }
 
 function ejTankChange() {
@@ -826,25 +1015,10 @@ function njAutoCalc(prefix, edited) {
   }
 }
 
-function njFetchDose() {
-  const blockId = document.getElementById("nj-block").value;
-  const productId = document.getElementById("nj-product").value;
-  if(!productId) return;
-  // Check override first
-  const ov = overrides.find(o=>o.block_id===blockId && o.product_id===productId);
-  if(ov) {
-    document.getElementById("nj-dose-amt").value = ov.dose_amount;
-    document.getElementById("nj-dose-unit").value = ov.dose_unit;
-    document.getElementById("nj-dose-per").value = ov.dose_per_litres;
-  } else {
-    const p = getProduct(productId);
-    if(p) {
-      document.getElementById("nj-dose-amt").value = p.default_dose_amount||"";
-      document.getElementById("nj-dose-unit").value = p.default_dose_unit||"g";
-      document.getElementById("nj-dose-per").value = p.default_dose_per_litres||"";
-    }
-  }
-  njAutoCalc('nj','S');
+function njUpdateUomLabel(prefix) {
+  const unit = document.getElementById(prefix+"-dose-unit")?.value || 'g';
+  const label = document.getElementById(prefix+"-uom-label");
+  if(label) label.textContent = '(' + unit + ')';
 }
 
 function njSetJobType(type) {
@@ -859,69 +1033,81 @@ function njSetJobType(type) {
 
 function njCheckDuplicate() {
   const blockId = document.getElementById("nj-block")?.value;
-  const productId = document.getElementById("nj-product")?.value;
   const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
   const warnEl = document.getElementById("nj-dup-warning");
   const createBtn = document.getElementById("nj-create-btn");
   if(!warnEl || !createBtn) return;
 
-  if(!blockId || !productId) {
+  if(!blockId || !njProducts.length) {
     warnEl.style.display = 'none';
     createBtn.disabled = false;
     return;
   }
 
   const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
-  const existing = jobs.find(j => j.block_id===blockId && j.product_id===productId && activeStatuses.includes(j.status));
+  const bName = getBlock(blockId)?.block_name || '?';
+  const dupes = njProducts.map(row => {
+    const existing = jobs.find(j => j.block_id===blockId && j.product_id===row.productId && activeStatuses.includes(j.status));
+    return existing ? { pName: getProduct(row.productId)?.product_name || '?', status: existing.status } : null;
+  }).filter(Boolean);
 
-  if(!existing) {
+  if(!dupes.length) {
     warnEl.style.display = 'none';
     createBtn.disabled = false;
     return;
   }
 
-  const bName = getBlock(blockId)?.block_name || '?';
-  const pName = getProduct(productId)?.product_name || '?';
-
+  const dupeList = dupes.map(d=>`<b>${esc(d.pName)}</b> (${esc(d.status)})`).join(', ');
   if(jobType === 'Scheduled') {
     warnEl.style.display = 'block';
-    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,96,96,0.1);border:1px solid rgba(232,96,96,0.3);font-size:12px;color:var(--red);line-height:1.5;">⚠️ An active job already exists for <b>${esc(bName)}</b> — <b>${esc(pName)}</b> (Status: ${esc(existing.status)}). Please complete or delete the existing job before creating a new scheduled job.</div>`;
+    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,96,96,0.1);border:1px solid rgba(232,96,96,0.3);font-size:12px;color:var(--red);line-height:1.5;">⚠️ Active jobs already exist for <b>${esc(bName)}</b> — ${dupeList}. Complete or delete existing jobs first.</div>`;
     createBtn.disabled = true;
   } else {
     warnEl.style.display = 'block';
-    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);font-size:12px;color:#E8A020;line-height:1.5;">ℹ️ A scheduled job exists for <b>${esc(bName)}</b> — <b>${esc(pName)}</b> (Status: ${esc(existing.status)}). This intervention will be logged separately.</div>`;
+    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);font-size:12px;color:#E8A020;line-height:1.5;">ℹ️ Scheduled jobs exist for <b>${esc(bName)}</b> — ${dupeList}. This intervention will be logged separately.</div>`;
     createBtn.disabled = false;
   }
 }
 
 async function submitNewJob() {
-  const blockId=document.getElementById("nj-block").value;
-  const productId=document.getElementById("nj-product").value;
-  const worker=document.getElementById("nj-worker").value;
-  const date=document.getElementById("nj-date").value;
-  const tankSize=getTankSize('nj');
-  const tanks=parseFloat(document.getElementById("nj-tanks").value);
-  const doseAmt=parseFloat(document.getElementById("nj-dose-amt").value);
-  const doseUnit=document.getElementById("nj-dose-unit").value;
-  const dosePer=parseFloat(document.getElementById("nj-dose-per").value);
-  const notes=document.getElementById("nj-notes").value.trim()||null;
-  const logged=document.getElementById("nj-logged").value.trim()||null;
-
-  // Tank size validation: if custom selected but empty, mark custom input
-  const njTankValId = document.getElementById("nj-tank-sel").value==="custom"?"nj-tank-custom":"nj-tank-sel";
-  const reqFields = ["nj-block","nj-product","nj-worker","nj-date",njTankValId,"nj-tanks","nj-dose-amt","nj-dose-per"];
-  if(!validateRequired(reqFields)) return;
-
+  const blockId = document.getElementById("nj-block").value;
+  const worker = document.getElementById("nj-worker").value;
+  const date = document.getElementById("nj-date").value;
+  const tankSize = getTankSize('nj');
+  const tanks = parseFloat(document.getElementById("nj-tanks").value);
+  const notes = document.getElementById("nj-notes").value.trim()||null;
+  const logged = document.getElementById("nj-logged").value.trim()||null;
   const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
+
+  if(!blockId) { notify("Block is required","warning"); return; }
+  if(!njProducts.length) { notify("Add at least one product","warning"); return; }
+  if(!worker) { notify("Worker is required","warning"); return; }
+  if(!date) { notify("Planned date is required","warning"); return; }
+  if(!tankSize || !tanks) { notify("Tank size and tanks planned are required","warning"); return; }
+  for(const row of njProducts) {
+    if(!row.doseAmt || !row.dosePer) { notify("Fill dose fields for all products","warning"); return; }
+  }
+
+  // Use first product as primary (for backward compat with spray log trigger)
+  const primary = njProducts[0];
   const result = await sbQuery(sb.from("pnd_jobs").insert({
-    block_id:blockId, product_id:productId, worker_name:worker, planned_date:date,
-    tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:doseAmt, dose_unit:doseUnit,
-    dose_per_litres:dosePer, notes, logged_by:logged, job_type:jobType
-  }));
+    block_id:blockId, product_id:primary.productId, worker_name:worker, planned_date:date,
+    tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:primary.doseAmt, dose_unit:primary.doseUnit,
+    dose_per_litres:primary.dosePer, notes, logged_by:logged, job_type:jobType
+  }).select());
   if(result===null) return;
-  notify("Job created successfully");
+
+  // Insert all products into junction table
+  const jobId = result[0].id;
+  const jpRows = njProducts.map(row => ({
+    job_id:jobId, product_id:row.productId,
+    dose_amount:row.doseAmt, dose_unit:row.doseUnit, dose_per_litres:row.dosePer
+  }));
+  await sbQuery(sb.from("pnd_job_products").insert(jpRows).select());
+
+  notify("Job created with " + njProducts.length + " product" + (njProducts.length>1?"s":""));
   closeModal();
-  await loadJobs();
+  await Promise.all([loadJobs(), loadJobProducts()]);
   renderJobsTable();
 }
 
@@ -931,25 +1117,36 @@ async function submitNewJob() {
 function openEditJobModal(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
-  const b=getBlock(j.block_id), p=getProduct(j.product_id);
+  const b=getBlock(j.block_id);
+  const jps = getJobProducts(j.id);
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
+  const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
+
+  // Build products display
+  const productsInMix = jps.length ? jps : [{ product_id:j.product_id, dose_amount:j.dose_amount, dose_unit:j.dose_unit, dose_per_litres:j.dose_per_litres }];
+  const productsHtml = productsInMix.map(jp => {
+    const p = getProduct(jp.product_id);
+    const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
+    const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+    return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><span style="font-weight:700;font-size:13px;">${esc(p?.product_name||'?')}</span>${ais?'<span style="font-size:11px;color:#8fcf80;margin-left:8px;">'+esc(ais)+'</span>':''}</div>
+        <span style="font-size:14px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total)+' '+esc(jp.dose_unit||'') : '—'}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${jp.dose_amount||'?'} ${esc(jp.dose_unit||'')} / ${jp.dose_per_litres||'?'}L</div>
+    </div>`;
+  }).join('');
 
   document.getElementById("modal-container").innerHTML = `
     <div class="modal-overlay">
       <div class="modal-box" style="max-width:560px;">
         <div class="modal-header"><div class="modal-title">Edit Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <div class="form-row">
-          <div class="form-field"><label>Block</label><div style="padding:9px 0;font-weight:600;">${esc(b?.block_name)}</div></div>
-          <div class="form-field"><label>Product</label><div style="padding:9px 0;font-weight:600;">${esc(p?.product_name)}</div></div>
-        </div>
-        <div class="form-row">
+        <div class="form-field"><label>Block</label><div style="padding:9px 0;font-weight:600;">${esc(b?.block_name)}</div></div>
+        <div style="margin:8px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Products & Formula</span></div>
+        ${productsHtml}
+        <div class="form-row" style="margin-top:12px;">
           <div class="form-field"><label>Worker</label><select id="ej-worker" style="width:100%;">${ejWorkerOpts}</select></div>
           <div class="form-field"><label>Planned Date</label><input id="ej-date" type="date" value="${j.planned_date}" style="width:100%;"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-field"><label>Dose Amount</label><input id="ej-dose-amt" type="number" step="0.001" value="${j.dose_amount}" style="width:100%;"></div>
-          <div class="form-field"><label>Unit</label><select id="ej-dose-unit" style="width:100%;"><option value="g" ${j.dose_unit==="g"?"selected":""}>g</option><option value="ml" ${j.dose_unit==="ml"?"selected":""}>ml</option><option value="kg" ${j.dose_unit==="kg"?"selected":""}>kg</option><option value="L" ${j.dose_unit==="L"?"selected":""}>L</option></select></div>
-          <div class="form-field"><label>Per Litres</label><input id="ej-dose-per" type="number" value="${j.dose_per_litres}" min="1" style="width:100%;"></div>
         </div>
         <div class="form-row">
           <div class="form-field"><label>Tank Size</label>
@@ -960,8 +1157,7 @@ function openEditJobModal(jobId) {
           <div class="form-field" id="ej-tank-custom-wrap" style="display:${[200,500,1000].includes(+j.tank_size_litres)?'none':'block'};"><label>Custom Litres</label><input id="ej-tank-custom" type="number" step="any" min="1" value="${[200,500,1000].includes(+j.tank_size_litres)?'':j.tank_size_litres}" style="width:100%;" oninput="njAutoCalc('ej','S')"></div>
           <div class="form-field"><label>Tanks Planned</label><input id="ej-tanks" type="number" step="any" min="0.1" value="${j.tanks_planned}" style="width:100%;" oninput="njAutoCalc('ej','P')"></div>
         </div>
-        <div class="form-field"><label>Total Litres of Water</label><input id="ej-water" type="number" step="any" value="${(parseFloat(j.tank_size_litres)||0)*(parseFloat(j.tanks_planned)||0)||''}" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" oninput="njAutoCalc('ej','W')"></div>
-        <div class="form-field"><label>Total Product Required</label><input id="ej-total" type="number" step="any" class="calc-input" value="${j.total_product_required||''}" style="width:100%;font-size:18px;font-weight:800;color:var(--gold-light);background:var(--gold-pale);text-align:center;padding:12px;" oninput="njAutoCalc('ej','T')"></div>
+        <div class="form-field"><label>Total Litres of Water</label><input id="ej-water" type="number" step="any" value="${W||''}" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" oninput="njAutoCalc('ej','W')"></div>
         <div class="form-field"><label>Notes</label><textarea id="ej-notes" rows="2" style="width:100%;">${esc(j.notes||"")}</textarea></div>
 
         <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px;">
@@ -1020,7 +1216,7 @@ function ejStatusChange(jobId) {
     html += '<div id="ej-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
     html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
-    html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="ej-aw-tank-sel" style="width:100%;" onchange="ejAwTankChange()"><option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option></select></div><div class="form-field" id="ej-aw-tank-custom-wrap" style="margin:0;display:none;"><label style="font-size:10px;">Custom (L)</label><input id="ej-aw-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="ej-aw-tanks" type="number" step="any" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="ej-aw-total" type="number" step="any" style="width:100%;font-weight:700;" oninput="ejCalcActualProduct()"></div></div></div>';
+    html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="ej-aw-tank-sel" style="width:100%;" onchange="ejAwTankChange()"><option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option></select></div><div class="form-field" id="ej-aw-tank-custom-wrap" style="margin:0;display:none;"><label style="font-size:10px;">Custom (L)</label><input id="ej-aw-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="ej-aw-tanks" type="number" step="any" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="ej-aw-total" type="number" step="any" data-job-id="'+jobId+'" style="width:100%;font-weight:700;" oninput="ejCalcActualProduct()"></div></div></div>';
     // Pre-fill from job values
     setTimeout(()=>{
       const tankSize = getTankSize('ej');
@@ -1045,12 +1241,13 @@ function ejCalcActualWater() {
   ejCalcActualProduct();
 }
 function ejCalcActualProduct() {
-  // Derive actual_product_used from actual water volume using the job's dose formula
+  // Derive actual_product_used from actual water volume using the primary product's dose formula
   const w = parseFloat(document.getElementById("ej-aw-total")?.value)||0;
-  const D = getVal("ej-dose-amt");
-  const L = getVal("ej-dose-per");
+  const jobId = document.getElementById("ej-aw-total")?.dataset.jobId;
+  const j = jobId ? jobs.find(x=>x.id===jobId) : null;
+  const D = j ? parseFloat(j.dose_amount)||0 : 0;
+  const L = j ? parseInt(j.dose_per_litres)||0 : 0;
   if(w && D && L) {
-    // Store computed value for submit to read
     document.getElementById("ej-aw-total").dataset.actualProduct = ((w/L)*D).toFixed(3);
   }
 }
@@ -1066,7 +1263,7 @@ async function submitEditJob(jobId) {
 
   // Validate base required fields
   const ejTankValId = document.getElementById("ej-tank-sel").value==="custom"?"ej-tank-custom":"ej-tank-sel";
-  const baseReq = ["ej-worker","ej-date",ejTankValId,"ej-tanks","ej-dose-amt","ej-dose-per"];
+  const baseReq = ["ej-worker","ej-date",ejTankValId,"ej-tanks"];
 
   // Add status-specific required fields
   const newStatus = document.getElementById("ej-new-status").value;
@@ -1082,9 +1279,6 @@ async function submitEditJob(jobId) {
     planned_date: document.getElementById("ej-date").value,
     tank_size_litres: getTankSize('ej'),
     tanks_planned: parseFloat(document.getElementById("ej-tanks").value),
-    dose_amount: parseFloat(document.getElementById("ej-dose-amt").value),
-    dose_unit: document.getElementById("ej-dose-unit").value,
-    dose_per_litres: parseFloat(document.getElementById("ej-dose-per").value),
     notes: document.getElementById("ej-notes").value.trim()||null
   };
 
@@ -1119,7 +1313,7 @@ async function submitEditJob(jobId) {
     return;
   }
 
-  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId));
+  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId).select());
   if(result===null) return;
   notify("Job updated successfully");
   if(willTriggerLog) {
@@ -1186,7 +1380,7 @@ async function jlStatusChange(sel, jobId) {
 
   // Simple statuses update directly
   if(newStatus === "Planned" || newStatus === "In Progress") {
-    const result = await sbQuery(sb.from("pnd_jobs").update({status: newStatus}).eq("id", jobId));
+    const result = await sbQuery(sb.from("pnd_jobs").update({status: newStatus}).eq("id", jobId).select());
     if(result===null) { sel.value=origStatus; return; }
     notify("Status updated");
     await loadJobs();
@@ -1236,7 +1430,7 @@ async function renderJobLogs() {
 
   const tbody = document.getElementById("joblogs-body");
   if(!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No job logs found. Adjust your filters or create a new job.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No job logs found. Adjust your filters or create a new job.</td></tr>';
     renderJlPagination();
     return;
   }
@@ -1250,11 +1444,12 @@ async function renderJobLogs() {
       <td>${fmtDateShort(j.completion_date)}</td>
       <td style="font-weight:600;">${esc(b?.block_name)}</td>
       <td>${typeBadge}</td>
-      <td>${esc(p?.product_name)}</td>
+      <td>${njJobProductNames(j)}</td>
+      <td style="font-size:11px;color:#8fcf80;">${njJobAIs(j)}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
       <td>${j.tanks_completed}/${j.tanks_planned}</td>
-      <td>${fmtNum(j.total_product_required)} ${esc(j.dose_unit)}</td>
+      <td>${njJobTotals(j)}</td>
       <td>${j.actual_product_used ? fmtNum(j.actual_product_used)+" "+esc(j.dose_unit) : "—"}</td>
       <td>${jlStatusSelect(j)}</td>
       <td><button class="btn btn-outline btn-sm" onclick="openEditStatusModal('${j.id}')">Edit Status</button></td>
@@ -1419,12 +1614,26 @@ async function submitEditStatus(jobId) {
     return;
   }
 
-  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId));
+  const result = await sbQuery(sb.from("pnd_jobs").update(update).eq("id", jobId).select());
   if(result===null) return;
   notify("Status updated successfully");
   if(willTriggerLog) {
-    const b=getBlock(j.block_id), p=getProduct(j.product_id);
-    setTimeout(()=>notify("Spray log updated automatically for "+(b?.block_name||"?")+" — "+(p?.product_name||"?"),"info",4000),500);
+    // DB trigger handles primary product; manually log additional products in the mix
+    const jps = getJobProducts(jobId);
+    const extraProds = jps.filter(jp => jp.product_id !== j.product_id);
+    for(const jp of extraProds) {
+      const ep = getProduct(jp.product_id);
+      const nextDate = (ep?.default_interval_days && update.completion_date) ? (() => { const d=new Date(update.completion_date); d.setDate(d.getDate()+ep.default_interval_days); return d.toISOString().split('T')[0]; })() : null;
+      await sbQuery(sb.from("pnd_spray_logs").insert({
+        block_id: j.block_id, product_id: jp.product_id,
+        date_completed: update.completion_date, next_spray_date: nextDate,
+        notes: 'Auto-logged (tank mix). Job ID: '+jobId,
+        logged_by: 'auto:job:'+jobId
+      }));
+    }
+    const b=getBlock(j.block_id);
+    const prodCount = jps.length || 1;
+    setTimeout(()=>notify("Spray log updated for "+prodCount+" product(s) on "+(b?.block_name||"?"),"info",4000),500);
   }
   closeModal();
   await Promise.all([loadJobs(), loadLatestSprays()]);
@@ -1531,17 +1740,22 @@ async function confirmInterventionDecision() {
     const existingNextDate = ls?.next_spray_date || null;
     updateObj.triggers_countdown = false;
     updateObj.next_spray_date = null;
-    const result = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    const result = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId).select());
     if(result===null) return;
-    // Manually insert spray log preserving existing next_spray_date
-    await sbQuery(sb.from("pnd_spray_logs").insert({
-      block_id: j.block_id, product_id: j.product_id,
-      date_completed: compDate, next_spray_date: existingNextDate,
-      notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
-      logged_by: 'intervention:job:'+jobId
-    }));
+    // Manually insert spray log for each product in the mix
+    const jps1 = getJobProducts(jobId);
+    const prodIds1 = jps1.length ? jps1.map(jp=>jp.product_id) : [j.product_id];
+    for(const pid of prodIds1) {
+      const ls2 = latestSprays.find(s=>s.block_id===j.block_id && s.product_id===pid);
+      await sbQuery(sb.from("pnd_spray_logs").insert({
+        block_id: j.block_id, product_id: pid,
+        date_completed: compDate, next_spray_date: ls2?.next_spray_date || null,
+        notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
+        logged_by: 'intervention:job:'+jobId
+      }));
+    }
     closeModal();
-    notify("Intervention logged. Schedule unchanged.");
+    notify("Intervention logged for "+prodIds1.length+" product(s). Schedule unchanged.");
   } else if(opt === 2) {
     // Reset from completion date
     let newNextDate = null;
@@ -1552,12 +1766,25 @@ async function confirmInterventionDecision() {
     }
     updateObj.next_spray_date = newNextDate;
     updateObj.triggers_countdown = true;
-    const result2 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    const result2 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId).select());
     if(result2===null) return;
     // Update existing scheduled active job's planned_date if any
     const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
     if(existingSched && newNextDate) {
-      await sbQuery(sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id));
+      await sbQuery(sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id).select());
+    }
+    // DB trigger handles primary product; manually log additional products
+    const jps2 = getJobProducts(jobId);
+    const extraProds2 = jps2.filter(jp => jp.product_id !== j.product_id);
+    for(const jp of extraProds2) {
+      const ep = getProduct(jp.product_id);
+      const epNext = (ep?.default_interval_days && compDate) ? (() => { const d2=new Date(compDate); d2.setDate(d2.getDate()+ep.default_interval_days); return d2.toISOString().split('T')[0]; })() : newNextDate;
+      await sbQuery(sb.from("pnd_spray_logs").insert({
+        block_id: j.block_id, product_id: jp.product_id,
+        date_completed: compDate, next_spray_date: epNext,
+        notes: 'Intervention spray (schedule reset). Job ID: '+jobId,
+        logged_by: 'intervention:job:'+jobId
+      }));
     }
     closeModal();
     notify("Schedule reset. Next spray: "+(newNextDate?fmtDateShort(newNextDate):'Not set'));
@@ -1567,12 +1794,23 @@ async function confirmInterventionDecision() {
     if(!manualDate) { notify("Please pick a date","warning"); return; }
     updateObj.next_spray_date = manualDate;
     updateObj.triggers_countdown = true;
-    const result3 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId));
+    const result3 = await sbQuery(sb.from("pnd_jobs").update(updateObj).eq("id", jobId).select());
     if(result3===null) return;
     // Update existing scheduled active job's planned_date if any
     const existingSched = jobs.find(x => x.block_id===j.block_id && x.product_id===j.product_id && x.id!==jobId && x.job_type==='Scheduled' && activeStatuses.includes(x.status));
     if(existingSched) {
-      await sbQuery(sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id));
+      await sbQuery(sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id).select());
+    }
+    // DB trigger handles primary product; manually log additional products
+    const jps3 = getJobProducts(jobId);
+    const extraProds3 = jps3.filter(jp => jp.product_id !== j.product_id);
+    for(const jp of extraProds3) {
+      await sbQuery(sb.from("pnd_spray_logs").insert({
+        block_id: j.block_id, product_id: jp.product_id,
+        date_completed: compDate, next_spray_date: manualDate,
+        notes: 'Intervention spray (manual date). Job ID: '+jobId,
+        logged_by: 'intervention:job:'+jobId
+      }));
     }
     closeModal();
     notify("Schedule updated. Next spray: "+fmtDateShort(manualDate));
@@ -1605,10 +1843,78 @@ function confirmDeleteJob(jobId) {
 }
 
 async function executeDeleteJob(jobId) {
-  const result = await sbQuery(sb.from("pnd_jobs").delete().eq("id", jobId));
+  const result = await sbQuery(sb.from("pnd_jobs").delete().eq("id", jobId).select());
   if(result===null) return;
   closeModal();
   notify("Job deleted successfully");
+  await loadJobs();
+  renderJobsTable();
+  if(currentPage==='joblogs') renderJobLogs();
+}
+
+// ============================================================
+// BATCH SELECT & DELETE
+// ============================================================
+const selectedJobIds = new Set();
+
+function onJobCheckChange() {
+  selectedJobIds.clear();
+  document.querySelectorAll('.job-cb:checked').forEach(cb => selectedJobIds.add(cb.dataset.id));
+  const allCbs = document.querySelectorAll('.job-cb');
+  const selAll = document.getElementById('jobs-select-all');
+  if(selAll) selAll.checked = allCbs.length > 0 && selectedJobIds.size === allCbs.length;
+  updateBatchBar();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.job-cb').forEach(cb => {
+    cb.checked = checked;
+    if(checked) selectedJobIds.add(cb.dataset.id); else selectedJobIds.delete(cb.dataset.id);
+  });
+  updateBatchBar();
+}
+
+function clearSelection() {
+  selectedJobIds.clear();
+  document.querySelectorAll('.job-cb').forEach(cb => cb.checked = false);
+  const selAll = document.getElementById('jobs-select-all');
+  if(selAll) selAll.checked = false;
+  updateBatchBar();
+}
+
+function updateBatchBar() {
+  const bar = document.getElementById('batch-bar');
+  if(!bar) return;
+  const n = selectedJobIds.size;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  document.getElementById('batch-count').textContent = n + ' selected';
+}
+
+function confirmBatchDelete() {
+  const n = selectedJobIds.size;
+  if(!n) return;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header"><div class="modal-title">Delete ${n} Job${n>1?'s':''}</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p style="padding:16px;">Are you sure you want to delete <strong>${n} job${n>1?'s':''}</strong>? This cannot be undone.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-danger" onclick="executeBatchDelete()">Delete ${n} Job${n>1?'s':''}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function executeBatchDelete() {
+  const ids = [...selectedJobIds];
+  const result = await sbQuery(sb.from("pnd_jobs").delete().in("id", ids).select());
+  if(result===null) return;
+  closeModal();
+  notify(ids.length + " job" + (ids.length>1?"s":"") + " deleted");
+  selectedJobIds.clear();
+  const selAll = document.getElementById('jobs-select-all');
+  if(selAll) selAll.checked = false;
   await loadJobs();
   renderJobsTable();
   if(currentPage==='joblogs') renderJobLogs();
@@ -1683,14 +1989,14 @@ async function addOverride(blockId) {
   const unit=document.getElementById("ov-unit-"+blockId).value;
   const per=parseInt(document.getElementById("ov-per-"+blockId).value);
   if(!productId||!amt||!per) { notify("Fill all override fields","warning"); return; }
-  const result = await sbQuery(sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per},{onConflict:"block_id,product_id"}));
+  const result = await sbQuery(sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per},{onConflict:"block_id,product_id"}).select());
   if(result===null) return;
   notify("Override saved");
   await loadOverrides(); renderOverridesSection();
 }
 
 async function deleteOverride(id, blockId) {
-  const result = await sbQuery(sb.from("pnd_block_product_overrides").delete().eq("id",id));
+  const result = await sbQuery(sb.from("pnd_block_product_overrides").delete().eq("id",id).select());
   if(result===null) return;
   notify("Override removed");
   await loadOverrides(); renderOverridesSection();
@@ -1702,30 +2008,212 @@ async function deleteOverride(id, blockId) {
 function renderProductsPage() {
   const tbody = document.getElementById("products-body");
   tbody.innerHTML = products.map(p => {
-    const doseDisplay = p.default_dose_amount ? `${p.default_dose_amount} ${p.default_dose_unit||""} / ${p.default_dose_per_litres||"?"}L` : "";
+    const pIngs = getProductIngredients(p.id);
+    const ingPills = pIngs.length ? pIngs.map(i=>`<span style="display:block;background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:2px 10px;font-size:11px;margin:2px 0;white-space:nowrap;">${esc(i.name)}</span>`).join('') : '<span style="color:var(--text-muted);font-size:11px;">—</span>';
     return `<tr>
-      <td><input class="inline-input" value="${esc(p.product_name)}" style="width:200px;" onchange="updateProduct('${p.id}','product_name',this.value)"></td>
-      <td><select class="inline-select" onchange="updateProduct('${p.id}','product_type',this.value)"><option value="fungicide" ${p.product_type==="fungicide"?"selected":""}>Fungicide</option><option value="pesticide" ${p.product_type==="pesticide"?"selected":""}>Pesticide</option></select></td>
+      <td style="font-weight:600;white-space:nowrap;">${esc(p.product_name)}</td>
+      <td>${ingPills}</td>
+      <td style="font-size:12px;">${p.pnd_formulations ? esc(p.pnd_formulations.name) : '—'}</td>
+      <td style="font-size:12px;">${p.product_type==='fungicide'?'Fungicide':'Pesticide'}</td>
       <td><input class="inline-input" type="number" value="${p.default_interval_days??""}" style="width:70px;" placeholder="—" onchange="updateProduct('${p.id}','default_interval_days',this.value===''?null:parseInt(this.value))"></td>
       <td style="white-space:nowrap;">
         <input class="inline-input" type="number" step="0.001" value="${p.default_dose_amount??""}" style="width:65px;" placeholder="amt" onchange="updateProduct('${p.id}','default_dose_amount',this.value===''?null:parseFloat(this.value))">
         <select class="inline-select" style="width:50px;" onchange="updateProduct('${p.id}','default_dose_unit',this.value||null)">
           <option value="">—</option><option value="g" ${p.default_dose_unit==="g"?"selected":""}>g</option><option value="ml" ${p.default_dose_unit==="ml"?"selected":""}>ml</option><option value="kg" ${p.default_dose_unit==="kg"?"selected":""}>kg</option><option value="L" ${p.default_dose_unit==="L"?"selected":""}>L</option>
         </select>
-        / <input class="inline-input" type="number" value="${p.default_dose_per_litres??""}" style="width:55px;" placeholder="L" onchange="updateProduct('${p.id}','default_dose_per_litres',this.value===''?null:parseInt(this.value))">L
+        / <input class="inline-input" type="number" value="${p.default_dose_per_litres??""}" style="width:75px;" placeholder="L" onchange="updateProduct('${p.id}','default_dose_per_litres',this.value===''?null:parseInt(this.value))">L
       </td>
       <td><label class="toggle"><input type="checkbox" ${p.is_active?"checked":""} onchange="updateProduct('${p.id}','is_active',this.checked)"><span class="toggle-slider"></span></label></td>
+      <td><button class="btn btn-outline btn-sm" onclick="openEditProductModal('${p.id}')" style="font-size:10px;">Edit</button></td>
       <td><span class="save-tick" id="tick-p-${p.id}">✓</span></td>
     </tr>`;
   }).join("");
 }
 
+const apSelectedIngredients = []; // [{id, name}]
+
+function populateAddProductDropdowns() {
+  refreshIngredientDropdown();
+  const frmSel = document.getElementById("ap-formulation");
+  if(frmSel) {
+    frmSel.innerHTML = '<option value="">— None —</option>' + formulations.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('') + '<option value="__new__">+ Add New...</option>';
+    frmSel.style.display = '';
+    document.getElementById('ap-formulation-new-wrap').style.display = 'none';
+  }
+}
+
+function refreshIngredientDropdown() {
+  const sel = document.getElementById("ap-ingredient-sel");
+  if(!sel) return;
+  const usedIds = apSelectedIngredients.map(i=>i.id);
+  sel.innerHTML = '<option value="">— Add —</option>' + ingredients.filter(i=>!usedIds.includes(i.id)).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('') + '<option value="__new__">+ New ingredient...</option>';
+}
+
+function renderApIngredientPills() {
+  const list = document.getElementById("ap-ingredient-list");
+  if(!list) return;
+  list.innerHTML = apSelectedIngredients.map(i=>`<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:3px 10px;font-size:12px;">${esc(i.name)} <span style="cursor:pointer;font-weight:700;color:#e04040;font-size:14px;line-height:1;" onclick="apRemoveIngredient('${i.id}')">&times;</span></span>`).join('');
+}
+
+function apAddSelectedIngredient() {
+  const sel = document.getElementById("ap-ingredient-sel");
+  if(sel.value === '__new__') {
+    sel.value = '';
+    document.getElementById('ap-ingredient-new-wrap').style.display = 'block';
+    return;
+  }
+  if(!sel.value) return;
+  const ing = ingredients.find(i=>i.id===sel.value);
+  if(ing && !apSelectedIngredients.some(x=>x.id===ing.id)) {
+    apSelectedIngredients.push({id:ing.id, name:ing.name});
+    renderApIngredientPills();
+    refreshIngredientDropdown();
+  }
+}
+
+async function apAddNewIngredient() {
+  const name = document.getElementById('ap-ingredient-new').value.trim();
+  if(!name) { notify('Ingredient name required','warning'); return; }
+  const res = await sbQuery(sb.from("pnd_ingredients").insert({name}).select());
+  if(res===null) return;
+  await loadIngredients();
+  apSelectedIngredients.push({id:res[0].id, name:res[0].name});
+  renderApIngredientPills();
+  cancelNewIngredient();
+  refreshIngredientDropdown();
+}
+
+function apRemoveIngredient(id) {
+  const idx = apSelectedIngredients.findIndex(x=>x.id===id);
+  if(idx>=0) apSelectedIngredients.splice(idx,1);
+  renderApIngredientPills();
+  refreshIngredientDropdown();
+}
+
+function cancelNewIngredient() {
+  document.getElementById('ap-ingredient-new-wrap').style.display = 'none';
+  document.getElementById('ap-ingredient-new').value = '';
+}
+
+function cancelNewFormulation() {
+  document.getElementById('ap-formulation').style.display = '';
+  document.getElementById('ap-formulation').value = '';
+  document.getElementById('ap-formulation-new-wrap').style.display = 'none';
+  document.getElementById('ap-formulation-new').value = '';
+}
+
 async function updateProduct(id, field, value) {
   const upd={}; upd[field]=value;
-  const result = await sbQuery(sb.from("pnd_products").update(upd).eq("id",id));
+  const result = await sbQuery(sb.from("pnd_products").update(upd).eq("id",id).select());
   if(result===null) return;
   const pr=products.find(p=>p.id===id); if(pr) pr[field]=value;
   showTick("tick-p-"+id);
+}
+
+let epSelectedIngredients = []; // for edit product modal
+
+function openEditProductModal(id) {
+  const p = products.find(x => x.id === id);
+  if(!p) return;
+  epSelectedIngredients = getProductIngredients(p.id).map(i=>({id:i.id, name:i.name}));
+  const ingOpts = '<option value="">— Add —</option>' + ingredients.filter(i=>!epSelectedIngredients.some(x=>x.id===i.id)).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('') + '<option value="__new__">+ New ingredient...</option>';
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-box" style="max-width:440px;">
+        <div class="modal-header"><div class="modal-title">Edit Product</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div style="padding:16px;">
+          <div class="form-field"><label>Product Name</label><input id="ep-name" value="${esc(p.product_name)}" style="width:100%;"></div>
+          <div class="form-field"><label>Active Ingredient(s)</label>
+            <div id="ep-ingredient-list" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="ep-ingredient-sel" style="flex:1;min-width:0;">${ingOpts}</select>
+              <button class="btn btn-primary btn-sm" type="button" onclick="epAddSelectedIngredient()" style="white-space:nowrap;padding:6px 12px;font-size:13px;font-weight:700;">+ Add</button>
+            </div>
+            <div id="ep-ingredient-new-wrap" style="display:none;margin-top:6px;"><input id="ep-ingredient-new" placeholder="New ingredient name" style="width:100%;"><div style="display:flex;gap:4px;margin-top:4px;"><button class="btn btn-primary btn-sm" onclick="epAddNewIngredient('${id}')">Add</button><button class="btn btn-outline btn-sm" onclick="epCancelNewIngredient()">Cancel</button></div></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveEditProduct('${id}')">Save</button>
+        </div>
+      </div>
+    </div>`;
+  renderEpIngredientPills();
+}
+
+function renderEpIngredientPills() {
+  const list = document.getElementById("ep-ingredient-list");
+  if(!list) return;
+  list.innerHTML = epSelectedIngredients.map(i=>`<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:3px 10px;font-size:12px;">${esc(i.name)} <span style="cursor:pointer;font-weight:700;color:#e04040;font-size:14px;line-height:1;" onclick="epRemoveIngredient('${i.id}')">&times;</span></span>`).join('');
+}
+
+function refreshEpIngredientDropdown() {
+  const sel = document.getElementById("ep-ingredient-sel");
+  if(!sel) return;
+  const usedIds = epSelectedIngredients.map(i=>i.id);
+  sel.innerHTML = '<option value="">— Add —</option>' + ingredients.filter(i=>!usedIds.includes(i.id)).map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('') + '<option value="__new__">+ New ingredient...</option>';
+}
+
+function epAddSelectedIngredient() {
+  const sel = document.getElementById("ep-ingredient-sel");
+  if(sel.value === '__new__') { sel.value=''; document.getElementById('ep-ingredient-new-wrap').style.display='block'; return; }
+  if(!sel.value) return;
+  const ing = ingredients.find(i=>i.id===sel.value);
+  if(ing && !epSelectedIngredients.some(x=>x.id===ing.id)) {
+    epSelectedIngredients.push({id:ing.id, name:ing.name});
+    renderEpIngredientPills();
+    refreshEpIngredientDropdown();
+  }
+}
+
+async function epAddNewIngredient(productId) {
+  const name = document.getElementById('ep-ingredient-new').value.trim();
+  if(!name) { notify('Ingredient name required','warning'); return; }
+  const res = await sbQuery(sb.from("pnd_ingredients").insert({name}).select());
+  if(res===null) return;
+  await loadIngredients();
+  epSelectedIngredients.push({id:res[0].id, name:res[0].name});
+  renderEpIngredientPills();
+  epCancelNewIngredient();
+  refreshEpIngredientDropdown();
+}
+
+function epCancelNewIngredient() {
+  document.getElementById('ep-ingredient-new-wrap').style.display='none';
+  document.getElementById('ep-ingredient-new').value='';
+}
+
+function epRemoveIngredient(id) {
+  const idx = epSelectedIngredients.findIndex(x=>x.id===id);
+  if(idx>=0) epSelectedIngredients.splice(idx,1);
+  renderEpIngredientPills();
+  refreshEpIngredientDropdown();
+}
+
+async function saveEditProduct(id) {
+  const newName = document.getElementById('ep-name').value.trim();
+  if(!newName) { notify('Product name required', 'warning'); return; }
+  const p = products.find(x => x.id === id);
+  if(!p) return;
+
+  // Update product name if changed
+  if(newName !== p.product_name) {
+    const result = await sbQuery(sb.from("pnd_products").update({ product_name: newName }).eq("id", id).select());
+    if(result === null) return;
+    p.product_name = newName;
+  }
+
+  // Sync ingredients: delete all, re-insert current selection
+  await sbQuery(sb.from("pnd_product_ingredients").delete().eq("product_id", id).select());
+  if(epSelectedIngredients.length) {
+    const rows = epSelectedIngredients.map(i=>({product_id:id, ingredient_id:i.id}));
+    await sbQuery(sb.from("pnd_product_ingredients").insert(rows).select());
+  }
+
+  closeModal();
+  notify('Product updated');
+  await loadProductIngredients();
+  renderProductsPage();
 }
 
 async function addProduct() {
@@ -1735,21 +2223,48 @@ async function addProduct() {
   const dAmt=document.getElementById("ap-dose-amt").value; const dAmtVal=dAmt===""?null:parseFloat(dAmt);
   const dUnit=document.getElementById("ap-dose-unit").value||null;
   const dPer=document.getElementById("ap-dose-per").value; const dPerVal=dPer===""?null:parseInt(dPer);
-  const sortOrder=parseInt(document.getElementById("ap-sort").value);
-  if(!validateRequired(["ap-name","ap-type","ap-sort"])) return;
-  if(isNaN(sortOrder)) { notify("Sort Order must be a number","warning"); return; }
-  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder}));
+  const sortOrder = products.length ? Math.max(...products.map(p => p.sort_order || 0)) + 1 : 1;
+  if(!validateRequired(["ap-name","ap-type"])) return;
+  if(!apSelectedIngredients.length) { notify("At least one active ingredient is required","warning"); return; }
+
+  // Resolve formulation: existing ID, new entry, or null
+  let formulationId = null;
+  const frmSel = document.getElementById("ap-formulation");
+  const frmNewName = document.getElementById("ap-formulation-new").value.trim();
+  if(frmNewName) {
+    const res = await sbQuery(sb.from("pnd_formulations").insert({name:frmNewName}).select());
+    if(res===null) return;
+    formulationId = res[0].id;
+    await loadFormulations();
+  } else if(frmSel.value && frmSel.value!=='__new__') {
+    formulationId = frmSel.value;
+  }
+
+  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,formulation_id:formulationId,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder}).select());
   if(result===null) return;
+
+  // Insert junction rows for selected ingredients
+  const newProductId = result[0].id;
+  if(apSelectedIngredients.length) {
+    const rows = apSelectedIngredients.map(i=>({product_id:newProductId, ingredient_id:i.id}));
+    await sbQuery(sb.from("pnd_product_ingredients").insert(rows).select());
+  }
+
   notify("Product added");
-  ["ap-name","ap-interval","ap-dose-amt","ap-dose-per","ap-sort"].forEach(id=>document.getElementById(id).value="");
-  await loadProducts(); renderProductsPage();
+  ["ap-name","ap-interval","ap-dose-amt","ap-dose-per"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("ap-formulation-new").value="";
+  apSelectedIngredients.length = 0;
+  renderApIngredientPills();
+  await Promise.all([loadProducts(), loadProductIngredients()]);
+  renderProductsPage();
+  populateAddProductDropdowns();
 }
 
 // ============================================================
 // REPORTS PAGE
 // ============================================================
 const REPORTS = [
-  {id:1,name:"By Single Block"},{id:2,name:"By Multiple Blocks"},{id:3,name:"By Product"},
+  {id:1,name:"By Single Block"},{id:2,name:"By Multiple Blocks"},{id:3,name:"By Product"},{id:11,name:"By Active Ingredient"},
   {id:4,name:"By Date Range"},{id:5,name:"By Month"},{id:6,name:"Overdue"},
   {id:7,name:"Compliance"},{id:8,name:"Product Consumption"},{id:9,name:"Worker Activity"},{id:10,name:"Job Status"}
 ];
@@ -1785,6 +2300,7 @@ function renderReportFilters(id) {
   const d90=new Date(); d90.setDate(d90.getDate()-90); const d90s=d90.getFullYear()+"-"+String(d90.getMonth()+1).padStart(2,"0")+"-"+String(d90.getDate()).padStart(2,"0");
   const m1=yr+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-01";
 
+  const ingOpts=ingredients.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("");
   const filters = {
     1: `<select id="rf-block">${blockOpts}</select>`,
     2: `<div style="max-height:200px;overflow-y:auto;background:var(--bg-input);padding:8px;border-radius:8px;border:1px solid var(--border);">${blocks.map(b=>`<label style="display:block;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="rf-blocks-cb" value="${b.id}"> ${esc(b.block_name)}</label>`).join("")}</div>`,
@@ -1795,7 +2311,8 @@ function renderReportFilters(id) {
     7: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
     8: `<div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="rf-product">${prodOpts}</select><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
     9: `<div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="rf-worker">${workerOpts}</select><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
-    10: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${m1}"><input type="date" id="rf-to" value="${today}"></div>`
+    10: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${m1}"><input type="date" id="rf-to" value="${today}"></div>`,
+    11: `<select id="rf-ingredient">${ingOpts}</select>`
   };
   el.innerHTML = filters[id]||'';
 }
@@ -1809,16 +2326,16 @@ async function generateReport() {
     const blockId=document.getElementById("rf-block").value;
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("block_id",blockId).order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Date Completed","Product","Next Spray Date","Interval (days)","Notes","Logged By"];
-    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",r.notes||"",r.logged_by||""]);
+    cols=["Date Completed","Product","Active Ingredient(s)","Next Spray Date","Interval (days)","Notes","Logged By"];
+    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",r.notes||"",r.logged_by||""];});
   } else if(id===2) {
     const cbs=document.querySelectorAll(".rf-blocks-cb:checked");
     const ids=[...cbs].map(c=>c.value);
     if(!ids.length){notify("Select at least one block","warning");return;}
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids).order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Block","Date Completed","Product","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>[r.pnd_blocks?.block_name,fmtDate(r.date_completed),r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    cols=["Block","Date Completed","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
+    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [r.pnd_blocks?.block_name,fmtDate(r.date_completed),r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
   } else if(id===3) {
     const prodId=document.getElementById("rf-product").value;
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("product_id",prodId).order("date_completed",{ascending:false}));
@@ -1829,8 +2346,8 @@ async function generateReport() {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Date Completed","Block","Product","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
+    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
   } else if(id===5) {
     const m=parseInt(document.getElementById("rf-month").value), y=parseInt(document.getElementById("rf-year").value);
     const from=y+"-"+String(m).padStart(2,"0")+"-01";
@@ -1838,17 +2355,18 @@ async function generateReport() {
     const to=y+"-"+String(m).padStart(2,"0")+"-"+lastDay;
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Date Completed","Block","Product","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
+    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
+    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
   } else if(id===6) {
     const map={};
     latestSprays.forEach(ls=>{if(ls.next_spray_date && ls.next_spray_date<today) map[ls.block_id+"_"+ls.product_id]=ls;});
-    cols=["Block","Product","Last Spray","Next Spray Date","Days Overdue"];
+    cols=["Block","Product","Active Ingredient(s)","Last Spray","Next Spray Date","Days Overdue"];
     rows=Object.values(map).map(ls=>{
       const b=getBlock(ls.block_id),p=getProduct(ls.product_id);
+      const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';
       const daysOver=daysDiff(ls.next_spray_date,today);
-      return [b?.block_name||"?",p?.product_name||"?",fmtDate(ls.date_completed),fmtDate(ls.next_spray_date),daysOver];
-    }).sort((a,b)=>(b[4]||0)-(a[4]||0));
+      return [b?.block_name||"?",p?.product_name||"?",ais,fmtDate(ls.date_completed),fmtDate(ls.next_spray_date),daysOver];
+    }).sort((a,b)=>(b[5]||0)-(a[5]||0));
   } else if(id===7) {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
     const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:true}));
@@ -1896,6 +2414,20 @@ async function generateReport() {
       const b=getBlock(j.block_id),p=getProduct(j.product_id);
       return [fmtDate(j.planned_date),b?.block_name,p?.product_name,j.worker_name,j.status,fmtDate(j.completion_date),j.notes||""];
     });
+  } else if(id===11) {
+    const ingId=document.getElementById("rf-ingredient").value;
+    const ing=ingredients.find(i=>i.id===ingId);
+    if(ing) title="By Active Ingredient: "+ing.name;
+    // Find all products that have this ingredient
+    const matchProdIds = productIngredients.filter(pi=>pi.ingredient_id===ingId).map(pi=>pi.product_id);
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("product_id",matchProdIds).order("date_completed",{ascending:false}));
+    if(!data) return;
+    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
+    rows=data.map(r=>{
+      const p=getProduct(r.product_id);
+      const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';
+      return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];
+    });
   }
 
   reportData={cols,rows,title};
@@ -1906,7 +2438,7 @@ async function generateReport() {
   else rows.forEach(r=>{
     html+='<tr>'+r.map((c,i)=>{
       let style="";
-      if(id===6 && i===4) style='style="color:var(--red);font-weight:700;"';
+      if(id===6 && i===5) style='style="color:var(--red);font-weight:700;"';
       if(id===7 && i===4) { if(c==="On Time") style='style="color:var(--green-light);font-weight:700;"'; else if(c==="Exceeded") style='style="color:var(--red);font-weight:700;"'; else style='style="color:var(--text-dim);"'; }
       return '<td '+style+'>'+esc(String(c??""))+'</td>';
     }).join("")+'</tr>';

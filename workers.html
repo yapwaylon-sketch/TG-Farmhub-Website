@@ -146,7 +146,7 @@
     <!-- WORKERS PAGE -->
     <div id="page-workers" class="page active">
       <div class="page-header">
-        <h1 class="page-title">Workers</h1>
+        <h1 class="page-title" id="workers-page-title">Workers Management</h1>
         <div style="display:flex;gap:10px;align-items:center;">
           <div class="search-box" style="width:200px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -158,7 +158,7 @@
       <div class="stat-grid" id="worker-stats"></div>
       <div class="card">
         <table class="data-table">
-          <thead><tr><th onclick="sortWorkers('name')" style="cursor:pointer;">Name <span id="sort-name"></span></th><th onclick="sortWorkers('gender')" style="cursor:pointer;">Gender <span id="sort-gender"></span></th><th onclick="sortWorkers('pay_rate')" style="cursor:pointer;">Pay Rate <span id="sort-pay_rate"></span></th><th onclick="sortWorkers('role')" style="cursor:pointer;">Role <span id="sort-role"></span></th><th onclick="sortWorkers('tenure')" style="cursor:pointer;">Tenure <span id="sort-tenure"></span></th><th onclick="sortWorkers('loan')" style="cursor:pointer;">Loan <span id="sort-loan"></span></th><th onclick="sortWorkers('active')" style="cursor:pointer;">Status <span id="sort-active"></span></th><th></th></tr></thead>
+          <thead><tr><th onclick="sortWorkers('name')" style="cursor:pointer;">Name <span id="sort-name"></span></th><th onclick="sortWorkers('gender')" style="cursor:pointer;">Gender <span id="sort-gender"></span></th><th onclick="sortWorkers('pay_rate')" style="cursor:pointer;">Pay Rate <span id="sort-pay_rate"></span></th><th onclick="sortWorkers('role')" style="cursor:pointer;">Role <span id="sort-role"></span></th><th onclick="sortWorkers('tenure')" style="cursor:pointer;">Tenure <span id="sort-tenure"></span></th><th onclick="sortWorkers('advance')" style="cursor:pointer;">Advances <span id="sort-advance"></span></th><th onclick="sortWorkers('loan')" style="cursor:pointer;">Loan <span id="sort-loan"></span></th><th onclick="sortWorkers('active')" style="cursor:pointer;">Status <span id="sort-active"></span></th><th></th></tr></thead>
           <tbody id="worker-tbody"></tbody>
         </table>
       </div>
@@ -184,6 +184,18 @@
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:14px;font-weight:700;color:var(--white);margin-bottom:14px;">Employment History</div>
         <div id="profile-stints"></div>
+      </div>
+
+      <!-- Salary Advances -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white);">Advances & Purchases</div>
+            <div style="font-size:12px;color:var(--text-muted);">Pending Total: <strong id="profile-advance-total" style="color:var(--gold);">RM 0.00</strong></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openNewAdvanceModal()">+ Record</button>
+        </div>
+        <div id="profile-advances"></div>
       </div>
 
       <!-- Loans -->
@@ -456,6 +468,32 @@
   </div>
 </div>
 
+<!-- SALARY ADVANCE MODAL -->
+<div id="advance-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title" id="advance-modal-title">Give Salary Advance</h3>
+      <button class="modal-close" onclick="closeModal('advance-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div id="advance-warning" style="display:none;background:rgba(232,160,32,0.15);border:1px solid var(--gold);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--gold);"></div>
+    <div class="form-field"><label>Category</label><select id="advance-category">
+      <option value="Canteen">Canteen</option>
+      <option value="Cigarettes">Cigarettes</option>
+      <option value="Salary Advance" selected>Salary Advance</option>
+    </select></div>
+    <div class="form-row">
+      <div class="form-field"><label>Amount (RM)</label><input type="number" id="advance-amount" step="1" placeholder="e.g. 200" oninput="checkAdvanceWarning()"></div>
+      <div class="form-field"><label>Date</label><input type="date" id="advance-date"></div>
+    </div>
+    <div class="form-field"><label>Deduct From Period</label><select id="advance-period"></select></div>
+    <div class="form-field"><label>Reason (optional)</label><input type="text" id="advance-reason" placeholder="e.g. rice, cooking oil..."></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('advance-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAdvance()">Give Advance</button>
+    </div>
+  </div>
+</div>
+
 <!-- REPAYMENT MODAL -->
 <div id="repay-modal" class="modal-overlay" style="display:none;">
 
@@ -569,14 +607,21 @@
     <!-- Section: Deductions -->
     <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);">
       <div style="font-size:12px;font-weight:700;color:var(--critical);margin-bottom:10px;">DEDUCTIONS</div>
+      <div id="pe-advance-breakdown" style="margin-bottom:10px;"></div>
       <div class="form-row">
-        <div class="form-field"><label>Salary Advance</label><input type="number" id="pe-dadv" step="1" oninput="calcPayroll()"></div>
-        <div class="form-field"><label>Shop / Store</label><input type="number" id="pe-dshop" step="1" oninput="calcPayroll()"></div>
+        <div class="form-field"><label>Canteen</label><input type="number" id="pe-d-canteen" step="1" oninput="calcPayroll()"></div>
+        <div class="form-field"><label>Cigarettes</label><input type="number" id="pe-d-cigs" step="1" oninput="calcPayroll()"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Salary Advance</label><input type="number" id="pe-d-advance" step="1" oninput="calcPayroll()"></div>
+        <div class="form-field"><label>Overpayment (prev)</label><input type="number" id="pe-d-overpay" step="1" oninput="calcPayroll()"></div>
       </div>
       <div class="form-row">
         <div class="form-field"><label>Other</label><input type="number" id="pe-dother" step="1" oninput="calcPayroll()"></div>
         <div class="form-field"><label>Other Deduction Note</label><input type="text" id="pe-dothernote" placeholder="Describe other deduction..."></div>
       </div>
+      <input type="hidden" id="pe-dadv">
+      <input type="hidden" id="pe-dshop">
       <div style="text-align:right;font-weight:700;color:var(--critical);">Total Deductions: RM <span id="pe-deducttotal">0.00</span></div>
     </div>
 
@@ -585,6 +630,13 @@
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Pay</span><span id="pe-totalpay" style="font-weight:700;">RM 0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Deductions</span><span id="pe-deductsummary" style="color:var(--critical);font-weight:700;">- RM 0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;color:var(--gold);border-top:1px solid var(--border);padding-top:8px;margin-top:8px;"><span>Final Pay</span><span id="pe-finalpay">RM 0.00</span></div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">
+        <div class="form-row" style="margin-bottom:0;">
+          <div class="form-field" style="margin-bottom:0;"><label>Cash Handed (RM)</label><input type="number" id="pe-cashhanded" step="1" oninput="calcOverpayment()" placeholder="e.g. 1550"></div>
+          <div class="form-field" style="margin-bottom:0;"><label>Overpayment (auto)</label><input type="text" id="pe-overpay-result" readonly style="color:var(--gold);"></div>
+        </div>
+        <div id="pe-overpay-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none;"></div>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -659,6 +711,7 @@ let taskUnits = [];
 let workerLoans = [];
 let loanRepayments = [];
 let employmentStints = [];
+let salaryAdvances = [];
 let profileWorkerId = null;
 let workerSortCol = 'name';
 let workerSortAsc = true;
@@ -666,6 +719,7 @@ let currentUser = null;
 let currentPage = "workers";
 let currentPeriodId = null;
 let users = [];
+const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 
 // ============================================================
 // HELPERS — notify, closeModal, fmtNum2, fmtDate, dbNextId
@@ -832,6 +886,22 @@ function getWorkerLoanBalance(workerId) {
   return workerLoans.filter(l => l.worker_id === workerId && l.status === "active").reduce((s, l) => s + (parseFloat(l.balance) || 0), 0);
 }
 
+function getWorkerPendingAdvances(workerId) {
+  return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+}
+
+function getWorkerPendingAdvancesForPeriod(workerId, periodId) {
+  return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending' && a.period_id === periodId).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+}
+
+function getCurrentPeriodId() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const match = payrollPeriods.find(p => p.year === y && p.month === m);
+  return match ? match.id : (payrollPeriods.length > 0 ? payrollPeriods[0].id : null);
+}
+
 // ============================================================
 // DATA LOADING
 // ============================================================
@@ -841,7 +911,7 @@ async function loadAllData() {
     return data || [];
   }
 
-  const [w, tt, rt, pp, wr, tu, wl, lr, es] = await Promise.all([
+  const [w, tt, rt, pp, wr, tu, wl, lr, es, sa] = await Promise.all([
     safeLoad(sb.from("workers").select("*").order("name")),
     safeLoad(sb.from("task_types").select("*").order("sort_order")),
     safeLoad(sb.from("responsibility_types").select("*").order("name")),
@@ -851,10 +921,12 @@ async function loadAllData() {
     safeLoad(sb.from("worker_loans").select("*").order("date_issued", { ascending: false })),
     safeLoad(sb.from("loan_repayments").select("*").order("date", { ascending: false })),
     safeLoad(sb.from("employment_stints").select("*").order("start_date", { ascending: false })),
+    safeLoad(sb.from("salary_advances").select("*").order("date_given", { ascending: false })),
   ]);
   workers = w; taskTypes = tt; responsibilityTypes = rt; payrollPeriods = pp;
   workerRoles = wr; taskUnits = tu; workerLoans = wl; loanRepayments = lr; employmentStints = es;
-  console.log("Data loaded:", { workers: workers.length, loans: workerLoans.length, stints: employmentStints.length });
+  salaryAdvances = sa;
+  console.log("Data loaded:", { workers: workers.length, loans: workerLoans.length, stints: employmentStints.length, advances: salaryAdvances.length });
 }
 
 // ============================================================
@@ -867,6 +939,11 @@ function sortWorkers(col) {
 }
 
 function renderWorkerList() {
+  // Update page title with current month
+  const now = new Date();
+  const titleEl = document.getElementById("workers-page-title");
+  if (titleEl) titleEl.textContent = "Workers Management — " + MONTH_NAMES[now.getMonth() + 1] + " " + now.getFullYear();
+
   const search = (document.getElementById("worker-search").value || "").toLowerCase();
   var filtered = workers.filter(w => !search || w.name.toLowerCase().includes(search));
   const active = workers.filter(w => w.active);
@@ -881,31 +958,43 @@ function renderWorkerList() {
       case "pay_rate": return ((parseFloat(a.pay_rate)||0) - (parseFloat(b.pay_rate)||0)) * dir;
       case "role": va = (a.role||"").toLowerCase(); vb = (b.role||"").toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
       case "tenure": var sa2 = getCurrentStint(a.id), sb2 = getCurrentStint(b.id); va = sa2 ? new Date(sa2.start_date).getTime() : 0; vb = sb2 ? new Date(sb2.start_date).getTime() : 0; return (va - vb) * dir;
+      case "advance": return (getWorkerPendingAdvances(a.id) - getWorkerPendingAdvances(b.id)) * dir;
       case "loan": return (getWorkerLoanBalance(a.id) - getWorkerLoanBalance(b.id)) * dir;
       case "active": va = a.active ? 0 : 1; vb = b.active ? 0 : 1; return (va - vb) * dir;
       default: return 0;
     }
   });
 
+  const pendingAdv = salaryAdvances.filter(a => a.status === 'pending');
+  const advCanteen = pendingAdv.filter(a => a.category === 'Canteen').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  const advCigs = pendingAdv.filter(a => a.category === 'Cigarettes').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  const advSalary = pendingAdv.filter(a => a.category === 'Salary Advance').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  const advOverpay = pendingAdv.filter(a => a.category === 'Overpayment').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  const advTotal = advCanteen + advCigs + advSalary + advOverpay;
   document.getElementById("worker-stats").innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Workers</div><div class="stat-value">${workers.length}</div></div>
     <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:var(--good);">${active.length}</div></div>
     <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:var(--critical);">${workers.length - active.length}</div></div>
     <div class="stat-card"><div class="stat-label">Avg Pay Rate</div><div class="stat-value">RM ${active.length ? fmtNum2(active.reduce((s,w) => s + (parseFloat(w.pay_rate)||0), 0) / active.length) : "0.00"}</div></div>
+    <div class="stat-card"><div class="stat-label">Canteen</div><div class="stat-value" style="color:${advCanteen > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advCanteen)}</div></div>
+    <div class="stat-card"><div class="stat-label">Cigarettes</div><div class="stat-value" style="color:${advCigs > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advCigs)}</div></div>
+    <div class="stat-card"><div class="stat-label">Salary Advance</div><div class="stat-value" style="color:${advSalary > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advSalary)}</div></div>
+    <div class="stat-card"><div class="stat-label">Overpayment</div><div class="stat-value" style="color:${advOverpay > 0 ? 'var(--text-muted)' : 'var(--text-dim)'};">RM ${fmtNum2(advOverpay)}</div></div>
   `;
 
   // Sort indicators
-  ["name","gender","pay_rate","role","tenure","loan","active"].forEach(function(c) {
+  ["name","gender","pay_rate","role","tenure","advance","loan","active"].forEach(function(c) {
     var el = document.getElementById("sort-" + c);
     if (el) el.textContent = workerSortCol === c ? (workerSortAsc ? "\u25B2" : "\u25BC") : "";
   });
 
   const tbody = document.getElementById("worker-tbody");
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:40px;">No workers found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:40px;">No workers found</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(w => {
+    const advBal = getWorkerPendingAdvances(w.id);
     const loanBal = getWorkerLoanBalance(w.id);
     return `
     <tr onclick="openWorkerProfile('${w.id}')" style="cursor:pointer;">
@@ -914,6 +1003,7 @@ function renderWorkerList() {
       <td>RM ${fmtNum2(w.pay_rate)}</td>
       <td style="color:var(--text-muted);">${w.role || '—'}</td>
       <td style="font-size:11px;color:var(--text-muted);">${getWorkerTenure(w.id)}</td>
+      <td>${advBal > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(advBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td>${loanBal > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmtNum2(loanBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td><span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span></td>
       <td style="text-align:right;" onclick="event.stopPropagation();">
@@ -1624,8 +1714,10 @@ function renderPayrollEntries() {
     payrollEntries.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
     for (const pe of payrollEntries) {
       const isPaid = (pe.payment_status || "unpaid") === "paid";
+      const pendAdv = getWorkerPendingAdvancesForPeriod(pe.worker_id, currentPeriodId);
+      const advIndicator = pendAdv > 0 ? ' <span style="font-size:10px;color:var(--gold);font-weight:400;" title="Pending salary advance">⚠ RM ' + fmtNum2(pendAdv) + ' adv</span>' : '';
       html += '<tr>';
-      html += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + '</td>';
+      html += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + advIndicator + '</td>';
       html += '<td>' + (pe.days_worked || 0) + '</td>';
       html += '<td>RM ' + fmtNum2(pe.daily_wage) + '</td>';
       html += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmtNum2(pe.ot_pay) : '—') + '</td>';
@@ -1787,11 +1879,35 @@ function openPayrollEntry(peId) {
   entryResps.forEach(pr => { peRespData.push({ name: pr.responsibility_name, rate: parseFloat(pr.rate) || 0 }); });
   renderRespRows();
 
-  // Deductions
-  document.getElementById("pe-dadv").value = pe.deduct_advance || "";
-  document.getElementById("pe-dshop").value = pe.deduct_shop || "";
+  // Deductions — auto-populate 4 advance categories from pending salary advances
+  const ADVANCE_CATS = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment'];
+  const catFieldMap = { 'Canteen': 'pe-d-canteen', 'Cigarettes': 'pe-d-cigs', 'Salary Advance': 'pe-d-advance', 'Overpayment': 'pe-d-overpay' };
+  const pendingForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'pending' && a.period_id === currentPeriodId);
+  const hasSavedDeductions = (pe.deduct_advance > 0) || (pe.deduct_shop > 0);
+
+  ADVANCE_CATS.forEach(cat => {
+    const fieldId = catFieldMap[cat];
+    const pendingSum = pendingForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+    // Auto-populate only if no saved deductions yet
+    document.getElementById(fieldId).value = !hasSavedDeductions && pendingSum > 0 ? pendingSum : "";
+  });
+
+  // If there are saved deductions, try to restore from advances that were already deducted
+  if (hasSavedDeductions) {
+    const deductedForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === currentPeriodId);
+    ADVANCE_CATS.forEach(cat => {
+      const fieldId = catFieldMap[cat];
+      const catSum = deductedForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+      if (catSum > 0) document.getElementById(fieldId).value = catSum;
+    });
+  }
+
+  renderAdvanceBreakdown(pe.worker_id);
   document.getElementById("pe-dother").value = pe.deduct_other || "";
   document.getElementById("pe-dothernote").value = pe.deduct_other_note || "";
+  document.getElementById("pe-cashhanded").value = pe.cash_handed || "";
+  document.getElementById("pe-overpay-result").value = "";
+  document.getElementById("pe-overpay-note").style.display = "none";
 
   // Task (Contract) entries
   const workerTasks = taskEntries.filter(te => te.payroll_entry_id === peId);
@@ -1863,11 +1979,16 @@ function calcPayroll() {
   for (const tid in peTaskData) { taskTotal += peTaskData[tid].total || 0; }
   document.getElementById("pe-tasktotal").textContent = fmtNum2(taskTotal);
 
-  // Deductions
-  const dAdv = parseFloat(document.getElementById("pe-dadv").value) || 0;
-  const dShop = parseFloat(document.getElementById("pe-dshop").value) || 0;
+  // Deductions — 4 advance categories + other
+  const dCanteen = parseFloat(document.getElementById("pe-d-canteen").value) || 0;
+  const dCigs = parseFloat(document.getElementById("pe-d-cigs").value) || 0;
+  const dAdvance = parseFloat(document.getElementById("pe-d-advance").value) || 0;
+  const dOverpay = parseFloat(document.getElementById("pe-d-overpay").value) || 0;
   const dOther = parseFloat(document.getElementById("pe-dother").value) || 0;
-  const totalDeduct = dAdv + dShop + dOther;
+  const totalDeduct = dCanteen + dCigs + dAdvance + dOverpay + dOther;
+  // Keep hidden fields in sync for backward compat
+  document.getElementById("pe-dadv").value = dCanteen + dCigs + dAdvance + dOverpay;
+  document.getElementById("pe-dshop").value = 0;
   document.getElementById("pe-deducttotal").textContent = fmtNum2(totalDeduct);
 
   // Totals
@@ -1876,6 +1997,28 @@ function calcPayroll() {
   document.getElementById("pe-totalpay").textContent = "RM " + fmtNum2(totalPay);
   document.getElementById("pe-deductsummary").textContent = "- RM " + fmtNum2(totalDeduct);
   document.getElementById("pe-finalpay").textContent = "RM " + fmtNum2(finalPay);
+  calcOverpayment();
+}
+
+function calcOverpayment() {
+  const cashHanded = parseFloat(document.getElementById("pe-cashhanded").value) || 0;
+  const finalPayText = document.getElementById("pe-finalpay").textContent.replace(/[^0-9.]/g, "");
+  const finalPay = parseFloat(finalPayText) || 0;
+  const resultEl = document.getElementById("pe-overpay-result");
+  const noteEl = document.getElementById("pe-overpay-note");
+
+  if (cashHanded > 0 && cashHanded > finalPay) {
+    const overpay = cashHanded - finalPay;
+    resultEl.value = "RM " + fmtNum2(overpay);
+    noteEl.textContent = "RM " + fmtNum2(overpay) + " will be carried to next month as Overpayment advance";
+    noteEl.style.display = "block";
+  } else if (cashHanded > 0 && cashHanded === finalPay) {
+    resultEl.value = "RM 0.00 — Exact";
+    noteEl.style.display = "none";
+  } else {
+    resultEl.value = "";
+    noteEl.style.display = "none";
+  }
 }
 
 async function savePayrollEntry() {
@@ -1891,11 +2034,16 @@ async function savePayrollEntry() {
 
   const respTotal = peRespData.reduce((s, r) => s + (r.rate || 0), 0);
 
-  const dAdv = parseFloat(document.getElementById("pe-dadv").value) || 0;
-  const dShop = parseFloat(document.getElementById("pe-dshop").value) || 0;
+  const dCanteen = parseFloat(document.getElementById("pe-d-canteen").value) || 0;
+  const dCigs = parseFloat(document.getElementById("pe-d-cigs").value) || 0;
+  const dAdvance = parseFloat(document.getElementById("pe-d-advance").value) || 0;
+  const dOverpay = parseFloat(document.getElementById("pe-d-overpay").value) || 0;
+  const dAdv = dCanteen + dCigs + dAdvance + dOverpay;
+  const dShop = 0;
   const dOther = parseFloat(document.getElementById("pe-dother").value) || 0;
   const dOtherNote = document.getElementById("pe-dothernote").value.trim();
-  const totalDeduct = dAdv + dShop + dOther;
+  const cashHanded = parseFloat(document.getElementById("pe-cashhanded").value) || 0;
+  const totalDeduct = dAdv + dOther;
 
   let taskTotal = 0;
   for (const tid in peTaskData) { taskTotal += peTaskData[tid].total || 0; }
@@ -1920,12 +2068,51 @@ async function savePayrollEntry() {
     deduct_advance: dAdv, deduct_loan: 0, deduct_shop: dShop, deduct_other: dOther,
     deduct_other_note: dOtherNote, total_deductions: totalDeduct,
     task_total: taskTotal, total_pay: totalPay, final_pay: finalPay,
+    cash_handed: cashHanded,
     updated_at: new Date().toISOString(),
   };
 
   var result = await sbQuery(sb.from("payroll_entries").update(updateData).eq("id", peId));
   if (result === null) return;
   Object.assign(pe, updateData);
+
+  // Mark pending salary advances as deducted for this worker+period
+  if (dAdv > 0) {
+    const pendingAdv = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'pending' && a.period_id === currentPeriodId);
+    for (const adv of pendingAdv) {
+      await sbQuery(sb.from("salary_advances").update({ status: 'deducted' }).eq("id", adv.id).select());
+      adv.status = 'deducted';
+    }
+  }
+
+  // Auto-create Overpayment advance for next month if cash handed > final pay
+  if (cashHanded > 0 && cashHanded > finalPay) {
+    const overpayAmt = cashHanded - finalPay;
+    // Find or create next month's period
+    const curPeriod = payrollPeriods.find(p => p.id === currentPeriodId);
+    let nextPeriodId = null;
+    if (curPeriod) {
+      const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
+      const nextYear = curPeriod.month === 12 ? curPeriod.year + 1 : curPeriod.year;
+      const nextP = payrollPeriods.find(p => p.year === nextYear && p.month === nextMonth);
+      nextPeriodId = nextP ? nextP.id : currentPeriodId; // fallback to current if next doesn't exist
+    }
+    // Remove any existing overpayment advance we previously created for this worker+next period from this save
+    const existingOp = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Overpayment' && a.status === 'pending' && a.period_id === nextPeriodId && a.reason && a.reason.startsWith('Cash overpayment from'));
+    if (existingOp) {
+      await sbQuery(sb.from("salary_advances").update({ amount: overpayAmt }).eq("id", existingOp.id).select());
+      existingOp.amount = overpayAmt;
+    } else {
+      const opId = await dbNextId("SA");
+      const opData = {
+        id: opId, worker_id: pe.worker_id, amount: overpayAmt, date_given: new Date().toISOString().slice(0, 10),
+        period_id: nextPeriodId, reason: 'Cash overpayment from ' + (curPeriod ? MONTH_NAMES[curPeriod.month] : '') + ' payroll',
+        category: 'Overpayment', status: 'pending', created_at: new Date().toISOString()
+      };
+      await sbQuery(sb.from("salary_advances").insert(opData).select());
+      salaryAdvances.unshift(opData);
+    }
+  }
 
   // Sync pay rate to worker profile
   const w = workers.find(x => x.id === pe.worker_id);
@@ -2032,12 +2219,22 @@ function openPaySlip(peId) {
   html += '<tr class="slip-total-row"><td colspan="2" style="text-align:right;">Total Earnings</td><td style="text-align:right;">RM ' + fmtNum2(totalEarnings) + '</td></tr>';
   html += '</tbody></table>';
 
-  // Deductions
+  // Deductions — show per-category breakdown from salary_advances
   const hasDeductions = (pe.deduct_advance || 0) + (pe.deduct_loan || 0) + (pe.deduct_shop || 0) + (pe.deduct_other || 0) > 0;
   if (hasDeductions) {
     html += '<div class="slip-section-title">Deductions</div>';
     html += '<table><thead><tr><th>Description</th><th style="text-align:right;">Amount (RM)</th></tr></thead><tbody>';
-    if ((pe.deduct_advance || 0) > 0) html += '<tr><td>Salary Advance</td><td style="text-align:right;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
+    // Get deducted advances for this period to show category breakdown
+    const slipAdvances = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === pe.period_id);
+    const slipCats = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment'];
+    slipCats.forEach(cat => {
+      const catTotal = slipAdvances.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+      if (catTotal > 0) html += '<tr><td>' + cat + '</td><td style="text-align:right;">' + fmtNum2(catTotal) + '</td></tr>';
+    });
+    // Fallback: if no advance records but deduct_advance > 0, show as lump
+    if (slipAdvances.length === 0 && (pe.deduct_advance || 0) > 0) {
+      html += '<tr><td>Advances</td><td style="text-align:right;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
+    }
     if ((pe.deduct_loan || 0) > 0) html += '<tr><td>Loan Repayment</td><td style="text-align:right;">' + fmtNum2(pe.deduct_loan) + '</td></tr>';
     if ((pe.deduct_shop || 0) > 0) html += '<tr><td>Shop / Store</td><td style="text-align:right;">' + fmtNum2(pe.deduct_shop) + '</td></tr>';
     if ((pe.deduct_other || 0) > 0) html += '<tr><td>Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="text-align:right;">' + fmtNum2(pe.deduct_other) + '</td></tr>';
@@ -2135,6 +2332,8 @@ async function renderWorkerProfile() {
     detailsHtml += '<div><div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Financial Info</div>';
     detailsHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;">';
     detailsHtml += detailRow("Outstanding Loans", loanBal > 0 ? '<strong style="color:var(--critical);">RM ' + fmtNum2(loanBal) + '</strong>' : '<span style="color:var(--good);">No outstanding loans</span>');
+    const advBal = getWorkerPendingAdvances(w.id);
+    detailsHtml += detailRow("Pending Advances", advBal > 0 ? '<strong style="color:var(--gold);">RM ' + fmtNum2(advBal) + '</strong>' : '<span style="color:var(--text-dim);">No pending advances</span>');
     detailsHtml += '</div></div>';
 
     document.getElementById("profile-details").innerHTML = detailsHtml;
@@ -2144,6 +2343,7 @@ async function renderWorkerProfile() {
   }
 
   // Render sub-sections with individual error handling
+  try { renderProfileAdvances(); } catch(e) { console.error("Advances render error:", e); }
   try { renderProfileLoans(); } catch(e) { console.error("Loans render error:", e); }
   try { renderProfileStints(); } catch(e) { console.error("Stints render error:", e); }
   try { await renderProfilePayHistory(); } catch(e) { console.error("Pay history render error:", e); }
@@ -2285,6 +2485,191 @@ async function renderProfilePayHistory() {
   html += '<td style="color:var(--critical);">RM ' + fmtNum2(totalDeduct) + '</td>';
   html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(totalNet) + '</td></tr></tbody></table>';
   document.getElementById("profile-payhistory").innerHTML = html;
+}
+
+// ============================================================
+// SALARY ADVANCE CRUD
+// ============================================================
+function renderProfileAdvances() {
+  const totalEl = document.getElementById("profile-advance-total");
+  const container = document.getElementById("profile-advances");
+  if (!totalEl || !container || !profileWorkerId) return;
+  const isAdmin = currentUser && currentUser.role === "admin";
+
+  const wAdvances = salaryAdvances.filter(a => a.worker_id === profileWorkerId).sort((a, b) => {
+    if (a.status === 'pending' && b.status !== 'pending') return -1;
+    if (a.status !== 'pending' && b.status === 'pending') return 1;
+    return (b.date_given || "").localeCompare(a.date_given || "");
+  });
+
+  const pendingTotal = wAdvances.filter(a => a.status === 'pending').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  totalEl.textContent = "RM " + fmtNum2(pendingTotal);
+
+  if (wAdvances.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:12px 0;">No salary advances on record</div>';
+    return;
+  }
+
+  container.innerHTML = wAdvances.map(a => {
+    const isPending = a.status === 'pending';
+    const period = payrollPeriods.find(p => p.id === a.period_id);
+    const periodLabel = period ? MONTH_NAMES[period.month] + ' ' + period.year : (a.period_id || '—');
+
+    let html = '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;margin-bottom:6px;border-left:3px solid ' + (isPending ? 'var(--gold)' : 'var(--good)') + ';">';
+    html += '<div style="flex:1;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(232,160,32,0.15);color:var(--gold);font-weight:600;">' + (a.category || 'Advance') + '</span>';
+    html += '<span style="font-weight:700;color:var(--white);">RM ' + fmtNum2(a.amount) + '</span>';
+    html += '<span class="badge ' + (isPending ? 'badge-inactive' : 'badge-active') + '">' + (isPending ? 'Pending' : 'Deducted') + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--text-muted);">';
+    html += fmtDate(a.date_given) + ' · For: ' + periodLabel;
+    if (a.reason) html += ' · ' + a.reason;
+    html += '</div>';
+    html += '</div>';
+    if (isPending && isAdmin) {
+      html += '<div style="display:flex;gap:4px;">';
+      html += '<button class="btn btn-outline btn-sm" onclick="openEditAdvanceModal(\'' + a.id + '\')">Edit</button>';
+      html += '<button class="btn btn-danger btn-sm" onclick="deleteAdvance(\'' + a.id + '\')">Delete</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }).join("");
+}
+
+function openNewAdvanceModal() {
+  document.getElementById("advance-amount").value = "";
+  document.getElementById("advance-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("advance-reason").value = "";
+  document.getElementById("advance-category").value = "Salary Advance";
+  document.getElementById("advance-modal").dataset.editId = "";
+  document.getElementById("advance-modal-title").textContent = "Record Advance / Purchase";
+  document.getElementById("advance-warning").style.display = "none";
+
+  // Populate period dropdown — open periods only, default to current month
+  const openPeriods = payrollPeriods.filter(p => p.status !== 'closed').sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month));
+  const curPeriodId = getCurrentPeriodId();
+  document.getElementById("advance-period").innerHTML = openPeriods.map(p =>
+    '<option value="' + p.id + '"' + (p.id === curPeriodId ? ' selected' : '') + '>' + MONTH_NAMES[p.month] + ' ' + p.year + '</option>'
+  ).join("");
+
+  document.getElementById("advance-modal").style.display = "flex";
+}
+
+function checkAdvanceWarning() {
+  const warningEl = document.getElementById("advance-warning");
+  if (!profileWorkerId) { warningEl.style.display = "none"; return; }
+  const w = workers.find(x => x.id === profileWorkerId);
+  if (!w || !w.pay_rate || parseFloat(w.pay_rate) <= 0) { warningEl.style.display = "none"; return; }
+
+  const newAmount = parseFloat(document.getElementById("advance-amount").value) || 0;
+  const existingPending = getWorkerPendingAdvances(profileWorkerId);
+  // If editing, subtract the original amount
+  const editId = document.getElementById("advance-modal").dataset.editId || "";
+  let editOriginal = 0;
+  if (editId) {
+    const orig = salaryAdvances.find(a => a.id === editId);
+    if (orig) editOriginal = parseFloat(orig.amount) || 0;
+  }
+  const cumulative = existingPending - editOriginal + newAmount;
+  const estimatedSalary = parseFloat(w.pay_rate) * 26;
+  const threshold = estimatedSalary * 0.5;
+
+  if (cumulative > threshold && newAmount > 0) {
+    warningEl.innerHTML = '⚠ Total advances (RM ' + fmtNum2(cumulative) + ') exceed 50% of estimated monthly salary (RM ' + fmtNum2(estimatedSalary) + ')';
+    warningEl.style.display = "block";
+  } else {
+    warningEl.style.display = "none";
+  }
+}
+
+async function saveAdvance() {
+  const editId = document.getElementById("advance-modal").dataset.editId || "";
+  const amount = parseFloat(document.getElementById("advance-amount").value) || 0;
+  const date_given = document.getElementById("advance-date").value;
+  const period_id = document.getElementById("advance-period").value;
+  const reason = document.getElementById("advance-reason").value.trim();
+  const category = document.getElementById("advance-category").value;
+
+  if (amount <= 0) { notify("Amount must be greater than 0", "warning"); return; }
+  if (!date_given) { notify("Date is required", "warning"); return; }
+  if (!period_id) { notify("Select a payroll period", "warning"); return; }
+
+  if (editId) {
+    const adv = salaryAdvances.find(a => a.id === editId);
+    if (!adv) return;
+    var result = await sbQuery(sb.from("salary_advances").update({ amount, date_given, period_id, reason, category }).eq("id", editId).select());
+    if (result === null) return;
+    adv.amount = amount; adv.date_given = date_given; adv.period_id = period_id; adv.reason = reason; adv.category = category;
+    await auditLog("salary_advances", editId, "update", "Edited " + category + ": RM " + fmtNum2(amount));
+    notify(category + " updated");
+  } else {
+    const newId = await dbNextId("SA");
+    const data = { id: newId, worker_id: profileWorkerId, amount, date_given, period_id, reason, category, status: "pending", created_at: new Date().toISOString() };
+    var result = await sbQuery(sb.from("salary_advances").insert(data).select());
+    if (result === null) return;
+    salaryAdvances.unshift(data);
+    await auditLog("salary_advances", newId, "create", "New " + category + ": RM " + fmtNum2(amount) + " for " + period_id);
+    const w = workers.find(x => x.id === profileWorkerId);
+    notify(category + ": RM " + fmtNum2(amount) + " — " + (w ? w.name : "worker"));
+  }
+
+  document.getElementById("advance-modal").dataset.editId = "";
+  closeModal("advance-modal");
+  renderProfileAdvances();
+}
+
+function openEditAdvanceModal(advId) {
+  const a = salaryAdvances.find(x => x.id === advId);
+  if (!a) return;
+  document.getElementById("advance-amount").value = a.amount;
+  document.getElementById("advance-date").value = a.date_given;
+  document.getElementById("advance-reason").value = a.reason || "";
+  document.getElementById("advance-category").value = a.category || "Salary Advance";
+  document.getElementById("advance-modal").dataset.editId = advId;
+  document.getElementById("advance-modal-title").textContent = "Edit " + (a.category || "Advance");
+
+  // Populate period dropdown
+  const openPeriods = payrollPeriods.filter(p => p.status !== 'closed' || p.id === a.period_id).sort((a2, b) => (a2.year * 100 + a2.month) - (b.year * 100 + b.month));
+  document.getElementById("advance-period").innerHTML = openPeriods.map(p =>
+    '<option value="' + p.id + '"' + (p.id === a.period_id ? ' selected' : '') + '>' + MONTH_NAMES[p.month] + ' ' + p.year + '</option>'
+  ).join("");
+
+  checkAdvanceWarning();
+  document.getElementById("advance-modal").style.display = "flex";
+}
+
+async function deleteAdvance(advId) {
+  const a = salaryAdvances.find(x => x.id === advId);
+  if (!a) return;
+  if (!confirm('Delete advance of RM ' + fmtNum2(a.amount) + '?')) return;
+  await sbQuery(sb.from("salary_advances").delete().eq("id", advId).select());
+  salaryAdvances = salaryAdvances.filter(x => x.id !== advId);
+  await auditLog("salary_advances", advId, "delete", "Deleted advance: RM " + fmtNum2(a.amount));
+  notify("Advance deleted");
+  renderProfileAdvances();
+}
+
+function renderAdvanceBreakdown(workerId) {
+  const container = document.getElementById("pe-advance-breakdown");
+  if (!container) return;
+  const pending = salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending' && a.period_id === currentPeriodId);
+  if (pending.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const total = pending.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  let html = '<div style="font-size:11px;color:var(--gold);background:rgba(232,160,32,0.1);border-radius:6px;padding:6px 8px;">';
+  html += '<div style="font-weight:600;margin-bottom:3px;">Pending advances (' + pending.length + '):</div>';
+  pending.forEach(a => {
+    html += '<div style="display:flex;justify-content:space-between;padding:1px 0;">';
+    html += '<span>' + (a.category || 'Advance') + ' · ' + fmtDate(a.date_given) + (a.reason ? ' — ' + a.reason : '') + '</span>';
+    html += '<span>RM ' + fmtNum2(a.amount) + '</span></div>';
+  });
+  html += '<div style="border-top:1px solid rgba(232,160,32,0.3);margin-top:3px;padding-top:3px;font-weight:700;text-align:right;">Total: RM ' + fmtNum2(total) + '</div>';
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 // ============================================================
@@ -2461,7 +2846,6 @@ async function deleteRepayment(repayId, loanId) {
 
 // SUMMARY PAGE
 // ============================================================
-const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 let summaryTrendChart = null;
 let summaryPieChart = null;
 let summaryData = []; // cached for export
