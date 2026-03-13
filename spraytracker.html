@@ -228,7 +228,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
     <div class="table-header">All Products</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Product Name</th><th>Active Ingredient</th><th>Formulation</th><th>Type</th><th>Interval (days)</th><th>Default Dose</th><th>Active</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Product Name</th><th>Active Ingredient</th><th>Formulation</th><th>Type</th><th>Interval (days)</th><th>Default Dose</th><th>Packaging</th><th>Active</th><th></th><th></th></tr></thead>
         <tbody id="products-body"></tbody>
       </table>
     </div>
@@ -254,6 +254,9 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
       <div class="form-field" style="margin:0;"><label>Dose Amount</label><input id="ap-dose-amt" type="number" step="0.001" placeholder="e.g. 250" style="width:100%;"></div>
       <div class="form-field" style="margin:0;"><label>Dose Unit</label><select id="ap-dose-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
       <div class="form-field" style="margin:0;"><label>Litres</label><input id="ap-dose-per" type="number" placeholder="e.g. 100" style="width:100%;"></div>
+      <div class="form-field" style="margin:0;"><label>Pack Size</label><input id="ap-pkg-size" type="number" step="0.001" placeholder="e.g. 250" style="width:100%;"></div>
+      <div class="form-field" style="margin:0;"><label>Pack Unit</label><select id="ap-pkg-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
+      <div class="form-field" style="margin:0;"><label>Pack Type</label><select id="ap-pkg-type" style="width:100%;"><option value="">—</option><option value="packet">Packet</option><option value="box">Box</option><option value="bottle">Bottle</option><option value="drum">Drum</option><option value="bag">Bag</option><option value="can">Can</option></select></div>
       <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="addProduct()" style="width:100%;">Add Product</button></div>
     </div>
   </div>
@@ -711,7 +714,7 @@ function renderJobsTable() {
     const p = getProduct(j.product_id);
     const bname = b?b.block_name:"?";
     const pname = p?p.product_name:"?";
-    let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
+    let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button> <button class="btn btn-outline btn-sm" onclick="shareJobWhatsApp('${j.id}')" title="Send via WhatsApp" style="color:#25D366;border-color:#25D366;padding:4px 8px;"><svg viewBox="0 0 24 24" fill="#25D366" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
     if(j.status==="Completed") {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
     }
@@ -758,6 +761,110 @@ async function viewSprayLog(jobId) {
 }
 
 // ============================================================
+// ============================================================
+// WHATSAPP JOB SHARE
+// ============================================================
+const MALAY_DAYS = ['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
+const MALAY_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+const MALAY_PKG_TYPE = {packet:'Bungkus',box:'Kotak',bottle:'Botol',drum:'Dram',bag:'Beg',can:'Tin'};
+
+function fmtDateMalay(dateStr) {
+  if(!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDate();
+  const month = MALAY_MONTHS[d.getMonth()];
+  const year = d.getFullYear();
+  const dayName = MALAY_DAYS[d.getDay()];
+  return `${day} ${month} ${year} (${dayName})`;
+}
+
+function buildJobMessage(jobId) {
+  const j = jobs.find(x => x.id === jobId);
+  if(!j) return '';
+  const b = getBlock(j.block_id);
+  const bname = b ? b.block_name : '?';
+  const tankSize = parseFloat(j.tank_size_litres) || 0;
+  const tanksPlanned = parseFloat(j.tanks_planned) || 0;
+
+  // Build product lines — per tank dose = (tankSize / dosePer) * doseAmount
+  const jps = getJobProducts(j.id);
+  let productLines = [];
+
+  function addProductLine(productId, doseAmt, doseUnit, dosePer) {
+    const p = getProduct(productId);
+    const pname = p ? p.product_name : '?';
+    const amt = parseFloat(doseAmt) || 0;
+    const unit = doseUnit || '';
+    const perL = parseFloat(dosePer) || 0;
+    const perTank = (amt && perL && tankSize) ? (tankSize / perL) * amt : 0;
+    let line = '\u2022 ' + fmtNum(perTank) + unit + ' ' + pname;
+    if(p && p.packaging_size && p.packaging_unit && p.packaging_type && perTank > 0) {
+      const pkgCount = Math.ceil(perTank / p.packaging_size);
+      const malayType = MALAY_PKG_TYPE[p.packaging_type] || p.packaging_type;
+      line += ' (' + pkgCount + ' ' + malayType + ' x ' + p.packaging_size + p.packaging_unit + ')';
+    }
+    productLines.push(line);
+  }
+
+  if(jps.length > 1) {
+    jps.forEach(jp => addProductLine(jp.product_id, jp.dose_amount, jp.dose_unit, jp.dose_per_litres));
+  } else {
+    addProductLine(j.product_id, j.dose_amount, j.dose_unit, j.dose_per_litres);
+  }
+  productLines.push('\u2022 \uD83D\uDCA7 ' + tankSize + 'L Air');
+
+  let msg = '*\uD83C\uDF3F Kerja Semburan PND*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+  msg += '\uD83D\uDC77 Pekerja: ' + j.worker_name + '\n';
+  msg += '\uD83D\uDCC5 Tarikh: ' + fmtDateMalay(j.planned_date) + '\n';
+  msg += '\uD83D\uDCCD Blok: ' + bname + '\n\n';
+  msg += '\uD83D\uDC8A Produk (setiap tangki ' + tankSize + 'L):\n';
+  msg += productLines.join('\n') + '\n\n';
+  msg += '\uD83D\uDD22 Jumlah tangki: ' + tanksPlanned + '\n';
+  msg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501';
+  return msg;
+}
+
+function shareJobWhatsApp(jobId) {
+  const msg = buildJobMessage(jobId);
+  if(!msg) return;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal-box" style="max-width:400px;">
+        <div class="modal-header"><div class="modal-title">Send Job Summary</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div style="padding:16px;">
+          <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-word;color:var(--text);font-family:inherit;max-height:300px;overflow-y:auto;">${esc(msg)}</pre>
+        </div>
+        <div class="modal-actions" style="gap:8px;">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-outline" onclick="copyJobText('${jobId}')" style="gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy Text
+          </button>
+          <button class="btn btn-primary" onclick="sendJobWhatsApp('${jobId}')" style="background:#25D366;gap:6px;">
+            <svg viewBox="0 0 24 24" fill="white" style="width:16px;height:16px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function sendJobWhatsApp(jobId) {
+  const msg = buildJobMessage(jobId);
+  closeModal();
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function copyJobText(jobId) {
+  const msg = buildJobMessage(jobId);
+  navigator.clipboard.writeText(msg).then(() => {
+    notify('Copied to clipboard!');
+    closeModal();
+  }).catch(() => {
+    notify('Failed to copy', 'warning');
+  });
+}
+
 // NEW JOB MODAL
 // ============================================================
 // Multi-product state for new job
@@ -811,7 +918,7 @@ function openNewJobModal() {
         <div class="form-row">
           <div class="form-field"><label>Tank Size</label>
             <select id="nj-tank-sel" style="width:100%;" onchange="njTankChange()">
-              <option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option>
+              <option value="200">200L</option><option value="500">500L</option><option value="1000" selected>1000L</option><option value="custom">Custom</option>
             </select>
           </div>
           <div class="form-field" id="nj-tank-custom-wrap" style="display:none;"><label>Custom Litres</label><input id="nj-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="njCalcAllTotals()"></div>
@@ -2018,10 +2125,19 @@ function renderProductsPage() {
       <td><input class="inline-input" type="number" value="${p.default_interval_days??""}" style="width:70px;" placeholder="—" onchange="updateProduct('${p.id}','default_interval_days',this.value===''?null:parseInt(this.value))"></td>
       <td style="white-space:nowrap;">
         <input class="inline-input" type="number" step="0.001" value="${p.default_dose_amount??""}" style="width:65px;" placeholder="amt" onchange="updateProduct('${p.id}','default_dose_amount',this.value===''?null:parseFloat(this.value))">
-        <select class="inline-select" style="width:50px;" onchange="updateProduct('${p.id}','default_dose_unit',this.value||null)">
-          <option value="">—</option><option value="g" ${p.default_dose_unit==="g"?"selected":""}>g</option><option value="ml" ${p.default_dose_unit==="ml"?"selected":""}>ml</option><option value="kg" ${p.default_dose_unit==="kg"?"selected":""}>kg</option><option value="L" ${p.default_dose_unit==="L"?"selected":""}>L</option>
-        </select>
+        ${p.default_dose_unit ? `<span style="color:var(--text);font-size:12px;">${p.default_dose_unit}</span>` : `<select class="inline-select" style="width:50px;" onchange="updateProduct('${p.id}','default_dose_unit',this.value||null)">
+          <option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option>
+        </select>`}
         / <input class="inline-input" type="number" value="${p.default_dose_per_litres??""}" style="width:75px;" placeholder="L" onchange="updateProduct('${p.id}','default_dose_per_litres',this.value===''?null:parseInt(this.value))">L
+      </td>
+      <td style="white-space:nowrap;font-size:11px;">${p.packaging_size != null ? `<span style="color:var(--text);">${p.packaging_size}${p.packaging_unit||''}/${p.packaging_type||''}</span>` : `
+        <input class="inline-input" type="number" step="0.001" value="" style="width:70px;" placeholder="size" onchange="updateProduct('${p.id}','packaging_size',this.value===''?null:parseFloat(this.value))">
+        <select class="inline-select" style="width:55px;" onchange="updateProduct('${p.id}','packaging_unit',this.value||null)">
+          <option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option>
+        </select>
+        <select class="inline-select" style="width:85px;" onchange="updateProduct('${p.id}','packaging_type',this.value||null)">
+          <option value="">—</option><option value="packet">Packet</option><option value="box">Box</option><option value="bottle">Bottle</option><option value="drum">Drum</option><option value="bag">Bag</option><option value="can">Can</option>
+        </select>`}
       </td>
       <td><label class="toggle"><input type="checkbox" ${p.is_active?"checked":""} onchange="updateProduct('${p.id}','is_active',this.checked)"><span class="toggle-slider"></span></label></td>
       <td><button class="btn btn-outline btn-sm" onclick="openEditProductModal('${p.id}')" style="font-size:10px;">Edit</button></td>
@@ -2124,13 +2240,24 @@ function openEditProductModal(id) {
         <div style="padding:16px;">
           <div class="form-field"><label>Product Name</label><input id="ep-name" value="${esc(p.product_name)}" style="width:100%;"></div>
           <div class="form-field"><label>Active Ingredient(s)</label>
-            <div id="ep-ingredient-list" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <select id="ep-ingredient-sel" style="flex:1;min-width:0;">${ingOpts}</select>
-              <button class="btn btn-primary btn-sm" type="button" onclick="epAddSelectedIngredient()" style="white-space:nowrap;padding:6px 12px;font-size:13px;font-weight:700;">+ Add</button>
-            </div>
-            <div id="ep-ingredient-new-wrap" style="display:none;margin-top:6px;"><input id="ep-ingredient-new" placeholder="New ingredient name" style="width:100%;"><div style="display:flex;gap:4px;margin-top:4px;"><button class="btn btn-primary btn-sm" onclick="epAddNewIngredient('${id}')">Add</button><button class="btn btn-outline btn-sm" onclick="epCancelNewIngredient()">Cancel</button></div></div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">${epSelectedIngredients.map(i=>`<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:3px 10px;font-size:12px;">${esc(i.name)}</span>`).join('')||'<span style="color:var(--text-muted);font-size:12px;">—</span>'}</div>
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-field" style="margin:0;"><label>Interval (days)</label><input id="ep-interval" type="number" value="${p.default_interval_days??""}" placeholder="—" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><label>Type</label><div style="padding:8px 0;color:var(--text-muted);font-size:13px;">${p.product_type==='fungicide'?'Fungicide':'Pesticide'}</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px;">
+            <div class="form-field" style="margin:0;"><label>Dose Amount</label><input id="ep-dose-amt" type="number" step="0.001" value="${p.default_dose_amount??""}" placeholder="amt" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><label>Dose Unit</label>${p.default_dose_unit ? `<div style="padding:8px 0;color:var(--text-muted);font-size:13px;">${p.default_dose_unit}</div><input type="hidden" id="ep-dose-unit" value="${p.default_dose_unit}">` : `<select id="ep-dose-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select>`}</div>
+            <div class="form-field" style="margin:0;"><label>Per (Litres)</label><input id="ep-dose-per" type="number" value="${p.default_dose_per_litres??""}" placeholder="L" style="width:100%;"></div>
+          </div>
+          ${p.packaging_size != null ? `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px;">
+            <div class="form-field" style="margin:0;grid-column:span 3;"><label>Packaging</label><div style="padding:8px 0;color:var(--text-muted);font-size:13px;">${p.packaging_size}${p.packaging_unit||''}/${p.packaging_type||''}</div><input type="hidden" id="ep-pkg-size" value="${p.packaging_size??""}"><input type="hidden" id="ep-pkg-unit" value="${p.packaging_unit??""}"><input type="hidden" id="ep-pkg-type" value="${p.packaging_type??""}"></div>
+          </div>` : `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px;">
+            <div class="form-field" style="margin:0;"><label>Pack Size</label><input id="ep-pkg-size" type="number" step="0.001" value="" placeholder="e.g. 250" style="width:100%;"></div>
+            <div class="form-field" style="margin:0;"><label>Pack Unit</label><select id="ep-pkg-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
+            <div class="form-field" style="margin:0;"><label>Pack Type</label><select id="ep-pkg-type" style="width:100%;"><option value="">—</option><option value="packet">Packet</option><option value="box">Box</option><option value="bottle">Bottle</option><option value="drum">Drum</option><option value="bag">Bag</option><option value="can">Can</option></select></div>
+          </div>`}
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -2196,23 +2323,33 @@ async function saveEditProduct(id) {
   const p = products.find(x => x.id === id);
   if(!p) return;
 
-  // Update product name if changed
-  if(newName !== p.product_name) {
-    const result = await sbQuery(sb.from("pnd_products").update({ product_name: newName }).eq("id", id).select());
-    if(result === null) return;
-    p.product_name = newName;
-  }
+  // Gather all editable fields
+  const interval = document.getElementById('ep-interval').value;
+  const dAmt = document.getElementById('ep-dose-amt').value;
+  const dUnit = document.getElementById('ep-dose-unit').value || null;
+  const dPer = document.getElementById('ep-dose-per').value;
+  const pkgSize = document.getElementById('ep-pkg-size').value;
+  const pkgUnit = document.getElementById('ep-pkg-unit').value || null;
+  const pkgType = document.getElementById('ep-pkg-type').value || null;
 
-  // Sync ingredients: delete all, re-insert current selection
-  await sbQuery(sb.from("pnd_product_ingredients").delete().eq("product_id", id).select());
-  if(epSelectedIngredients.length) {
-    const rows = epSelectedIngredients.map(i=>({product_id:id, ingredient_id:i.id}));
-    await sbQuery(sb.from("pnd_product_ingredients").insert(rows).select());
-  }
+  const updateData = {
+    product_name: newName,
+    default_interval_days: interval === "" ? null : parseInt(interval),
+    default_dose_amount: dAmt === "" ? null : parseFloat(dAmt),
+    default_dose_unit: dUnit,
+    default_dose_per_litres: dPer === "" ? null : parseInt(dPer),
+    packaging_size: pkgSize === "" ? null : parseFloat(pkgSize),
+    packaging_unit: pkgUnit,
+    packaging_type: pkgType
+  };
+
+  const result = await sbQuery(sb.from("pnd_products").update(updateData).eq("id", id).select());
+  if(result === null) return;
+  Object.assign(p, updateData);
 
   closeModal();
   notify('Product updated');
-  await loadProductIngredients();
+  await loadProducts();
   renderProductsPage();
 }
 
@@ -2240,7 +2377,10 @@ async function addProduct() {
     formulationId = frmSel.value;
   }
 
-  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,formulation_id:formulationId,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder}).select());
+  const pkgSize=document.getElementById("ap-pkg-size").value; const pkgSizeVal=pkgSize===""?null:parseFloat(pkgSize);
+  const pkgUnit=document.getElementById("ap-pkg-unit").value||null;
+  const pkgType=document.getElementById("ap-pkg-type").value||null;
+  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,formulation_id:formulationId,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder,packaging_size:pkgSizeVal,packaging_unit:pkgUnit,packaging_type:pkgType}).select());
   if(result===null) return;
 
   // Insert junction rows for selected ingredients
@@ -2251,7 +2391,8 @@ async function addProduct() {
   }
 
   notify("Product added");
-  ["ap-name","ap-interval","ap-dose-amt","ap-dose-per"].forEach(id=>document.getElementById(id).value="");
+  ["ap-name","ap-interval","ap-dose-amt","ap-dose-per","ap-pkg-size"].forEach(id=>document.getElementById(id).value="");
+  ["ap-pkg-unit","ap-pkg-type"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("ap-formulation-new").value="";
   apSelectedIngredients.length = 0;
   renderApIngredientPills();

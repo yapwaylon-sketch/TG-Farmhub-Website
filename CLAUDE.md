@@ -28,7 +28,10 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 - **Frontend**: Static HTML, CSS, vanilla JS (no framework, no build step)
 - **Backend**: Supabase (REST API + Row Level Security)
 - **Hosting**: Netlify at **tgfarmhub.com**
-- **Auth**: PIN-based login with session IDs, role-based permissions (admin / supervisor / user)
+- **Auth**: Hybrid — Google OAuth for admin (yapwaylon@gmail.com), PIN-based for workers/supervisors
+  - Google OAuth via Supabase Auth (`signInWithOAuth({ provider: 'google' })`)
+  - Admin can still use PIN as fallback
+  - Workers/supervisors use PIN only (no Google option)
 - **Theme**: Dark mode, green (#4A7C3F) + gold (#E8A020) accents
 
 ## Key Files
@@ -56,7 +59,14 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 - DB Host (Session Pooler): `aws-1-ap-northeast-1.pooler.supabase.com`
 - DB User: `postgres.qwlagcriiyoflseduvvc`
 - DB Password: `Hlfqdbi6wcM4Omsm`
-- All tables use RLS policies scoped to authenticated sessions
+- All tables use RLS policies for both `anon` (PIN login) and `authenticated` (Google OAuth) roles
+- **RLS fix (2026-03-14)**: Added `authenticated` role policies to 6 tables that only had `anon`: `pnd_ingredients`, `pnd_formulations`, `pnd_product_ingredients`, `pnd_job_products`, `salary_advances`, `id_counters`
+
+## Google OAuth
+- **Google Cloud credentials**: Stored in Supabase Dashboard → Authentication → Providers → Google (not in repo for security)
+- Authorized redirect URI: `https://qwlagcriiyoflseduvvc.supabase.co/auth/v1/callback`
+- Only admin email (yapwaylon@gmail.com) is matched to a user in `public.users`
+- RLS policies exist for both `anon` (PIN login) and `authenticated` (Google login) roles on all tables
 
 ## Netlify Deployment
 - Site ID: `a0ac5d18-a968-414c-a531-c78ed390e5c2`
@@ -69,7 +79,7 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 ### Active (Built)
 1. **Inventory Management** — Stock in/out, suppliers, reports, stock checks
 2. **Worker Management** — Profiles, monthly payroll, task-based pay, deductions
-3. **PND Spray Tracker** — Spray job system, product management (with ingredient/formulation lookups), batch job delete, logs, intervention logic
+3. **PND Spray Tracker** — Spray job system, product management (with ingredient/formulation lookups), batch job delete, logs, intervention logic, WhatsApp job sharing
 4. **Growth Tracker** — Read-only dashboard: block growth monitoring, plant counts by variety/status, target dates, harvest windows
 5. **Farm Configuration** — Centralized crop & block management, all data entry lives here
 6. **TV Display (Growth)** — `display-growth.html`, read-only, token auth (`?token=pnd2026`)
@@ -130,13 +140,11 @@ Growing → To Induce → Induced → Suckers → To Replant → *(Start New Cyc
 | `products_fields_migration.sql` | Added fields to `pnd_products` (type, registration_no, group_no, default doses, interval) |
 | `product_ingredients_junction_migration.sql` | Many-to-many `pnd_product_ingredients` junction table; products can have 2-3 active ingredients |
 | `job_products_migration.sql` | Many-to-many `pnd_job_products` junction table; jobs can have multiple products (tank mix) |
-| `pnd_wipe_data.sql` | Wipe all PND data (preserves table structure), FK-safe order |
-| `products_fields_migration.sql` | Added `active_ingredient` and `formulation` text columns to pnd_products (interim step) |
-| `products_lookup_migration.sql` | Created `pnd_ingredients` + `pnd_formulations` lookup tables, migrated text→FK, dropped text columns, added RLS |
-| `pnd_wipe_data.sql` | Utility: wipes all PND Spray Tracker data (preserves table structure) |
-| `product_ingredients_junction_migration.sql` | Many-to-many: `pnd_product_ingredients` junction table, migrated from single `ingredient_id` FK on `pnd_products` |
+| `pnd_wipe_data.sql` | Utility: wipes all PND Spray Tracker data (preserves table structure), FK-safe order |
 | `salary_advances_migration.sql` | Created `salary_advances` table for tracking mid-month salary advances, with indexes and RLS |
 | `salary_advance_categories_migration.sql` | Added `category` column to salary_advances (Canteen/Cigarettes/Salary Advance/Overpayment), `cash_handed` to payroll_entries |
+| `google_auth_migration.sql` | Added `email` column to `public.users`, set admin email for Google OAuth |
+| `packaging_fields_migration.sql` | Added `packaging_size`, `packaging_unit`, `packaging_type` to `pnd_products` |
 
 ### How to run SQL migrations
 ```bash
@@ -187,8 +195,12 @@ rm -rf node_modules package-lock.json package.json
 - `pnd_products` uses `formulation_id` FK → `pnd_formulations`; ingredients are many-to-many via `pnd_product_ingredients` junction table
 - **Multi-product jobs (tank mix)**: `pnd_job_products` junction table stores all products in a job. Primary product also stored on `pnd_jobs` for backward compat. Dose fields (amount/unit/per_litres) stored per-product in junction table. Products are set at job creation and read-only in edit modal.
 - **Spray log multi-product**: DB trigger handles primary product on completion; JS manually inserts spray logs for additional products in the mix
-- Formulation and Type are read-only once set on a product (cannot be changed)
+- **Product field lock-down**: Formulation, Type, Dose Unit, Active Ingredients, Packaging (size/unit/type) are all read-only once set on a product (cannot be changed after initial entry)
+- **Product packaging**: `pnd_products` has `packaging_size` (NUMERIC), `packaging_unit` (TEXT: g, kg, ml, L), `packaging_type` (TEXT: packet, box, bottle, drum, bag, can)
+- **WhatsApp job sharing**: Green WhatsApp button on each job row → popup with message preview, "Copy Text" + "Send WhatsApp" buttons. Message in Bahasa Malaysia with emojis, includes per-tank dose calculation: `(tankSize / dosePer) × doseAmount`. Packaging count: `Math.ceil(perTankDose / packagingSize)`
+- **Default tank size**: 1000L for new spray jobs
 - All Supabase mutation queries (insert/update/delete/upsert) must chain `.select()` before `sbQuery()` — Supabase v2 returns empty data without it
+- **Block management reminder**: Clickable to filter/show only incomplete blocks; excludes inactive (deactivated) blocks from count
 - Filter dropdowns: populate on data load only, NOT on every render (prevents state reset)
 - TV displays: same Netlify site, URL token auth (`?token=pnd2026`), read-only
 
@@ -235,6 +247,12 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Accessibility**: Added focus-visible, skip links, `role="main"`, `<nav>` with aria-label, focus trap for modals (2026-03-11)
 - [x] **Adopt `sbQuery()`**: Migrated all Supabase calls across all 5 modules (103 total calls) (2026-03-11)
 - [x] **`.select()` on mutations**: Added `.select()` to all insert/update/delete/upsert calls in index.html + spraytracker.html (2026-03-13)
+- [x] **Google OAuth login**: Admin can login via Google; workers use PIN. RLS policies for `authenticated` role added (2026-03-14)
+- [x] **Product packaging fields**: packaging_size, packaging_unit, packaging_type on pnd_products (2026-03-14)
+- [x] **Product lock-down expanded**: Dose unit, active ingredients, packaging fields now also locked once set (2026-03-14)
+- [x] **WhatsApp job sharing**: BM message format with emojis, popup with Copy Text + WhatsApp buttons (2026-03-14)
+- [x] **Block reminder improvements**: Clickable filter for incomplete blocks, excludes inactive blocks (2026-03-14)
+- [x] **Default tank size**: Changed to 1000L for new spray jobs (2026-03-14)
 - [ ] **Offline resilience** / retry logic with exponential backoff
 - [ ] **Module CSS extraction**: Extract inline CSS to `.inventory.css`, `.workers.css`, etc. for caching
 - [ ] Optimistic locking for concurrent edits

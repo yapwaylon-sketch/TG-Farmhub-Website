@@ -42,6 +42,12 @@ body { height: auto; min-height: 100vh; overflow: auto; }
   border-radius: 8px; color: var(--white); font-size: 14px; font-family: inherit;
 }
 .login-field input:focus { outline: none; border-color: var(--gold); }
+.login-divider { display:flex;align-items:center;gap:12px;margin:16px 0; }
+.login-divider::before,.login-divider::after { content:'';flex:1;height:1px;background:var(--border); }
+.login-divider span { font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px; }
+.btn-google { display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--white);font-size:14px;font-family:inherit;cursor:pointer;transition:all 0.2s; }
+.btn-google:hover { border-color:var(--gold);background:rgba(232,160,32,0.08); }
+.btn-google svg { width:18px;height:18px; }
 
 /* ===== BUTTONS — index.html overrides (gold theme for hub/login) ===== */
 .btn-primary { background: var(--gold); color: #1a1a1a; }
@@ -227,6 +233,11 @@ body { height: auto; min-height: 100vh; overflow: auto; }
         onkeydown="if(event.key==='Enter')doLogin();">
     </div>
     <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%;justify-content:center;padding:12px;margin-top:6px;font-size:14px;">Sign In</button>
+    <div class="login-divider"><span>or</span></div>
+    <button class="btn-google" id="google-login-btn" onclick="doGoogleLogin()">
+      <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
   </div>
 </div>
 
@@ -303,7 +314,7 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 
       <!-- BLOCK MANAGEMENT TAB -->
       <div id="fc-blocks" class="fc-panel" style="display:none;">
-        <div id="fc-block-reminder" style="display:none;padding:10px 16px;background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.25);border-radius:8px;margin-bottom:16px;font-size:12px;color:#E8A020;">
+        <div id="fc-block-reminder" style="display:none;padding:10px 16px;background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.25);border-radius:8px;margin-bottom:16px;font-size:12px;color:#E8A020;cursor:pointer;" onclick="filterIncompleteBlocks()">
           <strong>Reminder:</strong> Some blocks are missing crop type or quantity assignments.
         </div>
         <div id="fc-block-list"></div>
@@ -476,6 +487,7 @@ function mapUserFromDb(row) {
     id: row.id, username: row.username, pin: row.pin,
     pinHash: row.pin_hash || "", forcePinUpdate: row.force_pin_update || false,
     displayName: row.display_name, role: row.role,
+    email: row.email || null,
     permissions: row.permissions || {}
   };
 }
@@ -498,6 +510,45 @@ function hasPermission(moduleKey, permKey) {
 
 function hasModuleAccess(moduleKey) {
   return hasPermission(moduleKey, "view");
+}
+
+// ============================================================
+// GOOGLE OAUTH LOGIN
+// ============================================================
+async function doGoogleLogin() {
+  const btn = document.getElementById("google-login-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Redirecting..."; }
+  const { data, error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/index.html' }
+  });
+  if (error) {
+    notify("Google login failed: " + error.message, "warning");
+    if (btn) { btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Sign in with Google'; }
+  }
+}
+
+async function handleOAuthRedirect() {
+  const { data: { session }, error } = await sb.auth.getSession();
+  if (!session) return false;
+
+  const googleEmail = session.user.email;
+  if (!googleEmail) { await sb.auth.signOut(); return false; }
+
+  // Match Google email to a user in our users table
+  const matched = users.find(u => u.email && u.email.toLowerCase() === googleEmail.toLowerCase());
+  if (!matched) {
+    notify("No account linked to " + googleEmail, "warning");
+    await sb.auth.signOut();
+    return false;
+  }
+
+  // Success — log in as the matched user
+  currentUser = matched;
+  storeSession(matched);
+  // Clean OAuth tokens from URL
+  if (window.location.hash) { history.replaceState(null, '', window.location.pathname + window.location.search); }
+  return true;
 }
 
 // ============================================================
@@ -663,10 +714,11 @@ async function submitChangePin() {
   notify("PIN updated successfully!");
 }
 
-function doLogout() {
+async function doLogout() {
   currentUser = null;
   clearInactivityTimer();
   sessionStorage.removeItem("tgfarmhub_user");
+  await sb.auth.signOut().catch(() => {});
   location.reload();
 }
 
@@ -999,7 +1051,12 @@ async function init() {
     await loadUsers();
     const loginBtn = document.getElementById("login-btn");
 
-    if (tryRestoreSession()) {
+    // Check for Google OAuth redirect first
+    const oauthSuccess = await handleOAuthRedirect();
+    if (oauthSuccess) {
+      showHub();
+      startInactivityTimer();
+    } else if (tryRestoreSession()) {
       if (currentUser.forcePinUpdate) {
         // Don't auto-restore into PIN update — require fresh login
         currentUser = null;
@@ -1027,6 +1084,7 @@ init();
 // FARM CONFIG — DATA
 // ============================================================
 let fcCrops = [], fcVarieties = [], fcCropStatuses = [], fcBlockCrops = [], fcBlocks = [];
+let fcBlockFilterIncomplete = false;
 
 async function loadFarmConfig() {
   const [c, v, s, bc] = await Promise.all([
@@ -1244,6 +1302,17 @@ async function deleteCropStatus(id) {
 // ============================================================
 // FARM CONFIG — BLOCK MANAGEMENT
 // ============================================================
+function filterIncompleteBlocks() {
+  fcBlockFilterIncomplete = !fcBlockFilterIncomplete;
+  const reminder = document.getElementById('fc-block-reminder');
+  if (fcBlockFilterIncomplete) {
+    reminder.style.background = 'rgba(232,160,32,0.25)';
+  } else {
+    reminder.style.background = 'rgba(232,160,32,0.12)';
+  }
+  renderBlockList();
+}
+
 function renderBlockList() {
   const container = document.getElementById('fc-block-list');
   const reminder = document.getElementById('fc-block-reminder');
@@ -1256,15 +1325,22 @@ function renderBlockList() {
   }).join('');
 
   const incompleteCount = fcBlocks.filter(b => {
+    if (!b.is_active) return false;
     const bcrops = fcBlockCrops.filter(bc => bc.block_id === b.id);
     return bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0);
   }).length;
   reminder.style.display = incompleteCount > 0 ? '' : 'none';
-  if (incompleteCount > 0) reminder.innerHTML = `<strong>Reminder:</strong> ${incompleteCount} block(s) missing crop type or quantity assignments.`;
+  if (incompleteCount > 0) reminder.innerHTML = `<strong>Reminder:</strong> ${incompleteCount} active block(s) missing crop type or quantity assignments. <span style="text-decoration:underline;">${fcBlockFilterIncomplete ? 'Click to show all.' : 'Click to show.'}</span>`;
 
-  container.innerHTML = fcBlocks.map(b => {
+  const showBlocks = fcBlockFilterIncomplete ? fcBlocks.filter(b => {
+    if (!b.is_active) return false;
     const bcrops = fcBlockCrops.filter(bc => bc.block_id === b.id);
-    const hasMissing = bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0);
+    return bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0);
+  }) : fcBlocks;
+
+  container.innerHTML = showBlocks.map(b => {
+    const bcrops = fcBlockCrops.filter(bc => bc.block_id === b.id);
+    const hasMissing = b.is_active && (bcrops.length === 0 || bcrops.some(bc => bc.quantity === null || bc.quantity === 0));
 
     return `<div class="block-card${hasMissing ? ' incomplete' : ''}">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
