@@ -227,11 +227,22 @@ These live inside this folder but are gitignored. They share the same Supabase d
 If you modify tables that these sub-projects read from (especially `growth_records`, `pnd_blocks`, `crop_varieties`), check and update the sub-project `index.html` files too.
 
 ## Blueprint — What's Next
+- [ ] **Farm Map Module** (`farmmap.html`) — Google Maps integration, draw block polygons, satellite imagery, area calculation (see details below)
 - [ ] **`display-spray.html`** — TV display for Spray Tracker (KIV, needs spec)
 - [ ] **Seedlings Module** (`seedlings.html`) — Booking, sales, stock, pricing
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
 - [ ] **Mobile responsiveness** audit across all modules
+
+## Farm Map Module — Plan (Not Started)
+- **File**: `farmmap.html` (single HTML file like other modules)
+- **API**: Google Maps JavaScript API + Drawing Library + Geometry Library
+- **Features**: View blocks on satellite map, draw/edit polygon boundaries, auto area calculation
+- **Storage**: `geometry JSONB` column on Farm Config blocks table (stores GeoJSON polygon coordinates)
+- **Map center**: Ladang PND coordinates (Waylon has GPS coords)
+- **Google Maps API key**: Not yet created — use same Google Cloud project as OAuth
+- **Billing safety**: Set daily API quota cap (100-200 loads/day) in Google Cloud Console → APIs & Services → Quotas. Also set $0 budget alert in Billing → Budgets & Alerts. $200/month free credit covers ~28,000 map loads — farm usage is well under this.
+- **Prereqs before building**: 1) Enable Maps JavaScript API in Google Cloud Console, 2) Create API key restricted to Maps JS API + tgfarmhub.com domain, 3) Set daily quota cap + budget alert
 
 ## Growth Tracker — Parked Items
 - Re-induction tracking (failed -> retry with history)

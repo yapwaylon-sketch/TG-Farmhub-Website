@@ -1424,8 +1424,22 @@ async function submitEditJob(jobId) {
   if(result===null) return;
   notify("Job updated successfully");
   if(willTriggerLog) {
-    const b=getBlock(j.block_id), p=getProduct(j.product_id);
-    setTimeout(()=>notify("Spray log updated automatically for "+(b?.block_name||"?")+" — "+(p?.product_name||"?"),"info",4000),500);
+    // DB trigger handles primary product; manually log additional products in the mix
+    const jps = getJobProducts(jobId);
+    const extraProds = jps.filter(jp => jp.product_id !== j.product_id);
+    for(const jp of extraProds) {
+      const ep = getProduct(jp.product_id);
+      const nextDate = (ep?.default_interval_days && update.completion_date) ? (() => { const d=new Date(update.completion_date); d.setDate(d.getDate()+ep.default_interval_days); return d.toISOString().split('T')[0]; })() : null;
+      await sbQuery(sb.from("pnd_spray_logs").insert({
+        block_id: j.block_id, product_id: jp.product_id,
+        date_completed: update.completion_date, next_spray_date: nextDate,
+        notes: 'Auto-logged (tank mix). Job ID: '+jobId,
+        logged_by: 'auto:job:'+jobId
+      }));
+    }
+    const b=getBlock(j.block_id);
+    const prodCount = jps.length || 1;
+    setTimeout(()=>notify("Spray log updated for "+prodCount+" product(s) on "+(b?.block_name||"?"),"info",4000),500);
   }
   closeModal();
   await Promise.all([loadJobs(), loadLatestSprays()]);
