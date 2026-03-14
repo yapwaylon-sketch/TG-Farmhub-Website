@@ -264,6 +264,7 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **WhatsApp job sharing**: BM message format with emojis, popup with Copy Text + WhatsApp buttons (2026-03-14)
 - [x] **Block reminder improvements**: Clickable filter for incomplete blocks, excludes inactive blocks (2026-03-14)
 - [x] **Default tank size**: Changed to 1000L for new spray jobs (2026-03-14)
+- [x] **Multi-product spray log fix**: Edit Job Modal completion path now logs all products in tank mix (not just primary). Backfilled 2 existing completed jobs missing Benocide 50 WP spray logs (2026-03-14)
 - [ ] **Offline resilience** / retry logic with exponential backoff
 - [ ] **Module CSS extraction**: Extract inline CSS to `.inventory.css`, `.workers.css`, etc. for caching
 - [ ] Optimistic locking for concurrent edits
