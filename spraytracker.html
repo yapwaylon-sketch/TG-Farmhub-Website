@@ -166,7 +166,14 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
     <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Overview of all block spray statuses</div></div>
   </div>
   <div id="summary-cards" class="cards-grid"></div>
-  <div id="summary-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 0 0;"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0 0;align-items:center;">
+    <div id="summary-tabs" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    <div style="margin-left:auto;">
+      <select id="summary-status-filter" onchange="summaryStatusFilter=this.value;renderSummary();" style="font-size:11px;min-width:130px;">
+        <option value="">All Statuses</option>
+      </select>
+    </div>
+  </div>
   <div class="data-table">
     <div class="table-header">Spray Status by Block</div>
     <div class="table-wrap"><div id="summary-table-wrap"></div></div>
@@ -366,6 +373,8 @@ if(!currentUser) { location.href = "index.html"; }
 // ============================================================
 let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], latestSprays=[], sprayLogs=[];
 let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
+let blockCrops=[], cropStatuses=[];
+let summaryStatusFilter = '';
 let currentPage = 'summary';
 let currentReport = null;
 let reportData = [];
@@ -387,7 +396,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses()]);
 }
 
 async function syncAll() {
@@ -420,7 +429,7 @@ function navigateTo(page) {
 }
 
 async function renderCurrentPage() {
-  if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs()]); renderSummary(); }
+  if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs(), loadBlockCrops(), loadCropStatuses()]); renderSummary(); }
   else if(currentPage === 'jobs') { await loadJobs(); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
   else if(currentPage === 'products') { await Promise.all([loadIngredients(), loadFormulations(), loadProductIngredients()]); renderProductsPage(); populateAddProductDropdowns(); renderOverridesSection(); }
@@ -480,6 +489,21 @@ async function loadLatestSprays() {
   const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
   if(data) latestSprays = data;
 }
+async function loadBlockCrops() {
+  const data = await sbQuery(sb.from("block_crops").select("*,crop_varieties(id,name)").eq("is_current",true));
+  if(data) blockCrops = data;
+}
+async function loadCropStatuses() {
+  const data = await sbQuery(sb.from("crop_statuses").select("*").order("sort_order"));
+  if(data) cropStatuses = data;
+}
+function getBlockCrop(blockId) {
+  return blockCrops.find(bc => bc.block_id === blockId);
+}
+function getCropStatusName(statusId) {
+  const s = cropStatuses.find(x => x.id === statusId);
+  return s ? s.name : '—';
+}
 
 // ============================================================
 // HELPERS (module-specific — shared helpers are in shared.js)
@@ -503,6 +527,59 @@ function monthsFromPlant(dp) {
 }
 function getBlock(id) { return blocks.find(b=>b.id===id); }
 function getProduct(id) { return products.find(p=>p.id===id); }
+function getSprayLogJob(loggedBy) {
+  if(!loggedBy) return null;
+  const m = loggedBy.match(/^(?:auto|intervention):job:(.+)$/);
+  return m ? jobs.find(x=>x.id===m[1]) || null : null;
+}
+function fmtLoggedBy(loggedBy) {
+  if(!loggedBy) return '—';
+  const j = getSprayLogJob(loggedBy);
+  return j ? (j.logged_by||'—') : loggedBy;
+}
+function fmtSprayWorker(loggedBy) {
+  const j = getSprayLogJob(loggedBy);
+  return j ? (j.worker_name||'—') : '—';
+}
+function fmtSprayWater(loggedBy) {
+  const j = getSprayLogJob(loggedBy);
+  if(!j) return '—';
+  const tanks = parseFloat(j.tanks_completed||j.tanks_planned)||0;
+  const size = parseFloat(j.tank_size_litres)||0;
+  if(!tanks||!size) return '—';
+  return fmtNum(tanks*size) + 'L (' + fmtNum(tanks) + ' × ' + fmtNum(size) + 'L)';
+}
+function fmtSprayProductUsed(loggedBy, productId) {
+  const j = getSprayLogJob(loggedBy);
+  if(!j) return '—';
+  const tanks = parseFloat(j.tanks_completed||j.tanks_planned)||0;
+  const size = parseFloat(j.tank_size_litres)||0;
+  const totalWater = tanks * size;
+  // For tank mix: look up per-product dose from junction table
+  const jps = getJobProducts(j.id);
+  const jp = jps.find(x => x.product_id === productId);
+  if(jp) {
+    const amt = parseFloat(jp.dose_amount)||0;
+    const per = parseFloat(jp.dose_per_litres)||0;
+    if(amt && per && totalWater) {
+      const used = (totalWater / per) * amt;
+      return fmtNum(used) + ' ' + (jp.dose_unit||j.dose_unit||'');
+    }
+  }
+  // Fallback: primary product uses job-level actual_product_used
+  if(j.product_id === productId || !jps.length) {
+    const used = parseFloat(j.actual_product_used||j.total_product_required)||0;
+    if(!used) return '—';
+    return fmtNum(used) + ' ' + (j.dose_unit||'');
+  }
+  return '—';
+}
+function fmtSprayNotes(notes) {
+  if(!notes) return '—';
+  if(/^(Auto-logged|Backfill:?\s*Auto-logged)\s*(from|\(tank mix\)).*Job ID:/i.test(notes)) return '—';
+  if(/^Intervention spray\s*\(.*\).*Job ID:/i.test(notes)) return '—';
+  return notes;
+}
 function getStatusName(id) { const s=statuses.find(x=>x.id===id); return s?s.status_name:"—"; }
 function blockStatusBadgeClass(name) {
   const map={'growing':'badge-growing','induced':'badge-induced','suckers':'badge-suckers','to replant':'badge-to-replant','to induce':'badge-to-induce','tunggu buah':'badge-tunggu-buah','abandoned':'badge-abandoned','harvesting':'badge-harvesting'};
@@ -541,11 +618,11 @@ function renderSummary() {
   const map = {};
   latestSprays.forEach(ls => { map[ls.block_id+"_"+ls.product_id] = ls; });
 
-  let overdue=0, dueSoon=0, allClear=0;
+  let overdue=0, dueSoon=0, allClear=0, noData=0;
   activeBlocks.forEach(b => {
     activeProducts.forEach(p => {
       const ls = map[b.id+"_"+p.id];
-      if(!ls || !ls.next_spray_date) return;
+      if(!ls || !ls.next_spray_date) { noData++; return; }
       const dl = daysDiff(today, ls.next_spray_date);
       if(dl<0) overdue++;
       else if(dl<=7) dueSoon++;
@@ -557,7 +634,16 @@ function renderSummary() {
     <div class="summary-card"><div class="sc-label">Total Blocks</div><div class="sc-value" style="color:var(--white);">${activeBlocks.length}</div><div class="sc-sub">Active blocks</div></div>
     <div class="summary-card" style="background:rgba(232,96,96,0.08);border-color:rgba(232,96,96,0.3);"><div class="sc-label">Overdue</div><div class="sc-value" style="color:var(--red);">${overdue}</div><div class="sc-sub">Past next spray date</div></div>
     <div class="summary-card" style="background:rgba(232,160,32,0.08);border-color:rgba(232,160,32,0.3);"><div class="sc-label">Due This Week</div><div class="sc-value" style="color:var(--gold);">${dueSoon}</div><div class="sc-sub">Within 7 days</div></div>
-    <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>`;
+    <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>
+    <div class="summary-card" style="background:rgba(128,128,128,0.08);border-color:rgba(128,128,128,0.3);"><div class="sc-label">No Data</div><div class="sc-value" style="color:var(--text-dim);">${noData}</div><div class="sc-sub">Block+product with no spray history</div></div>`;
+
+  // Populate status filter dropdown (preserve selection)
+  const filterEl = document.getElementById("summary-status-filter");
+  const uniqueStatuses = [...new Set(activeBlocks.map(b => {
+    const bc = getBlockCrop(b.id);
+    return bc ? getCropStatusName(bc.status_id) : '—';
+  }))].sort();
+  filterEl.innerHTML = '<option value="">All Statuses</option>' + uniqueStatuses.map(s => `<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
 
   // Build product tabs (2 products per tab)
   const totalTabs = Math.ceil(activeProducts.length / PRODUCTS_PER_TAB);
@@ -589,6 +675,31 @@ function renderSummaryTable() {
     ajMap[key].push(j);
   });
 
+  // Enrich blocks with crop status info and apply filter
+  const statusOrder = {};
+  cropStatuses.forEach((s,i) => { statusOrder[s.name] = i; });
+  statusOrder['—'] = 999;
+
+  let enriched = activeBlocks.map(b => {
+    const bc = getBlockCrop(b.id);
+    const sName = bc ? getCropStatusName(bc.status_id) : '—';
+    const variety = bc?.crop_varieties?.name || '—';
+    const datePlanted = bc?.date_planted || null;
+    return { ...b, _statusName: sName, _variety: variety, _datePlanted: datePlanted };
+  });
+
+  // Apply status filter
+  if(summaryStatusFilter) {
+    enriched = enriched.filter(b => b._statusName === summaryStatusFilter);
+  }
+
+  // Sort by status group, then block name
+  enriched.sort((a,b) => {
+    const sa = statusOrder[a._statusName] ?? 998, sb2 = statusOrder[b._statusName] ?? 998;
+    if(sa !== sb2) return sa - sb2;
+    return (a.block_name||'').localeCompare(b.block_name||'', undefined, {numeric:true});
+  });
+
   // Get products for current tab
   const tabProducts = activeProducts.slice(summaryTab*PRODUCTS_PER_TAB, (summaryTab+1)*PRODUCTS_PER_TAB);
   const prodTints = ['rgba(74,124,63,0.04)', 'rgba(232,160,32,0.04)'];
@@ -596,17 +707,33 @@ function renderSummaryTable() {
   // Update active tab styling
   document.querySelectorAll('.sum-tab').forEach((btn,i) => btn.classList.toggle('active', i===summaryTab));
 
-  let html = '<table><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th><th rowspan="2" style="min-width:70px;">Status</th><th rowspan="2" style="min-width:50px;">Age</th>';
+  let html = '<table><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th><th rowspan="2" style="min-width:70px;">Status</th><th rowspan="2" style="min-width:60px;">Variety</th><th rowspan="2" style="min-width:50px;">Age</th>';
   tabProducts.forEach(p => { html += `<th colspan="4" class="product-group">${esc(p.product_name)}</th>`; });
   html += '</tr><tr>';
   tabProducts.forEach(() => { html += '<th class="product-sub">Last</th><th class="product-sub">Elapsed</th><th class="product-sub">Next</th><th class="product-sub">Due In (Days)</th>'; });
   html += '</tr></thead><tbody>';
 
-  activeBlocks.forEach(b => {
-    html += `<tr><td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
-    const sName = getStatusName(b.status_id);
-    html += `<td><span class="badge ${blockStatusBadgeClass(sName)}">${esc(sName)}</span></td>`;
-    html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b.date_planted)}</td>`;
+  let prevStatus = null;
+  enriched.forEach(b => {
+    // Status group separator
+    if(b._statusName !== prevStatus) {
+      if(prevStatus !== null) {
+        html += `<tr><td colspan="${4 + tabProducts.length*4}" style="height:4px;padding:0;background:var(--border);"></td></tr>`;
+      }
+      prevStatus = b._statusName;
+    }
+
+    // Check if this block has any spray data at all for current tab products
+    const hasAnyData = tabProducts.some(p => {
+      const ls = map[b.id+"_"+p.id];
+      return ls && ls.next_spray_date;
+    });
+    const rowStyle = hasAnyData ? '' : ' style="opacity:0.55;"';
+
+    html += `<tr${rowStyle}><td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
+    html += `<td><span class="badge ${blockStatusBadgeClass(b._statusName)}">${esc(b._statusName)}</span></td>`;
+    html += `<td style="font-size:11px;white-space:nowrap;">${esc(b._variety)}</td>`;
+    html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b._datePlanted)}</td>`;
     tabProducts.forEach((p, pi) => {
       const ls = map[b.id+"_"+p.id];
       const tint = prodTints[pi] || '';
@@ -621,7 +748,7 @@ function renderSummaryTable() {
 
       if(!ls || !ls.next_spray_date) {
         const s = "color:var(--text-dim);" + (tint?"background:"+tint+";":"");
-        html += `<td class="spray-cell${divCls}" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—${jobIcons}</td>`;
+        html += `<td class="spray-cell${divCls}" style="${s}">No data</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—${jobIcons}</td>`;
       } else {
         const ds = daysDiff(ls.date_completed, today);
         const dl = daysDiff(today, ls.next_spray_date);
@@ -637,6 +764,10 @@ function renderSummaryTable() {
     });
     html += '</tr>';
   });
+
+  if(!enriched.length) {
+    html += `<tr><td colspan="${4 + tabProducts.length*4}" class="empty-state">No blocks match the selected filter</td></tr>`;
+  }
   html += '</tbody></table>';
   document.getElementById("summary-table-wrap").innerHTML = html;
 }
@@ -2419,9 +2550,9 @@ async function addProduct() {
 // REPORTS PAGE
 // ============================================================
 const REPORTS = [
-  {id:1,name:"By Single Block"},{id:2,name:"By Multiple Blocks"},{id:3,name:"By Product"},{id:11,name:"By Active Ingredient"},
-  {id:4,name:"By Date Range"},{id:5,name:"By Month"},{id:6,name:"Overdue"},
-  {id:7,name:"Compliance"},{id:8,name:"Product Consumption"},{id:9,name:"Worker Activity"},{id:10,name:"Job Status"}
+  {id:2,name:"By Block"},{id:3,name:"By Product"},{id:11,name:"By Active Ingredient"},
+  {id:6,name:"Overdue"},{id:7,name:"Compliance"},{id:8,name:"Product Consumption"},
+  {id:9,name:"Worker Activity"},{id:10,name:"Job Status"}
 ];
 
 function initReports() {
@@ -2444,32 +2575,59 @@ function selectReport(id) {
 
 function renderReportFilters(id) {
   const el=document.getElementById("report-filters");
-  const blockOpts=blocks.map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
   const prodOpts=products.filter(p=>p.is_active).map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("");
   const workerOpts=workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
-  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const monthOpts=months.map((m,i)=>`<option value="${i+1}">${m}</option>`).join("");
-  const yr=new Date().getFullYear();
-  const yearOpts=[yr-1,yr,yr+1].map(y=>`<option value="${y}" ${y===yr?"selected":""}>${y}</option>`).join("");
   const today=todayStr();
+  const yr=new Date().getFullYear();
   const d90=new Date(); d90.setDate(d90.getDate()-90); const d90s=d90.getFullYear()+"-"+String(d90.getMonth()+1).padStart(2,"0")+"-"+String(d90.getDate()).padStart(2,"0");
   const m1=yr+"-"+String(new Date().getMonth()+1).padStart(2,"0")+"-01";
+  const dateRange=`<div style="display:flex;gap:8px;align-items:center;margin-top:8px;"><label style="font-size:11px;color:var(--text-muted);white-space:nowrap;">Date range:</label><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`;
 
   const ingOpts=ingredients.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("");
+  const blockCheckboxes=`<div style="margin-bottom:4px;"><label style="display:inline-flex;align-items:center;font-size:12px;font-weight:700;cursor:pointer;color:var(--green-light);"><input type="checkbox" id="rf-blocks-all" onchange="document.querySelectorAll('.rf-blocks-cb').forEach(c=>c.checked=this.checked)"> Select All</label></div><div style="max-height:200px;overflow-y:auto;background:var(--bg-input);padding:8px;border-radius:8px;border:1px solid var(--border);">${blocks.map(b=>`<label style="display:block;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="rf-blocks-cb" value="${b.id}" onchange="if(!this.checked)document.getElementById('rf-blocks-all').checked=false"> ${esc(b.block_name)}</label>`).join("")}</div>`;
   const filters = {
-    1: `<select id="rf-block">${blockOpts}</select>`,
-    2: `<div style="max-height:200px;overflow-y:auto;background:var(--bg-input);padding:8px;border-radius:8px;border:1px solid var(--border);">${blocks.map(b=>`<label style="display:block;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="rf-blocks-cb" value="${b.id}"> ${esc(b.block_name)}</label>`).join("")}</div>`,
-    3: `<select id="rf-product">${prodOpts}</select>`,
-    4: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
-    5: `<div style="display:flex;gap:8px;"><select id="rf-month">${monthOpts}</select><select id="rf-year">${yearOpts}</select></div>`,
+    2: blockCheckboxes+dateRange,
+    3: `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="rf-product"><option value="__all__">All Products</option>${prodOpts}</select></div>`+dateRange,
     6: '',
     7: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
     8: `<div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="rf-product">${prodOpts}</select><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
     9: `<div style="display:flex;gap:8px;flex-wrap:wrap;"><select id="rf-worker">${workerOpts}</select><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`,
     10: `<div style="display:flex;gap:8px;"><input type="date" id="rf-from" value="${m1}"><input type="date" id="rf-to" value="${today}"></div>`,
-    11: `<select id="rf-ingredient">${ingOpts}</select>`
+    11: `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="rf-ingredient"><option value="__all__">All Ingredients</option>${ingOpts}</select></div>`+dateRange
   };
   el.innerHTML = filters[id]||'';
+}
+
+// Build spray log rows with merge metadata for tank mix grouping
+// sharedLeftFn: columns shared at left (block, date) — merged on tank mix
+// perProductFn: columns per product (product name, AI, next spray, product used) — always shown
+// sharedRightFn: columns shared at right (worker, water, logged by, notes) — merged on tank mix
+function sprayLogRows(data, sharedLeftFn, perProductFn, sharedRightFn) {
+  // Group consecutive rows by job ID (from logged_by)
+  const getJobId = r => { const m=(r.logged_by||'').match(/^(?:auto|intervention):job:(.+)$/); return m?m[1]:null; };
+  const result = [];
+  let i = 0;
+  while(i < data.length) {
+    const r = data[i];
+    const jid = getJobId(r);
+    // Count how many consecutive rows share same job
+    let groupSize = 1;
+    if(jid) {
+      while(i+groupSize < data.length && getJobId(data[i+groupSize]) === jid) groupSize++;
+    }
+    for(let g=0; g<groupSize; g++) {
+      const row = data[i+g];
+      const left = sharedLeftFn(row);
+      const mid = perProductFn(row);
+      const right = sharedRightFn(row);
+      const cells = [...left, ...mid, ...right];
+      // Attach merge metadata
+      cells._merge = { isFirst: g===0, groupSize, leftCount: left.length, rightCount: right.length };
+      result.push(cells);
+    }
+    i += groupSize;
+  }
+  return result;
 }
 
 async function generateReport() {
@@ -2477,41 +2635,29 @@ async function generateReport() {
   let rows=[], cols=[], title=REPORTS.find(r=>r.id===id).name;
   const today=todayStr();
 
-  if(id===1) {
-    const blockId=document.getElementById("rf-block").value;
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("block_id",blockId).order("date_completed",{ascending:false}));
-    if(!data) return;
-    cols=["Date Completed","Product","Active Ingredient(s)","Next Spray Date","Interval (days)","Notes","Logged By"];
-    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",r.notes||"",r.logged_by||""];});
-  } else if(id===2) {
+  if(id===2) {
     const cbs=document.querySelectorAll(".rf-blocks-cb:checked");
     const ids=[...cbs].map(c=>c.value);
     if(!ids.length){notify("Select at least one block","warning");return;}
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids).order("date_completed",{ascending:false}));
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids);
+    if(from) q=q.gte("date_completed",from);
+    if(to) q=q.lte("date_completed",to);
+    const data=await sbQuery(q.order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Block","Date Completed","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [r.pnd_blocks?.block_name,fmtDate(r.date_completed),r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
+    cols=["Block","Date Completed","Product","Active Ingredient(s)","Next Spray Date","Interval (days)","Product Used","Done By","Water Used","Logged By","Notes"];
+    rows=sprayLogRows(data, r=>[r.pnd_blocks?.block_name,fmtDate(r.date_completed)], r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.next_spray_date&&r.date_completed?daysDiff(r.date_completed,r.next_spray_date):"—",fmtSprayProductUsed(r.logged_by,r.product_id)];}, r=>[fmtSprayWorker(r.logged_by),fmtSprayWater(r.logged_by),fmtLoggedBy(r.logged_by),fmtSprayNotes(r.notes)]);
   } else if(id===3) {
     const prodId=document.getElementById("rf-product").value;
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("product_id",prodId).order("date_completed",{ascending:false}));
-    if(!data) return;
-    cols=["Date Completed","Block","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""]);
-  } else if(id===4) {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)");
+    if(prodId!=="__all__") q=q.eq("product_id",prodId);
+    if(from) q=q.gte("date_completed",from);
+    if(to) q=q.lte("date_completed",to);
+    const data=await sbQuery(q.order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
-  } else if(id===5) {
-    const m=parseInt(document.getElementById("rf-month").value), y=parseInt(document.getElementById("rf-year").value);
-    const from=y+"-"+String(m).padStart(2,"0")+"-01";
-    const lastDay=new Date(y,m,0).getDate();
-    const to=y+"-"+String(m).padStart(2,"0")+"-"+lastDay;
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:false}));
-    if(!data) return;
-    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];});
+    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Product Used","Done By","Water Used","Logged By","Notes"];
+    rows=sprayLogRows(data, r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name], r=>{const p=getProduct(r.product_id);const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';return [r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),fmtSprayProductUsed(r.logged_by,r.product_id)];}, r=>[fmtSprayWorker(r.logged_by),fmtSprayWater(r.logged_by),fmtLoggedBy(r.logged_by),fmtSprayNotes(r.notes)]);
   } else if(id===6) {
     const map={};
     latestSprays.forEach(ls=>{if(ls.next_spray_date && ls.next_spray_date<today) map[ls.block_id+"_"+ls.product_id]=ls;});
@@ -2571,18 +2717,24 @@ async function generateReport() {
     });
   } else if(id===11) {
     const ingId=document.getElementById("rf-ingredient").value;
-    const ing=ingredients.find(i=>i.id===ingId);
-    if(ing) title="By Active Ingredient: "+ing.name;
-    // Find all products that have this ingredient
-    const matchProdIds = productIngredients.filter(pi=>pi.ingredient_id===ingId).map(pi=>pi.product_id);
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("product_id",matchProdIds).order("date_completed",{ascending:false}));
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    let matchProdIds;
+    if(ingId==="__all__") {
+      title="By Active Ingredient: All";
+      matchProdIds = products.filter(p=>p.is_active).map(p=>p.id);
+    } else {
+      const ing=ingredients.find(i=>i.id===ingId);
+      if(ing) title="By Active Ingredient: "+ing.name;
+      matchProdIds = productIngredients.filter(pi=>pi.ingredient_id===ingId).map(pi=>pi.product_id);
+    }
+    if(!matchProdIds.length){notify("No products found for this ingredient","warning");return;}
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("product_id",matchProdIds);
+    if(from) q=q.gte("date_completed",from);
+    if(to) q=q.lte("date_completed",to);
+    const data=await sbQuery(q.order("date_completed",{ascending:false}));
     if(!data) return;
-    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Notes","Logged By"];
-    rows=data.map(r=>{
-      const p=getProduct(r.product_id);
-      const ais=p?getProductIngredients(p.id).map(i=>i.name).join(', '):'—';
-      return [fmtDate(r.date_completed),r.pnd_blocks?.block_name,r.pnd_products?.product_name,ais,fmtDate(r.next_spray_date),r.notes||"",r.logged_by||""];
-    });
+    cols=["Date Completed","Block","Product","Active Ingredient(s)","Next Spray Date","Product Used","Done By","Water Used","Logged By","Notes"];
+    rows=sprayLogRows(data, r=>[fmtDate(r.date_completed),r.pnd_blocks?.block_name], r=>{const p2=getProduct(r.product_id);const ais2=p2?getProductIngredients(p2.id).map(i=>i.name).join(', '):'—';return [r.pnd_products?.product_name,ais2,fmtDate(r.next_spray_date),fmtSprayProductUsed(r.logged_by,r.product_id)];}, r=>[fmtSprayWorker(r.logged_by),fmtSprayWater(r.logged_by),fmtLoggedBy(r.logged_by),fmtSprayNotes(r.notes)]);
   }
 
   reportData={cols,rows,title};
@@ -2591,12 +2743,28 @@ async function generateReport() {
   let html='<table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join("")+'</tr></thead><tbody>';
   if(!rows.length) html+='<tr><td colspan="'+cols.length+'" class="empty-state">No data found</td></tr>';
   else rows.forEach(r=>{
-    html+='<tr>'+r.map((c,i)=>{
-      let style="";
-      if(id===6 && i===5) style='style="color:var(--red);font-weight:700;"';
-      if(id===7 && i===4) { if(c==="On Time") style='style="color:var(--green-light);font-weight:700;"'; else if(c==="Exceeded") style='style="color:var(--red);font-weight:700;"'; else style='style="color:var(--text-dim);"'; }
-      return '<td '+style+'>'+esc(String(c??""))+'</td>';
-    }).join("")+'</tr>';
+    const mg = r._merge;
+    html+='<tr>';
+    r.forEach((c,i)=>{
+      // Skip merged cells (not first row in group)
+      if(mg && !mg.isFirst) {
+        const isLeft = i < mg.leftCount;
+        const isRight = i >= r.length - mg.rightCount;
+        if(isLeft || isRight) return;
+      }
+      let attrs="";
+      // Add rowspan for first row in group on shared columns
+      if(mg && mg.isFirst && mg.groupSize > 1) {
+        const isLeft = i < mg.leftCount;
+        const isRight = i >= r.length - mg.rightCount;
+        if(isLeft || isRight) attrs+=` rowspan="${mg.groupSize}" style="vertical-align:middle;"`;
+      }
+      // Status coloring for specific reports
+      if(id===6 && i===5) attrs+=' style="color:var(--red);font-weight:700;"';
+      if(id===7 && i===4) { if(c==="On Time") attrs+=' style="color:var(--green-light);font-weight:700;"'; else if(c==="Exceeded") attrs+=' style="color:var(--red);font-weight:700;"'; else attrs+=' style="color:var(--text-dim);"'; }
+      html+='<td'+attrs+'>'+esc(String(c??""))+'</td>';
+    });
+    html+='</tr>';
   });
   html+='</tbody></table>';
   document.getElementById("report-table-wrap").innerHTML=html;
