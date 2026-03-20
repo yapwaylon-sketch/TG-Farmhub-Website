@@ -2695,6 +2695,10 @@ async function saveNewLoan() {
   if (amount <= 0) { notify("Amount must be greater than 0", "warning"); return; }
   if (!date_issued) { notify("Date is required", "warning"); return; }
 
+  if (!editId) {
+    if (!confirm("Issue loan of RM " + fmtNum2(amount) + " for \"" + purpose + "\"?")) return;
+  }
+
   if (editId) {
     var loan = workerLoans.find(function(x) { return x.id === editId; });
     if (!loan) return;

@@ -145,6 +145,11 @@ Growing → To Induce → Induced → Suckers → To Replant → *(Start New Cyc
 | `salary_advance_categories_migration.sql` | Added `category` column to salary_advances (Canteen/Cigarettes/Salary Advance/Overpayment), `cash_handed` to payroll_entries |
 | `google_auth_migration.sql` | Added `email` column to `public.users`, set admin email for Google OAuth |
 | `packaging_fields_migration.sql` | Added `packaging_size`, `packaging_unit`, `packaging_type` to `pnd_products` |
+| `ingredient_inventory_link_migration.sql` | **DEPRECATED** — superseded by spray_inventory_link_migration.sql. DO NOT RUN. |
+| `spray_inventory_link_migration.sql` | Added `inventory_product_id` to `pnd_products`, dropped `ingredient_inventory_link` table |
+| `latest_sprays_by_ai_migration.sql` | **DEPRECATED** — superseded by latest_sprays_by_ai_v2_migration.sql. DO NOT RUN. |
+| `latest_sprays_by_ai_v2_migration.sql` | View `pnd_latest_sprays_by_ai` with `ai_combo_key` grouping (sorted ingredient IDs) |
+| `ai_combo_overhaul_migration.sql` | Created `ai_combo_defaults` table, added `ai_combo_key` to `pnd_jobs`, wiped existing jobs/logs |
 
 ### How to run SQL migrations
 ```bash
@@ -207,6 +212,8 @@ rm -rf node_modules package-lock.json package.json
 - **Block management reminder**: Clickable to filter/show only incomplete blocks; excludes inactive (deactivated) blocks from count
 - Filter dropdowns: populate on data load only, NOT on every render (prevents state reset)
 - TV displays: same Netlify site, URL token auth (`?token=pnd2026`), read-only
+- **Spray-Inventory Link**: `pnd_products.inventory_product_id` FK links each spray product directly to `products` (inventory). Products are managed in Inventory module; Spray Tracker only configures spray-specific fields (interval, dose). Products page has "Enable for Spraying" to activate inventory products, and "Link to Inventory" banner for legacy unlinked products. Active Jobs page shows product-level stock check cards (need vs have + cost).
+- **Multiple jobs per block**: Scheduled jobs no longer blocked by existing active jobs for same block+product. Shows info warning instead.
 
 ## Sub-Projects (same folder, separate deploys)
 These live inside this folder but are gitignored. They share the same Supabase database and read from the same tables.

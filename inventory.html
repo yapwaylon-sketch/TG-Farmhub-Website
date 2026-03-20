@@ -979,7 +979,14 @@ select { min-width: 140px; }
     <div class="form-row">
       <div class="form-field">
         <label>Formulation</label>
-        <select id="prod-formulation" style="width:100%;"></select>
+        <select id="prod-formulation" style="width:100%;" onchange="onFormulationChange(this)"></select>
+        <div id="prod-formulation-new-wrap" style="display:none;margin-top:6px;">
+          <input id="prod-formulation-new" placeholder="New formulation name" style="width:100%;">
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <button class="btn btn-primary btn-sm" type="button" onclick="addNewFormulation()">Add</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="cancelNewFormulation()">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="form-row">
@@ -1008,9 +1015,24 @@ select { min-width: 140px; }
         </select>
       </div>
     </div>
-    <div class="form-field">
-      <label>Reorder Level</label>
-      <input type="number" id="prod-reorder" placeholder="0" style="width:100%;">
+    <div class="form-row">
+      <div class="form-field">
+        <label>Reorder Level</label>
+        <input type="number" id="prod-reorder" placeholder="0" style="width:100%;">
+      </div>
+    </div>
+    <div id="prod-opening-stock-section">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin:12px 0 8px;border-top:1px solid var(--border);padding-top:12px;">Opening Stock (one-time)</div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Opening Qty</label>
+          <input type="number" id="prod-opening-qty" placeholder="0" min="0" step="any" style="width:100%;">
+        </div>
+        <div class="form-field">
+          <label>Unit Cost (RM)</label>
+          <input type="number" id="prod-opening-cost" placeholder="0.00" min="0" step="0.01" style="width:100%;">
+        </div>
+      </div>
     </div>
     <div class="form-field">
       <label>Suppliers</label>
@@ -1078,6 +1100,8 @@ let products = [];
 let suppliers = [];
 let workers = [];
 let transactions = [];
+let pndIngredients = [];
+let pndFormulations = [];
 
 let currentUser = null; // set on login
 let dbReady = false;
@@ -1105,12 +1129,14 @@ function mapTxnFromDb(row) {
 // SUPABASE DATA LOADING
 // ============================================================
 async function loadAllData() {
-  const [uData, pData, sData, wData, tData] = await Promise.all([
+  const [uData, pData, sData, wData, tData, iData, fData] = await Promise.all([
     sbQuery(sb.from("users").select("*")),
     sbQuery(sb.from("products").select("*")),
     sbQuery(sb.from("suppliers").select("*")),
     sbQuery(sb.from("workers").select("*")),
     sbQuery(sb.from("transactions").select("*").order("date", { ascending: false })),
+    sbQuery(sb.from("pnd_ingredients").select("*").order("name")),
+    sbQuery(sb.from("pnd_formulations").select("*").order("name")),
   ]);
 
   if (!uData || !pData || !sData || !wData || !tData) return;
@@ -1120,8 +1146,10 @@ async function loadAllData() {
   suppliers = sData.map(mapSupplierFromDb);
   workers = wData.map(mapWorkerFromDb);
   transactions = tData.map(mapTxnFromDb);
+  if (iData) pndIngredients = iData;
+  if (fData) pndFormulations = fData;
   dbReady = true;
-  console.log("✅ Data loaded from Supabase:", { users: users.length, products: products.length, suppliers: suppliers.length, workers: workers.length, transactions: transactions.length });
+  console.log("✅ Data loaded from Supabase:", { users: users.length, products: products.length, suppliers: suppliers.length, workers: workers.length, transactions: transactions.length, ingredients: pndIngredients.length });
 }
 
 async function syncNow() {
@@ -1505,11 +1533,15 @@ function renderDashboard() {
     productUsageForChart[t.productId] = (productUsageForChart[t.productId] || 0) + t.quantity;
   });
 
-  // Group by active ingredient
+  // Group by active ingredient — match to pnd_ingredients for normalized grouping
   const aiGroups = {};
-  activeProducts.filter(p => p.reorderLevel > 0).forEach(p => {
-    const key = p.activeIngredient.trim().toLowerCase();
-    if (!aiGroups[key]) aiGroups[key] = { name: p.activeIngredient, packType: p.packType, packSize: p.packSize, packUnit: p.packUnit, totalStock: 0, totalReorder: 0, products: [] };
+  activeProducts.filter(p => p.activeIngredient && p.activeIngredient.trim()).forEach(p => {
+    // Try to match to a pnd_ingredients entry (normalized name)
+    const rawAI = p.activeIngredient.trim();
+    const match = pndIngredients.find(i => i.name.toLowerCase() === rawAI.toLowerCase() || i.name.replace(/\s+/g,' ').toLowerCase() === rawAI.replace(/\s+/g,' ').toLowerCase());
+    const key = match ? match.id : rawAI.replace(/\s+/g,' ').toLowerCase();
+    const displayName = match ? match.name : rawAI;
+    if (!aiGroups[key]) aiGroups[key] = { name: displayName, packType: p.packType, packSize: p.packSize, packUnit: p.packUnit, totalStock: 0, totalReorder: 0, products: [] };
     aiGroups[key].totalStock += p.currentStock;
     aiGroups[key].totalReorder += p.reorderLevel;
     aiGroups[key].products.push({ ...p, usage: productUsageForChart[p.id] || 0 });
@@ -1659,6 +1691,9 @@ function renderProductRow(p) {
       </button>
       <button class="btn btn-outline" style="padding:4px 8px;" onclick="event.stopPropagation();openEditProduct('${p.id}')" title="Edit">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="btn btn-outline" style="padding:4px 8px;color:var(--critical);border-color:var(--critical);" onclick="event.stopPropagation();deleteProduct('${p.id}')" title="Delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
     </td>
   </tr>`;
@@ -2456,7 +2491,7 @@ async function deleteTransaction(txnId) {
 function getProductAvgCost(productId) {
   let totalCost = 0, totalQty = 0;
   transactions.forEach(t => {
-    if (t.productId === productId && t.type === "in" && t.totalCost > 0) {
+    if (t.productId === productId && (t.type === "in" || t.type === "opening") && t.totalCost > 0) {
       totalCost += t.totalCost;
       totalQty += t.quantity;
     }
@@ -2505,6 +2540,9 @@ function openProductModal() {
   document.getElementById("prod-pack-type").value = "Bag";
   document.getElementById("prod-pack-size").value = "";
   document.getElementById("prod-pack-unit").value = "kg";
+  document.getElementById("prod-opening-qty").value = "";
+  document.getElementById("prod-opening-cost").value = "";
+  document.getElementById("prod-opening-stock-section").style.display = "block";
   populateSupplierCheckboxes([]);
   clearProductImage();
   document.getElementById("prod-image-file").value = "";
@@ -2527,6 +2565,7 @@ function openEditProduct(id) {
   document.getElementById("prod-pack-size").value = p.packSize || "";
   document.getElementById("prod-pack-unit").value = p.packUnit || "kg";
   document.getElementById("prod-reorder").value = p.reorderLevel;
+  document.getElementById("prod-opening-stock-section").style.display = "none";
   populateSupplierCheckboxes(p.supplierIds || []);
   // Show existing image
   if (p.imageUrl) {
@@ -2583,10 +2622,8 @@ function updateSubcategories() {
 }
 
 function getAllIngredients() {
-  // Merge CONFIG master list + any ingredients already used in products
-  const set = new Set(CONFIG.ingredients.map(i => i.trim()));
-  products.forEach(p => { if (p.activeIngredient && p.activeIngredient.trim()) set.add(p.activeIngredient.trim()); });
-  return [...set].sort((a, b) => a.localeCompare(b));
+  // Use pnd_ingredients from database as the single source of truth
+  return pndIngredients.map(i => i.name.trim()).filter(Boolean).sort((a, b) => a.localeCompare(b));
 }
 
 function showIngredientList() {
@@ -2628,12 +2665,52 @@ function filterIngredientList() {
   dropdown.style.display = "block";
 }
 
-function selectIngredient(value) {
+function onFormulationChange(sel) {
+  if(sel.value === '__new__') {
+    sel.style.display = 'none';
+    document.getElementById('prod-formulation-new-wrap').style.display = 'block';
+    document.getElementById('prod-formulation-new').focus();
+  }
+}
+
+async function addNewFormulation() {
+  const input = document.getElementById('prod-formulation-new');
+  const name = input.value.trim();
+  if(!name) { notify('Enter a formulation name', 'warning'); return; }
+  // Save to pnd_formulations
+  const exists = pndFormulations.find(f => f.name.toLowerCase() === name.toLowerCase());
+  if(!exists) {
+    const result = await sbQuery(sb.from('pnd_formulations').insert({ name }).select());
+    if(result && result.length) pndFormulations.push(result[0]);
+  }
+  // Add to dropdown and select it
+  const sel = document.getElementById('prod-formulation');
+  const allFormulations = [...new Set([...CONFIG.formulations, ...pndFormulations.map(f => f.name)])].sort();
+  sel.innerHTML = '<option value="">Select...</option>' + allFormulations.map(f => `<option value="${f}">${f}</option>`).join("") + '<option value="__new__">+ Add New...</option>';
+  sel.value = name;
+  sel.style.display = '';
+  document.getElementById('prod-formulation-new-wrap').style.display = 'none';
+  input.value = '';
+}
+
+function cancelNewFormulation() {
+  const sel = document.getElementById('prod-formulation');
+  sel.value = '';
+  sel.style.display = '';
+  document.getElementById('prod-formulation-new-wrap').style.display = 'none';
+  document.getElementById('prod-formulation-new').value = '';
+}
+
+async function selectIngredient(value) {
   document.getElementById("prod-ingredient").value = value;
   document.getElementById("ingredient-dropdown").style.display = "none";
-  // Auto-add to CONFIG if new
-  if (!CONFIG.ingredients.some(i => i.toLowerCase() === value.toLowerCase())) {
-    CONFIG.ingredients.push(value);
+  // Auto-create in pnd_ingredients if new
+  const exists = pndIngredients.find(i => i.name.toLowerCase() === value.toLowerCase());
+  if (!exists) {
+    const result = await sbQuery(sb.from("pnd_ingredients").insert({ name: value }).select());
+    if (result && result.length) {
+      pndIngredients.push(result[0]);
+    }
   }
 }
 
@@ -2670,10 +2747,34 @@ async function saveProduct() {
       // Cascade: update product_name in all transactions
       if (oldName !== name) {
         await cascadeProductRename(editId, oldName, name);
-        notify(name + ' updated — all records updated from "' + oldName + '"');
-      } else {
-        notify(name + " updated");
       }
+      // Cascade: sync to linked spray product (pnd_products)
+      const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant' };
+      const sprayUpdate = { product_name: name, product_type: typeMap[category] || 'pesticide', packaging_size: packSize || null, packaging_unit: packUnit || null, packaging_type: packType || null };
+      await sbQuery(sb.from('pnd_products').update(sprayUpdate).eq('inventory_product_id', editId).select());
+      // Sync AI to pnd_product_ingredients if AI changed
+      if (activeIngredient) {
+        const sprayProducts = await sbQuery(sb.from('pnd_products').select('id').eq('inventory_product_id', editId));
+        if (sprayProducts && sprayProducts.length) {
+          for (const sp of sprayProducts) {
+            // Remove old AI links
+            await sbQuery(sb.from('pnd_product_ingredients').delete().eq('product_id', sp.id).select());
+            // Add new AI links
+            const aiNames = activeIngredient.split(/[+\/,]/).map(s => s.trim()).filter(Boolean);
+            for (const aiName of aiNames) {
+              let ing = pndIngredients.find(i => i.name.toLowerCase() === aiName.toLowerCase());
+              if (!ing) {
+                const ingResult = await sbQuery(sb.from('pnd_ingredients').insert({ name: aiName }).select());
+                if (ingResult && ingResult.length) { ing = ingResult[0]; pndIngredients.push(ing); }
+              }
+              if (ing) {
+                await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: sp.id, ingredient_id: ing.id }).select());
+              }
+            }
+          }
+        }
+      }
+      notify(oldName !== name ? name + ' updated — all records synced from "' + oldName + '"' : name + " updated");
     }
   } else {
     const newId = await dbNextId("P");
@@ -2681,16 +2782,48 @@ async function saveProduct() {
     if (imageFile) {
       imageUrl = await uploadProductImage(newId, imageFile);
     }
-    const p = { id: newId, name, category, subcategory, activeIngredient, formulation, packType, packSize, packUnit, reorderLevel, currentStock: 0, openingStock: 0, archived: false, supplierIds, imageUrl };
+    const openingQty = parseFloat(document.getElementById("prod-opening-qty").value) || 0;
+    const openingCost = parseFloat(document.getElementById("prod-opening-cost").value) || 0;
+    const p = { id: newId, name, category, subcategory, activeIngredient, formulation, packType, packSize, packUnit, reorderLevel, currentStock: openingQty, openingStock: openingQty, archived: false, supplierIds, imageUrl };
     await dbInsertProduct(p);
     products.push(p);
-    notify(name + " added to inventory");
+    // Create opening transaction if qty > 0
+    if(openingQty > 0) {
+      const txnId = await dbNextId("T");
+      const txn = { id: txnId, date: new Date().toISOString().split("T")[0], productId: newId, productName: name, type: "opening", quantity: openingQty, supplier: "", takenBy: "", invoiceNo: "", recordedBy: currentUser.displayName || "Admin", unitCost: openingCost, totalCost: openingQty * openingCost, notes: "Opening stock with unit cost" };
+      await dbInsertTransaction(txn);
+      transactions.unshift(txn);
+    }
+    notify(name + " added to inventory" + (openingQty > 0 ? " with opening stock of " + openingQty : ""));
   }
 
   document.getElementById("prod-image-file").dataset.cleared = "";
   closeModal("product-modal");
   if (currentPage === "products") renderProducts();
   if (selectedProductId) renderJournal();
+}
+
+async function deleteProduct(id) {
+  const p = products.find(pr => pr.id === id);
+  if(!p) return;
+  const txnCount = transactions.filter(t => t.productId === id).length;
+  let msg = 'Delete "' + p.name + '"?';
+  if(txnCount > 0) msg += '\n\nThis product has ' + txnCount + ' transaction(s) which will also be deleted.';
+  if(!confirm(msg)) return;
+  // Delete transactions first
+  if(txnCount > 0) {
+    await sbQuery(sb.from("transactions").delete().eq("product_id", id).select());
+    transactions = transactions.filter(t => t.productId !== id);
+  }
+  // Unlink from any spray products
+  await sbQuery(sb.from("pnd_products").update({ inventory_product_id: null }).eq("inventory_product_id", id).select());
+  // Delete the product
+  await sbQuery(sb.from("products").delete().eq("id", id).select());
+  products = products.filter(pr => pr.id !== id);
+  if(selectedProductId === id) { selectedProductId = null; }
+  notify(p.name + " deleted");
+  renderProducts();
+  renderJournal();
 }
 
 // ============================================================
@@ -3016,7 +3149,8 @@ async function init() {
   prodCat.innerHTML = '<option value="">Select...</option>' + Object.keys(CONFIG.categories).map(c => `<option value="${c}">${c}</option>`).join("");
 
   const prodForm = document.getElementById("prod-formulation");
-  prodForm.innerHTML = '<option value="">Select...</option>' + CONFIG.formulations.map(f => `<option value="${f}">${f}</option>`).join("");
+  const allFormulations = [...new Set([...CONFIG.formulations, ...pndFormulations.map(f => f.name)])].sort();
+  prodForm.innerHTML = '<option value="">Select...</option>' + allFormulations.map(f => `<option value="${f}">${f}</option>`).join("") + '<option value="__new__">+ Add New...</option>';
 
   // Pack type/size/unit fields are hardcoded in HTML - no dynamic init needed
 

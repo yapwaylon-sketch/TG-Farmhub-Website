@@ -1520,17 +1520,83 @@ async function fcSaveBlockCrop(id) {
   notify('Saved');
 }
 
-// When status changes to an "induced" status, prompt for induction dates
+// When status changes, prompt appropriate modal
 function fcOnStatusChange(bcId, statusId) {
   if(!statusId) return;
   const status = fcCropStatuses.find(s => s.id === statusId);
   if(!status) return;
   const name = (status.name || '').toLowerCase();
-  if(name === 'induced' || name === 'to induce') {
+  if(name === 'to induce') {
+    fcOpenToInducePrompt(bcId, status.name);
+  } else if(name === 'induced') {
     fcOpenInductionPrompt(bcId, status.name);
   }
 }
 
+// "To Induce" — simple prompt for target induce date only
+async function fcOpenToInducePrompt(bcId, statusName) {
+  const bc = fcBlockCrops.find(x => x.id === bcId);
+  if(!bc) return;
+  const block = fcBlocks.find(b => b.id === bc.block_id);
+  const variety = fcVarieties.find(v => v.id === bc.variety_id);
+  const crop = variety ? fcCrops.find(c => c.id === variety.crop_id) : null;
+  const blockName = block ? block.block_name : '?';
+  const cropLabel = (crop ? crop.name : '?') + ' — ' + (variety ? variety.name : '?');
+
+  // Fetch existing target_induce_date to pre-fill
+  let existingDate = '';
+  const existing = await sbQuery(sb.from('growth_records').select('target_induce_date').eq('block_crop_id', bcId).limit(1));
+  if(existing && existing.length > 0 && existing[0].target_induce_date) {
+    existingDate = existing[0].target_induce_date;
+  }
+  if(!existingDate) existingDate = new Date().toISOString().split('T')[0];
+
+  let mc = document.getElementById('fc-modal-container');
+  if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:380px;max-width:90vw;position:relative;">' +
+        '<button onclick="fcCloseInductionPrompt()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:4px;">Target Induce Date — ' + esc(blockName) + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">' + esc(cropLabel) + '</div>' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">Target Induce Date</label>' +
+          '<input type="date" id="fc-target-induce-date" value="' + existingDate + '" class="inline-input" style="width:100%;">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+          '<button class="btn btn-outline" onclick="fcCloseInductionPrompt()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="fcSaveToInduce(\'' + bcId + '\')">Save</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+async function fcSaveToInduce(bcId) {
+  const targetDate = document.getElementById('fc-target-induce-date').value || null;
+  if(!targetDate) { notify('Target induce date is required', 'warning'); return; }
+
+  const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', bcId).limit(1));
+  if(existing && existing.length > 0) {
+    const r = await sbQuery(sb.from('growth_records').update({ target_induce_date: targetDate }).eq('id', existing[0].id).select());
+    if(r === null) return;
+  } else {
+    const r = await sbQuery(sb.from('growth_records').insert({ block_crop_id: bcId, target_induce_date: targetDate }).select());
+    if(r === null) return;
+  }
+
+  // Save status on block_crops
+  const stEl = document.getElementById('fc-st-' + bcId);
+  if(stEl && stEl.value) {
+    await sbQuery(sb.from('block_crops').update({ status_id: stEl.value }).eq('id', bcId).select());
+    const bc = fcBlockCrops.find(x => x.id === bcId); if(bc) bc.status_id = stEl.value;
+  }
+
+  notify('Target induce date saved');
+  fcCloseInductionPrompt();
+}
+
+// "Induced" — full modal for induction date range + harvest days
 function fcOpenInductionPrompt(bcId, statusName) {
   const bc = fcBlockCrops.find(x => x.id === bcId);
   if(!bc) return;
@@ -1540,7 +1606,6 @@ function fcOpenInductionPrompt(bcId, statusName) {
   const blockName = block ? block.block_name : '?';
   const cropLabel = (crop ? crop.name : '?') + ' — ' + (variety ? variety.name : '?');
 
-  // Check if modal-container exists, if not create one
   let mc = document.getElementById('fc-modal-container');
   if(!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
 

@@ -191,6 +191,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
       </button>
     </div>
   </div>
+  <div id="jobs-product-summary" style="display:none;margin-bottom:12px;"></div>
   <div class="data-table">
     <div class="table-toolbar" id="jobs-toolbar">
       <select id="jobs-filter-status" onchange="renderJobsTable()" style="min-width:140px;">
@@ -217,7 +218,7 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
       <table>
         <thead><tr>
           <th style="width:36px;text-align:center;"><input type="checkbox" id="jobs-select-all" onchange="toggleSelectAll(this.checked)" title="Select all"></th>
-          <th>Planned Date</th><th>Block</th><th>Type</th><th>Product</th><th>Active Ingredient</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
+          <th>Planned Date</th><th>Block</th><th>Type</th><th>Active Ingredient</th><th>Product Used</th><th>Worker</th><th>Tank</th><th>Tanks</th><th>Total Req.</th><th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="jobs-body"></tbody>
       </table>
@@ -229,42 +230,30 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
 <!-- PAGE: PRODUCTS -->
 <div id="page-products" class="page">
   <div class="page-header">
-    <div><div class="page-title">Manage Products</div><div class="page-subtitle">Edit products, intervals, and default dosages</div></div>
+    <div><div class="page-title">Spray Products</div><div class="page-subtitle">Products are managed in Inventory. Configure spray settings here.</div></div>
   </div>
+  <div id="unlinked-products-banner" style="display:none;margin-bottom:12px;"></div>
   <div class="data-table" style="margin-bottom:18px;">
-    <div class="table-header">All Products</div>
+    <div class="table-header">Spray Products</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Product Name</th><th>Active Ingredient</th><th>Formulation</th><th>Type</th><th>Interval (days)</th><th>Default Dose</th><th>Packaging</th><th>Active</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Product Name</th><th>Active Ingredient</th><th>Formulation</th><th>Type</th><th>Packaging</th><th>Stock</th><th>Active</th><th></th></tr></thead>
         <tbody id="products-body"></tbody>
       </table>
     </div>
   </div>
-  <div class="data-table">
-    <div class="table-header">Add New Product</div>
-    <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end;">
-      <div class="form-field" style="margin:0;"><label>Product Name</label><input id="ap-name" placeholder="e.g. Metalaxyl" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;grid-column:span 2;"><label>Active Ingredient(s) <span style="color:var(--danger);font-size:10px;">*required</span></label>
-        <div id="ap-ingredient-list" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <select id="ap-ingredient-sel" style="flex:1;min-width:0;"><option value="">— Select ingredient —</option></select>
-          <button class="btn btn-primary btn-sm" type="button" onclick="apAddSelectedIngredient()" style="white-space:nowrap;padding:6px 12px;font-size:13px;font-weight:700;">+ Add</button>
-        </div>
-        <div id="ap-ingredient-new-wrap" style="display:none;margin-top:6px;"><input id="ap-ingredient-new" placeholder="New ingredient name" style="width:100%;"><div style="display:flex;gap:4px;margin-top:4px;"><button class="btn btn-primary btn-sm" onclick="apAddNewIngredient()">Add</button><button class="btn btn-outline btn-sm" onclick="cancelNewIngredient()">Cancel</button></div></div>
-      </div>
-      <div class="form-field" style="margin:0;"><label>Formulation</label>
-        <select id="ap-formulation" style="width:100%;" onchange="if(this.value==='__new__'){this.style.display='none';document.getElementById('ap-formulation-new-wrap').style.display='block';}"><option value="">— Select —</option></select>
-        <div id="ap-formulation-new-wrap" style="display:none;margin-top:6px;"><input id="ap-formulation-new" placeholder="New formulation name" style="width:100%;"><button class="btn btn-outline btn-sm" style="margin-top:4px;" onclick="cancelNewFormulation()">Cancel</button></div>
-      </div>
-      <div class="form-field" style="margin:0;"><label>Type</label><select id="ap-type" style="width:100%;"><option value="fungicide">Fungicide</option><option value="pesticide">Pesticide</option></select></div>
-      <div class="form-field" style="margin:0;"><label>Interval (days)</label><input id="ap-interval" type="number" placeholder="—" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Dose Amount</label><input id="ap-dose-amt" type="number" step="0.001" placeholder="e.g. 250" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Dose Unit</label><select id="ap-dose-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
-      <div class="form-field" style="margin:0;"><label>Litres</label><input id="ap-dose-per" type="number" placeholder="e.g. 100" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Pack Size</label><input id="ap-pkg-size" type="number" step="0.001" placeholder="e.g. 250" style="width:100%;"></div>
-      <div class="form-field" style="margin:0;"><label>Pack Unit</label><select id="ap-pkg-unit" style="width:100%;"><option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option></select></div>
-      <div class="form-field" style="margin:0;"><label>Pack Type</label><select id="ap-pkg-type" style="width:100%;"><option value="">—</option><option value="packet">Packet</option><option value="box">Box</option><option value="bottle">Bottle</option><option value="drum">Drum</option><option value="bag">Bag</option><option value="can">Can</option></select></div>
-      <div class="form-field" style="margin:0;"><button class="btn btn-primary" onclick="addProduct()" style="width:100%;">Add Product</button></div>
+  <div class="data-table" style="margin-bottom:18px;">
+    <div class="table-header">Enable Inventory Products for Spraying</div>
+    <div style="padding:16px;">
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Select products from Inventory to use in spray jobs. Only Pesticide, Fungicide, Herbicide, PGR, and Adjuvant categories are shown.</div>
+      <div id="enable-products-container"></div>
+    </div>
+  </div>
+  <div class="data-table" style="margin-bottom:18px;">
+    <div class="table-header">AI Dose & Interval Settings</div>
+    <div style="padding:16px;">
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Set default dose and spray interval per active ingredient combo. These are used when creating new jobs.</div>
+      <div id="ai-dose-settings-container"></div>
     </div>
   </div>
   <div class="data-table">
@@ -373,7 +362,8 @@ if(!currentUser) { location.href = "index.html"; }
 // ============================================================
 let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], latestSprays=[], sprayLogs=[];
 let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
-let blockCrops=[], cropStatuses=[];
+let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
+let inventoryProducts=[], inventoryTransactions=[];
 let summaryStatusFilter = '';
 let currentPage = 'summary';
 let currentReport = null;
@@ -396,7 +386,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]);
 }
 
 async function syncAll() {
@@ -411,7 +401,7 @@ async function syncAll() {
 function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
-    await Promise.all([loadLatestSprays(), loadJobs(), loadOverrides()]);
+    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides()]);
     if(currentPage === 'summary') renderSummary();
     if(currentPage === 'jobs') renderJobsTable();
     if(currentPage === 'joblogs') renderJobLogs();
@@ -429,10 +419,10 @@ function navigateTo(page) {
 }
 
 async function renderCurrentPage() {
-  if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadJobs(), loadBlockCrops(), loadCropStatuses()]); renderSummary(); }
-  else if(currentPage === 'jobs') { await loadJobs(); populateJobFilters(); renderJobsTable(); }
+  if(currentPage === 'summary') { await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadBlockCrops(), loadCropStatuses(), loadIngredients(), loadProductIngredients()]); renderSummary(); }
+  else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
-  else if(currentPage === 'products') { await Promise.all([loadIngredients(), loadFormulations(), loadProductIngredients()]); renderProductsPage(); populateAddProductDropdowns(); renderOverridesSection(); }
+  else if(currentPage === 'products') { await Promise.all([loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); renderProductsPage(); renderEnableProductsSection(); renderAIDoseSettings(); renderOverridesSection(); }
   else if(currentPage === 'reports') initReports();
 }
 
@@ -488,6 +478,34 @@ function getJobProducts(jobId) {
 async function loadLatestSprays() {
   const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
   if(data) latestSprays = data;
+}
+async function loadLatestSpraysByAI() {
+  const data = await sbQuery(sb.from("pnd_latest_sprays_by_ai").select("*"));
+  if(data) latestSpraysByAI = data;
+}
+async function loadAIComboDefaults() {
+  const data = await sbQuery(sb.from("ai_combo_defaults").select("*"));
+  if(data) aiComboDefaults = data;
+}
+function getAIComboDefault(key) {
+  return aiComboDefaults.find(d => d.ai_combo_key === key);
+}
+async function loadInventoryProducts() {
+  const data = await sbQuery(sb.from("products").select("id,name,category,active_ingredient,current_stock,pack_size,pack_unit,pack_type,archived").eq("archived", false));
+  if(data) inventoryProducts = data;
+}
+async function loadInventoryTransactions() {
+  const data = await sbQuery(sb.from("transactions").select("product_id,type,quantity,unit_cost,total_cost").in("type",["in"]));
+  if(data) inventoryTransactions = data;
+}
+function getInventoryProduct(id) {
+  return inventoryProducts.find(p => p.id === id);
+}
+function getInventoryWAC(inventoryProductId) {
+  const txns = inventoryTransactions.filter(t => t.product_id === inventoryProductId && parseFloat(t.total_cost) > 0);
+  const totalCost = txns.reduce((s, t) => s + (parseFloat(t.total_cost) || 0), 0);
+  const totalQty = txns.reduce((s, t) => s + (parseFloat(t.quantity) || 0), 0);
+  return totalQty > 0 ? totalCost / totalQty : 0;
 }
 async function loadBlockCrops() {
   const data = await sbQuery(sb.from("block_crops").select("*,crop_varieties(id,name)").eq("is_current",true));
@@ -609,19 +627,37 @@ function allowedTransitions(current) {
 // SUMMARY PAGE
 // ============================================================
 let summaryTab = 0;
-const PRODUCTS_PER_TAB = 2;
+
+// Build AI combo groups from active products
+// Each combo is { key: sorted ingredient IDs, names: ["AI1", "AI2"], label: "AI1 + AI2", productIds: [...] }
+function getAICombos() {
+  const activeProductIds = products.filter(p => p.is_active).map(p => p.id);
+  const comboMap = {}; // key -> { key, names, productIds }
+  activeProductIds.forEach(pid => {
+    const pIngs = productIngredients.filter(pi => pi.product_id === pid && pi.pnd_ingredients);
+    if(!pIngs.length) return;
+    const sortedIds = pIngs.map(pi => pi.pnd_ingredients.id).sort();
+    const key = sortedIds.join(',');
+    if(!comboMap[key]) {
+      const names = pIngs.map(pi => pi.pnd_ingredients.name).sort();
+      comboMap[key] = { key, names, label: names.join(' + '), productIds: [] };
+    }
+    comboMap[key].productIds.push(pid);
+  });
+  return Object.values(comboMap).sort((a,b) => a.label.localeCompare(b.label));
+}
 
 function renderSummary() {
   const activeBlocks = blocks.filter(b=>b.is_active);
-  const activeProducts = products.filter(p=>p.is_active);
+  const combos = getAICombos();
   const today = todayStr();
   const map = {};
-  latestSprays.forEach(ls => { map[ls.block_id+"_"+ls.product_id] = ls; });
+  latestSpraysByAI.forEach(ls => { map[ls.block_id+"_"+ls.ai_combo_key] = ls; });
 
   let overdue=0, dueSoon=0, allClear=0, noData=0;
   activeBlocks.forEach(b => {
-    activeProducts.forEach(p => {
-      const ls = map[b.id+"_"+p.id];
+    combos.forEach(c => {
+      const ls = map[b.id+"_"+c.key];
       if(!ls || !ls.next_spray_date) { noData++; return; }
       const dl = daysDiff(today, ls.next_spray_date);
       if(dl<0) overdue++;
@@ -635,9 +671,9 @@ function renderSummary() {
     <div class="summary-card" style="background:rgba(232,96,96,0.08);border-color:rgba(232,96,96,0.3);"><div class="sc-label">Overdue</div><div class="sc-value" style="color:var(--red);">${overdue}</div><div class="sc-sub">Past next spray date</div></div>
     <div class="summary-card" style="background:rgba(232,160,32,0.08);border-color:rgba(232,160,32,0.3);"><div class="sc-label">Due This Week</div><div class="sc-value" style="color:var(--gold);">${dueSoon}</div><div class="sc-sub">Within 7 days</div></div>
     <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>
-    <div class="summary-card" style="background:rgba(128,128,128,0.08);border-color:rgba(128,128,128,0.3);"><div class="sc-label">No Data</div><div class="sc-value" style="color:var(--text-dim);">${noData}</div><div class="sc-sub">Block+product with no spray history</div></div>`;
+    <div class="summary-card" style="background:rgba(128,128,128,0.08);border-color:rgba(128,128,128,0.3);"><div class="sc-label">No Data</div><div class="sc-value" style="color:var(--text-dim);">${noData}</div><div class="sc-sub">No spray history</div></div>`;
 
-  // Populate status filter dropdown (preserve selection)
+  // Populate status filter
   const filterEl = document.getElementById("summary-status-filter");
   const uniqueStatuses = [...new Set(activeBlocks.map(b => {
     const bc = getBlockCrop(b.id);
@@ -645,37 +681,37 @@ function renderSummary() {
   }))].sort();
   filterEl.innerHTML = '<option value="">All Statuses</option>' + uniqueStatuses.map(s => `<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
 
-  // Build product tabs (2 products per tab)
-  const totalTabs = Math.ceil(activeProducts.length / PRODUCTS_PER_TAB);
-  if(summaryTab >= totalTabs) summaryTab = 0;
-  let tabsHtml = '';
-  for(let t=0; t<totalTabs; t++) {
-    const tabProds = activeProducts.slice(t*PRODUCTS_PER_TAB, (t+1)*PRODUCTS_PER_TAB);
-    const label = tabProds.map(p => esc(p.product_name.split('(')[0].trim())).join(' + ');
-    tabsHtml += `<button class="sum-tab${t===summaryTab?' active':''}" onclick="summaryTab=${t};renderSummaryTable()">${label}</button>`;
-  }
-  document.getElementById("summary-tabs").innerHTML = tabsHtml;
+  // Build AI combo tabs — one combo per tab
+  if(summaryTab >= combos.length) summaryTab = 0;
+  document.getElementById("summary-tabs").innerHTML = combos.map((c, t) =>
+    `<button class="sum-tab${t===summaryTab?' active':''}" onclick="summaryTab=${t};renderSummaryTable()">${esc(c.label)}</button>`
+  ).join('');
 
   renderSummaryTable();
 }
 
 function renderSummaryTable() {
   const activeBlocks = blocks.filter(b=>b.is_active);
-  const activeProducts = products.filter(p=>p.is_active);
+  const combos = getAICombos();
   const today = todayStr();
   const map = {};
-  latestSprays.forEach(ls => { map[ls.block_id+"_"+ls.product_id] = ls; });
+  latestSpraysByAI.forEach(ls => { map[ls.block_id+"_"+ls.ai_combo_key] = ls; });
 
-  // Build active jobs lookup map
+  const combo = combos[summaryTab];
+  if(!combo) {
+    document.getElementById("summary-table-wrap").innerHTML = '<div class="empty-state">No active ingredients found. Enable products with AIs first.</div>';
+    return;
+  }
+
+  // Active jobs for products in this combo
   const activeJobStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
   const ajMap = {};
-  jobs.filter(j=>activeJobStatuses.includes(j.status)).forEach(j => {
-    const key = j.block_id+"_"+j.product_id;
-    if(!ajMap[key]) ajMap[key] = [];
-    ajMap[key].push(j);
+  jobs.filter(j=>activeJobStatuses.includes(j.status) && combo.productIds.includes(j.product_id)).forEach(j => {
+    if(!ajMap[j.block_id]) ajMap[j.block_id] = [];
+    ajMap[j.block_id].push(j);
   });
 
-  // Enrich blocks with crop status info and apply filter
+  // Enrich blocks
   const statusOrder = {};
   cropStatuses.forEach((s,i) => { statusOrder[s.name] = i; });
   statusOrder['—'] = 999;
@@ -688,86 +724,82 @@ function renderSummaryTable() {
     return { ...b, _statusName: sName, _variety: variety, _datePlanted: datePlanted };
   });
 
-  // Apply status filter
-  if(summaryStatusFilter) {
-    enriched = enriched.filter(b => b._statusName === summaryStatusFilter);
-  }
+  if(summaryStatusFilter) enriched = enriched.filter(b => b._statusName === summaryStatusFilter);
 
-  // Sort by status group, then block name
   enriched.sort((a,b) => {
     const sa = statusOrder[a._statusName] ?? 998, sb2 = statusOrder[b._statusName] ?? 998;
     if(sa !== sb2) return sa - sb2;
     return (a.block_name||'').localeCompare(b.block_name||'', undefined, {numeric:true});
   });
 
-  // Get products for current tab
-  const tabProducts = activeProducts.slice(summaryTab*PRODUCTS_PER_TAB, (summaryTab+1)*PRODUCTS_PER_TAB);
-  const prodTints = ['rgba(74,124,63,0.04)', 'rgba(232,160,32,0.04)'];
-
-  // Update active tab styling
   document.querySelectorAll('.sum-tab').forEach((btn,i) => btn.classList.toggle('active', i===summaryTab));
 
-  let html = '<table><thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th><th rowspan="2" style="min-width:70px;">Status</th><th rowspan="2" style="min-width:60px;">Variety</th><th rowspan="2" style="min-width:50px;">Age</th>';
-  tabProducts.forEach(p => { html += `<th colspan="4" class="product-group">${esc(p.product_name)}</th>`; });
-  html += '</tr><tr>';
-  tabProducts.forEach(() => { html += '<th class="product-sub">Last</th><th class="product-sub">Elapsed</th><th class="product-sub">Next</th><th class="product-sub">Due In (Days)</th>'; });
-  html += '</tr></thead><tbody>';
+  // AI combo label + products list
+  const aiPills = combo.names.map(n => '<span style="background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:4px 14px;font-size:13px;font-weight:600;">' + esc(n) + '</span>').join(' ');
+  const prodNames = combo.productIds.map(pid => { const p=getProduct(pid); return p?p.product_name:'?'; }).join(', ');
+
+  let html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
+    aiPills +
+    '<span style="font-size:12px;color:var(--text-dim);">Products: ' + esc(prodNames) + '</span>' +
+  '</div>';
+
+  html += '<table><thead><tr>' +
+    '<th style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th>' +
+    '<th style="min-width:70px;">Status</th>' +
+    '<th style="min-width:60px;">Variety</th>' +
+    '<th style="min-width:50px;">Age</th>' +
+    '<th>Last Sprayed</th>' +
+    '<th>Days Elapsed</th>' +
+    '<th>Next Spray</th>' +
+    '<th>Due In (Days)</th>' +
+    '<th>Product Used</th>' +
+  '</tr></thead><tbody>';
 
   let prevStatus = null;
   enriched.forEach(b => {
-    // Status group separator
     if(b._statusName !== prevStatus) {
-      if(prevStatus !== null) {
-        html += `<tr><td colspan="${4 + tabProducts.length*4}" style="height:4px;padding:0;background:var(--border);"></td></tr>`;
-      }
+      if(prevStatus !== null) html += `<tr><td colspan="9" style="height:4px;padding:0;background:var(--border);"></td></tr>`;
       prevStatus = b._statusName;
     }
 
-    // Check if this block has any spray data at all for current tab products
-    const hasAnyData = tabProducts.some(p => {
-      const ls = map[b.id+"_"+p.id];
-      return ls && ls.next_spray_date;
-    });
-    const rowStyle = hasAnyData ? '' : ' style="opacity:0.55;"';
+    const ls = map[b.id+"_"+combo.key];
+    const hasData = ls && ls.next_spray_date;
+    const rowStyle = hasData ? '' : ' style="opacity:0.55;"';
 
-    html += `<tr${rowStyle}><td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
+    const cellJobs = ajMap[b.id] || [];
+    let jobIcons = '';
+    const schedJob = cellJobs.find(j=>j.job_type==='Scheduled');
+    const intvJob = cellJobs.find(j=>j.job_type==='Intervention');
+    if(schedJob) jobIcons += `<span title="Scheduled job — Worker: ${esc(schedJob.worker_name)}, Planned: ${fmtDateShort(schedJob.planned_date)}, Status: ${esc(schedJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">🔧</span>`;
+    if(intvJob) jobIcons += `<span title="Intervention — Worker: ${esc(intvJob.worker_name)}, Planned: ${fmtDateShort(intvJob.planned_date)}, Status: ${esc(intvJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">⚡</span>`;
+
+    const productUsed = hasData && ls.product_id ? (getProduct(ls.product_id)?.product_name || '—') : '—';
+
+    html += `<tr${rowStyle}>`;
+    html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
     html += `<td><span class="badge ${blockStatusBadgeClass(b._statusName)}">${esc(b._statusName)}</span></td>`;
     html += `<td style="font-size:11px;white-space:nowrap;">${esc(b._variety)}</td>`;
     html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b._datePlanted)}</td>`;
-    tabProducts.forEach((p, pi) => {
-      const ls = map[b.id+"_"+p.id];
-      const tint = prodTints[pi] || '';
-      const divCls = pi===0 ? ' pg-divider' : '';
-      // Active job indicators
-      const cellJobs = ajMap[b.id+"_"+p.id] || [];
-      let jobIcons = '';
-      const schedJob = cellJobs.find(j=>j.job_type==='Scheduled');
-      const intvJob = cellJobs.find(j=>j.job_type==='Intervention');
-      if(schedJob) jobIcons += `<span title="Scheduled job active — Worker: ${esc(schedJob.worker_name)}, Planned: ${fmtDateShort(schedJob.planned_date)}, Status: ${esc(schedJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">🔧</span>`;
-      if(intvJob) jobIcons += `<span title="Intervention job active — Worker: ${esc(intvJob.worker_name)}, Planned: ${fmtDateShort(intvJob.planned_date)}, Status: ${esc(intvJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">⚡</span>`;
 
-      if(!ls || !ls.next_spray_date) {
-        const s = "color:var(--text-dim);" + (tint?"background:"+tint+";":"");
-        html += `<td class="spray-cell${divCls}" style="${s}">No data</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—</td><td class="spray-cell" style="${s}">—${jobIcons}</td>`;
-      } else {
-        const ds = daysDiff(ls.date_completed, today);
-        const dl = daysDiff(today, ls.next_spray_date);
-        let bg = tint ? "background:"+tint+";" : "";
-        if(dl<0) bg="background:rgba(232,96,96,0.15);";
-        else if(dl<=7) bg="background:rgba(232,160,32,0.15);";
-        const dlColor = dl<0?"color:var(--red);font-weight:700;":dl<=7?"color:var(--gold);font-weight:700;":"color:var(--green-light);";
-        html += `<td class="spray-cell${divCls}" style="${bg}">${fmtDateShort(ls.date_completed)}</td>`;
-        html += `<td class="spray-cell" style="${bg}">${ds!=null?ds:"—"}</td>`;
-        html += `<td class="spray-cell" style="${bg}">${fmtDateShort(ls.next_spray_date)}</td>`;
-        html += `<td class="spray-cell" style="${bg}${dlColor}">${dl!=null?dl:"—"}${jobIcons}</td>`;
-      }
-    });
+    if(!hasData) {
+      html += `<td style="color:var(--text-dim);">No data</td><td>—</td><td>—</td><td>—${jobIcons}</td><td>—</td>`;
+    } else {
+      const ds = daysDiff(ls.date_completed, today);
+      const dl = daysDiff(today, ls.next_spray_date);
+      let bg = '';
+      if(dl<0) bg='background:rgba(232,96,96,0.1);';
+      else if(dl<=7) bg='background:rgba(232,160,32,0.1);';
+      const dlColor = dl<0?"color:var(--red);font-weight:700;":dl<=7?"color:var(--gold);font-weight:700;":"color:var(--green-light);";
+      html += `<td style="${bg}">${fmtDateShort(ls.date_completed)}</td>`;
+      html += `<td style="${bg}">${ds!=null?ds+"d":"—"}</td>`;
+      html += `<td style="${bg}">${fmtDateShort(ls.next_spray_date)}</td>`;
+      html += `<td style="${bg}${dlColor}">${dl!=null?dl+"d":"—"}${jobIcons}</td>`;
+      html += `<td style="font-size:11px;color:var(--text-dim);">${esc(productUsed)}</td>`;
+    }
     html += '</tr>';
   });
 
-  if(!enriched.length) {
-    html += `<tr><td colspan="${4 + tabProducts.length*4}" class="empty-state">No blocks match the selected filter</td></tr>`;
-  }
+  if(!enriched.length) html += `<tr><td colspan="9" class="empty-state">No blocks match the selected filter</td></tr>`;
   html += '</tbody></table>';
   document.getElementById("summary-table-wrap").innerHTML = html;
 }
@@ -818,6 +850,109 @@ function njJobTotals(j) {
   return fmtNum(j.total_product_required) + ' ' + esc(j.dose_unit||'');
 }
 
+function renderJobsProductSummary() {
+  const el = document.getElementById('jobs-product-summary');
+  if(!el) return;
+  const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
+  const activeJobs = jobs.filter(j => activeStatuses.includes(j.status));
+  if(!activeJobs.length) { el.style.display = 'none'; return; }
+
+  // Aggregate product usage per spray product
+  const productUsage = {};
+  activeJobs.forEach(j => {
+    const jps = getJobProducts(j.id);
+    const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
+    if(jps.length > 0) {
+      jps.forEach(jp => {
+        const amt = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+        const unit = jp.dose_unit || j.dose_unit || '';
+        if(!productUsage[jp.product_id]) productUsage[jp.product_id] = { amount: 0, unit };
+        productUsage[jp.product_id].amount += amt;
+      });
+    } else {
+      const amt = parseFloat(j.total_product_required) || 0;
+      const unit = j.dose_unit || '';
+      if(!productUsage[j.product_id]) productUsage[j.product_id] = { amount: 0, unit };
+      productUsage[j.product_id].amount += amt;
+    }
+  });
+
+  // Group by AI combo — sum usage and stock across products sharing the same AI combo
+  const combos = getAICombos();
+  const comboCards = {};
+  Object.keys(productUsage).forEach(pid => {
+    const usage = productUsage[pid];
+    // Find which combo this product belongs to
+    const combo = combos.find(c => c.productIds.includes(pid));
+    if(!combo) return;
+    if(!comboCards[combo.key]) {
+      comboCards[combo.key] = { combo, needed: 0, unit: usage.unit, stock: 0, stockUnit: '', linked: false, totalWacCost: 0, totalWacQty: 0, productNames: [] };
+    }
+    comboCards[combo.key].needed += usage.amount;
+  });
+
+  // Now add stock from ALL products in each combo (not just those with active jobs)
+  Object.values(comboCards).forEach(cc => {
+    cc.combo.productIds.forEach(pid => {
+      const p = getProduct(pid);
+      if(!p) return;
+      const pName = p.product_name;
+      if(!cc.productNames.includes(pName)) cc.productNames.push(pName);
+      const inv = p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
+      if(inv) {
+        cc.linked = true;
+        cc.stock += parseFloat(inv.current_stock) || 0;
+        cc.stockUnit = inv.pack_unit || '';
+        const wac = getInventoryWAC(inv.id);
+        const qty = parseFloat(inv.current_stock) || 0;
+        cc.totalWacCost += wac * qty;
+        cc.totalWacQty += qty;
+      }
+    });
+  });
+
+  const keys = Object.keys(comboCards).sort((a,b) => comboCards[a].combo.label.localeCompare(comboCards[b].combo.label));
+  if(!keys.length) { el.style.display = 'none'; return; }
+
+  const cards = keys.map(key => {
+    const cc = comboCards[key];
+    const aiLabel = cc.combo.label;
+    const prodList = cc.productNames.join(', ');
+    const avgWac = cc.totalWacQty > 0 ? cc.totalWacCost / cc.totalWacQty : 0;
+
+    if(!cc.linked) {
+      return '<div style="background:var(--bg-card);border:1px solid rgba(113,113,122,0.4);border-radius:10px;padding:10px 16px;min-width:180px;">' +
+        '<div style="font-size:12px;font-weight:700;color:#8fcf80;margin-bottom:2px;">' + esc(aiLabel) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">' + esc(prodList) + '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needed) + ' ' + esc(cc.unit) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Not linked to inventory</div>' +
+      '</div>';
+    }
+
+    const enough = cc.stock >= cc.needed;
+    const borderColor = enough ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.4)';
+    const statusIcon = enough ? '✓' : '⚠';
+    const statusColor = enough ? '#4ade80' : '#f87171';
+    const statusText = enough ? 'Sufficient' : 'Short ' + fmtNum(cc.needed - cc.stock) + ' ' + esc(cc.unit);
+    let costLabel = '';
+    if(avgWac > 0) costLabel = '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Est. cost: RM ' + fmtNum(cc.needed * avgWac) + '</div>';
+
+    return '<div style="background:var(--bg-card);border:1px solid ' + borderColor + ';border-radius:10px;padding:10px 16px;min-width:180px;">' +
+      '<div style="font-size:12px;font-weight:700;color:#8fcf80;margin-bottom:2px;">' + esc(aiLabel) + '</div>' +
+      '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">' + esc(prodList) + '</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needed) + ' ' + esc(cc.unit) + '</div>' +
+      '<div style="font-size:13px;color:var(--text-dim);">Stock: ' + fmtNum(cc.stock) + ' ' + esc(cc.stockUnit) + '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:' + statusColor + ';margin-top:3px;">' + statusIcon + ' ' + statusText + '</div>' +
+      costLabel +
+    '</div>';
+  }).join('');
+
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Stock Check — ' + activeJobs.length + ' active job' + (activeJobs.length !== 1 ? 's' : '') + '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + cards + '</div>';
+}
+
 function renderJobsTable() {
   const statusF = document.getElementById("jobs-filter-status").value;
   const blockF = document.getElementById("jobs-filter-block").value;
@@ -842,9 +977,12 @@ function renderJobsTable() {
   }
   tbody.innerHTML = filtered.map(j => {
     const b = getBlock(j.block_id);
-    const p = getProduct(j.product_id);
+    const p = j.product_id ? getProduct(j.product_id) : null;
     const bname = b?b.block_name:"?";
-    const pname = p?p.product_name:"?";
+    // AI combo label
+    const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
+    const aiLabel = combo ? combo.label : (p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '—');
+    const productUsed = p ? p.product_name : '<span style="color:var(--text-muted);font-size:11px;">Pending</span>';
     let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button> <button class="btn btn-outline btn-sm" onclick="shareJobWhatsApp('${j.id}')" title="Send via WhatsApp" style="color:#25D366;border-color:#25D366;padding:4px 8px;"><svg viewBox="0 0 24 24" fill="#25D366" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
     if(j.status==="Completed") {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
@@ -856,17 +994,18 @@ function renderJobsTable() {
       <td>${fmtDateShort(j.planned_date)}</td>
       <td style="font-weight:600;">${esc(bname)}</td>
       <td>${typeBadge}</td>
-      <td>${njJobProductNames(j)}</td>
-      <td style="font-size:11px;color:#8fcf80;">${njJobAIs(j)}</td>
+      <td style="font-size:11px;color:#8fcf80;">${esc(aiLabel)}</td>
+      <td style="font-size:11px;">${productUsed}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
-      <td>${j.tanks_completed}/${j.tanks_planned}</td>
+      <td>${j.tanks_completed||0}/${j.tanks_planned}</td>
       <td>${njJobTotals(j)}</td>
       <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
       <td>${actionsHtml}</td>
     </tr>`;
   }).join("");
   updateBatchBar();
+  renderJobsProductSummary();
 }
 
 async function viewSprayLog(jobId) {
@@ -918,30 +1057,26 @@ function buildJobMessage(jobId) {
   const tanksPlanned = parseFloat(j.tanks_planned) || 0;
 
   // Build product lines — per tank dose = (tankSize / dosePer) * doseAmount
-  const jps = getJobProducts(j.id);
   let productLines = [];
+  const amt = parseFloat(j.dose_amount) || 0;
+  const unit = j.dose_unit || '';
+  const perL = parseFloat(j.dose_per_litres) || 0;
+  const perTank = (amt && perL && tankSize) ? (tankSize / perL) * amt : 0;
 
-  function addProductLine(productId, doseAmt, doseUnit, dosePer) {
-    const p = getProduct(productId);
-    const pname = p ? p.product_name : '?';
-    const amt = parseFloat(doseAmt) || 0;
-    const unit = doseUnit || '';
-    const perL = parseFloat(dosePer) || 0;
-    const perTank = (amt && perL && tankSize) ? (tankSize / perL) * amt : 0;
-    let line = '\u2022 ' + fmtNum(perTank) + unit + ' ' + pname;
-    if(p && p.packaging_size && p.packaging_unit && p.packaging_type && perTank > 0) {
-      const pkgCount = Math.ceil(perTank / p.packaging_size);
-      const malayType = MALAY_PKG_TYPE[p.packaging_type] || p.packaging_type;
-      line += ' (' + pkgCount + ' ' + malayType + ' x ' + p.packaging_size + p.packaging_unit + ')';
-    }
-    productLines.push(line);
-  }
+  // AI-based job: show AI name (+ product if completed)
+  const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
+  const aiName = combo ? combo.label : '';
+  const p = j.product_id ? getProduct(j.product_id) : null;
+  const displayName = p ? p.product_name : (aiName || '?');
 
-  if(jps.length > 1) {
-    jps.forEach(jp => addProductLine(jp.product_id, jp.dose_amount, jp.dose_unit, jp.dose_per_litres));
-  } else {
-    addProductLine(j.product_id, j.dose_amount, j.dose_unit, j.dose_per_litres);
+  let line = '\u2022 ' + fmtNum(perTank) + unit + ' ' + displayName;
+  if(aiName && p) line += ' [' + aiName + ']';
+  if(p && p.packaging_size && p.packaging_unit && p.packaging_type && perTank > 0) {
+    const pkgCount = Math.ceil(perTank / p.packaging_size);
+    const malayType = MALAY_PKG_TYPE[p.packaging_type] || p.packaging_type;
+    line += ' (' + pkgCount + ' ' + malayType + ' x ' + p.packaging_size + p.packaging_unit + ')';
   }
+  productLines.push(line);
   productLines.push('\u2022 \uD83D\uDCA7 ' + tankSize + 'L Air');
 
   let msg = '*\uD83C\uDF3F Kerja Semburan PND*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
@@ -999,20 +1134,23 @@ function copyJobText(jobId) {
 // NEW JOB MODAL
 // ============================================================
 // Multi-product state for new job
-let njProducts = []; // [{id, productId, doseAmt, doseUnit, dosePer}]
+let njAIs = []; // [{id, comboKey, label, doseAmt, doseUnit, dosePer}]
+let completionProducts = []; // [{productId, productName, qty}] — products used on job completion
 let njNextId = 0;
 
-function njBuildProdOpts(excludeIds) {
-  const fung = products.filter(p=>p.is_active&&p.product_type==="fungicide"&&!excludeIds.includes(p.id));
-  const pest = products.filter(p=>p.is_active&&p.product_type==="pesticide"&&!excludeIds.includes(p.id));
-  let opts = '<option value="">— Select Product —</option>';
-  if(fung.length) opts += '<optgroup label="Fungicides">'+fung.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>';
-  if(pest.length) opts += '<optgroup label="Pesticides">'+pest.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("")+'</optgroup>';
+function njBuildAIOpts(excludeKeys) {
+  const combos = getAICombos().filter(c => !excludeKeys.includes(c.key));
+  let opts = '<option value="">— Select Active Ingredient —</option>';
+  combos.forEach(c => {
+    const def = getAIComboDefault(c.key);
+    const doseInfo = def ? ' (' + def.dose_amount + def.dose_unit + '/' + def.dose_per_litres + 'L)' : '';
+    opts += `<option value="${esc(c.key)}">${esc(c.label)}${esc(doseInfo)}</option>`;
+  });
   return opts;
 }
 
 function openNewJobModal() {
-  njProducts = [];
+  njAIs = [];
   njNextId = 0;
   const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
   const workerOpts = workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
@@ -1030,14 +1168,14 @@ function openNewJobModal() {
           <input type="hidden" id="nj-job-type" value="Scheduled">
           <div id="nj-intv-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);font-size:11px;color:#E8A020;line-height:1.4;">Intervention jobs are unscheduled emergency sprays. They log the application but handle the spray countdown separately on completion.</div>
         </div>
-        <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;" onchange="njRefreshAllDoses()"><option value="">— Select —</option>${blockOpts}</select></div>
+        <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;"><option value="">— Select —</option>${blockOpts}</select></div>
         <div id="nj-dup-warning" style="display:none;"></div>
 
-        <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Products & Spray Formula</span></div>
-        <div id="nj-products-list"></div>
-        <div id="nj-add-product-row" style="padding:4px 0;">
-          <select id="nj-add-product-sel" style="width:calc(100% - 80px);">${njBuildProdOpts([])}</select>
-          <button class="btn btn-primary btn-sm" onclick="njAddProduct()" style="margin-left:6px;padding:6px 14px;">+ Add</button>
+        <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Active Ingredients</span></div>
+        <div id="nj-ai-list"></div>
+        <div id="nj-add-ai-row" style="padding:4px 0;">
+          <select id="nj-add-ai-sel" style="width:calc(100% - 80px);">${njBuildAIOpts([])}</select>
+          <button class="btn btn-primary btn-sm" onclick="njAddAI()" style="margin-left:6px;padding:6px 14px;">+ Add</button>
         </div>
 
         <div class="form-row" style="margin-top:12px;">
@@ -1067,81 +1205,60 @@ function openNewJobModal() {
         </div>
       </div>
     </div>`;
+  njCalcAllTotals();
 }
 
-function njAddProduct() {
-  const sel = document.getElementById("nj-add-product-sel");
-  const productId = sel.value;
-  if(!productId) { notify("Select a product first","warning"); return; }
-  if(njProducts.some(p=>p.productId===productId)) { notify("Product already added","warning"); return; }
+function njAddAI() {
+  const sel = document.getElementById("nj-add-ai-sel");
+  const comboKey = sel.value;
+  if(!comboKey) { notify("Select an active ingredient first","warning"); return; }
+  if(njAIs.some(a=>a.comboKey===comboKey)) { notify("Already added","warning"); return; }
 
-  const p = getProduct(productId);
-  const blockId = document.getElementById("nj-block")?.value || '';
-  const ov = overrides.find(o=>o.block_id===blockId && o.product_id===productId);
-  const doseAmt = ov ? ov.dose_amount : (p?.default_dose_amount || '');
-  const doseUnit = ov ? ov.dose_unit : (p?.default_dose_unit || 'g');
-  const dosePer = ov ? ov.dose_per_litres : (p?.default_dose_per_litres || '');
-
+  const combo = getAICombos().find(c=>c.key===comboKey);
+  const def = getAIComboDefault(comboKey);
   const rowId = njNextId++;
-  njProducts.push({ id:rowId, productId, doseAmt:parseFloat(doseAmt)||0, doseUnit, dosePer:parseInt(dosePer)||0 });
-  njRenderProducts();
+  njAIs.push({
+    id: rowId, comboKey, label: combo?combo.label:'?',
+    doseAmt: def?parseFloat(def.dose_amount)||0:0,
+    doseUnit: def?def.dose_unit||'g':'g',
+    dosePer: def?parseInt(def.dose_per_litres)||0:0
+  });
+  njRenderAIs();
   njCalcAllTotals();
-  njCheckDuplicate();
 }
 
-function njRemoveProduct(rowId) {
-  njProducts = njProducts.filter(p=>p.id!==rowId);
-  njRenderProducts();
+function njRemoveAI(rowId) {
+  njAIs = njAIs.filter(a=>a.id!==rowId);
+  njRenderAIs();
   njCalcAllTotals();
-  njCheckDuplicate();
 }
 
-function njRenderProducts() {
-  const container = document.getElementById("nj-products-list");
+function njRenderAIs() {
+  const container = document.getElementById("nj-ai-list");
   if(!container) return;
-  const usedIds = njProducts.map(p=>p.productId);
+  const usedKeys = njAIs.map(a=>a.comboKey);
 
-  container.innerHTML = njProducts.map(row => {
-    const p = getProduct(row.productId);
-    const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
+  container.innerHTML = njAIs.map(row => {
     return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <div>
-          <span style="font-weight:700;font-size:13px;">${esc(p?.product_name||'?')}</span>
-          ${ais?'<span style="font-size:11px;color:#8fcf80;margin-left:8px;">'+esc(ais)+'</span>':''}
-        </div>
-        <span style="cursor:pointer;color:var(--danger);font-size:18px;font-weight:700;line-height:1;padding:0 4px;" onclick="njRemoveProduct(${row.id})" title="Remove">&times;</span>
+        <span style="background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:3px 12px;font-size:12px;font-weight:600;">${esc(row.label)}</span>
+        <span style="cursor:pointer;color:var(--danger);font-size:18px;font-weight:700;line-height:1;padding:0 4px;" onclick="njRemoveAI(${row.id})" title="Remove">&times;</span>
       </div>
       <div style="display:flex;gap:8px;align-items:end;">
-        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Dose</label><input type="number" step="0.001" value="${row.doseAmt||''}" style="width:100%;" onchange="njUpdateProductField(${row.id},'doseAmt',parseFloat(this.value)||0);njCalcAllTotals()"></div>
-        <div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><select style="width:100%;" onchange="njUpdateProductField(${row.id},'doseUnit',this.value);njCalcAllTotals()"><option value="g" ${row.doseUnit==='g'?'selected':''}>g</option><option value="ml" ${row.doseUnit==='ml'?'selected':''}>ml</option><option value="kg" ${row.doseUnit==='kg'?'selected':''}>kg</option><option value="L" ${row.doseUnit==='L'?'selected':''}>L</option></select></div>
-        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">per Litres</label><input type="number" min="1" value="${row.dosePer||''}" style="width:100%;" onchange="njUpdateProductField(${row.id},'dosePer',parseInt(this.value)||0);njCalcAllTotals()"></div>
+        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Dose</label><input type="number" step="0.001" value="${row.doseAmt||''}" style="width:100%;" onchange="njUpdateAIField(${row.id},'doseAmt',parseFloat(this.value)||0);njCalcAllTotals()"></div>
+        <div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><select style="width:100%;" onchange="njUpdateAIField(${row.id},'doseUnit',this.value);njCalcAllTotals()"><option value="g" ${row.doseUnit==='g'?'selected':''}>g</option><option value="ml" ${row.doseUnit==='ml'?'selected':''}>ml</option><option value="kg" ${row.doseUnit==='kg'?'selected':''}>kg</option><option value="L" ${row.doseUnit==='L'?'selected':''}>L</option></select></div>
+        <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">per Litres</label><input type="number" min="1" value="${row.dosePer||''}" style="width:100%;" onchange="njUpdateAIField(${row.id},'dosePer',parseInt(this.value)||0);njCalcAllTotals()"></div>
       </div>
     </div>`;
   }).join('');
 
-  // Refresh the "add product" dropdown excluding already-added
-  const addSel = document.getElementById("nj-add-product-sel");
-  if(addSel) addSel.innerHTML = njBuildProdOpts(usedIds);
+  const addSel = document.getElementById("nj-add-ai-sel");
+  if(addSel) addSel.innerHTML = njBuildAIOpts(usedKeys);
 }
 
-function njUpdateProductField(rowId, field, value) {
-  const row = njProducts.find(p=>p.id===rowId);
+function njUpdateAIField(rowId, field, value) {
+  const row = njAIs.find(a=>a.id===rowId);
   if(row) row[field] = value;
-}
-
-function njRefreshAllDoses() {
-  const blockId = document.getElementById("nj-block")?.value || '';
-  njProducts.forEach(row => {
-    const ov = overrides.find(o=>o.block_id===blockId && o.product_id===row.productId);
-    const p = getProduct(row.productId);
-    row.doseAmt = ov ? parseFloat(ov.dose_amount)||0 : (parseFloat(p?.default_dose_amount)||0);
-    row.doseUnit = ov ? ov.dose_unit : (p?.default_dose_unit || 'g');
-    row.dosePer = ov ? parseInt(ov.dose_per_litres)||0 : (parseInt(p?.default_dose_per_litres)||0);
-  });
-  njRenderProducts();
-  njCalcAllTotals();
-  njCheckDuplicate();
 }
 
 function njCalcAllTotals() {
@@ -1152,14 +1269,13 @@ function njCalcAllTotals() {
 
   const breakdown = document.getElementById("nj-totals-breakdown");
   if(!breakdown) return;
-  if(!njProducts.length || !W) { breakdown.innerHTML = ''; return; }
+  if(!njAIs.length || !W) { breakdown.innerHTML = ''; return; }
 
-  breakdown.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Product Required</div>' +
-    njProducts.map(row => {
-      const p = getProduct(row.productId);
+  breakdown.innerHTML = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">AI Required</div>' +
+    njAIs.map(row => {
       const total = (row.doseAmt && row.dosePer) ? (W / row.dosePer) * row.doseAmt : 0;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;margin-bottom:3px;background:var(--gold-pale);border-radius:6px;">
-        <span style="font-size:13px;font-weight:600;color:var(--white);">${esc(p?.product_name||'?')}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--white);">${esc(row.label)}</span>
         <span style="font-size:16px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total) : '—'} ${esc(row.doseUnit)}</span>
       </div>`;
     }).join('');
@@ -1270,41 +1386,9 @@ function njSetJobType(type) {
 }
 
 function njCheckDuplicate() {
-  const blockId = document.getElementById("nj-block")?.value;
-  const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
+  // Simplified — no blocking, just info
   const warnEl = document.getElementById("nj-dup-warning");
-  const createBtn = document.getElementById("nj-create-btn");
-  if(!warnEl || !createBtn) return;
-
-  if(!blockId || !njProducts.length) {
-    warnEl.style.display = 'none';
-    createBtn.disabled = false;
-    return;
-  }
-
-  const activeStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
-  const bName = getBlock(blockId)?.block_name || '?';
-  const dupes = njProducts.map(row => {
-    const existing = jobs.find(j => j.block_id===blockId && j.product_id===row.productId && activeStatuses.includes(j.status));
-    return existing ? { pName: getProduct(row.productId)?.product_name || '?', status: existing.status } : null;
-  }).filter(Boolean);
-
-  if(!dupes.length) {
-    warnEl.style.display = 'none';
-    createBtn.disabled = false;
-    return;
-  }
-
-  const dupeList = dupes.map(d=>`<b>${esc(d.pName)}</b> (${esc(d.status)})`).join(', ');
-  if(jobType === 'Scheduled') {
-    warnEl.style.display = 'block';
-    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,96,96,0.1);border:1px solid rgba(232,96,96,0.3);font-size:12px;color:var(--red);line-height:1.5;">⚠️ Active jobs already exist for <b>${esc(bName)}</b> — ${dupeList}. Complete or delete existing jobs first.</div>`;
-    createBtn.disabled = true;
-  } else {
-    warnEl.style.display = 'block';
-    warnEl.innerHTML = `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);font-size:12px;color:#E8A020;line-height:1.5;">ℹ️ Scheduled jobs exist for <b>${esc(bName)}</b> — ${dupeList}. This intervention will be logged separately.</div>`;
-    createBtn.disabled = false;
-  }
+  if(warnEl) warnEl.style.display = 'none';
 }
 
 async function submitNewJob() {
@@ -1318,32 +1402,45 @@ async function submitNewJob() {
   const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
 
   if(!blockId) { notify("Block is required","warning"); return; }
-  if(!njProducts.length) { notify("Add at least one product","warning"); return; }
+  if(!njAIs.length) { notify("Add at least one active ingredient","warning"); return; }
   if(!worker) { notify("Worker is required","warning"); return; }
   if(!date) { notify("Planned date is required","warning"); return; }
   if(!tankSize || !tanks) { notify("Tank size and tanks planned are required","warning"); return; }
-  for(const row of njProducts) {
-    if(!row.doseAmt || !row.dosePer) { notify("Fill dose fields for all products","warning"); return; }
+  for(const row of njAIs) {
+    if(!row.doseAmt || !row.dosePer) { notify("Fill dose fields for all AIs","warning"); return; }
   }
 
-  // Use first product as primary (for backward compat with spray log trigger)
-  const primary = njProducts[0];
+  // Build combined ai_combo_key for the job (all selected AI combos)
+  // For single AI job: the combo key. For tank mix: sorted combination of all combo keys
+  const primary = njAIs[0];
   const result = await sbQuery(sb.from("pnd_jobs").insert({
-    block_id:blockId, product_id:primary.productId, worker_name:worker, planned_date:date,
+    block_id:blockId, product_id:null, ai_combo_key:primary.comboKey, worker_name:worker, planned_date:date,
     tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:primary.doseAmt, dose_unit:primary.doseUnit,
     dose_per_litres:primary.dosePer, notes, logged_by:logged, job_type:jobType
   }).select());
   if(result===null) return;
 
-  // Insert all products into junction table
+  // Insert all AI combos into junction table (store combo key as product_id placeholder for now)
   const jobId = result[0].id;
-  const jpRows = njProducts.map(row => ({
-    job_id:jobId, product_id:row.productId,
+  const jpRows = njAIs.map(row => ({
+    job_id:jobId, product_id:null,
     dose_amount:row.doseAmt, dose_unit:row.doseUnit, dose_per_litres:row.dosePer
   }));
-  await sbQuery(sb.from("pnd_job_products").insert(jpRows).select());
+  // We can't insert null product_id into junction table if it has NOT NULL constraint
+  // Instead, skip junction table for now — the job stores primary AI combo key
+  // Additional AI combos for tank mix stored as separate jobs (one per AI combo per block)
+  if(njAIs.length > 1) {
+    for(let i = 1; i < njAIs.length; i++) {
+      const extra = njAIs[i];
+      await sbQuery(sb.from("pnd_jobs").insert({
+        block_id:blockId, product_id:null, ai_combo_key:extra.comboKey, worker_name:worker, planned_date:date,
+        tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:extra.doseAmt, dose_unit:extra.doseUnit,
+        dose_per_litres:extra.dosePer, notes: notes ? notes + ' (tank mix)' : '(tank mix)', logged_by:logged, job_type:jobType
+      }).select());
+    }
+  }
 
-  notify("Job created with " + njProducts.length + " product" + (njProducts.length>1?"s":""));
+  notify("Job created with " + njAIs.length + " AI" + (njAIs.length>1?"s":""));
   closeModal();
   await Promise.all([loadJobs(), loadJobProducts()]);
   renderJobsTable();
@@ -1424,12 +1521,36 @@ function openEditJobModal(jobId) {
   njAutoCalc('ej','S'); // initial calc on open
 }
 
-function calcNextSprayDate(compDate, productId) {
-  const p = getProduct(productId);
-  if(!p || !p.default_interval_days || !compDate) return '';
-  const d = new Date(compDate);
-  d.setDate(d.getDate() + p.default_interval_days);
-  return d.toISOString().split('T')[0];
+function calcNextSprayDate(compDate, productIdOrComboKey) {
+  if(!compDate) return '';
+  // Try AI combo key first
+  const def = getAIComboDefault(productIdOrComboKey);
+  if(def && def.interval_days) {
+    const d = new Date(compDate);
+    d.setDate(d.getDate() + def.interval_days);
+    return d.toISOString().split('T')[0];
+  }
+  // Fallback: look up product and find its AI combo
+  const p = getProduct(productIdOrComboKey);
+  if(p) {
+    const combos = getAICombos();
+    const combo = combos.find(c => c.productIds.includes(p.id));
+    if(combo) {
+      const comboDef = getAIComboDefault(combo.key);
+      if(comboDef && comboDef.interval_days) {
+        const d = new Date(compDate);
+        d.setDate(d.getDate() + comboDef.interval_days);
+        return d.toISOString().split('T')[0];
+      }
+    }
+    // Legacy fallback
+    if(p.default_interval_days) {
+      const d = new Date(compDate);
+      d.setDate(d.getDate() + p.default_interval_days);
+      return d.toISOString().split('T')[0];
+    }
+  }
+  return '';
 }
 
 function ejAutoNextDate(prefix, productId) {
@@ -1453,7 +1574,9 @@ function ejStatusChange(jobId) {
     html += '<div class="form-field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;"><input type="checkbox" id="ej-trigger-cd" onchange="ejToggleCountdown()"> Trigger spray countdown for this block?</label></div>';
     html += '<div id="ej-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
-    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
+    completionProducts = [];
+    html += buildCompletionProductsHTML('ej', j?.ai_combo_key || '');
+    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="ej-aw-tank-sel" style="width:100%;" onchange="ejAwTankChange()"><option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option></select></div><div class="form-field" id="ej-aw-tank-custom-wrap" style="margin:0;display:none;"><label style="font-size:10px;">Custom (L)</label><input id="ej-aw-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="ej-aw-tanks" type="number" step="any" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="ej-aw-total" type="number" step="any" data-job-id="'+jobId+'" style="width:100%;font-weight:700;" oninput="ejCalcActualProduct()"></div></div></div>';
     // Pre-fill from job values
     setTimeout(()=>{
@@ -1535,6 +1658,8 @@ async function submitEditJob(jobId) {
         willTriggerLog = true;
       }
     } else if(newStatus==="Completed") {
+      if(!completionProducts.length) { notify("Please add at least one product used","warning"); return; }
+      update.product_id = completionProducts[0].productId;
       update.completion_date = document.getElementById("ej-comp-date")?.value||todayStr();
       update.next_spray_date = document.getElementById("ej-next-date")?.value||null;
       const awEl = document.getElementById("ej-aw-total");
@@ -1731,7 +1856,10 @@ function openEditStatusModal(jobId, prefilledStatus) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
   window._esCurrentJob = j;
-  const b = getBlock(j.block_id), p = getProduct(j.product_id);
+  const b = getBlock(j.block_id), p = j.product_id ? getProduct(j.product_id) : null;
+  // AI combo info
+  const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
+  const aiLabel = combo ? combo.label : (p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '—');
 
   document.getElementById("modal-container").innerHTML = `
     <div class="modal-overlay">
@@ -1739,7 +1867,7 @@ function openEditStatusModal(jobId, prefilledStatus) {
         <div class="modal-header"><div class="modal-title">Edit Status</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-row" style="margin-bottom:12px;">
           <div class="form-field"><label>Block</label><div style="font-weight:600;">${esc(b?.block_name)}</div></div>
-          <div class="form-field"><label>Product</label><div style="font-weight:600;">${esc(p?.product_name)}</div></div>
+          <div class="form-field"><label>Active Ingredient</label><div style="font-weight:600;color:#8fcf80;">${esc(aiLabel)}</div></div>
         </div>
         <div class="form-field">
           <label>Current Status</label>
@@ -1782,7 +1910,9 @@ function esStatusChange(jobId) {
     html += '<div class="form-field"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;"><input type="checkbox" id="es-trigger-cd" onchange="document.getElementById(\'es-cd-fields\').style.display=this.checked?\'block\':\'none\'"> Trigger spray countdown?</label></div>';
     html += '<div id="es-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
-    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
+    completionProducts = [];
+    html += buildCompletionProductsHTML('es', j?.ai_combo_key || '');
+    html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     const tankVal = j ? j.tank_size_litres : 200;
     const isStd = [200,500,1000].includes(+tankVal);
     html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="es-aw-tank-sel" style="width:100%;" onchange="esAwTankChange()"><option value="200"'+(+tankVal===200?' selected':'')+'>200L</option><option value="500"'+(+tankVal===500?' selected':'')+'>500L</option><option value="1000"'+(+tankVal===1000?' selected':'')+'>1000L</option><option value="custom"'+(!isStd?' selected':'')+'>Custom</option></select></div><div class="form-field" id="es-aw-tank-custom-wrap" style="margin:0;display:'+(isStd?'none':'block')+';"><label style="font-size:10px;">Custom (L)</label><input id="es-aw-tank-custom" type="number" step="any" min="1" value="'+(isStd?'':tankVal)+'" style="width:100%;" oninput="esCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="es-aw-tanks" type="number" step="any" value="'+(j?.tanks_planned||'')+'" style="width:100%;" oninput="esCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="es-aw-total" type="number" step="any" style="width:100%;font-weight:700;" oninput="esCalcActualProduct(\''+prodId+'\')"></div></div></div>';
@@ -1790,6 +1920,77 @@ function esStatusChange(jobId) {
   }
   html += '</div>';
   el.innerHTML = html;
+}
+
+// Multi-product selection for job completion
+function buildCompletionProductsHTML(prefix, comboKey) {
+  const combos = getAICombos();
+  const combo = comboKey ? combos.find(c => c.key === comboKey) : null;
+  const matchingProducts = combo ? products.filter(p => p.is_active && combo.productIds.includes(p.id)) : products.filter(p => p.is_active);
+  const prodOpts = matchingProducts.map(p => '<option value="'+p.id+'">'+esc(p.product_name)+'</option>').join('');
+
+  return '<div class="form-field"><label>Products Used <span style="color:var(--danger);font-size:10px;">*required</span></label>' +
+    '<div id="'+prefix+'-products-used-list"></div>' +
+    '<div style="display:flex;gap:6px;align-items:center;margin-top:4px;">' +
+      '<select id="'+prefix+'-product-add-sel" style="flex:1;"><option value="">— Add product —</option>'+prodOpts+'</select>' +
+      '<button class="btn btn-primary btn-sm" type="button" onclick="addCompletionProduct(\''+prefix+'\')">+ Add</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function addCompletionProduct(prefix) {
+  const sel = document.getElementById(prefix+'-product-add-sel');
+  const pid = sel ? sel.value : '';
+  if(!pid) { notify('Select a product','warning'); return; }
+  const p = getProduct(pid);
+  if(!p) return;
+  // Allow same product multiple times? No — increment qty instead
+  const existing = completionProducts.find(cp => cp.productId === pid);
+  if(existing) { existing.qty++; }
+  else { completionProducts.push({ productId: pid, productName: p.product_name, qty: 1 }); }
+  renderCompletionProducts(prefix);
+}
+
+function removeCompletionProduct(prefix, pid) {
+  completionProducts = completionProducts.filter(cp => cp.productId !== pid);
+  renderCompletionProducts(prefix);
+}
+
+function updateCompletionProductQty(pid, qty) {
+  const cp = completionProducts.find(x => x.productId === pid);
+  if(cp) cp.qty = Math.max(1, parseInt(qty)||1);
+}
+
+function renderCompletionProducts(prefix) {
+  const container = document.getElementById(prefix+'-products-used-list');
+  if(!container) return;
+  if(!completionProducts.length) {
+    container.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px 0;">No products added yet</div>';
+    return;
+  }
+  container.innerHTML = completionProducts.map(cp => {
+    const inv = getProduct(cp.productId);
+    const invProd = inv?.inventory_product_id ? getInventoryProduct(inv.inventory_product_id) : null;
+    const stockInfo = invProd ? ' (stock: '+fmtNum(parseFloat(invProd.current_stock)||0)+')' : '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:13px;font-weight:600;color:var(--white);flex:1;">' + esc(cp.productName) + '<span style="font-size:10px;color:var(--text-dim);">'+esc(stockInfo)+'</span></span>' +
+      '<label style="font-size:10px;color:var(--text-muted);">Qty</label>' +
+      '<input type="number" min="1" value="'+cp.qty+'" style="width:60px;" onchange="updateCompletionProductQty(\''+cp.productId+'\',this.value)">' +
+      '<span style="cursor:pointer;color:var(--danger);font-size:16px;font-weight:700;" onclick="removeCompletionProduct(\''+prefix+'\',\''+cp.productId+'\')">&times;</span>' +
+    '</div>';
+  }).join('');
+}
+
+function getCompletionPrimaryProductId() {
+  return completionProducts.length ? completionProducts[0].productId : null;
+}
+
+function esProductUsedChange() {
+  const prodId = document.getElementById("es-product-used")?.value || '';
+  if(prodId) {
+    const compDate = document.getElementById("es-comp-date")?.value || todayStr();
+    ejAutoNextDate('es', prodId);
+  }
 }
 
 function esAwTankChange() {
@@ -1851,6 +2052,8 @@ async function submitEditStatus(jobId) {
       willTriggerLog = true;
     }
   } else if(newStatus==="Completed") {
+    if(!completionProducts.length) { notify("Please add at least one product used","warning"); return; }
+    update.product_id = completionProducts[0].productId; // primary product
     update.completion_date = document.getElementById("es-comp-date")?.value||todayStr();
     update.next_spray_date = document.getElementById("es-next-date")?.value||null;
     const esAwEl = document.getElementById("es-aw-total");
@@ -2176,6 +2379,178 @@ async function executeBatchDelete() {
 // BLOCK DOSAGE OVERRIDES (on Products page)
 // ============================================================
 
+// ============================================================
+// LEGACY — ingredient-inventory linking (removed, kept stub)
+// ============================================================
+function renderIngredientLinkingSection() { /* removed */ }
+/*
+
+  // Get unique ingredients used by active products
+  const activeProductIds = products.filter(p => p.is_active).map(p => p.id);
+  const usedIngredientIds = new Set();
+  productIngredients.forEach(pi => {
+    if(activeProductIds.includes(pi.product_id) && pi.pnd_ingredients) usedIngredientIds.add(pi.pnd_ingredients.id);
+  });
+  const usedIngredients = ingredients.filter(i => usedIngredientIds.has(i.id)).sort((a,b) => a.name.localeCompare(b.name));
+
+  if(!usedIngredients.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);">No active ingredients found. (Products: ' + products.length + ', Active: ' + activeProductIds.length + ', PI: ' + productIngredients.length + ', Ingredients: ' + ingredients.length + ')</div>';
+    return;
+  }
+
+  // Build inventory product options (sorted by name)
+  const invOptions = inventoryProducts.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  container.innerHTML = usedIngredients.map(ing => {
+    const links = getIngredientLinks(ing.id);
+    const linkedProducts = links.map(l => {
+      const p = getInventoryProduct(l.inventory_product_id);
+      if(!p) return null;
+      const stock = parseFloat(p.current_stock) || 0;
+      const wac = getInventoryWAC(p.id);
+      return { linkId: l.id, product: p, stock, wac };
+    }).filter(Boolean);
+
+    const totalStock = linkedProducts.reduce((s, lp) => s + lp.stock, 0);
+    const hasLinks = linkedProducts.length > 0;
+    const stockColor = hasLinks ? (totalStock > 0 ? '#4ade80' : '#f87171') : 'var(--text-muted)';
+
+    let linkedHtml = '';
+    if(hasLinks) {
+      linkedHtml = linkedProducts.map(lp =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">' +
+          '<span style="font-size:12px;color:var(--white);">' + esc(lp.product.name) + '</span>' +
+          '<span style="font-size:11px;color:var(--text-dim);">' + fmtNum(lp.stock) + ' ' + esc(lp.product.pack_unit||'') + ' in stock</span>' +
+          (lp.wac > 0 ? '<span style="font-size:11px;color:var(--text-muted);">WAC: RM ' + fmtNum(lp.wac) + '/' + esc(lp.product.pack_unit||'unit') + '</span>' : '') +
+          '<button class="btn btn-outline btn-sm" style="font-size:10px;padding:2px 8px;color:var(--danger);border-color:var(--danger);" onclick="removeIngredientLink(\'' + lp.linkId + '\')">Remove</button>' +
+        '</div>'
+      ).join('');
+    } else {
+      linkedHtml = '<div style="font-size:11px;color:var(--text-muted);padding:4px 0;">Not linked — select an inventory product below</div>';
+    }
+
+    // Build select with auto-suggest: filter inventory products whose name or active_ingredient contains the ingredient name
+    const ingNameLower = ing.name.toLowerCase();
+    const suggested = invOptions.filter(p => (p.name||'').toLowerCase().includes(ingNameLower) || (p.active_ingredient||'').toLowerCase().includes(ingNameLower));
+    const others = invOptions.filter(p => !suggested.includes(p));
+    const alreadyLinkedIds = links.map(l => l.inventory_product_id);
+
+    let optionsHtml = '<option value="">— Select inventory product —</option>';
+    if(suggested.length) {
+      optionsHtml += '<optgroup label="Suggested matches">';
+      suggested.forEach(p => {
+        if(!alreadyLinkedIds.includes(p.id)) optionsHtml += '<option value="' + p.id + '">' + esc(p.name) + ' (' + fmtNum(parseFloat(p.current_stock)||0) + ' ' + esc(p.pack_unit||'') + ')</option>';
+      });
+      optionsHtml += '</optgroup>';
+    }
+    if(others.length) {
+      optionsHtml += '<optgroup label="All inventory products">';
+      others.forEach(p => {
+        if(!alreadyLinkedIds.includes(p.id)) optionsHtml += '<option value="' + p.id + '">' + esc(p.name) + ' (' + fmtNum(parseFloat(p.current_stock)||0) + ' ' + esc(p.pack_unit||'') + ')</option>';
+      });
+      optionsHtml += '</optgroup>';
+    }
+
+    return '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<span style="background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:4px 14px;font-size:13px;font-weight:600;">' + esc(ing.name) + '</span>' +
+          '<span style="font-size:12px;color:' + stockColor + ';font-weight:600;">' + (hasLinks ? fmtNum(totalStock) + ' in stock' : 'No link') + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-bottom:8px;">' + linkedHtml + '</div>' +
+      (invOptions.filter(p => !alreadyLinkedIds.includes(p.id)).length > 0 ?
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<select id="iil-sel-' + ing.id + '" style="flex:1;min-width:0;">' + optionsHtml + '</select>' +
+          '<button class="btn btn-primary btn-sm" onclick="addIngredientLink(\'' + ing.id + '\')" style="white-space:nowrap;">Link</button>' +
+          '<span style="color:var(--text-muted);font-size:11px;">or</span>' +
+          '<button class="btn btn-outline btn-sm" onclick="createInventoryProductAndLink(\'' + ing.id + '\')" style="white-space:nowrap;">+ New</button>' +
+        '</div>'
+      :
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<span style="font-size:12px;color:var(--text-muted);">No inventory products available to link.</span>' +
+          '<button class="btn btn-primary btn-sm" onclick="createInventoryProductAndLink(\'' + ing.id + '\')" style="white-space:nowrap;">+ Create in Inventory</button>' +
+        '</div>'
+      ) +
+    '</div>';
+  }).join('');
+  } catch(e) {
+    console.error('renderIngredientLinkingSection error:', e);
+    container.innerHTML = '<div style="color:var(--danger);font-size:12px;">Error loading ingredient links: ' + e.message + '</div>';
+  }
+}
+
+async function addIngredientLink(ingredientId) {
+  const sel = document.getElementById('iil-sel-' + ingredientId);
+  const invProductId = sel ? sel.value : '';
+  if(!invProductId) { notify('Select an inventory product', 'warning'); return; }
+
+  // Check if already linked
+  const existing = ingredientLinks.find(l => l.pnd_ingredient_id === ingredientId && l.inventory_product_id === invProductId);
+  if(existing) { notify('Already linked', 'warning'); return; }
+
+  const newId = await dbNextId('IIL');
+  const data = { id: newId, pnd_ingredient_id: ingredientId, inventory_product_id: invProductId };
+  const result = await sbQuery(sb.from('ingredient_inventory_link').insert(data).select());
+  if(result === null) return;
+  ingredientLinks.push(data);
+  notify('Linked to inventory');
+  renderIngredientLinkingSection();
+}
+
+async function createInventoryProductAndLink(ingredientId) {
+  const ing = ingredients.find(i => i.id === ingredientId);
+  if(!ing) return;
+
+  // Find a spray product that uses this ingredient to get category/packaging info
+  const pi = productIngredients.find(x => x.pnd_ingredients && x.pnd_ingredients.id === ingredientId);
+  const sprayProduct = pi ? getProduct(pi.product_id) : null;
+
+  // Map spray product_type to inventory category
+  let category = 'Other';
+  if(sprayProduct) {
+    const typeMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'pgr': 'PGR', 'adjuvant': 'Adjuvant' };
+    category = typeMap[(sprayProduct.product_type||'').toLowerCase()] || 'Other';
+  }
+
+  // Use spray product's packaging unit as inventory pack_unit, or default to kg
+  const packUnit = sprayProduct?.packaging_unit || sprayProduct?.default_dose_unit || 'kg';
+
+  // Pre-fill name with ingredient name — let user confirm
+  const defaultName = ing.name + (sprayProduct ? ' (' + sprayProduct.product_name + ')' : '');
+  const name = prompt('Product name for Inventory:', defaultName);
+  if(!name) return;
+
+  const newId = await dbNextId('P');
+  const data = {
+    id: newId, name: name, category: category, active_ingredient: ing.name,
+    pack_unit: packUnit, pack_type: 'Bottle', pack_size: 0,
+    current_stock: 0, opening_stock: 0, reorder_level: 0,
+    supplier_ids: [], archived: false
+  };
+
+  const result = await sbQuery(sb.from('products').insert(data).select());
+  if(result === null) return;
+  inventoryProducts.push(data);
+
+  // Auto-link
+  const linkId = await dbNextId('IIL');
+  const linkData = { id: linkId, pnd_ingredient_id: ingredientId, inventory_product_id: newId };
+  const linkResult = await sbQuery(sb.from('ingredient_inventory_link').insert(linkData).select());
+  if(linkResult === null) return;
+  ingredientLinks.push(linkData);
+
+  notify('Created "' + name + '" in Inventory and linked');
+  renderIngredientLinkingSection();
+}
+
+async function removeIngredientLink(linkId) {
+  if(!confirm('Remove this inventory link?')) return;
+  const result = await sbQuery(sb.from('ingredient_inventory_link').delete().eq('id', linkId).select());
+  if(result === null) return;
+  ingredientLinks = ingredientLinks.filter(l => l.id !== linkId);
+*/
+
 function renderOverridesSection() {
   const container = document.getElementById("overrides-container");
   if(!container) return;
@@ -2259,36 +2634,212 @@ async function deleteOverride(id, blockId) {
 // ============================================================
 function renderProductsPage() {
   const tbody = document.getElementById("products-body");
+
+  // Show unlinked products banner
+  const unlinked = products.filter(p => !p.inventory_product_id);
+  const banner = document.getElementById("unlinked-products-banner");
+  if(unlinked.length > 0) {
+    banner.style.display = 'block';
+    banner.innerHTML = '<div style="background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);border-radius:10px;padding:16px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+        '<div style="font-size:13px;font-weight:600;color:#E8A020;">' + unlinked.length + ' product' + (unlinked.length > 1 ? 's' : '') + ' not yet in Inventory</div>' +
+        (unlinked.length > 1 ? '<button class="btn btn-primary btn-sm" onclick="migrateAllToInventory()" style="white-space:nowrap;">Migrate All to Inventory</button>' : '') +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">These spray products will be created in the Inventory module with the same name, AI, and packaging.</div>' +
+      unlinked.map(p => {
+        const pIngs = getProductIngredients(p.id);
+        const aiStr = pIngs.length ? pIngs.map(i => i.name).join(', ') : '—';
+        const pkgStr = p.packaging_size ? p.packaging_size + (p.packaging_unit||'') + '/' + (p.packaging_type||'') : '—';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(232,160,32,0.15);">' +
+          '<div style="flex:1;">' +
+            '<span style="font-size:13px;font-weight:600;color:var(--white);">' + esc(p.product_name) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-dim);margin-left:8px;">AI: ' + esc(aiStr) + ' | Pkg: ' + esc(pkgStr) + '</span>' +
+          '</div>' +
+          '<button class="btn btn-primary btn-sm" onclick="migrateSingleToInventory(\'' + p.id + '\')" style="white-space:nowrap;">Migrate</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // Render product table — read-only info from inventory, editable spray config
   tbody.innerHTML = products.map(p => {
-    const pIngs = getProductIngredients(p.id);
-    const ingPills = pIngs.length ? pIngs.map(i=>`<span style="display:block;background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:2px 10px;font-size:11px;margin:2px 0;white-space:nowrap;">${esc(i.name)}</span>`).join('') : '<span style="color:var(--text-muted);font-size:11px;">—</span>';
+    const inv = p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
+    // Product info: prefer inventory, fallback to pnd_products legacy data
+    const pName = inv ? inv.name : p.product_name;
+    const ai = inv ? (inv.active_ingredient || '—') : getProductIngredients(p.id).map(i => i.name).join(', ') || '—';
+    const formulation = inv ? (inv.formulation || '—') : (p.pnd_formulations ? p.pnd_formulations.name : '—');
+    const category = inv ? (inv.category || '—') : (p.product_type === 'fungicide' ? 'Fungicide' : 'Pesticide');
+    const packaging = inv ? ((inv.pack_size || '') + (inv.pack_unit || '') + (inv.pack_type ? '/' + inv.pack_type : '')) : (p.packaging_size != null ? p.packaging_size + (p.packaging_unit||'') + '/' + (p.packaging_type||'') : '—');
+    const stock = inv ? fmtNum(parseFloat(inv.current_stock) || 0) + ' ' + esc(inv.pack_unit || '') : '—';
+    const stockColor = inv ? ((parseFloat(inv.current_stock) || 0) > 0 ? '#4ade80' : '#f87171') : 'var(--text-muted)';
+    const linkedIcon = inv ? '' : '<span title="Not linked to inventory" style="color:#E8A020;font-size:10px;margin-left:4px;">⚠</span>';
+
     return `<tr>
-      <td style="font-weight:600;white-space:nowrap;">${esc(p.product_name)}</td>
-      <td>${ingPills}</td>
-      <td style="font-size:12px;">${p.pnd_formulations ? esc(p.pnd_formulations.name) : '—'}</td>
-      <td style="font-size:12px;">${p.product_type==='fungicide'?'Fungicide':'Pesticide'}</td>
-      <td><input class="inline-input" type="number" value="${p.default_interval_days??""}" style="width:70px;" placeholder="—" onchange="updateProduct('${p.id}','default_interval_days',this.value===''?null:parseInt(this.value))"></td>
-      <td style="white-space:nowrap;">
-        <input class="inline-input" type="number" step="0.001" value="${p.default_dose_amount??""}" style="width:65px;" placeholder="amt" onchange="updateProduct('${p.id}','default_dose_amount',this.value===''?null:parseFloat(this.value))">
-        ${p.default_dose_unit ? `<span style="color:var(--text);font-size:12px;">${p.default_dose_unit}</span>` : `<select class="inline-select" style="width:50px;" onchange="updateProduct('${p.id}','default_dose_unit',this.value||null)">
-          <option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option>
-        </select>`}
-        / <input class="inline-input" type="number" value="${p.default_dose_per_litres??""}" style="width:75px;" placeholder="L" onchange="updateProduct('${p.id}','default_dose_per_litres',this.value===''?null:parseInt(this.value))">L
-      </td>
-      <td style="white-space:nowrap;font-size:11px;">${p.packaging_size != null ? `<span style="color:var(--text);">${p.packaging_size}${p.packaging_unit||''}/${p.packaging_type||''}</span>` : `
-        <input class="inline-input" type="number" step="0.001" value="" style="width:70px;" placeholder="size" onchange="updateProduct('${p.id}','packaging_size',this.value===''?null:parseFloat(this.value))">
-        <select class="inline-select" style="width:55px;" onchange="updateProduct('${p.id}','packaging_unit',this.value||null)">
-          <option value="">—</option><option value="g">g</option><option value="ml">ml</option><option value="kg">kg</option><option value="L">L</option>
-        </select>
-        <select class="inline-select" style="width:85px;" onchange="updateProduct('${p.id}','packaging_type',this.value||null)">
-          <option value="">—</option><option value="packet">Packet</option><option value="box">Box</option><option value="bottle">Bottle</option><option value="drum">Drum</option><option value="bag">Bag</option><option value="can">Can</option>
-        </select>`}
-      </td>
+      <td style="font-weight:600;white-space:nowrap;">${esc(pName)}${linkedIcon}</td>
+      <td style="font-size:11px;color:#8fcf80;">${esc(ai)}</td>
+      <td style="font-size:12px;">${esc(formulation)}</td>
+      <td style="font-size:12px;">${esc(category)}</td>
+      <td style="font-size:11px;">${packaging === '—' ? '—' : esc(packaging)}</td>
+      <td style="font-size:12px;font-weight:600;color:${stockColor};">${stock}</td>
       <td><label class="toggle"><input type="checkbox" ${p.is_active?"checked":""} onchange="updateProduct('${p.id}','is_active',this.checked)"><span class="toggle-slider"></span></label></td>
-      <td><button class="btn btn-outline btn-sm" onclick="openEditProductModal('${p.id}')" style="font-size:10px;">Edit</button></td>
       <td><span class="save-tick" id="tick-p-${p.id}">✓</span></td>
     </tr>`;
   }).join("");
+}
+
+// Migrate a spray product to Inventory (auto-create + link)
+async function migrateToInventory(pndProductId) {
+  const p = products.find(x => x.id === pndProductId);
+  if(!p) return;
+  const categoryMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'pgr': 'PGR', 'adjuvant': 'Adjuvant' };
+  const category = categoryMap[p.product_type] || 'Other';
+  const ai = getProductIngredients(p.id).map(i => i.name).join(', ');
+  const formulation = p.pnd_formulations ? p.pnd_formulations.name : '';
+  const newId = await dbNextId('P');
+  const data = {
+    id: newId, name: p.product_name, category: category, active_ingredient: ai, formulation: formulation,
+    pack_unit: p.packaging_unit || p.default_dose_unit || 'kg', pack_type: p.packaging_type || 'Bottle',
+    pack_size: p.packaging_size || 0, current_stock: 0, opening_stock: 0, reorder_level: 0,
+    supplier_ids: [], archived: false
+  };
+  const invResult = await sbQuery(sb.from('products').insert(data).select());
+  if(invResult === null) return;
+  inventoryProducts.push(data);
+  const linkResult = await sbQuery(sb.from('pnd_products').update({ inventory_product_id: newId }).eq('id', pndProductId).select());
+  if(linkResult === null) return;
+  p.inventory_product_id = newId;
+  return true;
+}
+
+async function migrateSingleToInventory(pndProductId) {
+  const p = products.find(x => x.id === pndProductId);
+  const ok = await migrateToInventory(pndProductId);
+  if(ok) {
+    notify((p ? p.product_name : 'Product') + ' migrated to Inventory');
+    renderProductsPage();
+    renderEnableProductsSection();
+  }
+}
+
+async function migrateAllToInventory() {
+  const unlinked = products.filter(p => !p.inventory_product_id);
+  if(!unlinked.length) return;
+  if(!confirm('Migrate ' + unlinked.length + ' product' + (unlinked.length > 1 ? 's' : '') + ' to Inventory?')) return;
+  let count = 0;
+  for(const p of unlinked) {
+    const ok = await migrateToInventory(p.id);
+    if(ok) count++;
+  }
+  notify(count + ' product' + (count > 1 ? 's' : '') + ' migrated to Inventory');
+  renderProductsPage();
+  renderEnableProductsSection();
+}
+
+// Enable inventory product for spraying — creates a pnd_products row
+function renderEnableProductsSection() {
+  const container = document.getElementById('enable-products-container');
+  if(!container) return;
+  const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'PGR', 'Adjuvant'];
+  const linkedInvIds = products.map(p => p.inventory_product_id).filter(Boolean);
+  const available = inventoryProducts.filter(ip => !ip.archived && sprayCategories.includes(ip.category) && !linkedInvIds.includes(ip.id))
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  if(!available.length) {
+    container.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">All spray-eligible inventory products are already enabled. Add new products in the Inventory module.</div>';
+    return;
+  }
+  container.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;">' +
+    available.map(ip =>
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;">' +
+        '<div>' +
+          '<div style="font-size:13px;font-weight:600;color:var(--white);">' + esc(ip.name) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-dim);">' + esc(ip.category||'') + (ip.active_ingredient ? ' — ' + esc(ip.active_ingredient) : '') + '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary btn-sm" onclick="enableForSpraying(\'' + ip.id + '\')" style="white-space:nowrap;">Enable</button>' +
+      '</div>'
+    ).join('') +
+  '</div>';
+}
+
+async function enableForSpraying(invProductId) {
+  const ip = getInventoryProduct(invProductId);
+  if(!ip) return;
+  // Determine product_type from inventory category
+  const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant' };
+  const productType = typeMap[ip.category] || 'pesticide';
+  const data = {
+    product_name: ip.name, product_type: productType, inventory_product_id: ip.id,
+    is_active: true, sort_order: products.length + 1,
+    packaging_size: ip.pack_size || null, packaging_unit: ip.pack_unit || null, packaging_type: ip.pack_type || null
+  };
+  const result = await sbQuery(sb.from('pnd_products').insert(data).select());
+  if(result === null) return;
+  const newProduct = result.length ? result[0] : null;
+  if(newProduct) {
+    products.push(newProduct);
+    // Auto-link AI: match inventory active_ingredient text to pnd_ingredients
+    if(ip.active_ingredient) {
+      // Split on + / , for multi-AI products
+      const aiNames = ip.active_ingredient.split(/[+\/,]/).map(s => s.trim()).filter(Boolean);
+      for(const aiName of aiNames) {
+        const ing = ingredients.find(i => i.name.toLowerCase() === aiName.toLowerCase());
+        if(ing) {
+          const piResult = await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: newProduct.id, ingredient_id: ing.id }).select());
+          if(piResult && piResult.length) productIngredients.push({ ...piResult[0], pnd_ingredients: ing });
+        }
+      }
+    }
+  }
+  notify(ip.name + ' enabled for spraying');
+  renderProductsPage();
+  renderEnableProductsSection();
+}
+
+function renderAIDoseSettings() {
+  const container = document.getElementById('ai-dose-settings-container');
+  if(!container) return;
+  const combos = getAICombos();
+  if(!combos.length) { container.innerHTML = '<div style="color:var(--text-dim);font-size:12px;">No active ingredients found.</div>'; return; }
+
+  container.innerHTML = '<table style="width:100%;"><thead><tr><th>Active Ingredient</th><th>Products</th><th style="width:90px;">Dose</th><th style="width:60px;">Unit</th><th style="width:90px;">per Litres</th><th style="width:90px;">Interval (days)</th><th style="width:40px;"></th></tr></thead><tbody>' +
+    combos.map(c => {
+      const def = getAIComboDefault(c.key) || {};
+      const prodNames = c.productIds.map(pid => { const p=getProduct(pid); return p?p.product_name:'?'; }).join(', ');
+      return '<tr>' +
+        '<td style="font-weight:600;color:#8fcf80;font-size:12px;">' + esc(c.label) + '</td>' +
+        '<td style="font-size:11px;color:var(--text-dim);">' + esc(prodNames) + '</td>' +
+        '<td><input class="inline-input" type="number" step="0.001" value="' + (def.dose_amount||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_amount\',parseFloat(this.value)||null)"></td>' +
+        '<td><select class="inline-select" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_unit\',this.value||null)">' +
+          '<option value="g"' + (def.dose_unit==='g'?' selected':'') + '>g</option>' +
+          '<option value="ml"' + (def.dose_unit==='ml'?' selected':'') + '>ml</option>' +
+          '<option value="kg"' + (def.dose_unit==='kg'?' selected':'') + '>kg</option>' +
+          '<option value="L"' + (def.dose_unit==='L'?' selected':'') + '>L</option>' +
+        '</select></td>' +
+        '<td><input class="inline-input" type="number" value="' + (def.dose_per_litres||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_per_litres\',parseInt(this.value)||null)"></td>' +
+        '<td><input class="inline-input" type="number" value="' + (def.interval_days||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'interval_days\',parseInt(this.value)||null)"></td>' +
+        '<td><span class="save-tick" id="tick-ai-' + c.key.replace(/[^a-z0-9]/gi,'_') + '">✓</span></td>' +
+      '</tr>';
+    }).join('') +
+  '</tbody></table>';
+}
+
+async function updateAIDose(comboKey, field, value) {
+  const existing = aiComboDefaults.find(d => d.ai_combo_key === comboKey);
+  if(existing) {
+    const upd = {}; upd[field] = value;
+    await sbQuery(sb.from('ai_combo_defaults').update(upd).eq('ai_combo_key', comboKey).select());
+    existing[field] = value;
+  } else {
+    const data = { ai_combo_key: comboKey, dose_amount: null, dose_unit: 'g', dose_per_litres: null, interval_days: null };
+    data[field] = value;
+    const result = await sbQuery(sb.from('ai_combo_defaults').insert(data).select());
+    if(result && result.length) aiComboDefaults.push(result[0]);
+  }
+  // Show tick
+  const tickId = 'tick-ai-' + comboKey.replace(/[^a-z0-9]/gi,'_');
+  const tick = document.getElementById(tickId);
+  if(tick) { tick.style.opacity='1'; setTimeout(()=>{ tick.style.opacity='0'; }, 1500); }
 }
 
 const apSelectedIngredients = []; // [{id, name}]
