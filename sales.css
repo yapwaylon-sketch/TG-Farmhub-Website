@@ -1,0 +1,595 @@
+/* ============================================================
+   TG Farmhub — Sales Module Styles
+   Mobile-first. Uses shared.css variables.
+   ============================================================ */
+
+/* ============================================================
+   SALES CARDS
+   ============================================================ */
+.sales-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.2s, transform 0.15s;
+  cursor: pointer;
+}
+
+.sales-card:hover {
+  border-color: var(--green);
+  transform: translateY(-1px);
+}
+
+.sales-card:active {
+  transform: translateY(0);
+  border-color: var(--green-light);
+}
+
+.sales-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sales-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.sales-card-total {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--gold-light);
+  margin-bottom: 6px;
+}
+
+.sales-card-items {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   STATUS BADGES
+   ============================================================ */
+.badge-pending {
+  background: rgba(58, 122, 200, 0.15);
+  color: #6AA8E8;
+}
+
+.badge-preparing {
+  background: var(--gold-pale);
+  color: var(--gold-light);
+}
+
+.badge-prepared {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.badge-delivering {
+  background: rgba(140, 90, 210, 0.15);
+  color: #B08AE8;
+}
+
+.badge-completed {
+  background: rgba(60, 200, 80, 0.15);
+  color: #5EE068;
+}
+
+.badge-cancelled {
+  background: rgba(140, 140, 140, 0.12);
+  color: #8A8A8A;
+}
+
+/* ============================================================
+   DOC TYPE BADGES
+   ============================================================ */
+.badge-do {
+  background: rgba(58, 122, 200, 0.15);
+  color: #6AA8E8;
+}
+
+.badge-cs {
+  background: var(--gold-pale);
+  color: var(--gold-light);
+}
+
+/* ============================================================
+   PAYMENT STATUS BADGES
+   ============================================================ */
+.badge-unpaid {
+  background: var(--red-pale);
+  color: var(--red);
+}
+
+.badge-partial {
+  background: var(--gold-pale);
+  color: var(--gold-light);
+}
+
+.badge-paid {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+/* ============================================================
+   CUSTOMER RETURN RATE
+   ============================================================ */
+.return-rate-green {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.return-rate-yellow {
+  color: var(--gold-light);
+  font-weight: 700;
+}
+
+.return-rate-red {
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* ============================================================
+   SALES TABS
+   ============================================================ */
+.sales-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.sales-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sales-tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: inherit;
+}
+
+.sales-tab:hover {
+  color: var(--text);
+}
+
+.sales-tab.active {
+  color: var(--green-light);
+  border-bottom-color: var(--green);
+  font-weight: 700;
+}
+
+/* ============================================================
+   BOTTOM ACTION BAR
+   ============================================================ */
+.bottom-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.bottom-actions .btn {
+  flex: 1;
+  justify-content: center;
+  min-height: 44px;
+  font-size: 13px;
+}
+
+/* ============================================================
+   AGING BUCKETS
+   ============================================================ */
+.aging-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.aging-row:last-child {
+  border-bottom: none;
+}
+
+.aging-row .aging-label {
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.aging-row .aging-count {
+  font-weight: 700;
+  min-width: 36px;
+  text-align: center;
+}
+
+.aging-row .aging-amount {
+  font-weight: 700;
+  min-width: 100px;
+  text-align: right;
+}
+
+/* 0-7 days: normal */
+.aging-row.aging-current .aging-count,
+.aging-row.aging-current .aging-amount {
+  color: var(--text);
+}
+
+/* 8-14 days: gold */
+.aging-row.aging-warning .aging-count,
+.aging-row.aging-warning .aging-amount {
+  color: var(--gold);
+}
+
+/* 15-30 days: gold-light */
+.aging-row.aging-overdue .aging-count,
+.aging-row.aging-overdue .aging-amount {
+  color: var(--gold-light);
+}
+
+/* 30+ days: red */
+.aging-row.aging-critical .aging-count,
+.aging-row.aging-critical .aging-amount {
+  color: var(--red);
+}
+
+/* ============================================================
+   DUPLICATE WARNING
+   ============================================================ */
+.duplicate-warning {
+  background: var(--gold-pale);
+  border: 1px solid rgba(232, 160, 32, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.duplicate-warning svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   ORDER ITEM ROW
+   ============================================================ */
+.order-item-row {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.order-item-row input,
+.order-item-row select {
+  flex: 1;
+  min-width: 80px;
+}
+
+.order-item-row .order-item-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.order-item-row .order-item-remove:hover {
+  color: var(--red);
+  background: var(--red-pale);
+}
+
+/* ============================================================
+   SEARCH BAR
+   ============================================================ */
+.search-bar {
+  position: relative;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.search-bar input {
+  width: 100%;
+  padding-left: 36px;
+}
+
+.search-bar .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ============================================================
+   FILTER BAR
+   ============================================================ */
+.sales-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.sales-filters select {
+  min-width: 140px;
+}
+
+.sales-filters input[type="date"] {
+  min-width: 140px;
+}
+
+/* ============================================================
+   STATUS TIMELINE
+   ============================================================ */
+.status-timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 16px 0;
+  overflow-x: auto;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 60px;
+}
+
+.timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
+  transition: all 0.2s;
+}
+
+.timeline-step.done .timeline-dot {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.timeline-step.current .timeline-dot {
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(232, 160, 32, 0.2);
+}
+
+.timeline-step .timeline-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-top: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.timeline-step.done .timeline-label {
+  color: var(--green-light);
+}
+
+.timeline-step.current .timeline-label {
+  color: var(--gold-light);
+  font-weight: 700;
+}
+
+.timeline-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  min-width: 20px;
+  align-self: center;
+  margin-top: -10px;
+}
+
+.timeline-line.done {
+  background: var(--green);
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.sales-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-dim);
+}
+
+.sales-empty svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.sales-empty p {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.sales-empty .sales-empty-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ============================================================
+   SPINNER (inline)
+   ============================================================ */
+.sales-spin {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green-light);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 24px auto;
+}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+@media print {
+  .sales-tabs,
+  .sales-filters,
+  .bottom-actions,
+  .search-bar {
+    display: none !important;
+  }
+
+  .sales-card {
+    border: 1px solid #ccc;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sales-card-total {
+    color: #333;
+  }
+}
+
+/* ============================================================
+   MOBILE (≤768px)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Account for fixed bottom action bar */
+  .sales-content-area {
+    padding-bottom: 80px;
+  }
+
+  .sales-card-header {
+    flex-wrap: wrap;
+  }
+
+  .sales-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .bottom-actions {
+    padding: 8px 10px;
+  }
+
+  .bottom-actions .btn {
+    font-size: 12px;
+    min-height: 44px;
+  }
+
+  .order-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .order-item-row input,
+  .order-item-row select {
+    min-width: 100%;
+  }
+
+  .sales-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sales-filters select,
+  .sales-filters input[type="date"] {
+    min-width: 100%;
+  }
+
+  .status-timeline {
+    padding: 12px 0;
+  }
+
+  .timeline-step .timeline-label {
+    font-size: 9px;
+  }
+
+  .aging-row {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 400px) {
+  .sales-card {
+    padding: 10px 12px;
+  }
+
+  .sales-card-total {
+    font-size: 16px;
+  }
+
+  .sales-tab {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+}
