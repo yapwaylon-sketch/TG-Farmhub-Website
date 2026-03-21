@@ -118,8 +118,9 @@
       <div class="page-title">Products</div>
       <div class="page-subtitle">Pineapple product catalog</div>
     </div>
+    <div class="header-actions" id="products-header-actions"></div>
   </div>
-  <div class="page-body"></div>
+  <div class="page-body" id="products-body"></div>
 </div>
 
 <!-- PAGE: PAYMENTS -->
@@ -162,6 +163,61 @@
   <button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>
 </div>
 
+</div>
+
+<!-- PRODUCT MODAL -->
+<div id="sp-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('sp-modal')">
+  <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="sp-modal-title">Add Product</div>
+      <button class="modal-close" onclick="closeModal('sp-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="sp-edit-id" value="">
+    <div class="form-field">
+      <label>VARIETY</label>
+      <select id="sp-variety" style="width:100%;"></select>
+    </div>
+    <div class="form-field">
+      <label>PRODUCT NAME</label>
+      <input type="text" id="sp-name" placeholder="e.g., Whole Fruit >1kg (Crown)" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>CATEGORY</label>
+      <select id="sp-category" style="width:100%;" onchange="spCategoryChange()">
+        <option value="whole_crown">Whole with Crown</option>
+        <option value="whole_no_crown">Whole without Crown</option>
+        <option value="slice">Slices</option>
+        <option value="peeled">Peeled Whole</option>
+        <option value="slice_box">Slices (Box)</option>
+        <option value="chunk_box">Chunks (Box)</option>
+        <option value="ring_box">Rings (Box)</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>UNIT</label>
+        <select id="sp-unit" style="width:100%;">
+          <option value="kg">kg</option>
+          <option value="pcs">pcs</option>
+          <option value="box">box</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>DEFAULT PRICE (RM)</label>
+        <input type="number" id="sp-price" step="0.01" min="0" placeholder="0.00" style="width:100%;">
+      </div>
+    </div>
+    <div class="form-field" id="sp-box-qty-field" style="display:none;">
+      <label>PIECES PER BOX</label>
+      <input type="number" id="sp-box-qty" min="1" placeholder="e.g., 5 or 10" style="width:100%;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('sp-modal')">Cancel</button>
+      <button class="btn btn-primary" id="sp-save-btn" onclick="spSaveProduct()">Add Product</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -265,7 +321,176 @@ function renderCustomers() {
   document.getElementById('page-customers').querySelector('.page-body').innerHTML = '<div class="empty-state">Loading...</div>';
 }
 function renderProducts() {
-  document.getElementById('page-products').querySelector('.page-body').innerHTML = '<div class="empty-state">Loading...</div>';
+  // Header actions
+  document.getElementById('products-header-actions').innerHTML =
+    '<button class="btn btn-primary" onclick="spOpenModal()">+ Add Product</button>';
+
+  var body = document.getElementById('products-body');
+  if (!salesProducts.length) {
+    body.innerHTML = '<div class="empty-state">No products yet. Click "+ Add Product" to create your first product.</div>';
+    return;
+  }
+
+  // Group by variety
+  var grouped = {};
+  salesProducts.forEach(function(p) {
+    var vid = p.variety_id || 'none';
+    if (!grouped[vid]) grouped[vid] = [];
+    grouped[vid].push(p);
+  });
+
+  var html = '';
+  Object.keys(grouped).forEach(function(vid) {
+    var vName = 'Unassigned';
+    if (vid !== 'none') {
+      var v = varieties.find(function(x) { return x.id === vid; });
+      if (v) vName = v.name;
+    }
+    html += '<div class="section-group">';
+    html += '<div class="section-title">' + esc(vName) + ' <span style="color:var(--text-muted);font-weight:400;">(' + grouped[vid].length + ')</span></div>';
+    html += '<div class="data-table"><table><thead><tr>' +
+      '<th>Product</th><th>Category</th><th>Unit</th><th>Price</th><th>Status</th><th style="width:120px;">Actions</th>' +
+      '</tr></thead><tbody>';
+    grouped[vid].forEach(function(p) {
+      var dimStyle = p.is_active === false ? ' style="opacity:0.5;"' : '';
+      var statusBadge = p.is_active === false
+        ? '<span class="badge badge-muted">Inactive</span>'
+        : '<span class="badge badge-success">Active</span>';
+      var toggleLabel = p.is_active === false ? 'Activate' : 'Deactivate';
+      var boxInfo = p.box_quantity ? ' (' + p.box_quantity + ' pcs)' : '';
+      html += '<tr' + dimStyle + '>';
+      html += '<td><strong>' + esc(p.name) + '</strong>' + (boxInfo ? '<span style="color:var(--text-muted);font-size:11px;">' + esc(boxInfo) + '</span>' : '') + '</td>';
+      html += '<td><span class="badge badge-outline">' + esc(spCategoryLabel(p.category)) + '</span></td>';
+      html += '<td>' + esc(p.unit || '-') + '</td>';
+      html += '<td>' + formatRM(p.default_price || 0) + '</td>';
+      html += '<td>' + statusBadge + '</td>';
+      html += '<td><div style="display:flex;gap:4px;">';
+      html += '<button class="btn btn-outline btn-sm" onclick="spOpenModal(\'' + p.id + '\')">Edit</button>';
+      html += '<button class="btn btn-outline btn-sm" onclick="spToggleActive(\'' + p.id + '\')">' + toggleLabel + '</button>';
+      html += '</div></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  });
+  body.innerHTML = html;
+}
+
+// Category display name helper
+function spCategoryLabel(cat) {
+  var labels = {
+    whole_crown: 'Whole (Crown)', whole_no_crown: 'Whole (No Crown)',
+    slice: 'Slices', peeled: 'Peeled', slice_box: 'Slices (Box)',
+    chunk_box: 'Chunks (Box)', ring_box: 'Rings (Box)'
+  };
+  return labels[cat] || cat || '-';
+}
+
+// Show/hide box quantity field based on category
+function spCategoryChange() {
+  var cat = document.getElementById('sp-category').value;
+  document.getElementById('sp-box-qty-field').style.display = cat.endsWith('_box') ? 'block' : 'none';
+}
+
+function spOpenModal(editId) {
+  var modal = document.getElementById('sp-modal');
+  var title = document.getElementById('sp-modal-title');
+  var saveBtn = document.getElementById('sp-save-btn');
+  document.getElementById('sp-edit-id').value = editId || '';
+
+  // Populate variety dropdown
+  var varSel = document.getElementById('sp-variety');
+  varSel.innerHTML = varieties.map(function(v) { return '<option value="' + v.id + '">' + esc(v.name) + '</option>'; }).join('');
+
+  if (editId) {
+    title.textContent = 'Edit Product';
+    saveBtn.textContent = 'Save Changes';
+    var p = salesProducts.find(function(x) { return x.id === editId; });
+    if (p) {
+      varSel.value = p.variety_id || '';
+      document.getElementById('sp-name').value = p.name || '';
+      document.getElementById('sp-category').value = p.category || 'whole_crown';
+      document.getElementById('sp-unit').value = p.unit || 'kg';
+      document.getElementById('sp-price').value = p.default_price || '';
+      document.getElementById('sp-box-qty').value = p.box_quantity || '';
+    }
+  } else {
+    title.textContent = 'Add Product';
+    saveBtn.textContent = 'Add Product';
+    document.getElementById('sp-name').value = '';
+    document.getElementById('sp-category').value = 'whole_crown';
+    document.getElementById('sp-unit').value = 'kg';
+    document.getElementById('sp-price').value = '';
+    document.getElementById('sp-box-qty').value = '';
+  }
+
+  spCategoryChange();
+  modal.style.display = 'flex';
+  trapFocus(modal.querySelector('.modal-box'));
+}
+
+async function spSaveProduct() {
+  var editId = document.getElementById('sp-edit-id').value;
+  var name = document.getElementById('sp-name').value.trim();
+  var varietyId = document.getElementById('sp-variety').value;
+  var category = document.getElementById('sp-category').value;
+  var unit = document.getElementById('sp-unit').value;
+  var price = parseFloat(document.getElementById('sp-price').value) || 0;
+  var boxQty = category.endsWith('_box') ? (parseInt(document.getElementById('sp-box-qty').value) || null) : null;
+
+  if (!name) { notify('Product name required', 'warning'); return; }
+  if (!varietyId) { notify('Please select a variety', 'warning'); return; }
+
+  var btn = document.getElementById('sp-save-btn');
+  btnLoading(btn, true);
+
+  var data = {
+    variety_id: varietyId, name: name, category: category,
+    unit: unit, default_price: price, box_quantity: boxQty
+  };
+
+  if (editId) {
+    var result = await sbQuery(sb.from('sales_products').update(data).eq('id', editId).select());
+    if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
+    var idx = salesProducts.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) Object.assign(salesProducts[idx], data);
+    notify('Product updated');
+  } else {
+    var newId = await dbNextId('SP');
+    data.id = newId;
+    data.is_active = true;
+    data.sort_order = salesProducts.length;
+    var result = await sbQuery(sb.from('sales_products').insert(data).select());
+    if (result === null) { btnLoading(btn, false, 'Add Product'); return; }
+    salesProducts.push(result[0] || data);
+    notify('Product added');
+  }
+
+  btnLoading(btn, false, editId ? 'Save Changes' : 'Add Product');
+  closeModal('sp-modal');
+  renderProducts();
+}
+
+function spToggleActive(id) {
+  var p = salesProducts.find(function(x) { return x.id === id; });
+  if (!p) return;
+
+  if (p.is_active) {
+    confirmAction('Deactivate Product?', 'Deactivate "' + p.name + '"? It will be hidden from order forms.', async function() {
+      var result = await sbQuery(sb.from('sales_products').update({ is_active: false }).eq('id', id).select());
+      if (result === null) return;
+      p.is_active = false;
+      notify(p.name + ' deactivated');
+      renderProducts();
+    });
+  } else {
+    (async function() {
+      var result = await sbQuery(sb.from('sales_products').update({ is_active: true }).eq('id', id).select());
+      if (result === null) return;
+      p.is_active = true;
+      notify(p.name + ' activated');
+      renderProducts();
+    })();
+  }
 }
 function renderPayments() {
   document.getElementById('page-payments').querySelector('.page-body').innerHTML = '<div class="empty-state">Payments — Phase 4</div>';
