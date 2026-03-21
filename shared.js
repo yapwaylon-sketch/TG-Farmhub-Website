@@ -76,15 +76,51 @@ function notify(msg, type, duration) {
 }
 
 // ============================================================
-// Supabase Error Handler Wrapper
+// Offline Detection
+// ============================================================
+var _offlineBanner = null;
+
+function _showOfflineBanner() {
+  if (_offlineBanner) return;
+  _offlineBanner = document.createElement("div");
+  _offlineBanner.className = "offline-banner";
+  _offlineBanner.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg> You are offline — changes will not be saved';
+  document.body.appendChild(_offlineBanner);
+}
+
+function _hideOfflineBanner() {
+  if (_offlineBanner) {
+    _offlineBanner.remove();
+    _offlineBanner = null;
+    notify("Back online", "success", 2000);
+  }
+}
+
+window.addEventListener("online", _hideOfflineBanner);
+window.addEventListener("offline", _showOfflineBanner);
+if (!navigator.onLine) document.addEventListener("DOMContentLoaded", _showOfflineBanner);
+
+// ============================================================
+// Supabase Error Handler Wrapper (with retry & backoff)
 // ============================================================
 
-// Wraps a Supabase query with try-catch, error notification, and optional loading state.
+// Wraps a Supabase query with try-catch, error notification, retry with exponential backoff.
 // Usage: var data = await sbQuery(sb.from('table').select('*'), 'Loading items...');
 // Returns: data on success, null on error (error already shown to user).
+var SBQUERY_MAX_RETRIES = 2; // 2 retries = 3 total attempts
+var SBQUERY_BASE_DELAY = 1000; // 1 second
+
 async function sbQuery(queryPromise, loadingMsg) {
   var spinner = null;
   if (loadingMsg) spinner = showLoading(loadingMsg);
+
+  // Check offline first
+  if (!navigator.onLine) {
+    if (spinner) hideLoading(spinner);
+    notify("You are offline — please check your connection", "error", 5000);
+    return null;
+  }
+
   try {
     var result = await queryPromise;
     if (spinner) hideLoading(spinner);
@@ -100,6 +136,80 @@ async function sbQuery(queryPromise, loadingMsg) {
     notify("Connection error — please check your internet", "error", 5000);
     return null;
   }
+}
+
+// Retry wrapper for critical mutations (insert/update/delete).
+// Pass a function that returns the Supabase query promise (so it can be re-executed).
+// Usage: var data = await sbMutate(() => sb.from('t').update(d).eq('id',id).select(), 'Saving...');
+async function sbMutate(queryFn, loadingMsg) {
+  var spinner = null;
+  if (loadingMsg) spinner = showLoading(loadingMsg);
+
+  if (!navigator.onLine) {
+    if (spinner) hideLoading(spinner);
+    notify("You are offline — cannot save changes", "error", 5000);
+    return null;
+  }
+
+  var lastError = null;
+  for (var attempt = 0; attempt <= SBQUERY_MAX_RETRIES; attempt++) {
+    try {
+      var result = await queryFn();
+      if (result.error) {
+        // DB errors (constraint violations, RLS) — don't retry
+        if (spinner) hideLoading(spinner);
+        console.error("Supabase error:", result.error);
+        notify(result.error.message || "Database error", "error", 5000);
+        return null;
+      }
+      if (spinner) hideLoading(spinner);
+      return result.data;
+    } catch(e) {
+      lastError = e;
+      console.warn("Network error (attempt " + (attempt + 1) + "/" + (SBQUERY_MAX_RETRIES + 1) + "):", e.message);
+      if (attempt < SBQUERY_MAX_RETRIES) {
+        var delay = SBQUERY_BASE_DELAY * Math.pow(2, attempt); // 1s, 2s
+        await new Promise(function(resolve) { setTimeout(resolve, delay); });
+      }
+    }
+  }
+
+  if (spinner) hideLoading(spinner);
+  console.error("All retry attempts failed:", lastError);
+  notify("Connection failed after " + (SBQUERY_MAX_RETRIES + 1) + " attempts — please try again", "error", 6000);
+  return null;
+}
+
+// ============================================================
+// Optimistic Locking — prevent concurrent edit overwrites
+// ============================================================
+
+// Updates a record only if its updated_at matches the expected value.
+// If another user modified the record since it was loaded, shows a conflict warning.
+// Usage:
+//   var data = await sbUpdateWithLock('block_crops', id, updates, originalUpdatedAt);
+//   if (data) { /* success */ } else { /* conflict or error — already handled */ }
+async function sbUpdateWithLock(table, id, updates, expectedUpdatedAt) {
+  if (!expectedUpdatedAt) {
+    // No lock check — fall back to normal update
+    return await sbQuery(sb.from(table).update(updates).eq("id", id).select());
+  }
+
+  var result = await sb.from(table).update(updates).eq("id", id).eq("updated_at", expectedUpdatedAt).select();
+
+  if (result.error) {
+    console.error("Update error:", result.error);
+    notify(result.error.message || "Database error", "error", 5000);
+    return null;
+  }
+
+  if (!result.data || result.data.length === 0) {
+    // No rows matched — likely a concurrent edit changed updated_at
+    notify("This record was modified by another user. Please reload and try again.", "warning", 6000);
+    return null;
+  }
+
+  return result.data;
 }
 
 // ============================================================

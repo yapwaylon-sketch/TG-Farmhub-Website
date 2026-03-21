@@ -1,0 +1,47 @@
+/* Row colour coding */
+.row-overdue td { background: rgba(232,96,96,0.06); }
+.row-approaching td { background: rgba(232,160,32,0.06); }
+.row-no-induction td { opacity: 0.7; }
+
+.td-overdue { color: var(--red) !important; font-weight: 700; }
+.td-approaching { color: var(--gold-light) !important; font-weight: 700; }
+
+/* Filter bar */
+.filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+.filter-bar select { min-width:160px; }
+.filter-btn { padding:6px 14px; border-radius:8px; font-size:11px; font-weight:700; border:1px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; font-family:inherit; transition:all 0.15s; }
+.filter-btn:hover { border-color:var(--border-light); color:var(--text); }
+.filter-btn.active { border-color:var(--gold); background:var(--gold-pale); color:var(--gold-light); }
+
+/* Sortable headers */
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--green-light); }
+
+/* Empty state */
+.empty-state { padding:40px; text-align:center; color:var(--text-dim); font-size:14px; }
+
+/* Spin */
+.spin { animation:spin 1s linear infinite; }
+
+/* Badge status — per-status colours */
+.badge-status { background:var(--bg-hover); color:var(--text-muted); }
+.badge-growing { background:rgba(74,124,63,0.2); color:#6ECB63; }
+.badge-induced { background:rgba(100,149,237,0.2); color:#6495ED; }
+.badge-suckers { background:rgba(186,135,89,0.2); color:#C4956A; }
+.badge-to-replant { background:rgba(232,96,96,0.15); color:#E86060; }
+.badge-to-induce { background:rgba(232,160,32,0.2); color:#E8A020; }
+
+/* Table scroll for many columns */
+.table-wrap { overflow-x:auto; }
+
+/* Summary cards — 3 columns for overview */
+.cards-3 { grid-template-columns: repeat(3,1fr); }
+
+/* Print */
+@media print {
+  .filter-bar { display:none!important; }
+  .page { display:none!important; }
+  .page.active { display:block!important; }
+}
+
+tr:last-child td { border-bottom:none; }

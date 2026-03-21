@@ -1,0 +1,60 @@
+/* Workers-specific overrides */
+
+/* Gold primary button (overrides shared.css green) */
+.btn-primary { background: var(--gold); color: #1a1a1a; }
+.btn-primary:hover { background: var(--gold-light); }
+.btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+.btn-danger { background: var(--critical-bg); color: var(--critical); border: 1px solid transparent; }
+.btn-danger:hover { border-color: var(--critical); }
+
+/* MAIN layout (workers uses .main not .main-content) */
+.main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.page { display: none; flex: 1; padding: 24px; overflow-y: auto; }
+.page.active { display: block; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--white); }
+
+/* CARD */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+/* STAT CARDS (module-specific, different from shared .summary-card) */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 24px; font-weight: 800; color: var(--white); margin-top: 4px; }
+.stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* DATA TABLE — workers uses this as a plain <table> element, not a card wrapper */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: transparent; }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; color: var(--text); }
+.data-table tr:hover { background: var(--bg-hover); }
+
+/* BADGES — workers-specific variants */
+.badge-m { background: rgba(74,124,200,0.15); color: #7AA0D0; }
+.badge-f { background: rgba(200,100,150,0.15); color: #D080A0; }
+
+/* SPIN animation */
+.spin { animation: spin 1s linear infinite; }
+
+/* SEARCH BOX */
+.search-box { display: flex; align-items: center; gap: 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+.search-box input { background: none; border: none; color: var(--white); font-size: 13px; font-family: inherit; flex: 1; outline: none; }
+.search-box svg { width: 16px; height: 16px; color: var(--text-dim); flex-shrink: 0; }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* MOBILE — workers-specific collapsing sidebar */
+@media (max-width: 768px) {
+  .sidebar { width: 60px; }
+  .sidebar-brand-text, .sidebar-brand-sub, .nav-label, .sidebar-sync, #sidebar-user { display: none; }
+  .sidebar-brand { padding: 12px 10px; justify-content: center; }
+  .nav-item { justify-content: center; padding: 12px 0; }
+  .page { padding: 16px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-row { flex-direction: column; gap: 0; }
+  .modal-box { padding: 20px; max-width: 95vw; }
+  #page-summary [style*="grid-template-columns: 2fr 1fr"] { grid-template-columns: 1fr !important; }
+}

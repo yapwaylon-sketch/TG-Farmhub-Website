@@ -436,6 +436,32 @@ tr.clickable:hover { background:var(--bg-hover); }
 .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
 
 /* ============================================================
+   OFFLINE BANNER
+   ============================================================ */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10001;
+  background: var(--red);
+  color: white;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  animation: slideDown 0.3s ease;
+}
+
+.offline-banner svg { flex-shrink: 0; }
+
+@keyframes slideDown { from { transform:translateY(-100%); } to { transform:translateY(0); } }
+
+/* ============================================================
    NOTIFICATIONS
    ============================================================ */
 .notification-container {
