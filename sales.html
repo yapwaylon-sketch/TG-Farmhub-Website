@@ -374,9 +374,158 @@ async function syncAll() {
   if (icon) icon.style.animation = '';
 }
 
-// RENDER STUBS (to be implemented in later phases)
+// HELPERS
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function daysBetween(dateStr) {
+  if (!dateStr) return 999;
+  var d = new Date(dateStr + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  return Math.floor((today - d) / 86400000);
+}
+
+function getCustomerName(customerId) {
+  var c = customers.find(function(x) { return x.id === customerId; });
+  return c ? c.name : '\u2014';
+}
+
+function statusLabel(s) {
+  var labels = { pending: 'Pending', preparing: 'Preparing', prepared: 'Ready', delivering: 'Delivering', completed: 'Completed', cancelled: 'Cancelled' };
+  return labels[s] || s || '\u2014';
+}
+
+function docTypeLabel(dt) {
+  return dt === 'delivery_order' ? 'DO' : 'CS';
+}
+
+function docTypeBadgeClass(dt) {
+  return dt === 'delivery_order' ? 'badge-do' : 'badge-cs';
+}
+
+// DASHBOARD
 function renderDashboard() {
-  document.getElementById('page-dashboard').querySelector('.page-body').innerHTML = '<div class="empty-state">Dashboard coming soon</div>';
+  var body = document.getElementById('page-dashboard').querySelector('.page-body');
+  var today = todayStr();
+  var html = '';
+
+  // --- Summary Cards ---
+  var ordersToday = orders.filter(function(o) { return o.order_date === today; }).length;
+
+  var pendingPrep = orders.filter(function(o) { return o.status === 'pending' || o.status === 'preparing'; }).length;
+
+  var readyCount = orders.filter(function(o) { return o.status === 'prepared'; }).length;
+
+  var outstandingTotal = 0;
+  orders.forEach(function(o) {
+    if (o.payment_status !== 'paid') {
+      outstandingTotal += (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0);
+    }
+  });
+
+  html += '<div class="cards-grid">';
+
+  html += '<div class="summary-card">';
+  html += '<div class="sc-label">Orders Today</div>';
+  html += '<div class="sc-value">' + ordersToday + '</div>';
+  html += '<div class="sc-sub">' + today + '</div>';
+  html += '</div>';
+
+  html += '<div class="summary-card"' + (pendingPrep > 0 ? ' style="border-color:var(--red);"' : '') + '>';
+  html += '<div class="sc-label">Pending Prep</div>';
+  html += '<div class="sc-value"' + (pendingPrep > 0 ? ' style="color:var(--red);"' : '') + '>' + pendingPrep + '</div>';
+  html += '<div class="sc-sub">Pending + Preparing</div>';
+  html += '</div>';
+
+  html += '<div class="summary-card">';
+  html += '<div class="sc-label">Ready</div>';
+  html += '<div class="sc-value">' + readyCount + '</div>';
+  html += '<div class="sc-sub">Prepared for pickup/delivery</div>';
+  html += '</div>';
+
+  html += '<div class="summary-card" style="border-color:var(--gold);">';
+  html += '<div class="sc-label">Outstanding</div>';
+  html += '<div class="sc-value" style="color:var(--gold);">RM ' + outstandingTotal.toFixed(2) + '</div>';
+  html += '<div class="sc-sub">Unpaid / partial</div>';
+  html += '</div>';
+
+  html += '</div>';
+
+  // --- Outstanding Payments Aging ---
+  html += '<div style="margin-top:24px;">';
+  html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;">Outstanding Payments</div>';
+  html += '<hr style="border:none;border-top:1px solid var(--border);margin-bottom:12px;">';
+
+  var aging = [
+    { label: '0\u20137 days', min: 0, max: 7, cls: 'aging-current' },
+    { label: '8\u201314 days', min: 8, max: 14, cls: 'aging-warning' },
+    { label: '15\u201330 days', min: 15, max: 30, cls: 'aging-overdue' },
+    { label: '30+ days', min: 31, max: Infinity, cls: 'aging-critical' }
+  ];
+
+  var unpaidOrders = orders.filter(function(o) { return o.payment_status !== 'paid'; });
+
+  aging.forEach(function(bucket) {
+    var matched = unpaidOrders.filter(function(o) {
+      var days = daysBetween(o.order_date);
+      return days >= bucket.min && days <= bucket.max;
+    });
+    var total = 0;
+    matched.forEach(function(o) {
+      total += (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0);
+    });
+
+    html += '<div class="aging-row ' + bucket.cls + '">';
+    html += '<span class="aging-label">' + bucket.label + '</span>';
+    html += '<span class="aging-count">' + matched.length + '</span>';
+    html += '<span class="aging-amount">RM ' + total.toFixed(2) + '</span>';
+    html += '</div>';
+  });
+
+  html += '</div>';
+
+  // --- Today's Orders ---
+  html += '<div style="margin-top:24px;">';
+  html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;">Today\'s Orders</div>';
+
+  var todayOrders = orders.filter(function(o) { return o.order_date === today; });
+
+  if (!todayOrders.length) {
+    html += '<div class="empty-state">No orders today</div>';
+  } else {
+    var statusOrder = ['pending', 'preparing', 'prepared', 'delivering', 'completed'];
+    todayOrders.sort(function(a, b) {
+      return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+    });
+
+    html += '<div class="sales-cards-grid">';
+    todayOrders.forEach(function(o) {
+      var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+      var itemCount = items.length;
+      var total = parseFloat(o.grand_total) || 0;
+
+      html += '<div class="sales-card">';
+      html += '<div class="sales-card-header">';
+      html += '<div class="sales-card-title">' + esc(getCustomerName(o.customer_id)) + '</div>';
+      html += '<div style="display:flex;gap:4px;">';
+      html += '<span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span>';
+      html += '<span class="badge ' + docTypeBadgeClass(o.doc_type) + '">' + docTypeLabel(o.doc_type) + '</span>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="sales-card-meta">';
+      html += '<span>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</span>';
+      html += '<span>RM ' + total.toFixed(2) + '</span>';
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+
+  body.innerHTML = html;
 }
 function renderOrders() {
   document.getElementById('page-orders').querySelector('.page-body').innerHTML = '<div class="empty-state">Orders — Phase 2</div>';
