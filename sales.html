@@ -96,8 +96,9 @@
       <div class="page-title">Orders</div>
       <div class="page-subtitle">Manage sales orders</div>
     </div>
+    <div class="header-actions" id="orders-header-actions"></div>
   </div>
-  <div class="page-body"></div>
+  <div class="page-body" id="orders-body"></div>
 </div>
 
 <!-- PAGE: CUSTOMERS -->
@@ -620,9 +621,166 @@ function renderDashboard() {
 
   body.innerHTML = html;
 }
-function renderOrders() {
-  document.getElementById('page-orders').querySelector('.page-body').innerHTML = '<div class="empty-state">Orders — Phase 2</div>';
+// ==================== ORDERS TAB ====================
+var soFilterStatus = '';
+var soFilterDocType = '';
+var soFilterPayment = '';
+var soFilterDateFrom = '';
+var soFilterDateTo = '';
+var soFilterCustomer = '';
+var soFilterSort = 'newest';
+
+function soPaymentLabel(ps) {
+  var labels = { unpaid: 'Unpaid', partial: 'Partial', paid: 'Paid' };
+  return labels[ps] || ps || '\u2014';
 }
+
+function soItemsCount(orderId) {
+  return orderItems.filter(function(i) { return i.order_id === orderId; }).length;
+}
+
+function soHasActiveFilters() {
+  return soFilterStatus || soFilterDocType || soFilterPayment || soFilterDateFrom || soFilterDateTo || soFilterCustomer || soFilterSort !== 'newest';
+}
+
+function soClearFilters() {
+  soFilterStatus = '';
+  soFilterDocType = '';
+  soFilterPayment = '';
+  soFilterDateFrom = '';
+  soFilterDateTo = '';
+  soFilterCustomer = '';
+  soFilterSort = 'newest';
+  renderOrders();
+}
+
+function renderOrders() {
+  // Header actions
+  document.getElementById('orders-header-actions').innerHTML =
+    '<button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>';
+
+  var body = document.getElementById('orders-body');
+
+  // Filter bar
+  var fHtml = '<div class="sales-filters">';
+  fHtml += '<select onchange="soFilterStatus=this.value;renderOrderCards()" style="min-width:120px;">';
+  fHtml += '<option value=""' + (soFilterStatus === '' ? ' selected' : '') + '>All Status</option>';
+  ['pending','preparing','prepared','delivering','completed','cancelled'].forEach(function(s) {
+    fHtml += '<option value="' + s + '"' + (soFilterStatus === s ? ' selected' : '') + '>' + statusLabel(s) + '</option>';
+  });
+  fHtml += '</select>';
+
+  fHtml += '<select onchange="soFilterDocType=this.value;renderOrderCards()" style="min-width:130px;">';
+  fHtml += '<option value=""' + (soFilterDocType === '' ? ' selected' : '') + '>All Doc Types</option>';
+  fHtml += '<option value="delivery_order"' + (soFilterDocType === 'delivery_order' ? ' selected' : '') + '>Delivery Order</option>';
+  fHtml += '<option value="cash_sales"' + (soFilterDocType === 'cash_sales' ? ' selected' : '') + '>Cash Sales</option>';
+  fHtml += '</select>';
+
+  fHtml += '<select onchange="soFilterPayment=this.value;renderOrderCards()" style="min-width:120px;">';
+  fHtml += '<option value=""' + (soFilterPayment === '' ? ' selected' : '') + '>All Payment</option>';
+  fHtml += '<option value="unpaid"' + (soFilterPayment === 'unpaid' ? ' selected' : '') + '>Unpaid</option>';
+  fHtml += '<option value="partial"' + (soFilterPayment === 'partial' ? ' selected' : '') + '>Partial</option>';
+  fHtml += '<option value="paid"' + (soFilterPayment === 'paid' ? ' selected' : '') + '>Paid</option>';
+  fHtml += '</select>';
+
+  fHtml += '<input type="date" value="' + soFilterDateFrom + '" onchange="soFilterDateFrom=this.value;renderOrderCards()" title="Date From" placeholder="From">';
+  fHtml += '<input type="date" value="' + soFilterDateTo + '" onchange="soFilterDateTo=this.value;renderOrderCards()" title="Date To" placeholder="To">';
+
+  fHtml += '<input type="text" placeholder="Search customer..." value="' + esc(soFilterCustomer) + '" oninput="soFilterCustomer=this.value;renderOrderCards()" style="flex:1;min-width:150px;">';
+
+  fHtml += '<select onchange="soFilterSort=this.value;renderOrderCards()" style="min-width:130px;">';
+  fHtml += '<option value="newest"' + (soFilterSort === 'newest' ? ' selected' : '') + '>Newest First</option>';
+  fHtml += '<option value="oldest"' + (soFilterSort === 'oldest' ? ' selected' : '') + '>Oldest First</option>';
+  fHtml += '<option value="customer"' + (soFilterSort === 'customer' ? ' selected' : '') + '>Customer A\u2013Z</option>';
+  fHtml += '</select>';
+
+  if (soHasActiveFilters()) {
+    fHtml += '<button class="btn btn-outline btn-sm" onclick="soClearFilters()">Clear Filters</button>';
+  }
+
+  fHtml += '</div>';
+  fHtml += '<div id="so-cards-container"></div>';
+
+  body.innerHTML = fHtml;
+  renderOrderCards();
+}
+
+function renderOrderCards() {
+  var container = document.getElementById('so-cards-container');
+  if (!container) return;
+
+  // Filter
+  var filtered = orders.filter(function(o) {
+    if (soFilterStatus && o.status !== soFilterStatus) return false;
+    if (soFilterDocType && o.doc_type !== soFilterDocType) return false;
+    if (soFilterPayment && o.payment_status !== soFilterPayment) return false;
+    if (soFilterDateFrom && o.order_date < soFilterDateFrom) return false;
+    if (soFilterDateTo && o.order_date > soFilterDateTo) return false;
+    if (soFilterCustomer) {
+      var custName = getCustomerName(o.customer_id).toLowerCase();
+      if (custName.indexOf(soFilterCustomer.toLowerCase()) < 0) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  if (soFilterSort === 'newest') {
+    filtered.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+  } else if (soFilterSort === 'oldest') {
+    filtered.sort(function(a, b) { return (a.created_at || '').localeCompare(b.created_at || ''); });
+  } else if (soFilterSort === 'customer') {
+    filtered.sort(function(a, b) { return getCustomerName(a.customer_id).localeCompare(getCustomerName(b.customer_id)); });
+  }
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">' + (orders.length ? 'No orders match your filters.' : 'No orders yet. Click "+ New Order" to create your first order.') + '</div>';
+    return;
+  }
+
+  var html = '<div class="sales-cards-grid">';
+  filtered.forEach(function(o) {
+    var custName = getCustomerName(o.customer_id);
+    var itemCount = soItemsCount(o.id);
+    var total = parseFloat(o.grand_total) || 0;
+    var docLabel = docTypeLabel(o.doc_type);
+    var docBadge = docTypeBadgeClass(o.doc_type);
+    var docFull = o.doc_type === 'delivery_order' ? 'Delivery Order' : 'Cash Sales';
+
+    html += '<div class="sales-card" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
+
+    // Header: doc number + badges
+    html += '<div class="sales-card-header">';
+    html += '<div class="sales-card-title">' + esc(o.doc_number || o.id) + '</div>';
+    html += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+    html += '<span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span>';
+    html += '<span class="badge ' + docBadge + '">' + docLabel + '</span>';
+    html += '<span class="badge badge-' + esc(o.payment_status || 'unpaid') + '">' + soPaymentLabel(o.payment_status) + '</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Customer name
+    html += '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">' + esc(custName) + '</div>';
+
+    // Meta: dates + items
+    html += '<div class="sales-card-meta">';
+    html += '<span>Order: ' + esc(o.order_date || '\u2014') + '</span>';
+    if (o.delivery_date) html += '<span>Delivery: ' + esc(o.delivery_date) + '</span>';
+    html += '<span>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</span>';
+    html += '</div>';
+
+    // Total
+    html += '<div class="sales-card-total">' + formatRM(total) + '</div>';
+
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function soOpenDetail(orderId) {
+  notify('Detail view coming next', 'info');
+}
+
 var scSearchTerm = '';
 var scFilterType = '';
 var scFilterPayment = '';
