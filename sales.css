@@ -847,3 +847,141 @@
     flex-wrap: wrap;
   }
 }
+
+/* ============================================================
+   ORDER DETAIL VIEW
+   ============================================================ */
+.so-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.so-detail-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.so-detail-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.so-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+}
+
+.so-detail-field {
+  min-width: 0;
+}
+
+.so-detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.so-detail-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.so-detail-totals {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.so-detail-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.so-detail-grand-total {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--gold-light);
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.so-detail-grand-total span {
+  color: var(--gold-light);
+}
+
+.so-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.so-detail-photo {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  max-width: 160px;
+}
+
+.so-detail-photo img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+}
+
+.so-detail-photo-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0;
+  background: var(--bg-input);
+}
+
+/* Timeline dot checkmark centering */
+.timeline-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .so-detail-header {
+    flex-direction: column;
+  }
+
+  .so-detail-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .so-detail-actions {
+    flex-direction: column;
+  }
+
+  .so-detail-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

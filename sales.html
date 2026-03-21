@@ -285,11 +285,51 @@
   </div>
 </div>
 
+<!-- HIDDEN PHOTO INPUT -->
+<input type="file" id="so-photo-input" accept="image/*" capture="environment" style="display:none;">
+
+<!-- DRIVER ASSIGNMENT MODAL -->
+<div id="so-driver-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('so-driver-modal')">
+  <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Assign Driver</div>
+      <button class="modal-close" onclick="closeModal('so-driver-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-field">
+      <label>SELECT DRIVER</label>
+      <select id="so-driver-select" style="width:100%;"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('so-driver-modal')">Cancel</button>
+      <button class="btn btn-primary" id="so-driver-confirm-btn" onclick="soConfirmDriver()">Assign & Deliver</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO PROMPT MODAL -->
+<div id="so-photo-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('so-photo-modal')">
+  <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="so-photo-modal-title">Take Photo?</div>
+      <button class="modal-close" onclick="closeModal('so-photo-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="so-photo-modal-msg">Take a photo of the prepared order?</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="so-photo-skip-btn">Skip</button>
+      <button class="btn btn-primary" id="so-photo-take-btn">Take Photo</button>
+    </div>
+  </div>
+</div>
+
 <!-- ORDER MODAL -->
 <div id="so-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('so-modal')">
   <div class="modal-box so-modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <div class="modal-title">New Order</div>
+      <div class="modal-title" id="so-modal-title">New Order</div>
       <button class="modal-close" onclick="closeModal('so-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -383,7 +423,10 @@
 var currentUser = null;
 var customers = [], salesProducts = [], orders = [], orderItems = [], payments = [], returns = [];
 var varieties = [];
+var allWorkers = [];
 var currentTab = 'dashboard';
+var soDetailOrderId = null;
+var soEditOrderId = null;
 
 // SESSION GUARD + INIT
 (async function init() {
@@ -439,7 +482,8 @@ async function loadAllData() {
     sbQuery(sb.from('sales_order_items').select('*')),
     sbQuery(sb.from('sales_payments').select('*').order('created_at', {ascending: false})),
     sbQuery(sb.from('sales_returns').select('*').order('created_at', {ascending: false})),
-    sbQuery(sb.from('crop_varieties').select('*').eq('archived', false))
+    sbQuery(sb.from('crop_varieties').select('*').eq('archived', false)),
+    sbQuery(sb.from('workers').select('id,name').eq('is_active', true))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
@@ -448,6 +492,7 @@ async function loadAllData() {
   payments = results[4] || [];
   returns = results[5] || [];
   varieties = results[6] || [];
+  allWorkers = results[7] || [];
 }
 
 // SYNC
@@ -655,6 +700,9 @@ function soClearFilters() {
 }
 
 function renderOrders() {
+  // If detail view is active, render that instead
+  if (soDetailOrderId) { soRenderDetail(); return; }
+
   // Header actions
   document.getElementById('orders-header-actions').innerHTML =
     '<button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>';
@@ -778,7 +826,410 @@ function renderOrderCards() {
 }
 
 function soOpenDetail(orderId) {
-  notify('Detail view coming next', 'info');
+  soDetailOrderId = orderId;
+  soRenderDetail();
+}
+
+function soBackToList() {
+  soDetailOrderId = null;
+  renderOrders();
+}
+
+function soGetProductName(productId) {
+  var p = salesProducts.find(function(x) { return x.id === productId; });
+  if (!p) return '\u2014';
+  var v = varieties.find(function(x) { return x.id === p.variety_id; });
+  return (v ? v.name + ' \u2014 ' : '') + p.name;
+}
+
+function soGetProductVariety(productId) {
+  var p = salesProducts.find(function(x) { return x.id === productId; });
+  if (!p) return '\u2014';
+  var v = varieties.find(function(x) { return x.id === p.variety_id; });
+  return v ? v.name : '\u2014';
+}
+
+function soRenderDetail() {
+  var o = orders.find(function(x) { return x.id === soDetailOrderId; });
+  if (!o) { soBackToList(); return; }
+
+  var body = document.getElementById('orders-body');
+  var cust = customers.find(function(c) { return c.id === o.customer_id; });
+  var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+
+  // Update header actions - hide New Order button in detail view
+  document.getElementById('orders-header-actions').innerHTML = '';
+
+  var html = '';
+
+  // Back button
+  html += '<div style="margin-bottom:16px;">';
+  html += '<a href="javascript:void(0)" onclick="soBackToList()" style="font-size:13px;color:var(--green-light);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>';
+  html += 'Back to Orders</a>';
+  html += '</div>';
+
+  // Header: doc number + status
+  html += '<div class="so-detail-header">';
+  html += '<div>';
+  html += '<div style="font-size:18px;font-weight:800;color:var(--white);">' + esc(o.doc_number || o.id) + '</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Order ID: ' + esc(o.id) + '</div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  html += '<span class="badge badge-' + esc(o.status) + '" style="font-size:13px;padding:6px 14px;">' + statusLabel(o.status) + '</span>';
+  html += '<span class="badge ' + docTypeBadgeClass(o.doc_type) + '">' + docTypeLabel(o.doc_type) + '</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // Status Timeline
+  var steps = ['pending', 'preparing', 'prepared', 'delivering', 'completed'];
+  var stepLabels = ['Pending', 'Preparing', 'Prepared', 'Delivering', 'Completed'];
+  var currentIdx = steps.indexOf(o.status);
+  if (o.status === 'cancelled') currentIdx = -2; // special case
+
+  html += '<div class="so-detail-section">';
+  html += '<div class="status-timeline">';
+  steps.forEach(function(step, i) {
+    var cls = '';
+    if (o.status === 'cancelled') {
+      cls = ''; // all gray for cancelled
+    } else if (i < currentIdx) {
+      cls = 'done';
+    } else if (i === currentIdx) {
+      cls = 'current';
+    }
+    if (i > 0) {
+      var lineCls = (o.status !== 'cancelled' && i <= currentIdx) ? 'done' : '';
+      html += '<div class="timeline-line ' + lineCls + '"></div>';
+    }
+    html += '<div class="timeline-step ' + cls + '">';
+    html += '<div class="timeline-dot">' + (cls === 'done' ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" style="width:10px;height:10px;margin:0;display:block;"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</div>';
+    html += '<div class="timeline-label">' + stepLabels[i] + '</div>';
+    html += '</div>';
+  });
+  if (o.status === 'cancelled') {
+    html += '<div class="timeline-line"></div>';
+    html += '<div class="timeline-step current" style="--gold:var(--red);--gold-light:var(--red);">';
+    html += '<div class="timeline-dot" style="background:var(--red);border-color:var(--red);box-shadow:0 0 0 4px rgba(220,60,60,0.2);"></div>';
+    html += '<div class="timeline-label" style="color:var(--red);">Cancelled</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Customer Info
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title">Customer</div>';
+  html += '<div class="so-detail-grid">';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Name</div><div class="so-detail-value">' + esc(cust ? cust.name : '\u2014') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Phone</div><div class="so-detail-value">' + esc(cust ? (cust.phone || '\u2014') : '\u2014') + '</div></div>';
+  if (cust && cust.address) {
+    html += '<div class="so-detail-field" style="grid-column:1/-1;"><div class="so-detail-label">Address</div><div class="so-detail-value">' + esc(cust.address) + '</div></div>';
+  }
+  html += '<div class="so-detail-field"><div class="so-detail-label">Fulfillment</div><div class="so-detail-value">' + esc(o.fulfillment === 'delivery' ? 'Delivery' : 'Collection') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Doc Type</div><div class="so-detail-value">' + (o.doc_type === 'delivery_order' ? 'Delivery Order (DO)' : 'Cash Sales (CS)') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Delivery Date</div><div class="so-detail-value">' + esc(o.delivery_date || '\u2014') + (o.delivery_time ? ' ' + esc(o.delivery_time) : '') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Order Date</div><div class="so-detail-value">' + esc(o.order_date || '\u2014') + '</div></div>';
+  if (o.driver_id) {
+    var driver = allWorkers.find(function(w) { return w.id === o.driver_id; });
+    html += '<div class="so-detail-field"><div class="so-detail-label">Driver</div><div class="so-detail-value">' + esc(driver ? driver.name : o.driver_id) + '</div></div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // Items Table
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title">Items</div>';
+  html += '<div class="data-table"><table><thead><tr>';
+  html += '<th>Product</th><th>Variety</th><th>Index</th><th style="text-align:right;">Qty</th><th>Unit</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th>';
+  html += '</tr></thead><tbody>';
+  var subtotal = 0;
+  items.forEach(function(item) {
+    var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+    var prodName = prod ? prod.name : '\u2014';
+    var prodVariety = soGetProductVariety(item.product_id);
+    var prodUnit = prod ? (prod.unit || '') : '';
+    var idxStr = '';
+    if (item.index_min != null && item.index_max != null) idxStr = item.index_min + '\u2013' + item.index_max;
+    else if (item.index_min != null) idxStr = String(item.index_min);
+    var lineTotal = parseFloat(item.line_total) || 0;
+    subtotal += lineTotal;
+
+    html += '<tr>';
+    html += '<td>' + esc(prodName) + '</td>';
+    html += '<td>' + esc(prodVariety) + '</td>';
+    html += '<td>' + esc(idxStr || '\u2014') + '</td>';
+    html += '<td style="text-align:right;">' + (item.quantity || 0) + '</td>';
+    html += '<td>' + esc(prodUnit) + '</td>';
+    html += '<td style="text-align:right;">' + formatRM(item.unit_price || 0) + '</td>';
+    html += '<td style="text-align:right;">' + formatRM(lineTotal) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  // Totals
+  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var grandTotal = parseFloat(o.grand_total) || 0;
+  html += '<div class="so-detail-totals">';
+  html += '<div class="so-detail-total-row"><span>Subtotal</span><span>' + formatRM(subtotal) + '</span></div>';
+  if (returnsTotal > 0) {
+    html += '<div class="so-detail-total-row"><span>Returns</span><span style="color:var(--red);">-' + formatRM(returnsTotal) + '</span></div>';
+  }
+  html += '<div class="so-detail-total-row so-detail-grand-total"><span>Total</span><span>' + formatRM(grandTotal) + '</span></div>';
+  html += '</div>';
+  html += '</div>';
+
+  // Action Buttons
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title">Actions</div>';
+  html += '<div class="so-detail-actions">';
+
+  if (o.status === 'pending') {
+    html += '<button class="btn btn-primary" id="btn-start-prep" onclick="soStartPreparing(\'' + esc(o.id) + '\')">Start Preparing</button>';
+    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
+    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+  } else if (o.status === 'preparing') {
+    html += '<button class="btn btn-primary" id="btn-mark-prepared" onclick="soMarkPrepared(\'' + esc(o.id) + '\')">Mark Prepared</button>';
+    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+  } else if (o.status === 'prepared') {
+    if (o.fulfillment === 'delivery') {
+      html += '<button class="btn btn-primary" id="btn-assign-driver" onclick="soAssignDriver(\'' + esc(o.id) + '\')">Assign Driver & Deliver</button>';
+    } else {
+      html += '<button class="btn btn-primary" id="btn-mark-collected" onclick="soMarkCollected(\'' + esc(o.id) + '\')">Mark Collected</button>';
+    }
+    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+  } else if (o.status === 'delivering') {
+    html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
+  }
+
+  html += '</div>';
+  html += '</div>';
+
+  // Payment Info
+  var amountPaid = parseFloat(o.amount_paid) || 0;
+  var payStatus = o.payment_status || 'unpaid';
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title">Payment</div>';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">';
+  html += '<span style="font-size:15px;font-weight:700;color:var(--text);">Paid: ' + formatRM(amountPaid) + ' / ' + formatRM(grandTotal) + '</span>';
+  html += '<span class="badge badge-' + esc(payStatus) + '">' + soPaymentLabel(payStatus) + '</span>';
+  html += '</div>';
+  if (payStatus !== 'paid') {
+    html += '<button class="btn btn-outline btn-sm" onclick="notify(\'Payment recording coming soon\',\'info\')">Record Payment</button>';
+  }
+  html += '</div>';
+
+  // Photos
+  if (o.prep_photo_url || o.delivery_photo_url) {
+    html += '<div class="so-detail-section">';
+    html += '<div class="so-detail-section-title">Photos</div>';
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;">';
+    if (o.prep_photo_url) {
+      html += '<div class="so-detail-photo">';
+      html += '<img src="' + esc(o.prep_photo_url) + '" alt="Prep photo" onclick="window.open(this.src,\'_blank\')">';
+      html += '<div class="so-detail-photo-label">Preparation</div>';
+      html += '</div>';
+    }
+    if (o.delivery_photo_url) {
+      html += '<div class="so-detail-photo">';
+      html += '<img src="' + esc(o.delivery_photo_url) + '" alt="Delivery photo" onclick="window.open(this.src,\'_blank\')">';
+      html += '<div class="so-detail-photo-label">Delivery</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+
+  // Notes
+  if (o.notes) {
+    html += '<div class="so-detail-section">';
+    html += '<div class="so-detail-section-title">Notes</div>';
+    html += '<div style="font-size:13px;color:var(--text-muted);white-space:pre-wrap;">' + esc(o.notes) + '</div>';
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+// ==================== STATUS TRANSITIONS ====================
+
+async function soUpdateStatus(orderId, newStatus, extraData) {
+  var updateData = { status: newStatus };
+  if (extraData) Object.assign(updateData, extraData);
+  var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+  if (result === null) return false;
+  // Update local array
+  var idx = orders.findIndex(function(x) { return x.id === orderId; });
+  if (idx >= 0) Object.assign(orders[idx], updateData);
+  return true;
+}
+
+async function soStartPreparing(orderId) {
+  var btn = document.getElementById('btn-start-prep');
+  if (btn) btnLoading(btn, true);
+  var ok = await soUpdateStatus(orderId, 'preparing');
+  if (btn) btnLoading(btn, false, 'Start Preparing');
+  if (ok) {
+    notify('Order is now being prepared', 'success');
+    soRenderDetail();
+  }
+}
+
+async function soMarkPrepared(orderId) {
+  // Show photo prompt modal
+  var modal = document.getElementById('so-photo-modal');
+  document.getElementById('so-photo-modal-title').textContent = 'Preparation Photo';
+  document.getElementById('so-photo-modal-msg').textContent = 'Take a photo of the prepared order?';
+
+  var skipBtn = document.getElementById('so-photo-skip-btn');
+  var takeBtn = document.getElementById('so-photo-take-btn');
+
+  // Remove old listeners by cloning
+  var newSkip = skipBtn.cloneNode(true);
+  var newTake = takeBtn.cloneNode(true);
+  skipBtn.parentNode.replaceChild(newSkip, skipBtn);
+  takeBtn.parentNode.replaceChild(newTake, takeBtn);
+
+  modal.style.display = 'flex';
+
+  newSkip.onclick = async function() {
+    closeModal('so-photo-modal');
+    var btn = document.getElementById('btn-mark-prepared');
+    if (btn) btnLoading(btn, true);
+    var ok = await soUpdateStatus(orderId, 'prepared');
+    if (btn) btnLoading(btn, false, 'Mark Prepared');
+    if (ok) { notify('Order marked as prepared', 'success'); soRenderDetail(); }
+  };
+
+  newTake.onclick = async function() {
+    closeModal('so-photo-modal');
+    var photoUrl = await soUploadPhoto(orderId, 'prep');
+    var btn = document.getElementById('btn-mark-prepared');
+    if (btn) btnLoading(btn, true);
+    var extra = photoUrl ? { prep_photo_url: photoUrl } : {};
+    var ok = await soUpdateStatus(orderId, 'prepared', extra);
+    if (btn) btnLoading(btn, false, 'Mark Prepared');
+    if (ok) { notify('Order marked as prepared' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); }
+  };
+}
+
+async function soUploadPhoto(orderId, type) {
+  return new Promise(function(resolve) {
+    var input = document.getElementById('so-photo-input');
+    input.onchange = async function() {
+      if (!input.files.length) { resolve(null); return; }
+      var file = input.files[0];
+      var img = new Image();
+      img.onload = async function() {
+        var canvas = document.createElement('canvas');
+        var maxW = 1200;
+        var w = img.width, h = img.height;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(async function(blob) {
+          var path = orderId + '/' + type + '.jpg';
+          var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+          if (result.error) { notify('Photo upload failed (bucket may not exist yet)', 'warning'); resolve(null); return; }
+          var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
+          resolve(urlResult.data.publicUrl);
+        }, 'image/jpeg', 0.8);
+      };
+      img.onerror = function() { resolve(null); };
+      img.src = URL.createObjectURL(file);
+    };
+    input.value = '';
+    input.click();
+  });
+}
+
+function soAssignDriver(orderId) {
+  var modal = document.getElementById('so-driver-modal');
+  var sel = document.getElementById('so-driver-select');
+  sel.innerHTML = '<option value="">Select a driver...</option>';
+  allWorkers.forEach(function(w) {
+    sel.innerHTML += '<option value="' + esc(w.id) + '">' + esc(w.name) + '</option>';
+  });
+  // Store order ID on the confirm button for reference
+  document.getElementById('so-driver-confirm-btn').setAttribute('data-order-id', orderId);
+  modal.style.display = 'flex';
+  trapFocus(modal.querySelector('.modal-box'));
+}
+
+async function soConfirmDriver() {
+  var orderId = document.getElementById('so-driver-confirm-btn').getAttribute('data-order-id');
+  var driverId = document.getElementById('so-driver-select').value;
+  if (!driverId) { notify('Please select a driver', 'warning'); return; }
+  var btn = document.getElementById('so-driver-confirm-btn');
+  btnLoading(btn, true);
+  var ok = await soUpdateStatus(orderId, 'delivering', { driver_id: driverId });
+  btnLoading(btn, false, 'Assign & Deliver');
+  if (ok) {
+    closeModal('so-driver-modal');
+    notify('Driver assigned, order is delivering', 'success');
+    soRenderDetail();
+  }
+}
+
+function soMarkCollected(orderId) {
+  confirmAction('Mark as Collected?', 'Confirm that the customer has collected this order?', async function() {
+    var btn = document.getElementById('btn-mark-collected');
+    if (btn) btnLoading(btn, true);
+    var ok = await soUpdateStatus(orderId, 'completed');
+    if (btn) btnLoading(btn, false, 'Mark Collected');
+    if (ok) { notify('Order completed (collected)', 'success'); soRenderDetail(); }
+  });
+}
+
+async function soMarkDelivered(orderId) {
+  // Show photo prompt modal
+  var modal = document.getElementById('so-photo-modal');
+  document.getElementById('so-photo-modal-title').textContent = 'Delivery Photo';
+  document.getElementById('so-photo-modal-msg').textContent = 'Take a photo of the delivery?';
+
+  var skipBtn = document.getElementById('so-photo-skip-btn');
+  var takeBtn = document.getElementById('so-photo-take-btn');
+
+  var newSkip = skipBtn.cloneNode(true);
+  var newTake = takeBtn.cloneNode(true);
+  skipBtn.parentNode.replaceChild(newSkip, skipBtn);
+  takeBtn.parentNode.replaceChild(newTake, takeBtn);
+
+  modal.style.display = 'flex';
+
+  newSkip.onclick = async function() {
+    closeModal('so-photo-modal');
+    var btn = document.getElementById('btn-mark-delivered');
+    if (btn) btnLoading(btn, true);
+    var ok = await soUpdateStatus(orderId, 'completed');
+    if (btn) btnLoading(btn, false, 'Mark Delivered');
+    if (ok) { notify('Order delivered and completed', 'success'); soRenderDetail(); }
+  };
+
+  newTake.onclick = async function() {
+    closeModal('so-photo-modal');
+    var photoUrl = await soUploadPhoto(orderId, 'delivery');
+    var btn = document.getElementById('btn-mark-delivered');
+    if (btn) btnLoading(btn, true);
+    var extra = photoUrl ? { delivery_photo_url: photoUrl } : {};
+    var ok = await soUpdateStatus(orderId, 'completed', extra);
+    if (btn) btnLoading(btn, false, 'Mark Delivered');
+    if (ok) { notify('Order delivered' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); }
+  };
+}
+
+function soCancelOrder(orderId) {
+  confirmAction('Cancel Order?', 'This will cancel the order. This action cannot be undone.', async function() {
+    var ok = await soUpdateStatus(orderId, 'cancelled');
+    if (ok) { notify('Order cancelled', 'success'); soRenderDetail(); }
+  }, true);
+}
+
+function soEditOrder(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  if (o.status !== 'pending') { notify('Only pending orders can be edited', 'warning'); return; }
+  openNewOrderModal(orderId);
 }
 
 var scSearchTerm = '';
@@ -1177,7 +1628,8 @@ function renderReports() {
 var soItems = [];
 var soSelectedCustomer = null;
 
-function openNewOrderModal() {
+function openNewOrderModal(editOrderId) {
+  soEditOrderId = editOrderId || null;
   soItems = [];
   soSelectedCustomer = null;
 
@@ -1196,7 +1648,51 @@ function openNewOrderModal() {
   document.getElementById('so-notes').value = '';
   document.getElementById('so-subtotal').textContent = 'RM 0.00';
 
-  soAddItem();
+  var modalTitle = document.getElementById('so-modal-title');
+  var saveBtn = document.getElementById('so-save-btn');
+
+  if (soEditOrderId) {
+    // Edit mode: populate from existing order
+    var o = orders.find(function(x) { return x.id === soEditOrderId; });
+    if (!o) { notify('Order not found', 'error'); return; }
+
+    modalTitle.textContent = 'Edit Order';
+    saveBtn.textContent = 'Save Changes';
+
+    // Set customer
+    if (o.customer_id) soSelectCustomer(o.customer_id);
+
+    // Set fields
+    document.getElementById('so-order-date').value = o.order_date || todayStr();
+    document.getElementById('so-delivery-date').value = o.delivery_date || '';
+    document.getElementById('so-delivery-time').value = o.delivery_time || '';
+    document.getElementById('so-fulfillment').value = o.fulfillment || 'delivery';
+    document.getElementById('so-doc-type').value = o.doc_type || 'cash_sales';
+    document.getElementById('so-channel').value = o.channel || 'whatsapp';
+    document.getElementById('so-notes').value = o.notes || '';
+
+    // Populate items from existing order items
+    var existingItems = orderItems.filter(function(i) { return i.order_id === soEditOrderId; });
+    existingItems.forEach(function(item) {
+      var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+      soItems.push({
+        id: Date.now() + Math.random(),
+        productId: item.product_id || '',
+        quantity: item.quantity || '',
+        unitPrice: item.unit_price || '',
+        unit: prod ? (prod.unit || '') : '',
+        indexMin: item.index_min != null ? String(item.index_min) : '',
+        indexMax: item.index_max != null ? String(item.index_max) : '',
+        lineTotal: parseFloat(item.line_total) || 0,
+        existingItemId: item.id // track for update
+      });
+    });
+    if (!soItems.length) soAddItem();
+  } else {
+    modalTitle.textContent = 'New Order';
+    saveBtn.textContent = 'Create Order';
+    soAddItem();
+  }
   soRenderItems();
   var modal = document.getElementById('so-modal');
   modal.style.display = 'flex';
@@ -1389,67 +1885,119 @@ async function soSaveOrder() {
   if (!deliveryDate) { notify('Please set a delivery date', 'warning'); return; }
 
   var btn = document.getElementById('so-save-btn');
+  var isEdit = !!soEditOrderId;
   btnLoading(btn, true);
 
   try {
-    // Generate IDs
-    var orderId = await dbNextId('SO');
+    var subtotalVal = soItems.reduce(function(sum, i) { return sum + i.lineTotal; }, 0);
     var docType = document.getElementById('so-doc-type').value;
-    var docPrefix = docType === 'delivery_order' ? 'DO' : 'CS';
-    var docNumber = await dbNextId(docPrefix);
 
-    var subtotal = soItems.reduce(function(sum, i) { return sum + i.lineTotal; }, 0);
-
-    var orderData = {
-      id: orderId,
-      customer_id: soSelectedCustomer.id,
-      order_date: document.getElementById('so-order-date').value || todayStr(),
-      delivery_date: deliveryDate,
-      delivery_time: document.getElementById('so-delivery-time').value || null,
-      fulfillment: document.getElementById('so-fulfillment').value,
-      doc_type: docType,
-      doc_number: docNumber,
-      channel: document.getElementById('so-channel').value,
-      status: 'pending',
-      subtotal: subtotal,
-      grand_total: subtotal,
-      payment_status: 'unpaid',
-      notes: document.getElementById('so-notes').value.trim() || null,
-      created_by: currentUser.id
-    };
-
-    var result = await sbQuery(sb.from('sales_orders').insert(orderData).select());
-    if (result === null) { btnLoading(btn, false, 'Create Order'); return; }
-
-    // Insert line items
-    for (var vi = 0; vi < validItems.length; vi++) {
-      var item = validItems[vi];
-      var itemId = await dbNextId('SI');
-      var itemData = {
-        id: itemId,
-        order_id: orderId,
-        product_id: item.productId,
-        quantity: parseFloat(item.quantity),
-        unit_price: parseFloat(item.unitPrice) || 0,
-        line_total: item.lineTotal,
-        index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
-        index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null
+    if (isEdit) {
+      // UPDATE existing order
+      var updateData = {
+        customer_id: soSelectedCustomer.id,
+        order_date: document.getElementById('so-order-date').value || todayStr(),
+        delivery_date: deliveryDate,
+        delivery_time: document.getElementById('so-delivery-time').value || null,
+        fulfillment: document.getElementById('so-fulfillment').value,
+        doc_type: docType,
+        channel: document.getElementById('so-channel').value,
+        subtotal: subtotalVal,
+        grand_total: subtotalVal,
+        notes: document.getElementById('so-notes').value.trim() || null
       };
-      var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
-      if (itemResult === null) { btnLoading(btn, false, 'Create Order'); return; }
-      orderItems.push(itemResult[0] || itemData);
+
+      var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', soEditOrderId).select());
+      if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
+
+      // Delete existing items and re-insert
+      await sbQuery(sb.from('sales_order_items').delete().eq('order_id', soEditOrderId).select());
+      // Remove from local array
+      orderItems = orderItems.filter(function(i) { return i.order_id !== soEditOrderId; });
+
+      for (var vi = 0; vi < validItems.length; vi++) {
+        var item = validItems[vi];
+        var itemId = await dbNextId('SI');
+        var itemData = {
+          id: itemId,
+          order_id: soEditOrderId,
+          product_id: item.productId,
+          quantity: parseFloat(item.quantity),
+          unit_price: parseFloat(item.unitPrice) || 0,
+          line_total: item.lineTotal,
+          index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
+          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null
+        };
+        var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
+        if (itemResult === null) { btnLoading(btn, false, 'Save Changes'); return; }
+        orderItems.push(itemResult[0] || itemData);
+      }
+
+      // Update local orders array
+      var idx = orders.findIndex(function(x) { return x.id === soEditOrderId; });
+      if (idx >= 0) Object.assign(orders[idx], updateData);
+
+      btnLoading(btn, false, 'Save Changes');
+      closeModal('so-modal');
+      notify('Order updated');
+      soRenderDetail();
+    } else {
+      // CREATE new order
+      var orderId = await dbNextId('SO');
+      var docPrefix = docType === 'delivery_order' ? 'DO' : 'CS';
+      var docNumber = await dbNextId(docPrefix);
+
+      var orderData = {
+        id: orderId,
+        customer_id: soSelectedCustomer.id,
+        order_date: document.getElementById('so-order-date').value || todayStr(),
+        delivery_date: deliveryDate,
+        delivery_time: document.getElementById('so-delivery-time').value || null,
+        fulfillment: document.getElementById('so-fulfillment').value,
+        doc_type: docType,
+        doc_number: docNumber,
+        channel: document.getElementById('so-channel').value,
+        status: 'pending',
+        subtotal: subtotalVal,
+        grand_total: subtotalVal,
+        payment_status: 'unpaid',
+        notes: document.getElementById('so-notes').value.trim() || null,
+        created_by: currentUser.id
+      };
+
+      var result = await sbQuery(sb.from('sales_orders').insert(orderData).select());
+      if (result === null) { btnLoading(btn, false, 'Create Order'); return; }
+
+      // Insert line items
+      for (var vi = 0; vi < validItems.length; vi++) {
+        var item = validItems[vi];
+        var itemId = await dbNextId('SI');
+        var itemData = {
+          id: itemId,
+          order_id: orderId,
+          product_id: item.productId,
+          quantity: parseFloat(item.quantity),
+          unit_price: parseFloat(item.unitPrice) || 0,
+          line_total: item.lineTotal,
+          index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
+          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null
+        };
+        var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
+        if (itemResult === null) { btnLoading(btn, false, 'Create Order'); return; }
+        orderItems.push(itemResult[0] || itemData);
+      }
+
+      orders.unshift(result[0] || orderData);
+
+      btnLoading(btn, false, 'Create Order');
+      closeModal('so-modal');
+      notify('Order ' + orderId + ' created');
+      switchTab('orders');
+      renderOrders();
     }
-
-    orders.unshift(result[0] || orderData);
-
-    btnLoading(btn, false, 'Create Order');
-    closeModal('so-modal');
-    notify('Order ' + orderId + ' created');
-    switchTab('orders');
-    renderOrders();
   } catch (e) {
-    btnLoading(btn, false, 'Create Order');
-    notify('Error creating order: ' + e.message, 'error');
+    btnLoading(btn, false, isEdit ? 'Save Changes' : 'Create Order');
+    notify('Error ' + (isEdit ? 'updating' : 'creating') + ' order: ' + e.message, 'error');
   }
 }
 </script>
