@@ -43,6 +43,8 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `spraytracker.html` | PND Spray Tracker module |
 | `growthtracker.html` | Growth Tracker module (read-only dashboard) |
 | `display-growth.html` | TV display for Growth Tracker |
+| `sales.html` | Sales Management module |
+| `sales.css` | Sales module styles |
 | `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
 | `shared.js` | Shared JS (session guard, Supabase init, sidebar logic, sbMutate, sbUpdateWithLock) |
 | `{module}.css` | Per-module styles (index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css) |
@@ -84,9 +86,10 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 4. **Growth Tracker** — Read-only dashboard: block growth monitoring, plant counts by variety/status, target dates, harvest windows
 5. **Farm Configuration** — Centralized crop & block management, all data entry lives here
 6. **TV Display (Growth)** — `display-growth.html`, read-only, token auth (`?token=pnd2026`)
+7. **Sales** — Customer management, order workflow, payment tracking, delivery orders, cash sales, reports
 
 ### Coming Soon (Not Built)
-7. **Oil Palm Seedlings** — Booking management, sales tracking, seedling stock
+8. **Oil Palm Seedlings** — Booking management, sales tracking, seedling stock
 
 ## Architecture — Growth Data Flow
 
@@ -151,6 +154,7 @@ Growing → To Induce → Induced → Suckers → To Replant → *(Start New Cyc
 | `latest_sprays_by_ai_migration.sql` | **DEPRECATED** — superseded by latest_sprays_by_ai_v2_migration.sql. DO NOT RUN. |
 | `latest_sprays_by_ai_v2_migration.sql` | View `pnd_latest_sprays_by_ai` with `ai_combo_key` grouping (sorted ingredient IDs) |
 | `ai_combo_overhaul_migration.sql` | Created `ai_combo_defaults` table, added `ai_combo_key` to `pnd_jobs`, wiped existing jobs/logs |
+| `sales_migration.sql` | Created 6 sales tables: sales_customers, sales_products, sales_orders, sales_order_items, sales_payments, sales_returns |
 
 ### How to run SQL migrations
 ```bash
