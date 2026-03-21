@@ -602,3 +602,248 @@
     font-size: 11px;
   }
 }
+
+/* ============================================================
+   ORDER CREATION MODAL
+   ============================================================ */
+.so-modal-box {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.so-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.so-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+.so-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* Customer search dropdown */
+.so-cust-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  z-index: 50;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.so-cust-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--border);
+}
+
+.so-cust-item:last-child {
+  border-bottom: none;
+}
+
+.so-cust-item:hover {
+  background: var(--bg-hover);
+}
+
+.so-cust-item.so-cust-empty {
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: default;
+}
+
+.so-cust-item.so-cust-empty:hover {
+  background: none;
+}
+
+.so-cust-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.so-cust-phone {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Selected customer badge */
+.so-cust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--green-pale);
+  color: var(--green-light);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 124, 63, 0.3);
+}
+
+.so-cust-remove {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.so-cust-remove:hover {
+  opacity: 1;
+}
+
+/* Line item rows */
+.order-item-row {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.oir-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 18px;
+  padding-top: 8px;
+}
+
+.oir-fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oir-product select {
+  width: 100%;
+}
+
+.oir-nums-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.oir-qty {
+  flex: 1;
+}
+
+.oir-qty input {
+  width: 100%;
+}
+
+.oir-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 24px;
+  text-align: center;
+}
+
+.oir-price {
+  flex: 1;
+}
+
+.oir-price input {
+  width: 100%;
+}
+
+.oir-idx-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.oir-idx-row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0;
+}
+
+.oir-idx-row select {
+  width: 56px;
+  min-width: 56px;
+}
+
+.oir-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.oir-line-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-light);
+}
+
+.oir-remove {
+  color: var(--text-muted) !important;
+  font-size: 16px !important;
+  padding: 2px 6px !important;
+  min-width: auto !important;
+}
+
+.oir-remove:hover {
+  color: var(--red) !important;
+  background: var(--red-pale) !important;
+}
+
+/* Subtotal row */
+.so-subtotal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* ============================================================
+   ORDER MODAL — MOBILE
+   ============================================================ */
+@media (max-width: 768px) {
+  .so-modal-box {
+    max-width: 100%;
+    margin: 0 8px;
+    max-height: 95vh;
+  }
+
+  .oir-nums-row {
+    flex-wrap: wrap;
+  }
+
+  .oir-idx-row {
+    flex-wrap: wrap;
+  }
+}
