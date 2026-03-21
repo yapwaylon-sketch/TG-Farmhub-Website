@@ -150,13 +150,25 @@
 
 <!-- PAGE: REPORTS -->
 <div class="page" id="page-reports">
+  <div class="print-header" style="display:none;"><h2>Ladang PND — TG FarmHub</h2><p id="rpt-print-info"></p></div>
   <div class="page-header">
     <div>
       <div class="page-title">Reports</div>
       <div class="page-subtitle">Sales analytics and reports</div>
     </div>
   </div>
-  <div class="page-body"></div>
+  <div class="report-btns" id="rpt-btns"></div>
+  <div id="rpt-filters" style="margin-bottom:14px;"></div>
+  <div id="rpt-actions" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <button class="btn btn-primary" onclick="rptGenerate()">Generate Report</button>
+    <span id="rpt-count" style="font-size:12px;color:var(--text-muted);"></span>
+    <div style="flex:1;"></div>
+    <button class="btn btn-outline btn-sm" id="rpt-btn-csv" onclick="rptExportCSV()" style="display:none;">Export CSV</button>
+    <button class="btn btn-outline btn-sm" id="rpt-btn-print" onclick="rptPrint()" style="display:none;">Print</button>
+  </div>
+  <div class="data-table" id="rpt-results" style="display:none;">
+    <div class="table-wrap"><div id="rpt-table-wrap"></div></div>
+  </div>
 </div>
 
 </div>
@@ -2408,8 +2420,443 @@ async function invSaveInvoice() {
     notify('Failed to save invoice: ' + e.message, 'error');
   }
 }
+// ============================================================
+// REPORTS
+// ============================================================
+var rptType = 'customer';
+var rptData = null; // {cols, rows, title}
+
+var RPT_TYPES = [
+  {id:'customer', name:'Sales by Customer'},
+  {id:'product', name:'Sales by Product'},
+  {id:'period', name:'Sales by Period'},
+  {id:'outstanding', name:'Outstanding Payments'},
+  {id:'returns', name:'Return Rate'},
+  {id:'driver', name:'Driver Log'},
+  {id:'history', name:'Customer History'}
+];
+
 function renderReports() {
-  document.getElementById('page-reports').querySelector('.page-body').innerHTML = '<div class="empty-state">Reports — Phase 6</div>';
+  var el = document.getElementById('rpt-btns');
+  el.innerHTML = RPT_TYPES.map(function(r) {
+    return '<button class="report-btn' + (rptType === r.id ? ' active' : '') + '" onclick="rptSelect(\'' + r.id + '\')">' + esc(r.name) + '</button>';
+  }).join('');
+  rptRenderFilters();
+}
+
+function rptSelect(id) {
+  rptType = id;
+  document.querySelectorAll('.report-btn').forEach(function(b, i) {
+    b.classList.toggle('active', RPT_TYPES[i].id === id);
+  });
+  document.getElementById('rpt-results').style.display = 'none';
+  document.getElementById('rpt-btn-csv').style.display = 'none';
+  document.getElementById('rpt-btn-print').style.display = 'none';
+  document.getElementById('rpt-count').textContent = '';
+  rptData = null;
+  rptRenderFilters();
+  if (id === 'outstanding') rptGenerate();
+}
+
+function rptRenderFilters() {
+  var el = document.getElementById('rpt-filters');
+  var today = todayStr();
+  var m1 = today.substring(0, 8) + '01';
+  var custOpts = customers.map(function(c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+  var prodOpts = salesProducts.filter(function(p) { return p.is_active !== false; }).map(function(p) {
+    var v = varieties.find(function(x) { return x.id === p.variety_id; });
+    return '<option value="' + esc(p.id) + '">' + esc((v ? v.name + ' — ' : '') + p.name) + '</option>';
+  }).join('');
+  var varOpts = varieties.map(function(v) { return '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>'; }).join('');
+  var catOpts = ['whole_crown','whole_no_crown','slice','peeled','slice_box','chunk_box','ring_box'].map(function(c) {
+    return '<option value="' + c + '">' + esc(spCategoryLabel(c)) + '</option>';
+  }).join('');
+  var driverOpts = allWorkers.map(function(w) { return '<option value="' + esc(w.id) + '">' + esc(w.name) + '</option>'; }).join('');
+
+  var dateRange = '<label style="font-size:11px;color:var(--text-muted);white-space:nowrap;">From</label>' +
+    '<input type="date" id="rpt-from" value="' + m1 + '">' +
+    '<label style="font-size:11px;color:var(--text-muted);white-space:nowrap;">To</label>' +
+    '<input type="date" id="rpt-to" value="' + today + '">';
+
+  var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+  if (rptType === 'customer') {
+    html += dateRange;
+    html += '<select id="rpt-customer"><option value="">All Customers</option>' + custOpts + '</select>';
+  } else if (rptType === 'product') {
+    html += dateRange;
+    html += '<select id="rpt-variety"><option value="">All Varieties</option>' + varOpts + '</select>';
+    html += '<select id="rpt-category"><option value="">All Categories</option>' + catOpts + '</select>';
+  } else if (rptType === 'period') {
+    html += dateRange;
+    html += '<select id="rpt-period-group"><option value="monthly">Monthly</option><option value="weekly">Weekly</option></select>';
+  } else if (rptType === 'outstanding') {
+    html += '<select id="rpt-doc-type"><option value="">All Doc Types</option><option value="delivery_order">Delivery Order</option><option value="cash_sales">Cash Sales</option></select>';
+    html += '<select id="rpt-age-range"><option value="">All Ages</option><option value="0-7">0-7 days</option><option value="7-14">7-14 days</option><option value="14+">14+ days</option></select>';
+  } else if (rptType === 'returns') {
+    html += dateRange;
+    html += '<select id="rpt-customer"><option value="">All Customers</option>' + custOpts + '</select>';
+  } else if (rptType === 'driver') {
+    html += dateRange;
+    html += '<select id="rpt-driver"><option value="">All Drivers</option>' + driverOpts + '</select>';
+  } else if (rptType === 'history') {
+    html += '<select id="rpt-customer" required><option value="">— Select Customer —</option>' + custOpts + '</select>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function rptGenerate() {
+  var cols = [], rows = [], title = '';
+  var type = rptType;
+  var today = todayStr();
+  var fromEl = document.getElementById('rpt-from');
+  var toEl = document.getElementById('rpt-to');
+  var from = fromEl ? fromEl.value : '';
+  var to = toEl ? toEl.value : '';
+
+  function ordersInRange() {
+    return orders.filter(function(o) {
+      if (o.status === 'cancelled') return false;
+      if (from && o.order_date < from) return false;
+      if (to && o.order_date > to) return false;
+      return true;
+    });
+  }
+
+  function getOrderItems(orderId) {
+    return orderItems.filter(function(i) { return i.order_id === orderId; });
+  }
+
+  function getOrderReturns(orderId) {
+    return returns.filter(function(r) { return r.order_id === orderId; });
+  }
+
+  function getOrderPayments(orderId) {
+    return payments.filter(function(p) { return p.order_id === orderId; });
+  }
+
+  if (type === 'customer') {
+    title = 'Sales by Customer';
+    var custFilter = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
+    var filtered = ordersInRange();
+    if (custFilter) filtered = filtered.filter(function(o) { return o.customer_id === custFilter; });
+
+    var byCustomer = {};
+    filtered.forEach(function(o) {
+      var cid = o.customer_id || 'unknown';
+      if (!byCustomer[cid]) byCustomer[cid] = { orders: 0, qty: 0, revenue: 0, returns: 0 };
+      byCustomer[cid].orders++;
+      var items = getOrderItems(o.id);
+      items.forEach(function(it) { byCustomer[cid].qty += parseFloat(it.quantity) || 0; });
+      byCustomer[cid].revenue += parseFloat(o.subtotal) || 0;
+      byCustomer[cid].returns += parseFloat(o.returns_total) || 0;
+    });
+
+    cols = ['Customer', 'Orders', 'Total Qty', 'Total Revenue (RM)', 'Returns (RM)', 'Net Revenue (RM)'];
+    rows = Object.keys(byCustomer).map(function(cid) {
+      var d = byCustomer[cid];
+      var net = d.revenue - d.returns;
+      return [getCustomerName(cid), d.orders, fmtNum(d.qty), formatRM(d.revenue), formatRM(d.returns), formatRM(net), net];
+    }).sort(function(a, b) { return b[6] - a[6]; }).map(function(r) { return r.slice(0, 6); });
+
+  } else if (type === 'product') {
+    title = 'Sales by Product';
+    var varFilter = document.getElementById('rpt-variety') ? document.getElementById('rpt-variety').value : '';
+    var catFilter = document.getElementById('rpt-category') ? document.getElementById('rpt-category').value : '';
+    var filtered = ordersInRange();
+    var orderIds = {};
+    filtered.forEach(function(o) { orderIds[o.id] = true; });
+
+    var byProduct = {};
+    var totalRevenue = 0;
+    orderItems.forEach(function(it) {
+      if (!orderIds[it.order_id]) return;
+      var pid = it.product_id;
+      var prod = salesProducts.find(function(p) { return p.id === pid; });
+      if (!prod) return;
+      if (varFilter && prod.variety_id !== varFilter) return;
+      if (catFilter && prod.category !== catFilter) return;
+      if (!byProduct[pid]) byProduct[pid] = { qty: 0, revenue: 0 };
+      var qty = parseFloat(it.quantity) || 0;
+      var lineTotal = qty * (parseFloat(it.unit_price) || 0);
+      byProduct[pid].qty += qty;
+      byProduct[pid].revenue += lineTotal;
+      totalRevenue += lineTotal;
+    });
+
+    cols = ['Product', 'Variety', 'Category', 'Qty Sold', 'Revenue (RM)', 'Avg Price', '% of Total'];
+    rows = Object.keys(byProduct).map(function(pid) {
+      var d = byProduct[pid];
+      var prod = salesProducts.find(function(p) { return p.id === pid; });
+      var v = prod ? varieties.find(function(x) { return x.id === prod.variety_id; }) : null;
+      var avgPrice = d.qty > 0 ? d.revenue / d.qty : 0;
+      var pct = totalRevenue > 0 ? (d.revenue / totalRevenue * 100) : 0;
+      return [prod ? prod.name : '?', v ? v.name : '\u2014', prod ? spCategoryLabel(prod.category) : '\u2014', fmtNum(d.qty), formatRM(d.revenue), formatRM(avgPrice), pct.toFixed(1) + '%', d.revenue];
+    }).sort(function(a, b) { return b[7] - a[7]; }).map(function(r) { return r.slice(0, 7); });
+
+  } else if (type === 'period') {
+    title = 'Sales by Period';
+    var groupBy = document.getElementById('rpt-period-group') ? document.getElementById('rpt-period-group').value : 'monthly';
+    var filtered = ordersInRange();
+
+    function getWeekKey(dateStr) {
+      var d = new Date(dateStr + 'T00:00:00');
+      var day = d.getDay() || 7;
+      d.setDate(d.getDate() + 4 - day);
+      var yearStart = new Date(d.getFullYear(), 0, 1);
+      var weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+      return d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
+    }
+
+    var byPeriod = {};
+    filtered.forEach(function(o) {
+      var key = groupBy === 'monthly' ? (o.order_date || '').substring(0, 7) : getWeekKey(o.order_date || today);
+      if (!byPeriod[key]) byPeriod[key] = { orders: 0, qty: 0, revenue: 0 };
+      byPeriod[key].orders++;
+      var items = getOrderItems(o.id);
+      items.forEach(function(it) { byPeriod[key].qty += parseFloat(it.quantity) || 0; });
+      byPeriod[key].revenue += parseFloat(o.grand_total) || 0;
+    });
+
+    cols = ['Period', 'Orders', 'Total Qty', 'Revenue (RM)', 'Avg Order Value'];
+    rows = Object.keys(byPeriod).sort().map(function(key) {
+      var d = byPeriod[key];
+      var avg = d.orders > 0 ? d.revenue / d.orders : 0;
+      return [key, d.orders, fmtNum(d.qty), formatRM(d.revenue), formatRM(avg)];
+    });
+
+    // Totals row
+    if (rows.length > 0) {
+      var tOrders = 0, tQty = 0, tRev = 0;
+      Object.keys(byPeriod).forEach(function(k) { tOrders += byPeriod[k].orders; tQty += byPeriod[k].qty; tRev += byPeriod[k].revenue; });
+      rows.push(['TOTAL', tOrders, fmtNum(tQty), formatRM(tRev), formatRM(tOrders > 0 ? tRev / tOrders : 0)]);
+      rows[rows.length - 1]._summary = true;
+    }
+
+  } else if (type === 'outstanding') {
+    title = 'Outstanding Payments';
+    var docFilter = document.getElementById('rpt-doc-type') ? document.getElementById('rpt-doc-type').value : '';
+    var ageFilter = document.getElementById('rpt-age-range') ? document.getElementById('rpt-age-range').value : '';
+
+    var unpaid = orders.filter(function(o) {
+      if (o.status === 'cancelled') return false;
+      if (o.payment_status === 'paid') return false;
+      if (docFilter && o.doc_type !== docFilter) return false;
+      return true;
+    });
+
+    cols = ['Customer', 'Doc No', 'Doc Type', 'Order Date', 'Total', 'Paid', 'Balance', 'Days Outstanding'];
+    var totalBal = 0, totalAmt = 0, totalPaid = 0;
+    rows = unpaid.map(function(o) {
+      var total = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      var balance = total - paid;
+      var days = daysBetween(o.order_date);
+      return [getCustomerName(o.customer_id), o.doc_number || '\u2014', docTypeLabel(o.doc_type), fmtDate(o.order_date), formatRM(total), formatRM(paid), formatRM(balance), days, balance];
+    });
+
+    // Age filter
+    if (ageFilter === '0-7') rows = rows.filter(function(r) { return r[7] <= 7; });
+    else if (ageFilter === '7-14') rows = rows.filter(function(r) { return r[7] > 7 && r[7] <= 14; });
+    else if (ageFilter === '14+') rows = rows.filter(function(r) { return r[7] > 14; });
+
+    rows.sort(function(a, b) { return b[7] - a[7]; });
+
+    // Color coding metadata
+    rows.forEach(function(r) {
+      if (r[7] > 14) r._daysClass = 'rpt-outstanding-red';
+      else if (r[7] > 7) r._daysClass = 'rpt-outstanding-gold';
+      else r._daysClass = 'rpt-outstanding-green';
+    });
+
+    // Summary
+    rows.forEach(function(r) { totalAmt += parseFloat(String(r[4]).replace(/[^0-9.-]/g, '')) || 0; totalPaid += parseFloat(String(r[5]).replace(/[^0-9.-]/g, '')) || 0; totalBal += r[8]; });
+    rows = rows.map(function(r) { var row = r.slice(0, 8); row._daysClass = r._daysClass; return row; });
+    if (rows.length > 0) {
+      var sumRow = ['TOTAL', '', '', '', formatRM(totalAmt), formatRM(totalPaid), formatRM(totalBal), ''];
+      sumRow._summary = true;
+      rows.push(sumRow);
+    }
+
+  } else if (type === 'returns') {
+    title = 'Return Rate';
+    var custFilter = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
+    var filtered = ordersInRange();
+    if (custFilter) filtered = filtered.filter(function(o) { return o.customer_id === custFilter; });
+
+    var orderIds = {};
+    filtered.forEach(function(o) { orderIds[o.id] = o.customer_id; });
+
+    var byCust = {};
+    filtered.forEach(function(o) {
+      var cid = o.customer_id || 'unknown';
+      if (!byCust[cid]) byCust[cid] = { orders: 0, purchased: 0, retCount: 0, retAmount: 0, reasons: {} };
+      byCust[cid].orders++;
+      byCust[cid].purchased += parseFloat(o.subtotal) || 0;
+    });
+
+    returns.forEach(function(r) {
+      var cid = orderIds[r.order_id];
+      if (!cid || !byCust[cid]) return;
+      byCust[cid].retCount++;
+      byCust[cid].retAmount += parseFloat(r.amount) || 0;
+      var reason = r.reason || 'Unspecified';
+      byCust[cid].reasons[reason] = (byCust[cid].reasons[reason] || 0) + 1;
+    });
+
+    cols = ['Customer', 'Total Orders', 'Total Purchased (RM)', 'Returns Count', 'Return Amount (RM)', 'Return Rate (%)', 'Top Reason'];
+    rows = Object.keys(byCust).filter(function(cid) { return byCust[cid].retCount > 0; }).map(function(cid) {
+      var d = byCust[cid];
+      var rate = d.purchased > 0 ? (d.retAmount / d.purchased * 100) : 0;
+      var topReason = '\u2014';
+      var maxCount = 0;
+      Object.keys(d.reasons).forEach(function(r) { if (d.reasons[r] > maxCount) { maxCount = d.reasons[r]; topReason = r; } });
+      return [getCustomerName(cid), d.orders, formatRM(d.purchased), d.retCount, formatRM(d.retAmount), rate.toFixed(1) + '%', topReason, rate];
+    }).sort(function(a, b) { return b[7] - a[7]; });
+
+    rows.forEach(function(r) {
+      var rate = r[7];
+      if (rate > 10) r._rateClass = 'return-rate-red';
+      else if (rate >= 5) r._rateClass = 'return-rate-yellow';
+      else r._rateClass = 'return-rate-green';
+    });
+    rows = rows.map(function(r) { var row = r.slice(0, 7); row._rateClass = r._rateClass; return row; });
+
+  } else if (type === 'driver') {
+    title = 'Driver Delivery Log';
+    var driverFilter = document.getElementById('rpt-driver') ? document.getElementById('rpt-driver').value : '';
+    var filtered = ordersInRange().filter(function(o) {
+      if (o.fulfillment !== 'delivery') return false;
+      if (!o.driver_id) return false;
+      if (o.status !== 'completed' && o.status !== 'delivering') return false;
+      if (driverFilter && o.driver_id !== driverFilter) return false;
+      return true;
+    });
+
+    var byDriver = {};
+    filtered.forEach(function(o) {
+      var did = o.driver_id;
+      if (!byDriver[did]) byDriver[did] = { deliveries: 0, customers: {}, value: 0 };
+      byDriver[did].deliveries++;
+      byDriver[did].customers[o.customer_id] = true;
+      byDriver[did].value += parseFloat(o.grand_total) || 0;
+    });
+
+    cols = ['Driver', 'Deliveries Count', 'Customers Served', 'Total Delivered Value (RM)'];
+    rows = Object.keys(byDriver).map(function(did) {
+      var d = byDriver[did];
+      var driver = allWorkers.find(function(w) { return w.id === did; });
+      return [driver ? driver.name : did, d.deliveries, Object.keys(d.customers).length, formatRM(d.value), d.deliveries];
+    }).sort(function(a, b) { return b[4] - a[4]; }).map(function(r) { return r.slice(0, 4); });
+
+  } else if (type === 'history') {
+    title = 'Customer History';
+    var custId = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
+    if (!custId) { notify('Select a customer', 'warning'); return; }
+    title = 'Customer History — ' + getCustomerName(custId);
+
+    var custOrders = orders.filter(function(o) {
+      return o.customer_id === custId && o.status !== 'cancelled';
+    }).sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || ''); });
+
+    cols = ['Order Date', 'Doc No', 'Items', 'Total (RM)', 'Payments (RM)', 'Returns (RM)', 'Balance (RM)'];
+    var tTotal = 0, tPaid = 0, tReturns = 0;
+    rows = custOrders.map(function(o) {
+      var items = getOrderItems(o.id);
+      var itemSummary = items.map(function(it) {
+        var prod = salesProducts.find(function(p) { return p.id === it.product_id; });
+        return (prod ? prod.name : '?') + ' x' + (it.quantity || 0);
+      }).join(', ');
+      var total = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      var ret = parseFloat(o.returns_total) || 0;
+      var balance = total - paid;
+      tTotal += total;
+      tPaid += paid;
+      tReturns += ret;
+      return [fmtDate(o.order_date), o.doc_number || '\u2014', itemSummary, formatRM(total), formatRM(paid), formatRM(ret), formatRM(balance)];
+    });
+
+    if (rows.length > 0) {
+      var sumRow = ['TOTAL', '', '', formatRM(tTotal), formatRM(tPaid), formatRM(tReturns), formatRM(tTotal - tPaid)];
+      sumRow._summary = true;
+      rows.push(sumRow);
+    }
+  }
+
+  // Store report data
+  rptData = { cols: cols, rows: rows, title: title };
+  document.getElementById('rpt-count').textContent = rows.length + ' result' + (rows.length !== 1 ? 's' : '');
+
+  // Render table
+  var html = '<table><thead><tr>' + cols.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  if (!rows.length) {
+    html += '<tr><td colspan="' + cols.length + '" class="empty-state">No data found</td></tr>';
+  } else {
+    rows.forEach(function(r) {
+      var trClass = r._summary ? ' class="rpt-summary-row"' : '';
+      html += '<tr' + trClass + '>';
+      r.forEach(function(c, i) {
+        var attrs = '';
+        // Outstanding days coloring
+        if (type === 'outstanding' && i === 7 && r._daysClass && !r._summary) {
+          attrs = ' class="' + r._daysClass + '"';
+        }
+        // Return rate coloring
+        if (type === 'returns' && i === 5 && r._rateClass) {
+          attrs = ' class="' + r._rateClass + '"';
+        }
+        // Right-align numeric/currency columns
+        if (typeof c === 'string' && (c.indexOf('RM ') === 0 || c.match(/^\d+\.\d+%$/))) {
+          attrs += ' style="text-align:right;"';
+        }
+        if (typeof c === 'number') {
+          attrs += ' style="text-align:right;"';
+        }
+        html += '<td' + attrs + '>' + esc(String(c != null ? c : '')) + '</td>';
+      });
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table>';
+  document.getElementById('rpt-table-wrap').innerHTML = html;
+  document.getElementById('rpt-results').style.display = 'block';
+  document.getElementById('rpt-btn-csv').style.display = 'inline-flex';
+  document.getElementById('rpt-btn-print').style.display = 'inline-flex';
+  document.getElementById('rpt-print-info').textContent = title + ' — Generated ' + new Date().toLocaleDateString();
+}
+
+function rptExportCSV() {
+  if (!rptData || !rptData.rows) return;
+  var escCSV = function(v) {
+    var s = String(v != null ? v : '');
+    return (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  var csv = rptData.cols.map(escCSV).join(',') + '\n';
+  rptData.rows.forEach(function(r) {
+    csv += Array.prototype.slice.call(r).map(escCSV).join(',') + '\n';
+  });
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sales-' + rptData.title.replace(/\s+/g, '-').toLowerCase() + '-' + todayStr() + '.csv';
+  a.click();
+}
+
+function rptPrint() {
+  var tableHtml = document.getElementById('rpt-table-wrap').innerHTML;
+  if (!tableHtml) return;
+  var w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html><head><title>' + esc(rptData ? rptData.title : 'Report') + '</title>');
+  w.document.write('<style>body{font-family:Arial,sans-serif;margin:20px;color:#222;}h2{margin:0 0 4px;}p{margin:0 0 16px;color:#666;font-size:13px;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}th{background:#f5f5f5;font-weight:700;}tr:nth-child(even){background:#fafafa;}.rpt-summary-row td{font-weight:700;background:#eee;border-top:2px solid #999;}.rpt-outstanding-green{color:#2d8a3e;}.rpt-outstanding-gold{color:#b8860b;}.rpt-outstanding-red{color:#c0392b;font-weight:700;}.return-rate-green{color:#2d8a3e;font-weight:700;}.return-rate-yellow{color:#b8860b;font-weight:700;}.return-rate-red{color:#c0392b;font-weight:700;}</style>');
+  w.document.write('</head><body>');
+  w.document.write('<h2>Ladang PND — TG FarmHub</h2>');
+  w.document.write('<p>' + esc(rptData ? rptData.title : 'Report') + ' — Generated ' + new Date().toLocaleDateString() + '</p>');
+  w.document.write(tableHtml);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.focus();
+  w.print();
 }
 
 // ==================== ORDER CREATION ====================
