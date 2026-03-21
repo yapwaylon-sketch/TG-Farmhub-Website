@@ -530,6 +530,76 @@
   </div>
 </div>
 
+<!-- PAYMENT MODAL -->
+<div id="pay-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('pay-modal')">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Record Payment</div>
+      <button class="modal-close" onclick="closeModal('pay-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="pay-order-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
+    <input type="hidden" id="pay-order-id" value="">
+    <div class="form-field">
+      <label>AMOUNT (RM)</label>
+      <input type="number" id="pay-amount" step="0.01" min="0.01" placeholder="0.00" style="width:100%;">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>PAYMENT DATE</label>
+        <input type="date" id="pay-date" style="width:100%;">
+      </div>
+      <div class="form-field">
+        <label>METHOD</label>
+        <select id="pay-method" style="width:100%;">
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="cheque">Cheque</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-field">
+      <label>REFERENCE (optional)</label>
+      <input type="text" id="pay-reference" placeholder="Bank ref / cheque number" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>NOTES (optional)</label>
+      <textarea id="pay-notes" rows="2" placeholder="Payment notes" style="width:100%;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('pay-modal')">Cancel</button>
+      <button class="btn btn-primary" id="pay-save-btn" onclick="paySavePayment()">Save Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div id="inv-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('inv-modal')">
+  <div class="modal-box" style="max-width:500px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Mark as Invoiced</div>
+      <button class="modal-close" onclick="closeModal('inv-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="inv-do-list" style="max-height:200px;overflow-y:auto;margin-bottom:14px;font-size:13px;"></div>
+    <div id="inv-total" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;"></div>
+    <div class="form-field">
+      <label>QB INVOICE NUMBER <span style="color:var(--red);">*</span></label>
+      <input type="text" id="inv-qb-number" placeholder="e.g., INV-2026-001" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>INVOICE DATE</label>
+      <input type="date" id="inv-date" style="width:100%;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('inv-modal')">Cancel</button>
+      <button class="btn btn-primary" id="inv-save-btn" onclick="invSaveInvoice()">Save Invoice</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // CONFIG
 var currentUser = null;
@@ -1135,7 +1205,7 @@ function soRenderDetail() {
   html += '<span class="badge badge-' + esc(payStatus) + '">' + soPaymentLabel(payStatus) + '</span>';
   html += '</div>';
   if (payStatus !== 'paid') {
-    html += '<button class="btn btn-outline btn-sm" onclick="notify(\'Payment recording coming soon\',\'info\')">Record Payment</button>';
+    html += '<button class="btn btn-outline btn-sm" onclick="payOpenModal(\'' + esc(o.id) + '\')">Record Payment</button>';
   }
   html += '</div>';
 
@@ -1734,11 +1804,519 @@ function spToggleActive(id) {
     })();
   }
 }
-function renderPayments() {
-  document.getElementById('page-payments').querySelector('.page-body').innerHTML = '<div class="empty-state">Payments — Phase 4</div>';
+// ==================== HELPERS: PAYMENTS ====================
+function orderBalance(o) {
+  return (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0);
 }
+
+function recalcPaymentStatus(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var totalPaid = payments.filter(function(p) { return p.order_id === orderId; }).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
+  o.amount_paid = totalPaid;
+  if (totalPaid >= (parseFloat(o.grand_total) || 0)) o.payment_status = 'paid';
+  else if (totalPaid > 0) o.payment_status = 'partial';
+  else o.payment_status = 'unpaid';
+}
+
+// ==================== PAYMENTS TAB ====================
+var payFilterDocType = '';
+var payFilterDateFrom = '';
+var payFilterDateTo = '';
+var payFilterStatus = 'outstanding'; // 'unpaid', 'partial', 'outstanding', ''
+var payFilterSort = 'oldest';
+
+function renderPayments() {
+  var body = document.getElementById('page-payments').querySelector('.page-body');
+  var html = '';
+
+  // Filter bar
+  html += '<div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:flex-end;">';
+
+  html += '<div class="form-field" style="min-width:120px;">';
+  html += '<label style="font-size:10px;margin-bottom:2px;">DOC TYPE</label>';
+  html += '<select id="pay-f-doctype" onchange="payFilterDocType=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;">';
+  html += '<option value=""' + (payFilterDocType === '' ? ' selected' : '') + '>All</option>';
+  html += '<option value="cash_sales"' + (payFilterDocType === 'cash_sales' ? ' selected' : '') + '>Cash Sales</option>';
+  html += '<option value="delivery_order"' + (payFilterDocType === 'delivery_order' ? ' selected' : '') + '>Delivery Orders</option>';
+  html += '</select></div>';
+
+  html += '<div class="form-field" style="min-width:120px;">';
+  html += '<label style="font-size:10px;margin-bottom:2px;">FROM</label>';
+  html += '<input type="date" id="pay-f-from" value="' + esc(payFilterDateFrom) + '" onchange="payFilterDateFrom=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;">';
+  html += '</div>';
+
+  html += '<div class="form-field" style="min-width:120px;">';
+  html += '<label style="font-size:10px;margin-bottom:2px;">TO</label>';
+  html += '<input type="date" id="pay-f-to" value="' + esc(payFilterDateTo) + '" onchange="payFilterDateTo=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;">';
+  html += '</div>';
+
+  html += '<div class="form-field" style="min-width:130px;">';
+  html += '<label style="font-size:10px;margin-bottom:2px;">SHOW</label>';
+  html += '<select id="pay-f-status" onchange="payFilterStatus=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;">';
+  html += '<option value="outstanding"' + (payFilterStatus === 'outstanding' ? ' selected' : '') + '>All Outstanding</option>';
+  html += '<option value="unpaid"' + (payFilterStatus === 'unpaid' ? ' selected' : '') + '>Unpaid Only</option>';
+  html += '<option value="partial"' + (payFilterStatus === 'partial' ? ' selected' : '') + '>Partial Only</option>';
+  html += '<option value=""' + (payFilterStatus === '' ? ' selected' : '') + '>All (incl. Paid)</option>';
+  html += '</select></div>';
+
+  html += '<div class="form-field" style="min-width:130px;">';
+  html += '<label style="font-size:10px;margin-bottom:2px;">SORT</label>';
+  html += '<select id="pay-f-sort" onchange="payFilterSort=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;">';
+  html += '<option value="oldest"' + (payFilterSort === 'oldest' ? ' selected' : '') + '>Oldest First</option>';
+  html += '<option value="newest"' + (payFilterSort === 'newest' ? ' selected' : '') + '>Newest First</option>';
+  html += '<option value="amount"' + (payFilterSort === 'amount' ? ' selected' : '') + '>Amount (Highest)</option>';
+  html += '</select></div>';
+
+  html += '</div>';
+
+  // Filter orders
+  var filtered = orders.filter(function(o) {
+    if (o.status === 'cancelled') return false;
+    if (payFilterDocType && o.doc_type !== payFilterDocType) return false;
+    if (payFilterDateFrom && o.order_date < payFilterDateFrom) return false;
+    if (payFilterDateTo && o.order_date > payFilterDateTo) return false;
+    if (payFilterStatus === 'outstanding') return o.payment_status !== 'paid';
+    if (payFilterStatus === 'unpaid') return o.payment_status === 'unpaid';
+    if (payFilterStatus === 'partial') return o.payment_status === 'partial';
+    return true;
+  });
+
+  // Sort
+  if (payFilterSort === 'oldest') {
+    filtered.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
+  } else if (payFilterSort === 'newest') {
+    filtered.sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || ''); });
+  } else if (payFilterSort === 'amount') {
+    filtered.sort(function(a, b) { return orderBalance(b) - orderBalance(a); });
+  }
+
+  // Summary
+  var totalOutstanding = 0;
+  filtered.forEach(function(o) { totalOutstanding += orderBalance(o); });
+  html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">';
+  html += filtered.length + ' order' + (filtered.length !== 1 ? 's' : '') + ' &middot; Total outstanding: <strong style="color:var(--gold);">' + formatRM(totalOutstanding) + '</strong>';
+  html += '</div>';
+
+  if (!filtered.length) {
+    html += '<div class="empty-state">No matching orders</div>';
+  } else {
+    filtered.forEach(function(o) {
+      var cust = customers.find(function(c) { return c.id === o.customer_id; });
+      var custName = cust ? cust.name : '\u2014';
+      var balance = orderBalance(o);
+      var days = daysBetween(o.order_date);
+      var isDO = o.doc_type === 'delivery_order';
+
+      // Age color
+      var ageColor, ageLabel;
+      if (isDO) {
+        ageColor = '#5B9BD5'; // blue for DOs
+        ageLabel = days + 'd';
+      } else {
+        if (days <= 7) { ageColor = '#4A7C3F'; ageLabel = days + 'd'; }
+        else if (days <= 14) { ageColor = '#E8A020'; ageLabel = days + 'd'; }
+        else { ageColor = '#E05252'; ageLabel = days + 'd'; }
+      }
+
+      html += '<div class="pay-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;';
+      if (!isDO && days > 7) html += 'border-left:3px solid ' + ageColor + ';';
+      html += '">';
+
+      // Row 1: Customer + badges
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+      html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(custName) + '</div>';
+      html += '<div style="display:flex;gap:4px;align-items:center;">';
+      html += '<span class="badge ' + docTypeBadgeClass(o.doc_type) + '">' + docTypeLabel(o.doc_type) + '</span>';
+      html += '<span class="badge badge-' + esc(o.payment_status || 'unpaid') + '">' + soPaymentLabel(o.payment_status) + '</span>';
+      html += '</div></div>';
+
+      // Row 2: Doc number + date + age
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--text-muted);">';
+      html += '<span>' + esc(o.doc_number || o.id) + '</span>';
+      html += '<span>' + fmtDateNice(o.order_date) + ' &middot; <span style="color:' + ageColor + ';font-weight:600;">' + ageLabel + '</span></span>';
+      html += '</div>';
+
+      // Row 3: Amounts
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+      html += '<div style="font-size:12px;color:var(--text-muted);">Total: ' + formatRM(parseFloat(o.grand_total) || 0) + ' &middot; Paid: ' + formatRM(parseFloat(o.amount_paid) || 0) + '</div>';
+      html += '<div style="font-size:15px;font-weight:800;color:' + (balance > 0 ? 'var(--gold)' : 'var(--green-light)') + ';">' + formatRM(balance) + '</div>';
+      html += '</div>';
+
+      // Row 4: Payment history + button
+      var orderPayments = payments.filter(function(p) { return p.order_id === o.id; });
+      if (orderPayments.length > 0) {
+        html += '<div style="margin-bottom:8px;padding:6px 8px;background:var(--bg-hover);border-radius:6px;font-size:11px;color:var(--text-muted);">';
+        orderPayments.forEach(function(p) {
+          var methodLabel = p.method === 'bank_transfer' ? 'Bank' : (p.method === 'cheque' ? 'Cheque' : 'Cash');
+          html += '<div style="display:flex;justify-content:space-between;margin-bottom:2px;">';
+          html += '<span>' + fmtDateShort(p.payment_date) + ' &middot; ' + methodLabel + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span>';
+          html += '<span style="font-weight:600;">+' + formatRM(parseFloat(p.amount) || 0) + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      if (balance > 0) {
+        html += '<button class="btn btn-primary btn-sm" onclick="payOpenModal(\'' + esc(o.id) + '\')" style="width:100%;justify-content:center;">Record Payment</button>';
+      }
+
+      html += '</div>';
+    });
+  }
+
+  body.innerHTML = html;
+}
+
+// Open payment modal
+function payOpenModal(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var balance = orderBalance(o);
+  var cust = customers.find(function(c) { return c.id === o.customer_id; });
+
+  document.getElementById('pay-order-id').value = orderId;
+  document.getElementById('pay-order-info').innerHTML =
+    '<div style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + ' \u2014 ' + esc(cust ? cust.name : '\u2014') + '</div>' +
+    '<div>Total: ' + formatRM(parseFloat(o.grand_total) || 0) + ' &middot; Paid: ' + formatRM(parseFloat(o.amount_paid) || 0) + ' &middot; <strong>Balance: ' + formatRM(balance) + '</strong></div>';
+  document.getElementById('pay-amount').value = balance.toFixed(2);
+  document.getElementById('pay-amount').max = balance.toFixed(2);
+  document.getElementById('pay-date').value = todayStr();
+  document.getElementById('pay-method').value = 'cash';
+  document.getElementById('pay-reference').value = '';
+  document.getElementById('pay-notes').value = '';
+  document.getElementById('pay-modal').style.display = 'flex';
+}
+
+// Save payment
+async function paySavePayment() {
+  var orderId = document.getElementById('pay-order-id').value;
+  var amount = parseFloat(document.getElementById('pay-amount').value);
+  var payDate = document.getElementById('pay-date').value;
+  var method = document.getElementById('pay-method').value;
+  var reference = document.getElementById('pay-reference').value.trim();
+  var notes = document.getElementById('pay-notes').value.trim();
+
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) { notify('Order not found', 'error'); return; }
+
+  var balance = orderBalance(o);
+  if (!amount || amount <= 0) { notify('Enter a valid amount', 'warning'); return; }
+  if (amount > balance + 0.01) { notify('Amount exceeds balance of ' + formatRM(balance), 'warning'); return; }
+  if (!payDate) { notify('Select payment date', 'warning'); return; }
+
+  var btn = document.getElementById('pay-save-btn');
+  btnLoading(btn, true);
+
+  try {
+    var paymentId = await dbNextId('SY');
+
+    var payData = {
+      id: paymentId,
+      order_id: orderId,
+      amount: amount,
+      payment_date: payDate,
+      method: method,
+      reference: reference || null,
+      notes: notes || null,
+      created_by: currentUser ? currentUser.id : null
+    };
+
+    var result = await sbQuery(sb.from('sales_payments').insert(payData).select());
+    if (result === null) { btnLoading(btn, false, 'Save Payment'); return; }
+
+    // Add to local payments array
+    payments.unshift(result[0] || payData);
+
+    // Recalc order payment status
+    recalcPaymentStatus(orderId);
+
+    // Update order in DB
+    var newStatus = o.payment_status;
+    var newAmountPaid = o.amount_paid;
+    await sbQuery(sb.from('sales_orders').update({ amount_paid: newAmountPaid, payment_status: newStatus }).eq('id', orderId).select());
+
+    btnLoading(btn, false, 'Save Payment');
+    closeModal('pay-modal');
+    notify('Payment of ' + formatRM(amount) + ' recorded', 'success');
+    renderCurrentTab();
+  } catch(e) {
+    btnLoading(btn, false, 'Save Payment');
+    notify('Failed to save payment: ' + e.message, 'error');
+  }
+}
+
+// ==================== INVOICING TAB ====================
+var invSelectedDOs = {};
+
 function renderInvoicing() {
-  document.getElementById('page-invoicing').querySelector('.page-body').innerHTML = '<div class="empty-state">Invoicing — Phase 4</div>';
+  var body = document.getElementById('page-invoicing').querySelector('.page-body');
+  var html = '';
+
+  // ---- Section A: Uninvoiced Delivery Orders ----
+  html += '<div style="margin-bottom:32px;">';
+  html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Uninvoiced Delivery Orders</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Select DOs to batch into a QuickBooks invoice</div>';
+
+  var uninvoicedDOs = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && !o.qb_invoice_no && o.status !== 'cancelled';
+  });
+
+  // Group by customer
+  var byCustomer = {};
+  uninvoicedDOs.forEach(function(o) {
+    if (!byCustomer[o.customer_id]) byCustomer[o.customer_id] = [];
+    byCustomer[o.customer_id].push(o);
+  });
+
+  var customerIds = Object.keys(byCustomer);
+  if (!customerIds.length) {
+    html += '<div class="empty-state">No uninvoiced delivery orders</div>';
+  } else {
+    customerIds.forEach(function(custId) {
+      var custOrders = byCustomer[custId];
+      var cust = customers.find(function(c) { return c.id === custId; });
+      var custName = cust ? cust.name : '\u2014';
+      var custTotal = 0;
+      custOrders.forEach(function(o) { custTotal += parseFloat(o.grand_total) || 0; });
+
+      html += '<div class="inv-customer-group" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">';
+
+      // Customer header (clickable to expand)
+      html += '<div class="inv-cust-header" style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="invToggleCustomer(\'' + esc(custId) + '\')">';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(custName) + '</div>';
+      html += '<div style="font-size:12px;color:var(--text-muted);">' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + ' &middot; ' + formatRM(custTotal) + '</div>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<label style="font-size:11px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">';
+      html += '<input type="checkbox" onchange="invSelectAllCustomer(\'' + esc(custId) + '\', this.checked)" id="inv-selall-' + esc(custId) + '"> Select All</label>';
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;transition:transform 0.2s;" id="inv-chevron-' + esc(custId) + '"><polyline points="6 9 12 15 18 9"/></svg>';
+      html += '</div></div>';
+
+      // Customer DOs (expandable)
+      html += '<div id="inv-dos-' + esc(custId) + '" style="display:none;border-top:1px solid var(--border);padding:8px 16px;">';
+      custOrders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
+      custOrders.forEach(function(o) {
+        var checked = invSelectedDOs[o.id] ? ' checked' : '';
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">';
+        html += '<input type="checkbox" data-order-id="' + esc(o.id) + '" data-customer-id="' + esc(custId) + '" onchange="invToggleDO(\'' + esc(o.id) + '\', \'' + esc(custId) + '\', this.checked)"' + checked + '>';
+        html += '<span style="flex:1;">';
+        html += '<span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span>';
+        html += ' &middot; ' + fmtDateNice(o.order_date);
+        html += '</span>';
+        html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+        html += '</label>';
+      });
+      html += '</div>';
+
+      html += '</div>';
+    });
+
+    // Mark as Invoiced button
+    var selectedCount = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; }).length;
+    html += '<div style="margin-top:12px;">';
+    html += '<button class="btn btn-primary" id="inv-mark-btn" onclick="invOpenInvoiceModal()"' + (selectedCount === 0 ? ' disabled style="opacity:0.5;cursor:not-allowed;"' : '') + '>';
+    html += 'Mark as Invoiced (' + selectedCount + ' selected)</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ---- Section B: Invoice History ----
+  html += '<div>';
+  html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Invoice History</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Past QuickBooks invoices</div>';
+
+  var invoicedDOs = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && o.qb_invoice_no;
+  });
+
+  // Group by QB invoice number
+  var byInvoice = {};
+  invoicedDOs.forEach(function(o) {
+    var key = o.qb_invoice_no;
+    if (!byInvoice[key]) byInvoice[key] = { orders: [], customer_id: o.customer_id, invoiced_at: o.qb_invoiced_at };
+    byInvoice[key].orders.push(o);
+  });
+
+  var invoiceKeys = Object.keys(byInvoice);
+  // Sort by invoiced date (newest first)
+  invoiceKeys.sort(function(a, b) {
+    return (byInvoice[b].invoiced_at || '').localeCompare(byInvoice[a].invoiced_at || '');
+  });
+
+  if (!invoiceKeys.length) {
+    html += '<div class="empty-state">No invoices yet</div>';
+  } else {
+    invoiceKeys.forEach(function(invNo) {
+      var group = byInvoice[invNo];
+      var cust = customers.find(function(c) { return c.id === group.customer_id; });
+      var custName = cust ? cust.name : '\u2014';
+      var total = 0;
+      group.orders.forEach(function(o) { total += parseFloat(o.grand_total) || 0; });
+
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">';
+
+      html += '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="invToggleHistory(\'' + esc(invNo) + '\')">';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(invNo) + '</div>';
+      html += '<div style="font-size:12px;color:var(--text-muted);">' + esc(custName) + ' &middot; ' + group.orders.length + ' DO' + (group.orders.length !== 1 ? 's' : '') + ' &middot; ' + formatRM(total) + '</div>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<span style="font-size:11px;color:var(--text-muted);">' + fmtDateNice(group.invoiced_at) + '</span>';
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;" id="inv-h-chevron-' + esc(invNo) + '"><polyline points="6 9 12 15 18 9"/></svg>';
+      html += '</div></div>';
+
+      html += '<div id="inv-h-dos-' + esc(invNo) + '" style="display:none;border-top:1px solid var(--border);padding:8px 16px;">';
+      group.orders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
+      group.orders.forEach(function(o) {
+        html += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;">';
+        html += '<span><span style="font-weight:600;">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
+        html += '<span style="font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+
+      html += '</div>';
+    });
+  }
+  html += '</div>';
+
+  body.innerHTML = html;
+}
+
+// Invoicing helpers
+function invToggleCustomer(custId) {
+  var el = document.getElementById('inv-dos-' + custId);
+  var chevron = document.getElementById('inv-chevron-' + custId);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    el.style.display = 'none';
+    if (chevron) chevron.style.transform = '';
+  }
+}
+
+function invToggleHistory(invNo) {
+  var el = document.getElementById('inv-h-dos-' + invNo);
+  var chevron = document.getElementById('inv-h-chevron-' + invNo);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+  } else {
+    el.style.display = 'none';
+    if (chevron) chevron.style.transform = '';
+  }
+}
+
+function invToggleDO(orderId, custId, checked) {
+  if (checked) invSelectedDOs[orderId] = true;
+  else delete invSelectedDOs[orderId];
+  // Update select-all checkbox
+  invUpdateSelectAll(custId);
+  // Re-render button count
+  var selectedCount = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; }).length;
+  var btn = document.getElementById('inv-mark-btn');
+  if (btn) {
+    btn.textContent = 'Mark as Invoiced (' + selectedCount + ' selected)';
+    btn.disabled = selectedCount === 0;
+    btn.style.opacity = selectedCount === 0 ? '0.5' : '';
+    btn.style.cursor = selectedCount === 0 ? 'not-allowed' : '';
+  }
+}
+
+function invUpdateSelectAll(custId) {
+  var checkboxes = document.querySelectorAll('input[data-customer-id="' + custId + '"]');
+  var allChecked = true;
+  checkboxes.forEach(function(cb) { if (!cb.checked) allChecked = false; });
+  var selAll = document.getElementById('inv-selall-' + custId);
+  if (selAll) selAll.checked = allChecked;
+}
+
+function invSelectAllCustomer(custId, checked) {
+  var checkboxes = document.querySelectorAll('input[data-customer-id="' + custId + '"]');
+  checkboxes.forEach(function(cb) {
+    cb.checked = checked;
+    var orderId = cb.getAttribute('data-order-id');
+    if (checked) invSelectedDOs[orderId] = true;
+    else delete invSelectedDOs[orderId];
+  });
+  var selectedCount = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; }).length;
+  var btn = document.getElementById('inv-mark-btn');
+  if (btn) {
+    btn.textContent = 'Mark as Invoiced (' + selectedCount + ' selected)';
+    btn.disabled = selectedCount === 0;
+    btn.style.opacity = selectedCount === 0 ? '0.5' : '';
+    btn.style.cursor = selectedCount === 0 ? 'not-allowed' : '';
+  }
+}
+
+function invOpenInvoiceModal() {
+  var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
+  if (!selectedIds.length) { notify('Select at least one DO', 'warning'); return; }
+
+  var listHtml = '';
+  var total = 0;
+  selectedIds.forEach(function(id) {
+    var o = orders.find(function(x) { return x.id === id; });
+    if (!o) return;
+    total += parseFloat(o.grand_total) || 0;
+    listHtml += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px;">';
+    listHtml += '<span>' + esc(o.doc_number || o.id) + ' &middot; ' + fmtDateNice(o.order_date) + '</span>';
+    listHtml += '<span style="font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+    listHtml += '</div>';
+  });
+
+  document.getElementById('inv-do-list').innerHTML = listHtml;
+  document.getElementById('inv-total').innerHTML = 'Total: ' + formatRM(total) + ' (' + selectedIds.length + ' DO' + (selectedIds.length !== 1 ? 's' : '') + ')';
+  document.getElementById('inv-qb-number').value = '';
+  document.getElementById('inv-date').value = todayStr();
+  document.getElementById('inv-modal').style.display = 'flex';
+}
+
+async function invSaveInvoice() {
+  var qbNumber = document.getElementById('inv-qb-number').value.trim();
+  var invDate = document.getElementById('inv-date').value;
+
+  if (!qbNumber) { notify('QB Invoice Number is required', 'warning'); document.getElementById('inv-qb-number').focus(); return; }
+  if (!invDate) { notify('Select invoice date', 'warning'); return; }
+
+  var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
+  if (!selectedIds.length) { notify('No DOs selected', 'warning'); return; }
+
+  var btn = document.getElementById('inv-save-btn');
+  btnLoading(btn, true);
+
+  try {
+    // Update each selected order
+    for (var i = 0; i < selectedIds.length; i++) {
+      var orderId = selectedIds[i];
+      var result = await sbQuery(sb.from('sales_orders').update({
+        qb_invoice_no: qbNumber,
+        qb_invoiced_at: invDate
+      }).eq('id', orderId).select());
+      if (result === null) { btnLoading(btn, false, 'Save Invoice'); return; }
+
+      // Update local array
+      var idx = orders.findIndex(function(x) { return x.id === orderId; });
+      if (idx >= 0) {
+        orders[idx].qb_invoice_no = qbNumber;
+        orders[idx].qb_invoiced_at = invDate;
+      }
+    }
+
+    btnLoading(btn, false, 'Save Invoice');
+    closeModal('inv-modal');
+    invSelectedDOs = {};
+    notify(selectedIds.length + ' DO' + (selectedIds.length !== 1 ? 's' : '') + ' invoiced as ' + qbNumber, 'success');
+    renderInvoicing();
+  } catch(e) {
+    btnLoading(btn, false, 'Save Invoice');
+    notify('Failed to save invoice: ' + e.message, 'error');
+  }
 }
 function renderReports() {
   document.getElementById('page-reports').querySelector('.page-body').innerHTML = '<div class="empty-state">Reports — Phase 6</div>';
