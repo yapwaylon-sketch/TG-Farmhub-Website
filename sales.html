@@ -107,8 +107,9 @@
       <div class="page-title">Customers</div>
       <div class="page-subtitle">Customer profiles and history</div>
     </div>
+    <div class="header-actions" id="customers-header-actions"></div>
   </div>
-  <div class="page-body"></div>
+  <div class="page-body" id="customers-body"></div>
 </div>
 
 <!-- PAGE: PRODUCTS -->
@@ -220,6 +221,69 @@
   </div>
 </div>
 
+<!-- CUSTOMER MODAL -->
+<div id="sc-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('sc-modal')">
+  <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="sc-modal-title">Add Customer</div>
+      <button class="modal-close" onclick="closeModal('sc-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="sc-edit-id" value="">
+    <div class="form-field">
+      <label>PHONE</label>
+      <input type="tel" id="sc-phone" placeholder="e.g., 012-3456789" style="width:100%;" onblur="scCheckPhone()">
+      <div id="sc-dup-warning" class="duplicate-warning" style="display:none;color:#E8A020;font-size:12px;margin-top:4px;padding:6px 8px;background:rgba(232,160,32,0.1);border-radius:6px;"></div>
+    </div>
+    <div class="form-field">
+      <label>NAME</label>
+      <input type="text" id="sc-name" placeholder="Customer or company name" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>CONTACT PERSON</label>
+      <input type="text" id="sc-contact-person" placeholder="Contact person name (optional)" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>ADDRESS</label>
+      <textarea id="sc-address" rows="2" placeholder="Delivery address (optional)" style="width:100%;"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>TYPE</label>
+        <select id="sc-type" style="width:100%;">
+          <option value="wholesale">Wholesale</option>
+          <option value="retail">Retail</option>
+          <option value="walkin">Walk-in</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>CHANNEL</label>
+        <select id="sc-channel" style="width:100%;">
+          <option value="whatsapp_delivery">WhatsApp (Delivery)</option>
+          <option value="whatsapp_collect">WhatsApp (Collect)</option>
+          <option value="walkin">Walk-in</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-field">
+      <label>PAYMENT TERMS</label>
+      <select id="sc-payment-terms" style="width:100%;">
+        <option value="cash">Cash</option>
+        <option value="credit">Credit</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>NOTES</label>
+      <textarea id="sc-notes" rows="2" placeholder="Optional notes" style="width:100%;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('sc-modal')">Cancel</button>
+      <button class="btn btn-primary" id="sc-save-btn" onclick="scSaveCustomer()">Add Customer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // CONFIG
 var currentUser = null;
@@ -317,8 +381,215 @@ function renderDashboard() {
 function renderOrders() {
   document.getElementById('page-orders').querySelector('.page-body').innerHTML = '<div class="empty-state">Orders — Phase 2</div>';
 }
+var scSearchTerm = '';
+var scFilterType = '';
+var scFilterPayment = '';
+
 function renderCustomers() {
-  document.getElementById('page-customers').querySelector('.page-body').innerHTML = '<div class="empty-state">Loading...</div>';
+  // Header actions
+  document.getElementById('customers-header-actions').innerHTML =
+    '<button class="btn btn-primary" onclick="scOpenModal()">+ Add Customer</button>';
+
+  var body = document.getElementById('customers-body');
+
+  // Search + filters
+  var filterHtml = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
+  filterHtml += '<input type="text" placeholder="Search name or phone..." value="' + esc(scSearchTerm) + '" oninput="scSearchTerm=this.value;renderCustomerCards()" style="flex:1;min-width:180px;">';
+  filterHtml += '<select onchange="scFilterType=this.value;renderCustomerCards()" style="min-width:120px;">';
+  filterHtml += '<option value=""' + (scFilterType === '' ? ' selected' : '') + '>All Types</option>';
+  filterHtml += '<option value="wholesale"' + (scFilterType === 'wholesale' ? ' selected' : '') + '>Wholesale</option>';
+  filterHtml += '<option value="retail"' + (scFilterType === 'retail' ? ' selected' : '') + '>Retail</option>';
+  filterHtml += '<option value="walkin"' + (scFilterType === 'walkin' ? ' selected' : '') + '>Walk-in</option>';
+  filterHtml += '</select>';
+  filterHtml += '<select onchange="scFilterPayment=this.value;renderCustomerCards()" style="min-width:130px;">';
+  filterHtml += '<option value=""' + (scFilterPayment === '' ? ' selected' : '') + '>All Payment</option>';
+  filterHtml += '<option value="credit"' + (scFilterPayment === 'credit' ? ' selected' : '') + '>Credit</option>';
+  filterHtml += '<option value="cash"' + (scFilterPayment === 'cash' ? ' selected' : '') + '>Cash</option>';
+  filterHtml += '</select>';
+  filterHtml += '</div>';
+  filterHtml += '<div id="sc-cards-container"></div>';
+
+  body.innerHTML = filterHtml;
+  renderCustomerCards();
+}
+
+function renderCustomerCards() {
+  var container = document.getElementById('sc-cards-container');
+  if (!container) return;
+
+  var filtered = customers.filter(function(c) {
+    if (scFilterType && c.type !== scFilterType) return false;
+    if (scFilterPayment && c.payment_terms !== scFilterPayment) return false;
+    if (scSearchTerm) {
+      var term = scSearchTerm.toLowerCase();
+      var nameMatch = (c.name || '').toLowerCase().indexOf(term) >= 0;
+      var phoneMatch = (c.phone || '').toLowerCase().indexOf(term) >= 0;
+      if (!nameMatch && !phoneMatch) return false;
+    }
+    return true;
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">' + (customers.length ? 'No customers match your filters.' : 'No customers yet. Click "+ Add Customer" to add your first customer.') + '</div>';
+    return;
+  }
+
+  var html = '<div class="sales-cards-grid">';
+  filtered.forEach(function(c) {
+    var dimStyle = c.is_active === false ? ' style="opacity:0.5;"' : '';
+    html += '<div class="sales-card"' + dimStyle + ' onclick="scOpenDetail(\'' + c.id + '\')">';
+    html += '<div class="sales-card-header">';
+    html += '<div class="sales-card-title">' + esc(c.name) + '</div>';
+    html += '<span class="badge badge-' + (c.payment_terms === 'credit' ? 'do' : 'cs') + '">' + (c.payment_terms === 'credit' ? 'Credit' : 'Cash') + '</span>';
+    html += '</div>';
+    html += '<div class="sales-card-meta">';
+    html += '<span>' + esc(c.phone || 'No phone') + '</span>';
+    html += '<span>' + scTypeLabel(c.type) + '</span>';
+    if (c.address) html += '<span>' + esc(c.address).substring(0, 40) + (c.address.length > 40 ? '...' : '') + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;margin-top:8px;" onclick="event.stopPropagation()">';
+    html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
+    html += '<button class="btn btn-outline btn-sm" onclick="scToggleActive(\'' + c.id + '\')">' + (c.is_active === false ? 'Activate' : 'Deactivate') + '</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function scTypeLabel(type) {
+  var labels = { wholesale: 'Wholesale', retail: 'Retail', walkin: 'Walk-in' };
+  return labels[type] || type || '\u2014';
+}
+
+function scOpenModal(editId) {
+  var modal = document.getElementById('sc-modal');
+  var title = document.getElementById('sc-modal-title');
+  var saveBtn = document.getElementById('sc-save-btn');
+  document.getElementById('sc-edit-id').value = editId || '';
+  document.getElementById('sc-dup-warning').style.display = 'none';
+
+  if (editId) {
+    title.textContent = 'Edit Customer';
+    saveBtn.textContent = 'Save Changes';
+    var c = customers.find(function(x) { return x.id === editId; });
+    if (c) {
+      document.getElementById('sc-phone').value = c.phone || '';
+      document.getElementById('sc-name').value = c.name || '';
+      document.getElementById('sc-contact-person').value = c.contact_person || '';
+      document.getElementById('sc-address').value = c.address || '';
+      document.getElementById('sc-type').value = c.type || 'wholesale';
+      document.getElementById('sc-channel').value = c.channel || 'whatsapp_delivery';
+      document.getElementById('sc-payment-terms').value = c.payment_terms || 'cash';
+      document.getElementById('sc-notes').value = c.notes || '';
+    }
+  } else {
+    title.textContent = 'Add Customer';
+    saveBtn.textContent = 'Add Customer';
+    document.getElementById('sc-phone').value = '';
+    document.getElementById('sc-name').value = '';
+    document.getElementById('sc-contact-person').value = '';
+    document.getElementById('sc-address').value = '';
+    document.getElementById('sc-type').value = 'wholesale';
+    document.getElementById('sc-channel').value = 'whatsapp_delivery';
+    document.getElementById('sc-payment-terms').value = 'cash';
+    document.getElementById('sc-notes').value = '';
+  }
+
+  modal.style.display = 'flex';
+  trapFocus(modal.querySelector('.modal-box'));
+}
+
+function scCheckPhone() {
+  var phone = document.getElementById('sc-phone').value.trim();
+  var editId = document.getElementById('sc-edit-id').value;
+  var warning = document.getElementById('sc-dup-warning');
+  if (!phone) { warning.style.display = 'none'; return; }
+  var match = customers.find(function(c) { return c.phone === phone && c.id !== editId; });
+  if (match) {
+    warning.style.display = 'block';
+    warning.textContent = 'Customer "' + match.name + '" already has this phone number.';
+  } else {
+    warning.style.display = 'none';
+  }
+}
+
+async function scSaveCustomer() {
+  var editId = document.getElementById('sc-edit-id').value;
+  var name = document.getElementById('sc-name').value.trim();
+  var phone = document.getElementById('sc-phone').value.trim();
+  var contactPerson = document.getElementById('sc-contact-person').value.trim();
+  var address = document.getElementById('sc-address').value.trim();
+  var type = document.getElementById('sc-type').value;
+  var channel = document.getElementById('sc-channel').value;
+  var paymentTerms = document.getElementById('sc-payment-terms').value;
+  var notes = document.getElementById('sc-notes').value.trim();
+
+  if (!name) { notify('Customer name is required', 'warning'); return; }
+
+  // Check phone uniqueness (skip if editing same customer)
+  if (phone) {
+    var dup = customers.find(function(c) { return c.phone === phone && c.id !== editId; });
+    if (dup) { notify('Phone number already belongs to "' + dup.name + '"', 'warning'); return; }
+  }
+
+  var btn = document.getElementById('sc-save-btn');
+  btnLoading(btn, true);
+
+  var data = {
+    name: name, phone: phone || null, contact_person: contactPerson || null,
+    address: address || null, type: type, channel: channel,
+    payment_terms: paymentTerms, notes: notes || null
+  };
+
+  if (editId) {
+    var result = await sbQuery(sb.from('sales_customers').update(data).eq('id', editId).select());
+    if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
+    var idx = customers.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) Object.assign(customers[idx], data);
+    notify('Customer updated');
+  } else {
+    var newId = await dbNextId('SC');
+    data.id = newId;
+    data.is_active = true;
+    var result = await sbQuery(sb.from('sales_customers').insert(data).select());
+    if (result === null) { btnLoading(btn, false, 'Add Customer'); return; }
+    customers.push(result[0] || data);
+    // Re-sort customers array by name
+    customers.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    notify('Customer added');
+  }
+
+  btnLoading(btn, false, editId ? 'Save Changes' : 'Add Customer');
+  closeModal('sc-modal');
+  renderCustomerCards();
+}
+
+function scToggleActive(id) {
+  var c = customers.find(function(x) { return x.id === id; });
+  if (!c) return;
+
+  if (c.is_active !== false) {
+    confirmAction('Deactivate Customer?', 'Deactivate "' + c.name + '"? They will be dimmed and hidden from order forms.', async function() {
+      var result = await sbQuery(sb.from('sales_customers').update({ is_active: false }).eq('id', id).select());
+      if (result === null) return;
+      c.is_active = false;
+      notify(c.name + ' deactivated');
+      renderCustomerCards();
+    });
+  } else {
+    (async function() {
+      var result = await sbQuery(sb.from('sales_customers').update({ is_active: true }).eq('id', id).select());
+      if (result === null) return;
+      c.is_active = true;
+      notify(c.name + ' activated');
+      renderCustomerCards();
+    })();
+  }
+}
+
+function scOpenDetail(id) {
+  notify('Customer detail view coming soon', 'info');
 }
 function renderProducts() {
   // Header actions

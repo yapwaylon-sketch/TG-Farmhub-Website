@@ -6,6 +6,15 @@
 /* ============================================================
    SALES CARDS
    ============================================================ */
+.sales-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.sales-cards-grid .sales-card {
+  margin-bottom: 0;
+}
+
 .sales-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
