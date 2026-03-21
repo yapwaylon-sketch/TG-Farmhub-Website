@@ -598,7 +598,7 @@ function renderDashboard() {
   html += '<div class="sc-sub">' + today + '</div>';
   html += '</div>';
 
-  html += '<div class="summary-card"' + (pendingPrep > 0 ? ' style="border-color:var(--red);"' : '') + '>';
+  html += '<div class="summary-card" style="cursor:pointer;' + (pendingPrep > 0 ? 'border-color:var(--red);' : '') + '" onclick="soFilterStatus=\'pending\';switchTab(\'orders\')">';
   html += '<div class="sc-label">Pending Prep</div>';
   html += '<div class="sc-value"' + (pendingPrep > 0 ? ' style="color:var(--red);"' : '') + '>' + pendingPrep + '</div>';
   html += '<div class="sc-sub">Pending + Preparing</div>';
@@ -610,7 +610,7 @@ function renderDashboard() {
   html += '<div class="sc-sub">Prepared for pickup/delivery</div>';
   html += '</div>';
 
-  html += '<div class="summary-card" style="border-color:var(--gold);">';
+  html += '<div class="summary-card" style="cursor:pointer;border-color:var(--gold);" onclick="switchTab(\'payments\')">';
   html += '<div class="sc-label">Outstanding</div>';
   html += '<div class="sc-value" style="color:var(--gold);">RM ' + outstandingTotal.toFixed(2) + '</div>';
   html += '<div class="sc-sub">Unpaid / partial</div>';
@@ -671,7 +671,7 @@ function renderDashboard() {
       var itemCount = items.length;
       var total = parseFloat(o.grand_total) || 0;
 
-      html += '<div class="sales-card">';
+      html += '<div class="sales-card" style="cursor:pointer;" onclick="switchTab(\'orders\'); soOpenDetail(\'' + esc(o.id) + '\')">';
       html += '<div class="sales-card-header">';
       html += '<div class="sales-card-title">' + esc(getCustomerName(o.customer_id)) + '</div>';
       html += '<div style="display:flex;gap:4px;">';
