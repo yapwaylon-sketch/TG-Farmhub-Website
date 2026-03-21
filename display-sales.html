@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<title>PND Sales — Packing Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CSS Variables & Reset
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #1A1F1A;
+  --bg-subtle: #1E241E;
+  --surface: #252B25;
+  --surface-2: #2E352E;
+  --border: rgba(70, 80, 70, 0.5);
+  --border-light: rgba(90, 100, 90, 0.6);
+  --text: #fafafa;
+  --text-dim: #b0b8b0;
+  --text-muted: #707870;
+  --green: #6B9E5E;
+  --gold: #E8A020;
+  --red: #E86060;
+  --blue: #6495ED;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font: 'IBM Plex Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  background-image: linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.5;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Loading Overlay
+   ═══════════════════════════════════════════════════════════════ */
+#loadingOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+#loadingOverlay.done { opacity: 0; filter: blur(8px); pointer-events: none; }
+.loader-ring {
+  width: 44px; height: 44px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text {
+  margin-top: 20px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Auth Error
+   ═══════════════════════════════════════════════════════════════ */
+#authError {
+  display: none;
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg);
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--red);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+#authError .sub {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 8px;
+  font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Layout
+   ═══════════════════════════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Header */
+.header-row {
+  padding: 10px 16px 0;
+  flex-shrink: 0;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.header-logo { height: 56px; }
+.header-text { flex: 1; }
+.header-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.header-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  margin-top: 4px;
+}
+
+/* Live indicator */
+.live-dot {
+  width: 10px; height: 10px;
+  background: #4ade80;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-live 2s ease-in-out infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
+  50% { opacity: 0.6; box-shadow: 0 0 8px 4px rgba(74, 222, 128, 0.2); }
+}
+.live-label {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: #4ade80;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Content area */
+.content-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 12px 20px;
+}
+
+/* Page (fades in/out) */
+.sales-page {
+  position: absolute;
+  inset: 0;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  overflow: hidden;
+}
+.sales-page.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Status Group Headers
+   ═══════════════════════════════════════════════════════════════ */
+.status-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+.status-group-header:first-child { margin-top: 0; }
+.status-group-header .emoji { font-size: 1.1rem; }
+.status-group-header .count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0.8;
+  font-family: var(--mono);
+}
+
+.sg-pending { background: var(--red); }
+.sg-preparing { background: var(--gold); color: #1a1a1a; }
+.sg-preparing .count { color: #1a1a1a; }
+.sg-prepared { background: var(--green); }
+.sg-out-delivery { background: var(--blue); }
+.sg-awaiting-collection { background: var(--blue); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Order Cards
+   ═══════════════════════════════════════════════════════════════ */
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.order-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  border-left: 4px solid var(--border);
+  transition: background 0.2s;
+}
+.order-card.border-pending { border-left-color: var(--red); }
+.order-card.border-preparing { border-left-color: var(--gold); }
+.order-card.border-prepared { border-left-color: var(--green); }
+.order-card.border-out-delivery { border-left-color: var(--blue); }
+.order-card.border-awaiting-collection { border-left-color: var(--blue); }
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.order-customer {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+.order-datetime {
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  white-space: nowrap;
+  text-align: right;
+}
+.order-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+}
+.order-items li {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  padding: 2px 0;
+  line-height: 1.4;
+}
+.order-items li::before {
+  content: "\2022 ";
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.item-qty {
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--mono);
+}
+.order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fulfillment-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+}
+.order-notes {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+  max-width: 60%;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Footer Bar
+   ═══════════════════════════════════════════════════════════════ */
+.footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 0;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+
+/* Page dots */
+.page-dots {
+  display: flex;
+  gap: 8px;
+}
+.page-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+.page-dot:hover { background: var(--border-light); transform: scale(1.2); }
+.page-dot.active { background: var(--green); border-color: var(--green); transform: scale(1.3); }
+
+/* Fullscreen toggle */
+.fs-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 6px 10px;
+  line-height: 1;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.fs-btn:hover { background: var(--border-light); color: var(--text); }
+.fs-btn svg { width: 18px; height: 18px; display: block; }
+
+/* No data */
+.no-data {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4K TV Optimization
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 2560px) {
+  html { font-size: 18px; }
+  .header-logo { height: 72px; }
+  .header-title { font-size: 1.4rem; }
+  .orders-grid { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
+  .order-customer { font-size: 1.3rem; }
+  .order-items li { font-size: 0.95rem; }
+  .status-group-header { font-size: 1.15rem; padding: 10px 20px; }
+}
+@media (min-width: 3200px) {
+  html { font-size: 20px; }
+}
+@media (min-width: 3840px) {
+  html { font-size: 22px; }
+  .header-logo { height: 84px; }
+  .header-title { font-size: 1.5rem; }
+  .orders-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .order-customer { font-size: 1.4rem; }
+  .order-items li { font-size: 1.05rem; }
+  .status-group-header { font-size: 1.3rem; padding: 12px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Auth Error -->
+<div id="authError">
+  <div>Access Denied</div>
+  <div class="sub">Invalid or missing token. Use ?token=pnd2026</div>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loadStatus">Connecting to sales data...</div>
+</div>
+
+<!-- App -->
+<div class="app" id="appContainer" style="display:none;">
+  <!-- Header -->
+  <div class="header-row">
+    <header class="app-header">
+      <img src="https://tgfarmhub.com/assets/logo.png" alt="TG Agro Fruits" class="header-logo">
+      <div class="header-text">
+        <div class="header-title">
+          <span>PND Sales — Packing Station</span>
+          <span class="live-dot"></span>
+          <span class="live-label">Live</span>
+        </div>
+        <div class="header-meta">
+          <span id="clockDisplay"></span>
+          <span id="lastUpdate"></span>
+        </div>
+      </div>
+      <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">
+        <svg id="fsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path id="fsExpand" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+          <path id="fsShrink" d="M4 14h3a2 2 0 012 2v3m6-9h3a2 2 0 002-2V5m-9 0v3a2 2 0 01-2 2H4m16 4v3a2 2 0 01-2 2h-3" style="display:none"/>
+        </svg>
+      </button>
+    </header>
+  </div>
+
+  <!-- Content -->
+  <div class="content-area" id="contentArea"></div>
+
+  <!-- Footer -->
+  <div class="footer-bar">
+    <span id="refreshInfo">Auto-refresh: 60s</span>
+    <div class="page-dots" id="pageDots"></div>
+    <span id="pageInfo"></span>
+    <span id="dataTime"></span>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// AUTH CHECK
+// ═══════════════════════════════════════════════════════════════
+const VALID_TOKEN = "pnd2026";
+const params = new URLSearchParams(window.location.search);
+const token = params.get("token");
+
+if (token !== VALID_TOKEN) {
+  document.getElementById("authError").style.display = "flex";
+  document.getElementById("loadingOverlay").style.display = "none";
+  throw new Error("Invalid token");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
+const HEADERS = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+
+async function sbGet(table, select, params) {
+  let url = SUPABASE_URL + "/rest/v1/" + table + "?select=" + encodeURIComponent(select);
+  if (params) url += "&" + params;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error("Failed to load " + table);
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let orders = [];
+let orderItems = [];
+let customers = {};
+let products = {};
+let varieties = {};
+
+let pages = [];
+let currentPage = 0;
+let rotateTimer = null;
+let paused = false;
+
+const STATUS_CONFIG = [
+  { key: "pending",              label: "PENDING",              emoji: "\u23F3", cssClass: "sg-pending",              borderClass: "border-pending" },
+  { key: "preparing",           label: "PREPARING",            emoji: "\uD83D\uDD04", cssClass: "sg-preparing",            borderClass: "border-preparing" },
+  { key: "prepared",            label: "PREPARED",             emoji: "\u2705", cssClass: "sg-prepared",             borderClass: "border-prepared" },
+  { key: "out_for_delivery",    label: "OUT FOR DELIVERY",     emoji: "\uD83D\uDE9A", cssClass: "sg-out-delivery",         borderClass: "border-out-delivery" },
+  { key: "awaiting_collection", label: "AWAITING COLLECTION",  emoji: "\uD83C\uDFEA", cssClass: "sg-awaiting-collection",  borderClass: "border-awaiting-collection" }
+];
+
+// ═══════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════
+function getTodayAndTomorrow() {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return { today: fmt(today), tomorrow: fmt(tomorrow) };
+}
+
+async function loadData() {
+  const { today, tomorrow } = getTodayAndTomorrow();
+
+  const [ordersData, itemsData, customersData, productsData, varietiesData] = await Promise.all([
+    sbGet("sales_orders", "*", "delivery_date=gte." + today + "&delivery_date=lte." + tomorrow + "&order=delivery_date,delivery_time"),
+    sbGet("sales_order_items", "*"),
+    sbGet("sales_customers", "id,name"),
+    sbGet("sales_products", "id,name,variety_id"),
+    sbGet("crop_varieties", "id,name")
+  ]);
+
+  orders = ordersData || [];
+  orderItems = itemsData || [];
+
+  // Build lookup maps
+  customers = {};
+  (customersData || []).forEach(c => { customers[c.id] = c.name; });
+
+  products = {};
+  (productsData || []).forEach(p => { products[p.id] = p; });
+
+  varieties = {};
+  (varietiesData || []).forEach(v => { varieties[v.id] = v.name; });
+
+  // Filter order items to only include items for loaded orders
+  const orderIds = new Set(orders.map(o => o.id));
+  orderItems = orderItems.filter(item => orderIds.has(item.order_id));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  if (s == null) return "";
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatDeliveryDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T00:00:00");
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const isToday = d.toDateString() === today.toDateString();
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+  if (isToday) return "Today";
+  if (isTomorrow) return "Tomorrow";
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mmm = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  return dd + ' ' + mmm;
+}
+
+function formatTime(timeStr) {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  let h = parseInt(parts[0]);
+  const m = parts[1] || "00";
+  const ampm = h >= 12 ? "PM" : "AM";
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  return h + ":" + m + " " + ampm;
+}
+
+function getItemDisplay(item) {
+  const prod = products[item.product_id];
+  const prodName = prod ? prod.name : "Unknown";
+  const varietyName = prod && prod.variety_id ? varieties[prod.variety_id] : null;
+
+  let parts = [];
+  if (varietyName) parts.push(varietyName);
+
+  // Product name (may include index range info)
+  parts.push(prodName);
+
+  // Index range
+  if (item.index_min != null && item.index_max != null) {
+    parts.push("(" + item.index_min + "-" + item.index_max + ")");
+  }
+
+  const label = parts.join(" ");
+  const qty = item.quantity != null ? item.quantity : 0;
+  const unit = item.unit || "kg";
+
+  return { label, qty, unit };
+}
+
+function getFulfillmentBadge(order) {
+  const type = (order.fulfillment_type || "delivery").toLowerCase();
+  if (type === "collection" || type === "pickup") {
+    return '<span class="fulfillment-badge">\uD83C\uDFEA Collection</span>';
+  }
+  return '<span class="fulfillment-badge">\uD83D\uDCE6 Delivery</span>';
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  const isFs = !!document.fullscreenElement;
+  document.getElementById('fsExpand').style.display = isFs ? 'none' : '';
+  document.getElementById('fsShrink').style.display = isFs ? '' : 'none';
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD PAGES
+// ═══════════════════════════════════════════════════════════════
+function buildPages() {
+  // Group orders by status
+  const grouped = {};
+  STATUS_CONFIG.forEach(s => { grouped[s.key] = []; });
+
+  orders.forEach(order => {
+    const status = (order.status || "pending").toLowerCase().replace(/\s+/g, '_');
+    if (!grouped[status]) grouped[status] = [];
+
+    // Attach items to order
+    const items = orderItems.filter(i => i.order_id === order.id);
+    grouped[status].push({ ...order, items });
+  });
+
+  // Build content blocks: array of { type: 'header'|'cards', ... }
+  const blocks = [];
+  STATUS_CONFIG.forEach(sc => {
+    const grp = grouped[sc.key];
+    if (!grp || grp.length === 0) return;
+    blocks.push({ type: 'header', config: sc, count: grp.length });
+    blocks.push({ type: 'cards', config: sc, orders: grp });
+  });
+
+  if (blocks.length === 0) {
+    pages = [];
+    return;
+  }
+
+  // Estimate how many cards fit per page
+  const maxCards = calcMaxCards();
+
+  // Flatten into pages
+  pages = [];
+  let currentPageBlocks = [];
+  let currentCardCount = 0;
+
+  blocks.forEach(block => {
+    if (block.type === 'header') {
+      currentPageBlocks.push(block);
+    } else if (block.type === 'cards') {
+      const ordersList = block.orders;
+      let idx = 0;
+
+      while (idx < ordersList.length) {
+        const remaining = maxCards - currentCardCount;
+        if (remaining <= 0) {
+          // Start new page
+          pages.push({ blocks: currentPageBlocks });
+          currentPageBlocks = [{ type: 'header', config: block.config, count: ordersList.length, continued: true }];
+          currentCardCount = 0;
+        }
+
+        const take = Math.min(ordersList.length - idx, maxCards - currentCardCount);
+        if (take <= 0) {
+          pages.push({ blocks: currentPageBlocks });
+          currentPageBlocks = [{ type: 'header', config: block.config, count: ordersList.length, continued: true }];
+          currentCardCount = 0;
+          continue;
+        }
+
+        const slice = ordersList.slice(idx, idx + take);
+        currentPageBlocks.push({ type: 'cards', config: block.config, orders: slice });
+        currentCardCount += slice.length;
+        idx += take;
+      }
+    }
+  });
+
+  if (currentPageBlocks.length > 0) {
+    pages.push({ blocks: currentPageBlocks });
+  }
+}
+
+function calcMaxCards() {
+  // Estimate based on viewport height
+  const headerH = 90;
+  const footerH = 40;
+  const available = window.innerHeight - headerH - footerH - 40;
+  // Each card ~110px, header ~45px, assume ~2 status groups visible
+  const cardH = 110;
+  const statusHeaderH = 45;
+  const estimatedHeaders = 2;
+  const usable = available - (estimatedHeaders * statusHeaderH);
+  return Math.max(3, Math.floor(usable / cardH));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderPages() {
+  const container = document.getElementById("contentArea");
+  const dotsEl = document.getElementById("pageDots");
+
+  if (pages.length === 0) {
+    container.innerHTML = '<div class="no-data">No orders for today or tomorrow</div>';
+    dotsEl.innerHTML = '';
+    document.getElementById("pageInfo").textContent = '';
+    return;
+  }
+
+  container.innerHTML = pages.map((pg, i) => {
+    let html = '<div class="sales-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">';
+
+    pg.blocks.forEach(block => {
+      if (block.type === 'header') {
+        const contLabel = block.continued ? ' (cont.)' : '';
+        html += '<div class="status-group-header ' + block.config.cssClass + '">' +
+          '<span class="emoji">' + block.config.emoji + '</span>' +
+          '<span>' + block.config.label + contLabel + '</span>' +
+          '<span class="count">(' + block.count + ')</span>' +
+        '</div>';
+      } else if (block.type === 'cards') {
+        html += '<div class="orders-grid">';
+        block.orders.forEach(order => {
+          const custName = customers[order.customer_id] || "Unknown Customer";
+          const dateFmt = formatDeliveryDate(order.delivery_date);
+          const timeFmt = order.delivery_time ? formatTime(order.delivery_time) : "";
+          const dateTimeStr = dateFmt + (timeFmt ? " " + timeFmt : "");
+
+          html += '<div class="order-card ' + block.config.borderClass + '">';
+          html += '<div class="order-header">';
+          html += '<div class="order-customer">' + esc(custName) + '</div>';
+          html += '<div class="order-datetime">' + esc(dateTimeStr) + '</div>';
+          html += '</div>';
+
+          // Items
+          if (order.items && order.items.length > 0) {
+            html += '<ul class="order-items">';
+            order.items.forEach(item => {
+              const display = getItemDisplay(item);
+              html += '<li>' + esc(display.label) + ' — <span class="item-qty">' + display.qty + ' ' + esc(display.unit) + '</span></li>';
+            });
+            html += '</ul>';
+          }
+
+          // Footer: fulfillment badge + notes
+          html += '<div class="order-footer">';
+          html += getFulfillmentBadge(order);
+          if (order.notes) {
+            html += '<div class="order-notes" title="' + esc(order.notes) + '">' + esc(order.notes) + '</div>';
+          }
+          html += '</div>';
+          html += '</div>'; // .order-card
+        });
+        html += '</div>'; // .orders-grid
+      }
+    });
+
+    html += '</div>'; // .sales-page
+    return html;
+  }).join('');
+
+  // Page dots
+  if (pages.length > 1) {
+    dotsEl.innerHTML = pages.map((_, i) =>
+      '<div class="page-dot' + (i === currentPage ? ' active' : '') + '" data-page="' + i + '"></div>'
+    ).join('');
+    dotsEl.querySelectorAll('.page-dot').forEach(dot => {
+      dot.addEventListener('click', function() {
+        const idx = parseInt(this.getAttribute('data-page'));
+        if (idx === currentPage) return;
+        showPage(idx);
+        scheduleNextPage();
+      });
+    });
+    document.getElementById("pageInfo").textContent = "Page " + (currentPage + 1) + "/" + pages.length;
+  } else {
+    dotsEl.innerHTML = '';
+    document.getElementById("pageInfo").textContent = '';
+  }
+}
+
+function showPage(idx) {
+  const cur = document.getElementById("page-" + currentPage);
+  if (cur) cur.classList.remove("active");
+
+  currentPage = idx % pages.length;
+
+  setTimeout(() => {
+    const next = document.getElementById("page-" + currentPage);
+    if (next) next.classList.add("active");
+
+    document.querySelectorAll(".page-dot").forEach((d, i) => {
+      d.classList.toggle("active", i === currentPage);
+    });
+
+    if (pages.length > 1) {
+      document.getElementById("pageInfo").textContent = "Page " + (currentPage + 1) + "/" + pages.length;
+    }
+  }, 50);
+}
+
+function nextPage() {
+  if (pages.length <= 1) return;
+  showPage(currentPage + 1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE ROTATION
+// ═══════════════════════════════════════════════════════════════
+function scheduleNextPage() {
+  if (rotateTimer) clearTimeout(rotateTimer);
+  if (paused) return;
+  if (pages.length > 1) {
+    rotateTimer = setTimeout(() => { nextPage(); scheduleNextPage(); }, 15000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const opts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+  document.getElementById("clockDisplay").textContent = now.toLocaleDateString('en-GB', opts);
+}
+
+function updateLastRefresh() {
+  const now = new Date();
+  const hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  document.getElementById("dataTime").textContent = "Data: " + hm;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT & REFRESH
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    document.getElementById("loadStatus").textContent = "Loading sales data...";
+    await loadData();
+    buildPages();
+    currentPage = 0;
+    renderPages();
+    updateLastRefresh();
+
+    // Show app, hide loading
+    document.getElementById("appContainer").style.display = "flex";
+    document.getElementById("loadingOverlay").classList.add("done");
+
+    // Start clock
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Start page rotation
+    scheduleNextPage();
+
+    // Data refresh every 60 seconds
+    setInterval(refreshData, 60000);
+
+    // Recalculate on resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const prevPage = currentPage;
+        buildPages();
+        currentPage = Math.min(prevPage, Math.max(0, pages.length - 1));
+        renderPages();
+        scheduleNextPage();
+      }, 300);
+    });
+
+  } catch (e) {
+    console.error("Init error:", e);
+    document.getElementById("loadStatus").textContent = "Error loading data. Retrying in 10s...";
+    setTimeout(init, 10000);
+  }
+}
+
+async function refreshData() {
+  try {
+    await loadData();
+    const prevPage = currentPage;
+    buildPages();
+    currentPage = Math.min(prevPage, Math.max(0, pages.length - 1));
+    renderPages();
+    updateLastRefresh();
+    scheduleNextPage();
+  } catch (e) {
+    console.error("Refresh error:", e);
+  }
+}
+
+// Go
+init();
+</script>
+</body>
+</html>
