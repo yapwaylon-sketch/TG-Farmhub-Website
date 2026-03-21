@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<title>Deliveries — TG FarmHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="shared.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   Delivery Page — Mobile-First
+   ═══════════════════════════════════════════════════════════════ */
+body { overflow: auto; height: auto; min-height: 100vh; }
+
+/* Login */
+#login-screen {
+  display: flex; justify-content: center; align-items: center;
+  height: 100vh; width: 100vw; background: var(--bg);
+  position: fixed; inset: 0; z-index: 100;
+}
+.login-box {
+  width: 90%; max-width: 340px; text-align: center;
+  background: var(--bg-card); padding: 32px 24px; border-radius: 16px;
+  border: 1px solid var(--border);
+}
+.login-box h2 { font-size: 22px; font-weight: 800; color: var(--white); margin-bottom: 4px; }
+.login-box .login-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+.login-box input {
+  width: 100%; padding: 12px 14px; margin-bottom: 12px;
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--white); font-size: 15px; font-family: inherit;
+}
+.login-box input::placeholder { color: var(--text-dim); }
+.login-box input:focus { outline: none; border-color: var(--green); }
+.login-box .btn-login {
+  width: 100%; padding: 12px; font-size: 15px; font-weight: 700;
+  background: var(--green); color: #fff; border: none; border-radius: 10px;
+  cursor: pointer; font-family: inherit; min-height: 48px;
+}
+.login-box .btn-login:active { opacity: 0.85; }
+
+/* Main app */
+#app-main { display: none; }
+
+/* Header bar */
+.delivery-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 50;
+}
+.delivery-header h1 { flex: 1; font-size: 18px; font-weight: 800; color: var(--white); margin: 0; }
+.hdr-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.hdr-btn:active { background: var(--border); }
+.hdr-btn svg { width: 18px; height: 18px; }
+
+/* Content area */
+.delivery-content { padding: 12px 12px 80px; }
+
+/* Delivery card */
+.delivery-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-left: 4px solid var(--green); border-radius: 12px;
+  padding: 16px; margin-bottom: 12px;
+}
+.dc-customer { font-size: 18px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+.dc-meta { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.dc-meta a {
+  font-size: 13px; color: var(--green-light); text-decoration: none;
+  display: flex; align-items: center; gap: 6px;
+}
+.dc-meta a:active { opacity: 0.7; }
+.dc-meta a svg { width: 14px; height: 14px; flex-shrink: 0; }
+.dc-items { list-style: none; padding: 0; margin: 0 0 10px; }
+.dc-items li {
+  font-size: 14px; color: var(--text); padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.dc-items li:last-child { border-bottom: none; }
+.dc-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.dc-total { font-size: 16px; font-weight: 700; color: var(--gold); }
+.dc-badge {
+  font-size: 11px; font-weight: 700; padding: 3px 10px;
+  border-radius: 6px; background: var(--green-pale); color: var(--green-light);
+}
+.dc-badge.badge-do { background: rgba(100,149,237,0.15); color: #6495ED; }
+.dc-badge.badge-cs { background: var(--gold-pale); color: var(--gold); }
+
+.btn-deliver {
+  width: 100%; padding: 14px; min-height: 52px;
+  font-size: 15px; font-weight: 700; font-family: inherit;
+  background: var(--green); color: #fff; border: none; border-radius: 10px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-deliver:active { opacity: 0.85; }
+.btn-deliver:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-muted);
+}
+.empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 16px; margin-bottom: 16px; }
+.btn-refresh-empty {
+  padding: 10px 24px; font-size: 14px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); cursor: pointer; font-family: inherit;
+}
+
+/* Completed section */
+.completed-toggle {
+  width: 100%; padding: 12px 16px; font-size: 14px; font-weight: 600;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-muted); cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px;
+}
+.completed-toggle:active { background: var(--bg-hover); }
+.completed-toggle .arrow { transition: transform 0.2s; }
+.completed-toggle.open .arrow { transform: rotate(180deg); }
+#completed-list { display: none; margin-top: 8px; }
+#completed-list .delivery-card { border-left-color: var(--text-dim); opacity: 0.7; }
+
+/* Document view */
+#doc-view {
+  display: none; position: fixed; inset: 0; z-index: 80;
+  background: var(--bg); overflow-y: auto;
+}
+#doc-view .doc-toolbar {
+  display: flex; gap: 8px; padding: 12px 16px;
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 81; flex-wrap: wrap;
+}
+#doc-view .doc-toolbar .btn-doc {
+  flex: 1; min-width: 80px; min-height: 44px; padding: 10px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  border: none; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-doc.btn-print { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+.btn-doc.btn-share { background: #25D366; color: #fff; }
+.btn-doc.btn-done { background: var(--green); color: #fff; }
+
+/* Document content (white, professional) */
+#doc-content {
+  background: #fff; color: #222; font-family: 'Arial','Helvetica Neue',sans-serif;
+  max-width: 500px; margin: 16px auto; padding: 28px 24px;
+  border-radius: 4px;
+}
+#doc-content table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+#doc-content th { background: #1a1a1a; color: #d4af37; padding: 7px 8px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+#doc-content th:last-child, #doc-content td:last-child { text-align: right; }
+#doc-content td { padding: 6px 8px; border-bottom: 1px solid #e0e0e0; font-size: 12px; vertical-align: top; }
+#doc-content .doc-header { text-align: center; margin-bottom: 16px; }
+#doc-content .doc-header h2 { font-size: 16px; margin: 0; color: #1a3a1a; font-weight: 800; letter-spacing: 1px; }
+#doc-content .doc-header p { font-size: 10px; color: #666; margin: 2px 0; }
+#doc-content .doc-title { text-align: center; font-size: 14px; font-weight: 700; margin: 14px 0 6px; border-top: 2px solid #d4af37; border-bottom: 2px solid #d4af37; padding: 8px 4px; color: #1a1a1a; }
+#doc-content .doc-doc-number { text-align: center; font-size: 16px; font-weight: 800; color: #1a3a1a; margin-bottom: 14px; }
+#doc-content .doc-info-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px dashed #ccc; }
+#doc-content .doc-info-label { color: #666; font-weight: 600; white-space: nowrap; }
+#doc-content .doc-info-value { color: #222; }
+#doc-content .doc-totals { text-align: right; margin-top: 6px; padding-top: 8px; border-top: 1px solid #ccc; }
+#doc-content .doc-totals div { font-size: 12px; margin-bottom: 3px; }
+#doc-content .doc-grand-total { font-size: 16px !important; font-weight: 800; color: #1a1a1a; margin-top: 4px !important; padding-top: 6px; border-top: 2px solid #1a1a1a; }
+#doc-content .doc-payment-section { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #ccc; font-size: 12px; }
+#doc-content .doc-sig-line { border-bottom: 1px solid #999; display: inline-block; width: 180px; margin-left: 8px; }
+#doc-content .doc-footer { text-align: center; font-size: 9px; color: #999; margin-top: 24px; padding-top: 10px; border-top: 1px solid #e0e0e0; }
+
+/* Print */
+@media print {
+  body * { visibility: hidden; }
+  #doc-content, #doc-content * { visibility: visible; }
+  #doc-content { position: absolute; left: 0; top: 0; margin: 0; padding: 20px; max-width: 100%; box-shadow: none; border-radius: 0; }
+  #doc-view .doc-toolbar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>&#127821; Deliveries</h2>
+    <div class="login-sub">Sign in to view pending deliveries</div>
+    <input type="text" id="login-username" placeholder="Username" autocomplete="off">
+    <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6" onkeydown="if(event.key==='Enter')doLogin();">
+    <button class="btn-login" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app-main">
+  <!-- Header -->
+  <div class="delivery-header">
+    <h1>&#127821; Deliveries</h1>
+    <button class="hdr-btn" onclick="refreshData()" title="Refresh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+      </svg>
+    </button>
+    <button class="hdr-btn" onclick="doLogout()" title="Logout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Delivery List -->
+  <div class="delivery-content">
+    <div id="delivery-list"></div>
+
+    <!-- Completed Today -->
+    <button class="completed-toggle" id="completed-toggle" onclick="toggleCompleted()" style="display:none;">
+      <span>Completed Today (<span id="completed-count">0</span>)</span>
+      <span class="arrow">&#9660;</span>
+    </button>
+    <div id="completed-list"></div>
+  </div>
+</div>
+
+<!-- Document View (full-screen overlay) -->
+<div id="doc-view">
+  <div class="doc-toolbar">
+    <button class="btn-doc btn-print" onclick="window.print()">&#128424; Print</button>
+    <button class="btn-doc btn-share" onclick="shareDoc()">&#128172; Share</button>
+    <button class="btn-doc btn-done" onclick="closeDoc()">Done</button>
+  </div>
+  <div id="doc-content"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+var currentUser = null;
+var users = [];
+var orders = [];
+var orderItems = [];
+var customers = [];
+var salesProducts = [];
+var varieties = [];
+var allWorkers = [];
+var refreshTimer = null;
+var docCurrentOrder = null;
+
+// ═══════════════════════════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════════════════════════
+async function loadUsers() {
+  var data = await sbQuery(sb.from('users').select('*'));
+  users = data || [];
+}
+
+function doLogin() {
+  if (!checkLoginRateLimit()) return;
+  var u = document.getElementById('login-username').value.trim().toLowerCase();
+  var p = document.getElementById('login-pin').value.trim();
+  if (!u || !p) { notify('Enter username and PIN', 'warning'); return; }
+
+  var user = users.find(function(x) { return x.username && x.username.toLowerCase() === u && x.pin === p; });
+  if (!user) {
+    recordFailedLogin();
+    notify('Invalid credentials', 'warning');
+    return;
+  }
+
+  clearLoginAttempts();
+  currentUser = user;
+  sessionStorage.setItem('tgfarmhub_delivery_user', JSON.stringify({ id: user.id, username: user.username, displayName: user.displayName || user.username }));
+  showApp();
+}
+
+function tryRestoreSession() {
+  try {
+    var s = JSON.parse(sessionStorage.getItem('tgfarmhub_delivery_user'));
+    if (s && s.id) {
+      var u = users.find(function(x) { return x.id === s.id; });
+      if (u) { currentUser = u; return true; }
+    }
+  } catch(e) {}
+  return false;
+}
+
+function doLogout() {
+  currentUser = null;
+  sessionStorage.removeItem('tgfarmhub_delivery_user');
+  if (refreshTimer) clearInterval(refreshTimer);
+  document.getElementById('app-main').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-main').style.display = 'block';
+  loadAllData();
+  // Auto-refresh every 30 seconds
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshData, 30000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+async function loadAllData() {
+  var results = await Promise.all([
+    sbQuery(sb.from('sales_orders').select('*').in('status', ['delivering', 'completed']).order('created_at', { ascending: false })),
+    sbQuery(sb.from('sales_order_items').select('*')),
+    sbQuery(sb.from('sales_customers').select('*')),
+    sbQuery(sb.from('sales_products').select('*')),
+    sbQuery(sb.from('crop_varieties').select('id,name')),
+    sbQuery(sb.from('workers').select('id,name'))
+  ]);
+
+  orders = results[0] || [];
+  orderItems = results[1] || [];
+  customers = results[2] || [];
+  salesProducts = results[3] || [];
+  varieties = results[4] || [];
+  allWorkers = results[5] || [];
+
+  renderDeliveries();
+}
+
+async function refreshData() {
+  await loadAllData();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function findCustomer(id) {
+  return customers.find(function(c) { return c.id === id; });
+}
+
+function findProduct(id) {
+  return salesProducts.find(function(p) { return p.id === id; });
+}
+
+function getVarietyName(varId) {
+  var v = varieties.find(function(x) { return x.id === varId; });
+  return v ? v.name : '';
+}
+
+function getDriverName(driverId) {
+  var w = allWorkers.find(function(x) { return x.id === driverId; });
+  return w ? w.name : '';
+}
+
+function getTodayStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function getItemDisplay(item) {
+  var prod = findProduct(item.product_id);
+  var prodName = prod ? prod.name : 'Unknown';
+  var varietyName = prod && prod.variety_id ? getVarietyName(prod.variety_id) : '';
+  var parts = [];
+  if (varietyName) parts.push(varietyName);
+  parts.push(prodName);
+  if (item.index_min != null && item.index_max != null) {
+    parts.push('(Index ' + item.index_min + '-' + item.index_max + ')');
+  }
+  var qty = item.quantity != null ? item.quantity : 0;
+  var unit = item.unit || 'kg';
+  return { label: parts.join(' '), qty: qty, unit: unit };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderDeliveries() {
+  var today = getTodayStr();
+  var delivering = [];
+  var completedToday = [];
+
+  orders.forEach(function(o) {
+    if (o.status === 'delivering') {
+      delivering.push(o);
+    } else if (o.status === 'completed') {
+      var checkDate = o.delivery_date || '';
+      if (checkDate === today) completedToday.push(o);
+    }
+  });
+
+  var listEl = document.getElementById('delivery-list');
+  var html = '';
+
+  if (delivering.length === 0) {
+    html += '<div class="empty-state">';
+    html += '<div class="emoji">&#127881;</div>';
+    html += '<p>No pending deliveries</p>';
+    html += '<button class="btn-refresh-empty" onclick="refreshData()">Refresh</button>';
+    html += '</div>';
+  } else {
+    delivering.forEach(function(o) {
+      html += renderDeliveryCard(o);
+    });
+  }
+
+  listEl.innerHTML = html;
+
+  // Completed today
+  var toggleBtn = document.getElementById('completed-toggle');
+  var completedEl = document.getElementById('completed-list');
+  document.getElementById('completed-count').textContent = completedToday.length;
+
+  if (completedToday.length > 0) {
+    toggleBtn.style.display = 'flex';
+    var cHtml = '';
+    completedToday.forEach(function(o) {
+      cHtml += renderCompletedCard(o);
+    });
+    completedEl.innerHTML = cHtml;
+  } else {
+    toggleBtn.style.display = 'none';
+    completedEl.innerHTML = '';
+    completedEl.style.display = 'none';
+  }
+}
+
+function renderDeliveryCard(o) {
+  var cust = findCustomer(o.customer_id);
+  var custName = cust ? cust.name : 'Unknown Customer';
+  var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+  var isDO = o.doc_type === 'delivery_order';
+
+  var html = '<div class="delivery-card" id="card-' + esc(o.id) + '">';
+  html += '<div class="dc-customer">' + esc(custName) + '</div>';
+
+  // Meta: address + phone
+  html += '<div class="dc-meta">';
+  if (cust && cust.address) {
+    html += '<a href="https://maps.google.com/?q=' + encodeURIComponent(cust.address) + '" target="_blank" rel="noopener">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    html += esc(cust.address);
+    html += '</a>';
+  }
+  if (cust && cust.phone) {
+    html += '<a href="tel:' + esc(cust.phone) + '">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>';
+    html += esc(cust.phone);
+    html += '</a>';
+  }
+  html += '</div>';
+
+  // Items
+  if (items.length > 0) {
+    html += '<ul class="dc-items">';
+    items.forEach(function(item) {
+      var display = getItemDisplay(item);
+      html += '<li>' + esc(display.label) + ' &mdash; <strong>' + display.qty + ' ' + esc(display.unit) + '</strong></li>';
+    });
+    html += '</ul>';
+  }
+
+  // Footer: total + doc badge
+  var grandTotal = parseFloat(o.grand_total) || 0;
+  html += '<div class="dc-footer">';
+  html += '<div class="dc-total">' + formatRM(grandTotal) + '</div>';
+  html += '<span class="dc-badge ' + (isDO ? 'badge-do' : 'badge-cs') + '">' + (isDO ? 'DO' : 'CS') + ' ' + esc(o.doc_number || '') + '</span>';
+  html += '</div>';
+
+  // Mark Delivered button
+  html += '<button class="btn-deliver" onclick="markDelivered(\'' + esc(o.id) + '\')">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="20 6 9 17 4 12"/></svg>';
+  html += 'Mark Delivered</button>';
+
+  html += '</div>';
+  return html;
+}
+
+function renderCompletedCard(o) {
+  var cust = findCustomer(o.customer_id);
+  var custName = cust ? cust.name : 'Unknown';
+  var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+  var grandTotal = parseFloat(o.grand_total) || 0;
+  var isDO = o.doc_type === 'delivery_order';
+
+  var html = '<div class="delivery-card">';
+  html += '<div class="dc-customer">' + esc(custName) + '</div>';
+  if (items.length > 0) {
+    html += '<ul class="dc-items">';
+    items.forEach(function(item) {
+      var display = getItemDisplay(item);
+      html += '<li>' + esc(display.label) + ' &mdash; <strong>' + display.qty + ' ' + esc(display.unit) + '</strong></li>';
+    });
+    html += '</ul>';
+  }
+  html += '<div class="dc-footer">';
+  html += '<div class="dc-total">' + formatRM(grandTotal) + '</div>';
+  html += '<span class="dc-badge ' + (isDO ? 'badge-do' : 'badge-cs') + '">' + (isDO ? 'DO' : 'CS') + ' ' + esc(o.doc_number || '') + '</span>';
+  html += '</div>';
+
+  // View Document button
+  html += '<button class="btn-deliver" style="background:var(--bg-input);color:var(--text);border:1px solid var(--border);" onclick="showDoc(\'' + esc(o.id) + '\')">';
+  html += 'View Document</button>';
+
+  html += '</div>';
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MARK DELIVERED
+// ═══════════════════════════════════════════════════════════════
+function markDelivered(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var cust = findCustomer(o.customer_id);
+  var custName = cust ? cust.name : 'this customer';
+
+  confirmAction('Confirm Delivery', 'Confirm delivery to ' + custName + '?', async function() {
+    var result = await sbQuery(
+      sb.from('sales_orders').update({ status: 'completed' }).eq('id', orderId).select(),
+      'Updating order...'
+    );
+    if (result) {
+      notify('Delivery completed!', 'success');
+      // Update local state
+      o.status = 'completed';
+      renderDeliveries();
+      // Show document
+      showDoc(orderId);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPLETED TOGGLE
+// ═══════════════════════════════════════════════════════════════
+function toggleCompleted() {
+  var btn = document.getElementById('completed-toggle');
+  var list = document.getElementById('completed-list');
+  var isOpen = btn.classList.contains('open');
+  btn.classList.toggle('open');
+  list.style.display = isOpen ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOCUMENT GENERATION
+// ═══════════════════════════════════════════════════════════════
+function showDoc(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) { notify('Order not found', 'warning'); return; }
+
+  docCurrentOrder = o;
+  var cust = findCustomer(o.customer_id);
+  var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+  var isDO = o.doc_type === 'delivery_order';
+  var docLabel = isDO ? 'DELIVERY ORDER' : 'CASH SALES';
+
+  var html = '';
+
+  // Header
+  html += '<div class="doc-header">';
+  html += '<h2>TG GROUP SDN BHD</h2>';
+  html += '<p>LADANG PND</p>';
+  html += '</div>';
+
+  // Title
+  html += '<div class="doc-title">' + docLabel + '</div>';
+
+  // Doc Number
+  html += '<div class="doc-doc-number">' + esc(o.doc_number || o.id) + '</div>';
+
+  // Customer Info
+  html += '<div class="doc-info-grid">';
+  html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(cust ? cust.name : '\u2014') + '</div>';
+  if (cust && cust.phone) {
+    html += '<div class="doc-info-label">Phone:</div><div class="doc-info-value">' + esc(cust.phone) + '</div>';
+  }
+  if (cust && cust.address) {
+    html += '<div class="doc-info-label">Address:</div><div class="doc-info-value">' + esc(cust.address) + '</div>';
+  }
+  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(o.delivery_date || o.order_date) + '</div>';
+  html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDate(o.order_date) + '</div>';
+  if (o.driver_id) {
+    html += '<div class="doc-info-label">Driver:</div><div class="doc-info-value">' + esc(getDriverName(o.driver_id) || '\u2014') + '</div>';
+  }
+  html += '</div>';
+
+  // Items Table
+  html += '<table>';
+  html += '<thead><tr><th style="width:30px;">No</th><th>Product</th><th style="text-align:right;width:50px;">Qty</th><th style="text-align:right;width:60px;">Price</th><th style="text-align:right;width:70px;">Amount</th></tr></thead>';
+  html += '<tbody>';
+  var subtotal = 0;
+  items.forEach(function(item, idx) {
+    var prod = findProduct(item.product_id);
+    var prodName = prod ? prod.name : '\u2014';
+    var prodVariety = prod && prod.variety_id ? getVarietyName(prod.variety_id) : '';
+    var prodUnit = prod ? (prod.unit || '') : '';
+    var fullName = '';
+    if (prodVariety) fullName += prodVariety + ' ';
+    fullName += prodName;
+    if (item.index_min != null && item.index_max != null) {
+      fullName += ' (Index ' + item.index_min + '-' + item.index_max + ')';
+    } else if (item.index_min != null) {
+      fullName += ' (Index ' + item.index_min + ')';
+    }
+    var lineTotal = parseFloat(item.line_total) || 0;
+    subtotal += lineTotal;
+    var qtyStr = (item.quantity || 0) + (prodUnit ? prodUnit : '');
+
+    html += '<tr>';
+    html += '<td style="text-align:center;">' + (idx + 1) + '</td>';
+    html += '<td>' + esc(fullName) + '</td>';
+    html += '<td style="text-align:right;">' + esc(qtyStr) + '</td>';
+    html += '<td style="text-align:right;">' + (parseFloat(item.unit_price) || 0).toFixed(2) + '</td>';
+    html += '<td style="text-align:right;">' + lineTotal.toFixed(2) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Totals
+  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var grandTotal = parseFloat(o.grand_total) || 0;
+  html += '<div class="doc-totals">';
+  html += '<div>Subtotal: <strong>RM ' + subtotal.toFixed(2) + '</strong></div>';
+  if (returnsTotal > 0) {
+    html += '<div>Returns: <strong style="color:#c00;">-RM ' + returnsTotal.toFixed(2) + '</strong></div>';
+  }
+  html += '<div class="doc-grand-total">TOTAL: RM ' + grandTotal.toFixed(2) + '</div>';
+  html += '</div>';
+
+  // Payment / Signature
+  html += '<div class="doc-payment-section">';
+  if (isDO) {
+    html += '<div style="margin-bottom:8px;"><strong>Payment:</strong> CREDIT</div>';
+    html += '<div style="margin-bottom:14px;margin-top:20px;">Received by: <span class="doc-sig-line"></span></div>';
+    html += '<div style="margin-bottom:14px;">Date: <span class="doc-sig-line"></span></div>';
+    html += '<div>Signature: <span class="doc-sig-line"></span></div>';
+  } else {
+    var payStatus = o.payment_status || 'unpaid';
+    var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
+    html += '<div style="margin-bottom:6px;"><strong>Payment:</strong> CASH</div>';
+    html += '<div><strong>Status:</strong> ' + payLabel + '</div>';
+  }
+  html += '</div>';
+
+  // Footer
+  html += '<div class="doc-footer">';
+  html += 'TG Group Sdn Bhd | Ladang PND<br>';
+  html += 'Thank you for your business';
+  html += '</div>';
+
+  document.getElementById('doc-content').innerHTML = html;
+  document.getElementById('doc-view').style.display = 'block';
+  document.getElementById('doc-view').scrollTop = 0;
+}
+
+function closeDoc() {
+  document.getElementById('doc-view').style.display = 'none';
+  docCurrentOrder = null;
+}
+
+async function shareDoc() {
+  var docEl = document.getElementById('doc-content');
+  if (!docEl || !docCurrentOrder) { notify('No document to share', 'warning'); return; }
+
+  notify('Generating image...', 'info', 2000);
+
+  try {
+    var canvas = await html2canvas(docEl, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
+    });
+
+    var blob = await new Promise(function(resolve) {
+      canvas.toBlob(function(b) { resolve(b); }, 'image/png');
+    });
+
+    var fileName = (docCurrentOrder.doc_number || docCurrentOrder.id) + '.png';
+
+    // Try Web Share API (mobile)
+    if (navigator.share && navigator.canShare) {
+      var file = new File([blob], fileName, { type: 'image/png' });
+      var shareData = { files: [file], title: fileName };
+      if (navigator.canShare(shareData)) {
+        try {
+          await navigator.share(shareData);
+          notify('Document shared!', 'success');
+          return;
+        } catch(e) {
+          if (e.name === 'AbortError') return;
+        }
+      }
+    }
+
+    // Fallback: download
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify('Image downloaded', 'success');
+
+  } catch(e) {
+    notify('Failed to generate image: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+(async function init() {
+  await loadUsers();
+  if (tryRestoreSession()) {
+    showApp();
+  }
+})();
+</script>
+</body>
+</html>
