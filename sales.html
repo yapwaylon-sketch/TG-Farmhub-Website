@@ -509,7 +509,7 @@ async function loadAllData() {
     sbQuery(sb.from('sales_payments').select('*').order('created_at', {ascending: false})),
     sbQuery(sb.from('sales_returns').select('*').order('created_at', {ascending: false})),
     sbQuery(sb.from('crop_varieties').select('*').eq('archived', false)),
-    sbQuery(sb.from('workers').select('id,name').eq('is_active', true))
+    sbQuery(sb.from('workers').select('id,name').eq('active', true))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
