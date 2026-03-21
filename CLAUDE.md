@@ -43,8 +43,10 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `spraytracker.html` | PND Spray Tracker module |
 | `growthtracker.html` | Growth Tracker module (read-only dashboard) |
 | `display-growth.html` | TV display for Growth Tracker |
-| `sales.html` | Sales Management module |
-| `sales.css` | Sales module styles |
+| `sales.html` | Sales Management module (7 tabs: Dashboard, Orders, Customers, Products, Payments, Invoicing, Reports) |
+| `sales.css` | Sales module styles (cards, badges, timeline, aging) |
+| `delivery.html` | Mobile driver delivery page (phone-only, PIN login, mark delivered, print DO/CS) |
+| `display-sales.html` | TV display for packing station (token auth, auto-refresh, status-grouped orders) |
 | `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
 | `shared.js` | Shared JS (session guard, Supabase init, sidebar logic, sbMutate, sbUpdateWithLock) |
 | `{module}.css` | Per-module styles (index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css) |
@@ -86,10 +88,12 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 4. **Growth Tracker** — Read-only dashboard: block growth monitoring, plant counts by variety/status, target dates, harvest windows
 5. **Farm Configuration** — Centralized crop & block management, all data entry lives here
 6. **TV Display (Growth)** — `display-growth.html`, read-only, token auth (`?token=pnd2026`)
-7. **Sales** — Customer management, order workflow, payment tracking, delivery orders, cash sales, reports
+7. **Sales** — Customer management, order workflow (pending→preparing→prepared→delivering→completed), payment tracking, delivery orders, cash sales, returns/debit notes, 7 report types, document generation (DO/CS with print + WhatsApp image share)
+8. **Delivery (Sales)** — `delivery.html`, phone-only driver page, PIN login, mark delivered + photo + print/share DO/CS
+9. **TV Display (Sales)** — `display-sales.html`, read-only packing station display, token auth (`?token=pnd2026`), auto-refresh 60s, auto-rotate pages
 
 ### Coming Soon (Not Built)
-8. **Oil Palm Seedlings** — Booking management, sales tracking, seedling stock
+10. **Oil Palm Seedlings** — Booking management, sales tracking, seedling stock
 
 ## Architecture — Growth Data Flow
 
@@ -220,6 +224,56 @@ rm -rf node_modules package-lock.json package.json
 - **Spray-Inventory Link**: `pnd_products.inventory_product_id` FK links each spray product directly to `products` (inventory). Products are managed in Inventory module; Spray Tracker only configures spray-specific fields (interval, dose). Products page has "Enable for Spraying" to activate inventory products, and "Link to Inventory" banner for legacy unlinked products. Active Jobs page shows product-level stock check cards (need vs have + cost).
 - **Multiple jobs per block**: Scheduled jobs no longer blocked by existing active jobs for same block+product. Shows info warning instead.
 
+## Sales Module — Architecture
+
+### Tables
+| Table | Purpose |
+|-------|---------|
+| `sales_customers` | Customer profiles, phone unique constraint, type (wholesale/retail/walkin), payment_terms (credit/cash) |
+| `sales_products` | Product catalog linked to crop_varieties (MD2/SG1), categories (whole_crown, slice, peeled, etc.), pricing |
+| `sales_orders` | Orders with status workflow, doc_type (cash_sales/delivery_order), doc_number, driver_id, payment tracking |
+| `sales_order_items` | Line items per order: product, quantity, unit_price, ripeness index_min/max |
+| `sales_payments` | Payment records per order: amount, method, reference |
+| `sales_returns` | Returns with resolution (deduct/refund/debit_note), photo proof, debit note tracking |
+
+### Order Status Flow
+`pending` → `preparing` → `prepared` → `delivering` → `completed` (or `cancelled` from any stage)
+- Walk-in shortcut: `pending` → `completed` (skip preparation/delivery)
+- Collection orders: `prepared` → `completed` (no driver assignment)
+- Document generation auto-triggered on `completed`
+
+### Document Types
+- **Delivery Order (DO)**: Credit customers, signature line, batched into QB invoices later
+- **Cash Sales (CS)**: Cash customers, PAID/UNPAID status
+- Both: print (thermal 80mm + A4), PNG export via html2canvas for WhatsApp sharing
+- Numbering: `DO-YYMMDD-NNN`, `CS-YYMMDD-NNN` via `dbNextId()`
+
+### Payment Tracking
+- Cash Sales: expected to pay immediately, aging dashboard highlights overdue (7d yellow, 14d red)
+- Delivery Orders: batched into QB invoices — mandatory QB invoice number to close DOs
+- Partial payments supported, payment_status auto-calculated (unpaid/partial/paid)
+
+### Returns & Debit Notes
+- Trust-based (customer sends photo proof, no physical return)
+- Resolution: deduct from balance, refund, or debit note
+- Debit notes auto-numbered (`DN-YYMMDD-NNN`), can be applied to future orders
+- Return rate tracked per customer (green <5%, yellow 5-10%, red >10%)
+
+### Key Patterns (Sales-specific)
+- `workers` table uses column `active` (NOT `is_active`) — driver dropdown must filter `.eq('active', true)`
+- `crop_varieties.id` is UUID type — `sales_products.variety_id` is UUID FK (not TEXT)
+- All other sales table IDs are TEXT via `dbNextId()` with prefixes: SC, SP, SO, SI, SY, SR, DN
+- Customer duplicate prevention: partial unique index on phone WHERE NOT NULL
+- WhatsApp worker notification: BM message format with order details, Copy Text + Send WhatsApp buttons
+- Photo upload: resize to max 1200px, JPEG 80%, Supabase Storage bucket `sales-photos`
+- `delivery.html`: standalone page, imports shared.css/shared.js, shows ALL delivering orders (not filtered by driver)
+- `display-sales.html`: standalone page, no shared.css/shared.js dependency, uses Supabase REST API directly, token auth
+
+### Design Spec & Plans
+- Spec: `docs/superpowers/specs/2026-03-21-sales-module-design.md`
+- Phase 1 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase1.md`
+- Phase 2 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase2.md`
+
 ## Sub-Projects (same folder, separate deploys)
 These live inside this folder but are gitignored. They share the same Supabase database and read from the same tables.
 
@@ -243,12 +297,13 @@ These live inside this folder but are gitignored. They share the same Supabase d
 If you modify tables that these sub-projects read from (especially `growth_records`, `pnd_blocks`, `crop_varieties`), check and update the sub-project `index.html` files too.
 
 ## Blueprint — What's Next
+- [x] **Sales Module** (`sales.html` + `delivery.html` + `display-sales.html`) — **DONE** (2026-03-21)
+- [x] **Mobile responsiveness** audit across all modules — **DONE** (2026-03-21)
 - [ ] **Farm Map Module** (`farmmap.html`) — Google Maps integration, draw block polygons, satellite imagery, area calculation (see details below)
 - [ ] **`display-spray.html`** — TV display for Spray Tracker (KIV, needs spec)
 - [ ] **Seedlings Module** (`seedlings.html`) — Booking, sales, stock, pricing
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
-- [ ] **Mobile responsiveness** audit across all modules
 
 ## Farm Map Module — Plan (Not Started)
 - **File**: `farmmap.html` (single HTML file like other modules)
@@ -288,6 +343,8 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Offline resilience**: Offline banner, sbQuery() onLine check, sbMutate() retry with exponential backoff (2026-03-21)
 - [x] **Module CSS extraction**: Extracted 714 lines to index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css (2026-03-21)
 - [x] **Optimistic locking**: sbUpdateWithLock() checks updated_at; applied to 8 critical paths in block_crops + pnd_jobs (2026-03-21)
+- [x] **Website quality overhaul** (2026-03-21): Standardized green primary buttons across all modules, replaced 15 browser confirm() with styled confirmAction() modals, added Save buttons for Farm Config inline edits (variety days), block deactivation requires confirmation, btnLoading() on 6 key save operations, mobile touch targets min 36-40px, table horizontal scroll on all modules, Growth Tracker hides 8 columns on mobile (15→7), text overflow protection on all tables, fixed 37 missing .select() on mutations, fixed worker name race condition (payroll cascade uses worker_id not worker_name), inventory modal-card→modal-box consistency, spray tracker sort dropdown on Active Jobs, growth tracker clear filters button
+- [x] **Sales module** (2026-03-21): Full 8-phase build — DB migration, products, customers, orders, documents (DO/CS), payments, QB invoicing, returns/debit notes, 7 reports, delivery.html (driver page), display-sales.html (TV display)
 
 ## Audit Results (2026-03-11)
 | Category | Status | Priority |
