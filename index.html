@@ -255,6 +255,22 @@ const MODULES = [
     ]
   },
   {
+    key: "sales",
+    name: "Sales",
+    icon: "🍍",
+    desc: "Pineapple sales orders, customers, payments, delivery tracking, and reports",
+    url: "sales.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View orders, customers & reports" },
+      { key: "createOrder", label: "Create / edit sales orders" },
+      { key: "payments", label: "Record & manage payments" },
+      { key: "delivery", label: "Manage delivery orders" },
+      { key: "manageCustomers", label: "Add / edit customers" },
+      { key: "export", label: "Export reports (CSV / PDF)" },
+    ]
+  },
+  {
     key: "seedlings",
     name: "Oil Palm Seedlings",
     icon: "🌴",
