@@ -160,6 +160,94 @@
 }
 
 /* ============================================================
+   RESOLUTION BADGES
+   ============================================================ */
+.badge-deduct {
+  background: var(--gold-pale);
+  color: var(--gold-light);
+}
+
+.badge-refund {
+  background: var(--red-pale);
+  color: var(--red);
+}
+
+.badge-debit_note {
+  background: rgba(58, 122, 200, 0.15);
+  color: #6AA8E8;
+}
+
+/* ============================================================
+   RETURNS LIST
+   ============================================================ */
+.ret-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.ret-item + .ret-item {
+  margin-top: 8px;
+}
+
+.ret-item-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ret-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.ret-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.ret-item-product {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ret-item-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Debit note banner in order modal */
+.dn-banner {
+  background: rgba(58, 122, 200, 0.1);
+  border: 1px solid rgba(58, 122, 200, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #6AA8E8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dn-banner strong {
+  color: #89BFED;
+}
+
+/* ============================================================
    SALES TABS
    ============================================================ */
 .sales-tabs {

@@ -574,6 +574,53 @@
   </div>
 </div>
 
+<!-- RETURN MODAL -->
+<div id="ret-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('ret-modal')">
+  <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Add Return</div>
+      <button class="modal-close" onclick="closeModal('ret-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="ret-order-id" value="">
+    <div class="form-field">
+      <label>ORDER ITEM <span style="color:var(--red);">*</span></label>
+      <select id="ret-item" style="width:100%;" onchange="retItemChange()"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>QUANTITY RETURNED <span style="color:var(--red);">*</span></label>
+        <input type="number" id="ret-qty" step="0.01" min="0.01" placeholder="0" style="width:100%;" oninput="retCalcAmount()">
+      </div>
+      <div class="form-field">
+        <label>AMOUNT (RM)</label>
+        <input type="number" id="ret-amount" step="0.01" min="0" placeholder="0.00" style="width:100%;">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>REASON</label>
+      <textarea id="ret-reason" rows="2" placeholder="Reason for return" style="width:100%;"></textarea>
+    </div>
+    <div class="form-field">
+      <label>RESOLUTION <span style="color:var(--red);">*</span></label>
+      <select id="ret-resolution" style="width:100%;">
+        <option value="deduct">Deduct from balance</option>
+        <option value="refund">Refund</option>
+        <option value="debit_note">Debit Note</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>PHOTO (optional)</label>
+      <input type="file" id="ret-photo-input" accept="image/*" capture="environment" style="width:100%;font-size:12px;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('ret-modal')">Cancel</button>
+      <button class="btn btn-primary" id="ret-save-btn" onclick="retSaveReturn()">Save Return</button>
+    </div>
+  </div>
+</div>
+
 <!-- INVOICE MODAL -->
 <div id="inv-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal('inv-modal')">
   <div class="modal-box" style="max-width:500px;" onclick="event.stopPropagation()">
@@ -1209,6 +1256,44 @@ function soRenderDetail() {
   }
   html += '</div>';
 
+  // Returns Section
+  var orderReturns = returns.filter(function(r) { return r.order_id === o.id; });
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title">Returns' + (orderReturns.length ? ' (' + orderReturns.length + ')' : '') + '</div>';
+  if (orderReturns.length) {
+    orderReturns.forEach(function(ret) {
+      var retItem = orderItems.find(function(i) { return i.id === ret.item_id; });
+      var retProd = retItem ? salesProducts.find(function(p) { return p.id === retItem.product_id; }) : null;
+      var prodName = retProd ? retProd.name : (ret.item_id || '\u2014');
+      var resBadge = '<span class="badge badge-' + esc(ret.resolution) + '">' + retResolutionLabel(ret.resolution) + '</span>';
+
+      html += '<div class="ret-item">';
+      if (ret.photo_url) {
+        html += '<img class="ret-item-photo" src="' + esc(ret.photo_url) + '" alt="Return photo" onclick="window.open(this.src,\'_blank\')">';
+      }
+      html += '<div class="ret-item-details">';
+      html += '<div class="ret-item-top">';
+      html += '<span class="ret-item-product">' + esc(prodName) + '</span>';
+      html += resBadge;
+      html += '</div>';
+      html += '<div class="ret-item-meta">';
+      html += 'Qty: ' + (ret.quantity || 0) + ' &middot; ' + formatRM(parseFloat(ret.amount) || 0);
+      if (ret.reason) html += ' &middot; ' + esc(ret.reason);
+      html += '</div>';
+      if (ret.debit_note_no) {
+        html += '<div class="ret-item-meta">DN: ' + esc(ret.debit_note_no) + (ret.debit_note_used_on ? ' (used on ' + esc(ret.debit_note_used_on) + ')' : ' (unused)') + '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:13px;color:var(--text-muted);">No returns for this order.</div>';
+  }
+  if (o.status === 'completed') {
+    html += '<button class="btn btn-outline btn-sm" onclick="retOpenModal(\'' + esc(o.id) + '\')" style="margin-top:10px;">+ Add Return</button>';
+  }
+  html += '</div>';
+
   // Photos
   if (o.prep_photo_url || o.delivery_photo_url) {
     html += '<div class="so-detail-section">';
@@ -1487,6 +1572,11 @@ function renderCustomerCards() {
     html += '<span>' + esc(c.phone || 'No phone') + '</span>';
     html += '<span>' + scTypeLabel(c.type) + '</span>';
     if (c.address) html += '<span>' + esc(c.address).substring(0, 40) + (c.address.length > 40 ? '...' : '') + '</span>';
+    var rr = retCustomerReturnRate(c.id);
+    if (rr !== null) {
+      var rrCls = rr < 5 ? 'return-rate-green' : (rr < 10 ? 'return-rate-yellow' : 'return-rate-red');
+      html += '<span class="' + rrCls + '" style="font-size:11px;">Return rate: ' + rr.toFixed(1) + '%</span>';
+    }
     html += '</div>';
     html += '<div style="display:flex;gap:6px;margin-top:8px;" onclick="event.stopPropagation()">';
     html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
@@ -2330,6 +2420,7 @@ function openNewOrderModal(editOrderId) {
   soEditOrderId = editOrderId || null;
   soItems = [];
   soSelectedCustomer = null;
+  soAppliedDebitNotes = [];
 
   // Reset fields
   document.getElementById('so-cust-search').value = '';
@@ -2440,14 +2531,20 @@ function soSelectCustomer(customerId) {
   } else {
     document.getElementById('so-doc-type').value = 'cash_sales';
   }
+
+  // Check for unused debit notes
+  soCheckDebitNotes(customerId);
 }
 
 function soClearCustomer() {
   soSelectedCustomer = null;
+  soAppliedDebitNotes = [];
   document.getElementById('so-cust-selected').style.display = 'none';
   document.getElementById('so-cust-selected').innerHTML = '';
   document.getElementById('so-cust-search-wrap').style.display = 'block';
   document.getElementById('so-cust-search').value = '';
+  var banner = document.getElementById('so-dn-banner');
+  if (banner) banner.remove();
 }
 
 function soAddCustomerInline() {
@@ -2686,6 +2783,28 @@ async function soSaveOrder() {
       }
 
       orders.unshift(result[0] || orderData);
+
+      // Apply debit notes if any
+      if (soAppliedDebitNotes.length) {
+        var dnTotal = soAppliedDebitNotes.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+        var newGrand = Math.max(0, subtotalVal - dnTotal);
+        // Update each debit note return as used
+        for (var di = 0; di < soAppliedDebitNotes.length; di++) {
+          var dn = soAppliedDebitNotes[di];
+          await sbQuery(sb.from('sales_returns').update({ debit_note_used_on: orderId }).eq('id', dn.id).select());
+          // Update local
+          var localRet = returns.find(function(r) { return r.id === dn.id; });
+          if (localRet) localRet.debit_note_used_on = orderId;
+        }
+        // Update order grand_total
+        var localOrder = orders.find(function(x) { return x.id === orderId; });
+        if (localOrder) {
+          localOrder.grand_total = newGrand;
+          localOrder.returns_total = dnTotal;
+        }
+        await sbQuery(sb.from('sales_orders').update({ grand_total: newGrand, returns_total: dnTotal }).eq('id', orderId).select());
+        soAppliedDebitNotes = [];
+      }
 
       btnLoading(btn, false, 'Create Order');
       closeModal('so-modal');
@@ -2978,6 +3097,233 @@ function soCopyOrderText() {
 function soSendOrderWhatsApp() {
   closeModal('so-wa-modal');
   window.open('https://wa.me/?text=' + encodeURIComponent(soWaCurrentMsg), '_blank');
+}
+
+// ==================== RETURNS ====================
+
+function retResolutionLabel(r) {
+  var labels = { deduct: 'Deduct', refund: 'Refund', debit_note: 'Debit Note' };
+  return labels[r] || r || '\u2014';
+}
+
+function retOpenModal(orderId) {
+  document.getElementById('ret-order-id').value = orderId;
+  document.getElementById('ret-qty').value = '';
+  document.getElementById('ret-amount').value = '';
+  document.getElementById('ret-reason').value = '';
+  document.getElementById('ret-resolution').value = 'deduct';
+  document.getElementById('ret-photo-input').value = '';
+
+  // Populate item dropdown
+  var items = orderItems.filter(function(i) { return i.order_id === orderId; });
+  var sel = document.getElementById('ret-item');
+  sel.innerHTML = '<option value="">Select item...</option>';
+  items.forEach(function(item) {
+    var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+    var prodName = prod ? prod.name : item.product_id;
+    var prodUnit = prod ? (prod.unit || '') : '';
+    sel.innerHTML += '<option value="' + esc(item.id) + '" data-qty="' + (item.quantity || 0) + '" data-price="' + (item.unit_price || 0) + '">' + esc(prodName) + ' (qty: ' + (item.quantity || 0) + ' ' + esc(prodUnit) + ')</option>';
+  });
+
+  var modal = document.getElementById('ret-modal');
+  modal.style.display = 'flex';
+  trapFocus(modal.querySelector('.modal-box'));
+}
+
+function retItemChange() {
+  var sel = document.getElementById('ret-item');
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  var maxQty = parseFloat(opt.getAttribute('data-qty')) || 0;
+  document.getElementById('ret-qty').max = maxQty;
+  document.getElementById('ret-qty').value = '';
+  document.getElementById('ret-amount').value = '';
+}
+
+function retCalcAmount() {
+  var sel = document.getElementById('ret-item');
+  var opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  var unitPrice = parseFloat(opt.getAttribute('data-price')) || 0;
+  var qty = parseFloat(document.getElementById('ret-qty').value) || 0;
+  document.getElementById('ret-amount').value = (qty * unitPrice).toFixed(2);
+}
+
+async function retUploadPhoto(orderId, returnId) {
+  var input = document.getElementById('ret-photo-input');
+  if (!input.files.length) return null;
+
+  return new Promise(function(resolve) {
+    var file = input.files[0];
+    var img = new Image();
+    img.onload = async function() {
+      var canvas = document.createElement('canvas');
+      var maxW = 1200;
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(async function(blob) {
+        var path = orderId + '/return-' + returnId + '.jpg';
+        var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (result.error) { notify('Photo upload failed', 'warning'); resolve(null); return; }
+        var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
+        resolve(urlResult.data.publicUrl);
+      }, 'image/jpeg', 0.8);
+    };
+    img.onerror = function() { resolve(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function retSaveReturn() {
+  var orderId = document.getElementById('ret-order-id').value;
+  var itemId = document.getElementById('ret-item').value;
+  var qty = parseFloat(document.getElementById('ret-qty').value);
+  var amount = parseFloat(document.getElementById('ret-amount').value);
+  var reason = document.getElementById('ret-reason').value.trim();
+  var resolution = document.getElementById('ret-resolution').value;
+
+  if (!itemId) { notify('Please select an item', 'warning'); return; }
+  if (!qty || qty <= 0) { notify('Enter a valid quantity', 'warning'); return; }
+  if (!resolution) { notify('Select a resolution', 'warning'); return; }
+
+  // Validate qty doesn't exceed original
+  var sel = document.getElementById('ret-item');
+  var opt = sel.options[sel.selectedIndex];
+  var maxQty = parseFloat(opt.getAttribute('data-qty')) || 0;
+  if (qty > maxQty) { notify('Quantity exceeds original item quantity of ' + maxQty, 'warning'); return; }
+
+  var btn = document.getElementById('ret-save-btn');
+  btnLoading(btn, true);
+
+  try {
+    var returnId = await dbNextId('SR');
+    var debitNoteNo = null;
+    if (resolution === 'debit_note') {
+      debitNoteNo = await dbNextId('DN');
+    }
+
+    // Upload photo if provided
+    var photoUrl = await retUploadPhoto(orderId, returnId);
+
+    var retData = {
+      id: returnId,
+      order_id: orderId,
+      item_id: itemId,
+      quantity: qty,
+      amount: amount || 0,
+      reason: reason || null,
+      resolution: resolution,
+      debit_note_no: debitNoteNo,
+      debit_note_used_on: null,
+      photo_url: photoUrl,
+      created_by: currentUser ? currentUser.id : null
+    };
+
+    var result = await sbQuery(sb.from('sales_returns').insert(retData).select());
+    if (result === null) { btnLoading(btn, false, 'Save Return'); return; }
+
+    // Add to local returns array
+    returns.unshift(result[0] || retData);
+
+    // Recalculate order returns_total and grand_total
+    var o = orders.find(function(x) { return x.id === orderId; });
+    if (o) {
+      var totalReturns = returns.filter(function(r) { return r.order_id === orderId; }).reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+      var subtotal = parseFloat(o.subtotal) || 0;
+      var newGrandTotal = subtotal - totalReturns;
+      if (newGrandTotal < 0) newGrandTotal = 0;
+
+      o.returns_total = totalReturns;
+      o.grand_total = newGrandTotal;
+
+      await sbQuery(sb.from('sales_orders').update({ returns_total: totalReturns, grand_total: newGrandTotal }).eq('id', orderId).select());
+
+      // If resolution is deduct, recalculate payment status (grand_total changed)
+      if (resolution === 'deduct') {
+        recalcPaymentStatus(orderId);
+        await sbQuery(sb.from('sales_orders').update({ amount_paid: o.amount_paid, payment_status: o.payment_status }).eq('id', orderId).select());
+      }
+    }
+
+    btnLoading(btn, false, 'Save Return');
+    closeModal('ret-modal');
+    notify('Return recorded' + (debitNoteNo ? ' — Debit Note: ' + debitNoteNo : ''), 'success');
+    soRenderDetail();
+  } catch(e) {
+    btnLoading(btn, false, 'Save Return');
+    notify('Failed to save return: ' + e.message, 'error');
+  }
+}
+
+// ==================== DEBIT NOTE HELPERS ====================
+
+function retGetUnusedDebitNotes(customerId) {
+  // Get all order IDs for this customer
+  var custOrderIds = orders.filter(function(o) { return o.customer_id === customerId; }).map(function(o) { return o.id; });
+  // Find unused debit notes (debit_note_no set, debit_note_used_on is null)
+  return returns.filter(function(r) {
+    return r.debit_note_no && !r.debit_note_used_on && custOrderIds.indexOf(r.order_id) >= 0;
+  });
+}
+
+var soAppliedDebitNotes = [];
+
+function soCheckDebitNotes(customerId) {
+  soAppliedDebitNotes = [];
+  var banner = document.getElementById('so-dn-banner');
+  if (banner) banner.remove();
+
+  var unusedDNs = retGetUnusedDebitNotes(customerId);
+  if (!unusedDNs.length) return;
+
+  var total = unusedDNs.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+  var bannerHtml = '<div class="dn-banner" id="so-dn-banner">';
+  bannerHtml += '<span>This customer has <strong>' + unusedDNs.length + '</strong> unused debit note' + (unusedDNs.length > 1 ? 's' : '') + ' totaling <strong>' + formatRM(total) + '</strong></span>';
+  bannerHtml += '<button class="btn btn-outline btn-sm" onclick="soApplyDebitNotes()" style="border-color:#6AA8E8;color:#6AA8E8;">Apply Debit Notes</button>';
+  bannerHtml += '</div>';
+
+  // Insert after customer selection section
+  var custSection = document.querySelector('#so-modal .so-section');
+  if (custSection) custSection.insertAdjacentHTML('afterend', bannerHtml);
+}
+
+async function soApplyDebitNotes() {
+  if (!soSelectedCustomer) return;
+  var unusedDNs = retGetUnusedDebitNotes(soSelectedCustomer.id);
+  if (!unusedDNs.length) { notify('No unused debit notes', 'info'); return; }
+
+  soAppliedDebitNotes = unusedDNs;
+  var total = unusedDNs.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+
+  var banner = document.getElementById('so-dn-banner');
+  if (banner) {
+    banner.innerHTML = '<span>Applied <strong>' + unusedDNs.length + '</strong> debit note' + (unusedDNs.length > 1 ? 's' : '') + ': <strong>-' + formatRM(total) + '</strong></span>';
+    banner.innerHTML += '<button class="btn btn-outline btn-sm" onclick="soRemoveDebitNotes()" style="border-color:var(--red);color:var(--red);">Remove</button>';
+  }
+
+  notify(unusedDNs.length + ' debit note(s) will be applied (' + formatRM(total) + ')', 'success');
+}
+
+function soRemoveDebitNotes() {
+  soAppliedDebitNotes = [];
+  if (soSelectedCustomer) soCheckDebitNotes(soSelectedCustomer.id);
+  else { var banner = document.getElementById('so-dn-banner'); if (banner) banner.remove(); }
+}
+
+// ==================== CUSTOMER RETURN RATE ====================
+
+function retCustomerReturnRate(customerId) {
+  var custOrderIds = orders.filter(function(o) { return o.customer_id === customerId; }).map(function(o) { return o.id; });
+  if (!custOrderIds.length) return null;
+
+  var totalPurchase = orders.filter(function(o) { return o.customer_id === customerId; }).reduce(function(s, o) { return s + (parseFloat(o.subtotal) || 0); }, 0);
+  if (totalPurchase <= 0) return null;
+
+  var totalReturns = returns.filter(function(r) { return custOrderIds.indexOf(r.order_id) >= 0; }).reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+
+  return (totalReturns / totalPurchase) * 100;
 }
 </script>
 </body>
