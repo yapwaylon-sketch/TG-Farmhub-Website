@@ -247,6 +247,51 @@ function btnLoading(btn, loading, originalText) {
 }
 
 // ============================================================
+// Styled Confirm Modal (replaces browser confirm())
+// ============================================================
+
+// Usage: confirmAction("Delete User?", "This will permanently remove the user.", function() { doDelete(); });
+// Optional 4th param: true for danger styling (red confirm button).
+function confirmAction(title, message, onConfirm, danger) {
+  // Remove existing confirm modal if any
+  var existing = document.getElementById("tg-confirm-modal");
+  if (existing) existing.remove();
+
+  var modal = document.createElement("div");
+  modal.id = "tg-confirm-modal";
+  modal.className = "modal-overlay";
+  modal.style.display = "flex";
+  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+  var btnClass = danger ? "btn-danger" : "btn-primary";
+  var confirmLabel = danger ? "Delete" : "Confirm";
+
+  modal.innerHTML =
+    '<div class="modal-box" style="max-width:400px;">' +
+      '<div class="modal-header">' +
+        '<div class="modal-title">' + esc(title) + '</div>' +
+        '<button class="modal-close" onclick="document.getElementById(\'tg-confirm-modal\').remove()">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:20px;">' + esc(message) + '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-outline" onclick="document.getElementById(\'tg-confirm-modal\').remove()">Cancel</button>' +
+        '<button class="btn ' + btnClass + '" id="tg-confirm-btn">' + confirmLabel + '</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+
+  document.getElementById("tg-confirm-btn").onclick = function() {
+    modal.remove();
+    if (onConfirm) onConfirm();
+  };
+
+  trapFocus(modal.querySelector(".modal-box"));
+}
+
+// ============================================================
 // Modal Focus Trap (accessibility)
 // ============================================================
 

@@ -37,11 +37,6 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 .btn-google:hover { border-color:var(--gold);background:rgba(232,160,32,0.08); }
 .btn-google svg { width:18px;height:18px; }
 
-/* ===== BUTTONS — index.html overrides (gold theme for hub/login) ===== */
-.btn-primary { background: var(--gold); color: #1a1a1a; }
-.btn-primary:hover { background: var(--gold-light); }
-.btn-outline:hover { border-color: var(--gold); color: var(--gold); }
-
 /* ===== HUB LAYOUT ===== */
 #hub { display: none; min-height: 100vh; }
 .hub-header {
@@ -125,8 +120,6 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 .user-table tr:hover { background: var(--bg-hover); }
 .user-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
-/* form-field focus override for gold theme */
-.form-field input:focus, .form-field select:focus { border-color: var(--gold); }
 
 /* ===== PERMISSIONS PANEL ===== */
 .perm-section-title {
@@ -178,10 +171,6 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 }
 
 /* ===== SHARED UTILITY — index.html specific overrides ===== */
-.btn-danger { background: var(--red); color: white; border: none; }
-.btn-danger:hover { background: #d04040; }
-/* inline-input/select focus: gold theme override */
-.inline-input:focus, .inline-select:focus { border-color: var(--gold); }
 
 /* ===== FARM CONFIG ===== */
 .fc-tab { flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; background: var(--bg-input); color: var(--text-muted); transition: all 0.15s; }

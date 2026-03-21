@@ -43,8 +43,9 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `spraytracker.html` | PND Spray Tracker module |
 | `growthtracker.html` | Growth Tracker module (read-only dashboard) |
 | `display-growth.html` | TV display for Growth Tracker |
-| `shared.css` | Shared styles (sidebar, layout, variables) |
-| `shared.js` | Shared JS (session guard, Supabase init, sidebar logic) |
+| `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
+| `shared.js` | Shared JS (session guard, Supabase init, sidebar logic, sbMutate, sbUpdateWithLock) |
+| `{module}.css` | Per-module styles (index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css) |
 | `*.sql` | Database migration scripts |
 
 ## Git
@@ -280,9 +281,9 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Summary tab overhaul**: Block status/variety/age now from `block_crops`+`crop_statuses` (Farm Config). Added status filter dropdown, variety column, "No Data" card, status grouping with separators, dimmed no-data rows (2026-03-18)
 - [x] **Report consolidation**: Removed redundant reports (By Single Block, By Date Range, By Month — 11→8 reports). Added date range to Block/Product/AI reports. Added "Select All" for blocks, "All Products"/"All Ingredients" options (2026-03-18)
 - [x] **Report columns enriched**: Added Done By (worker), Water Used (tanks × size), Product Used (per-product for tank mix). Logged By now shows supervisor name. Auto-generated notes hidden. Tank mix rows merged with `rowspan` (2026-03-18)
-- [ ] **Offline resilience** / retry logic with exponential backoff
-- [ ] **Module CSS extraction**: Extract inline CSS to `.inventory.css`, `.workers.css`, etc. for caching
-- [ ] Optimistic locking for concurrent edits
+- [x] **Offline resilience**: Offline banner, sbQuery() onLine check, sbMutate() retry with exponential backoff (2026-03-21)
+- [x] **Module CSS extraction**: Extracted 714 lines to index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css (2026-03-21)
+- [x] **Optimistic locking**: sbUpdateWithLock() checks updated_at; applied to 8 critical paths in block_crops + pnd_jobs (2026-03-21)
 
 ## Audit Results (2026-03-11)
 | Category | Status | Priority |

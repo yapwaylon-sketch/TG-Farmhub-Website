@@ -218,7 +218,7 @@ body {
 .btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
 .btn-outline:hover { border-color:var(--border-light); background:rgba(255,255,255,0.03); }
 .btn-danger { background:var(--red-pale); color:var(--red); border:1px solid rgba(232,96,96,0.25); }
-.btn-sm { padding:4px 10px; font-size:11px; }
+.btn-sm { padding:6px 12px; font-size:11px; min-height:32px; }
 
 /* ============================================================
    FORM ELEMENTS
@@ -313,6 +313,9 @@ td {
   font-size: 13px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  max-width: 220px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 tr.clickable { cursor:pointer; transition:background 0.1s; }
@@ -320,6 +323,10 @@ tr.clickable:hover { background:var(--bg-hover); }
 
 .td-bold { font-weight:600; color:var(--white); }
 .td-gold { color:var(--gold-light); font-size:12px; }
+
+/* Text truncation helper */
+.td-truncate { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 
 /* ============================================================
    CARDS
@@ -634,6 +641,15 @@ textarea:focus-visible,
 
   .modal-box { max-width:95vw !important; width:95vw !important; max-height:85vh !important; }
   .form-row { flex-direction:column !important; }
+
+  /* Mobile touch targets */
+  .btn-sm { min-height:36px; padding:8px 14px; font-size:12px; }
+  .btn { min-height:40px; }
+
+  /* Tables: ensure horizontal scroll */
+  .table-wrap, .data-table { overflow-x:auto !important; -webkit-overflow-scrolling:touch; }
+  table { min-width:500px; }
+  td { max-width:160px; }
 }
 
 @media (max-width:400px) {

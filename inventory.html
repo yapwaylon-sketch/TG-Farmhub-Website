@@ -260,7 +260,7 @@
 
     <!-- SUPPLIER MODAL -->
     <div id="supplier-modal" class="modal-overlay" style="display:none;">
-      <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h2 id="supplier-modal-title">Add Supplier</h2>
           <button class="modal-close" onclick="closeModal('supplier-modal')">
@@ -301,7 +301,7 @@
 
     <!-- REORDER MODAL -->
     <div id="reorder-modal" class="modal-overlay" style="display:none;">
-      <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-box" onclick="event.stopPropagation()">
         <div class="modal-header">
           <h2>Reorder / Restock</h2>
           <button class="modal-close" onclick="closeModal('reorder-modal')">
@@ -570,7 +570,7 @@
 
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('transaction-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTransaction()">Save Transaction</button>
+      <button class="btn btn-primary" id="txn-save-btn" onclick="saveTransaction()">Save Transaction</button>
     </div>
   </div>
 </div>
@@ -857,7 +857,7 @@ async function dbInsertProduct(p) {
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
-  }));
+  }).select());
   return result !== null;
 }
 
@@ -868,12 +868,12 @@ async function dbUpdateProduct(p) {
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
-  }).eq("id", p.id));
+  }).eq("id", p.id).select());
   return result !== null;
 }
 
 async function dbUpdateProductStock(productId, newStock) {
-  var result = await sbQuery(sb.from("products").update({ current_stock: newStock }).eq("id", productId));
+  var result = await sbQuery(sb.from("products").update({ current_stock: newStock }).eq("id", productId).select());
   return result !== null;
 }
 
@@ -884,7 +884,7 @@ async function dbInsertTransaction(t) {
     taken_by: t.takenBy || "", invoice_no: t.invoiceNo || "",
     recorded_by: t.recordedBy, unit_cost: t.unitCost || 0,
     total_cost: t.totalCost || 0, notes: t.notes || ""
-  }));
+  }).select());
   return result !== null;
 }
 
@@ -895,7 +895,7 @@ async function dbUpdateTransaction(t) {
     taken_by: t.takenBy || "", invoice_no: t.invoiceNo || "",
     recorded_by: t.recordedBy, unit_cost: t.unitCost || 0,
     total_cost: t.totalCost || 0, notes: t.notes || ""
-  }).eq("id", t.id));
+  }).eq("id", t.id).select());
   return result !== null;
 }
 
@@ -908,7 +908,7 @@ async function dbInsertSupplier(s) {
   var result = await sbQuery(sb.from("suppliers").insert({
     id: s.id, name: s.name, contact: s.contact || "", phone: s.phone || "",
     email: s.email || "", notes: s.notes || "", product_ids: s.productIds || []
-  }));
+  }).select());
   return result !== null;
 }
 
@@ -916,7 +916,7 @@ async function dbUpdateSupplier(s) {
   var result = await sbQuery(sb.from("suppliers").update({
     name: s.name, contact: s.contact || "", phone: s.phone || "",
     email: s.email || "", notes: s.notes || "", product_ids: s.productIds || []
-  }).eq("id", s.id));
+  }).eq("id", s.id).select());
   return result !== null;
 }
 
@@ -1864,6 +1864,7 @@ function updateCheckResult() {
 }
 
 async function saveTransaction() {
+  const txnBtn = document.getElementById("txn-save-btn");
   if (txnType === "in") {
     // Multi-line stock in
     const supplier = document.getElementById("txn-in-supplier").value;
@@ -1889,6 +1890,7 @@ async function saveTransaction() {
 
     if (hasError || lines.length === 0) { notify("Please fill in product and quantity for all line items", "warning"); return; }
 
+    if (txnBtn) btnLoading(txnBtn, true);
     // Create one transaction per line
     for (const line of lines) {
       const product = products.find(p => p.id === line.productId);
@@ -1922,6 +1924,7 @@ async function saveTransaction() {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    if (txnBtn) btnLoading(txnBtn, true);
     const avgCost = getProductAvgCost(productId);
     const txnId = await dbNextId("T");
     const txn = {
@@ -1948,6 +1951,7 @@ async function saveTransaction() {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    if (txnBtn) btnLoading(txnBtn, true);
     const variance = physicalCount - product.currentStock;
     const checkNote = variance === 0 ? "OK" : `Variance: ${variance > 0 ? "+" : ""}${variance} (System: ${product.currentStock}, Physical: ${physicalCount})`;
     const fullNote = notes ? checkNote + " · " + notes : checkNote;
@@ -1974,6 +1978,7 @@ async function saveTransaction() {
     }
   }
 
+  if (txnBtn) btnLoading(txnBtn, false, 'Save Transaction');
   closeModal("transaction-modal");
   if (selectedProductId) renderJournal();
   else if (currentPage === "dashboard") renderDashboard();
@@ -2145,25 +2150,25 @@ async function deleteTransaction(txnId) {
   const typeLabel = t.type === "in" ? "Stock In" : t.type === "out" ? "Stock Out" : "Stock Check";
   const msg = 'Delete this ' + typeLabel + '?\n\n' + t.quantity + ' ' + (product ? packLabel(product) : '') + ' of ' + t.productName + '\nDate: ' + t.date + '\n\nThis will adjust the stock balance.';
 
-  if (!confirm(msg)) return;
-
-  // Reverse stock effect
-  if (product) {
-    if (t.type === "in") {
-      product.currentStock = Math.max(0, product.currentStock - t.quantity);
-    } else if (t.type === "out") {
-      product.currentStock += t.quantity;
+  confirmAction('Delete Transaction', msg, async function() {
+    // Reverse stock effect
+    if (product) {
+      if (t.type === "in") {
+        product.currentStock = Math.max(0, product.currentStock - t.quantity);
+      } else if (t.type === "out") {
+        product.currentStock += t.quantity;
+      }
+      await dbUpdateProductStock(product.id, product.currentStock);
     }
-    await dbUpdateProductStock(product.id, product.currentStock);
-  }
 
-  // Delete from DB and memory
-  await dbDeleteTransaction(txnId);
-  transactions = transactions.filter(tx => tx.id !== txnId);
+    // Delete from DB and memory
+    await dbDeleteTransaction(txnId);
+    transactions = transactions.filter(tx => tx.id !== txnId);
 
-  notify(typeLabel + " deleted — stock adjusted");
-  if (selectedProductId) renderJournal();
-  else if (currentPage === "dashboard") renderDashboard();
+    notify(typeLabel + " deleted — stock adjusted");
+    if (selectedProductId) renderJournal();
+    else if (currentPage === "dashboard") renderDashboard();
+  }, true);
 }
 
 // ============================================================
@@ -2412,6 +2417,9 @@ async function saveProduct() {
 
   if (!name || !category) { notify("Please fill in product name and category", "warning"); return; }
 
+  const prodBtn = document.getElementById("prod-save-btn");
+  if (prodBtn) btnLoading(prodBtn, true);
+
   if (editId) {
     const p = products.find(pr => pr.id === editId);
     if (p) {
@@ -2478,6 +2486,7 @@ async function saveProduct() {
     notify(name + " added to inventory" + (openingQty > 0 ? " with opening stock of " + openingQty : ""));
   }
 
+  if (prodBtn) btnLoading(prodBtn, false, editId ? 'Save Changes' : 'Add Product');
   document.getElementById("prod-image-file").dataset.cleared = "";
   closeModal("product-modal");
   if (currentPage === "products") renderProducts();
@@ -2489,22 +2498,23 @@ async function deleteProduct(id) {
   if(!p) return;
   const txnCount = transactions.filter(t => t.productId === id).length;
   let msg = 'Delete "' + p.name + '"?';
-  if(txnCount > 0) msg += '\n\nThis product has ' + txnCount + ' transaction(s) which will also be deleted.';
-  if(!confirm(msg)) return;
-  // Delete transactions first
-  if(txnCount > 0) {
-    await sbQuery(sb.from("transactions").delete().eq("product_id", id).select());
-    transactions = transactions.filter(t => t.productId !== id);
-  }
-  // Unlink from any spray products
-  await sbQuery(sb.from("pnd_products").update({ inventory_product_id: null }).eq("inventory_product_id", id).select());
-  // Delete the product
-  await sbQuery(sb.from("products").delete().eq("id", id).select());
-  products = products.filter(pr => pr.id !== id);
-  if(selectedProductId === id) { selectedProductId = null; }
-  notify(p.name + " deleted");
-  renderProducts();
-  renderJournal();
+  if(txnCount > 0) msg += ' This product has ' + txnCount + ' transaction(s) which will also be deleted.';
+  confirmAction('Delete Product', msg, async function() {
+    // Delete transactions first
+    if(txnCount > 0) {
+      await sbQuery(sb.from("transactions").delete().eq("product_id", id).select());
+      transactions = transactions.filter(t => t.productId !== id);
+    }
+    // Unlink from any spray products
+    await sbQuery(sb.from("pnd_products").update({ inventory_product_id: null }).eq("inventory_product_id", id).select());
+    // Delete the product
+    await sbQuery(sb.from("products").delete().eq("id", id).select());
+    products = products.filter(pr => pr.id !== id);
+    if(selectedProductId === id) { selectedProductId = null; }
+    notify(p.name + " deleted");
+    renderProducts();
+    renderJournal();
+  }, true);
 }
 
 // ============================================================
@@ -2580,6 +2590,9 @@ async function saveSupplier() {
 
   if (!name || !phone) { notify("Please fill in company name and WhatsApp number", "warning"); return; }
 
+  const supBtn = document.getElementById("sup-save-btn");
+  if (supBtn) btnLoading(supBtn, true);
+
   if (editId) {
     const s = suppliers.find(su => su.id === editId);
     if (s) {
@@ -2602,6 +2615,7 @@ async function saveSupplier() {
     notify(name + " added as supplier");
   }
 
+  if (supBtn) btnLoading(supBtn, false, editId ? 'Save Changes' : 'Add Supplier');
   closeModal("supplier-modal");
   renderSuppliers();
 }
@@ -2613,7 +2627,7 @@ async function deleteSupplier(id) {
   const msg = linkedCount > 0
     ? `Delete "${s.name}"? ${linkedCount} product(s) are linked to this supplier.`
     : `Delete "${s.name}"?`;
-  if (confirm(msg)) {
+  confirmAction('Delete Supplier', msg, async function() {
     // Unlink products
     for (const p of products) {
       if ((p.supplierIds||[]).includes(id)) {
@@ -2625,7 +2639,7 @@ async function deleteSupplier(id) {
     suppliers = suppliers.filter(su => su.id !== id);
     notify(s.name + " removed", "warning");
     renderSuppliers();
-  }
+  }, true);
 }
 
 // ============================================================
@@ -2788,7 +2802,7 @@ async function submitChangePin() {
   if (!pin1 || pin1.length !== 6 || !/^\d{6}$/.test(pin1)) { notify("New PIN must be exactly 6 digits", "warning"); return; }
   if (pin1 !== pin2) { notify("PINs do not match", "warning"); return; }
   var hashed = await hashPinLocal(pin1);
-  var res = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id));
+  var res = await sbQuery(sb.from("users").update({ pin: "", pin_hash: hashed, force_pin_update: false }).eq("id", currentUser.id).select());
   if (!res) return;
   document.getElementById("change-pin-modal").style.display = "none";
   notify("PIN updated successfully!");

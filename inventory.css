@@ -262,7 +262,7 @@ select { min-width: 140px; }
   .data-table table { min-width: 550px; }
 
   /* Modals → full width */
-  .modal-box, .modal-card { 
+  .modal-box {
     max-width: 95vw !important; 
     width: 95vw !important;
     max-height: 85vh !important; 

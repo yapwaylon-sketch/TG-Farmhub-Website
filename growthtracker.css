@@ -45,3 +45,25 @@ th.sortable:hover { color:var(--green-light); }
 }
 
 tr:last-child td { border-bottom:none; }
+
+/* Mobile: hide non-essential columns (Age, Target Induce, Days to Induce, Induce Start, Induce End, Days After Induce, Harvest Days, Remarks) */
+@media (max-width:768px) {
+  .data-table table th:nth-child(3),
+  .data-table table td:nth-child(3),
+  .data-table table th:nth-child(7),
+  .data-table table td:nth-child(7),
+  .data-table table th:nth-child(8),
+  .data-table table td:nth-child(8),
+  .data-table table th:nth-child(9),
+  .data-table table td:nth-child(9),
+  .data-table table th:nth-child(10),
+  .data-table table td:nth-child(10),
+  .data-table table th:nth-child(11),
+  .data-table table td:nth-child(11),
+  .data-table table th:nth-child(12),
+  .data-table table td:nth-child(12),
+  .data-table table th:nth-child(15),
+  .data-table table td:nth-child(15) {
+    display: none;
+  }
+}

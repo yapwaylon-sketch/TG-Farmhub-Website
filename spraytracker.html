@@ -119,6 +119,11 @@
       </select>
       <input type="date" id="jobs-filter-from" onchange="renderJobsTable()" placeholder="From" style="width:130px;">
       <input type="date" id="jobs-filter-to" onchange="renderJobsTable()" placeholder="To" style="width:130px;">
+      <select id="jobs-sort" onchange="renderJobsTable()" style="min-width:160px;">
+        <option value="date_desc">Planned Date (Newest)</option>
+        <option value="date_asc">Planned Date (Oldest)</option>
+        <option value="block_asc">Block Name (A-Z)</option>
+      </select>
     </div>
     <div id="batch-bar" style="display:none;padding:10px 16px;background:var(--bg-danger,#3a1c1c);border:1px solid var(--danger,#e04040);border-radius:8px;margin-bottom:8px;display:none;align-items:center;gap:12px;">
       <span id="batch-count" style="font-weight:600;color:var(--danger,#e04040);">0 selected</span>
@@ -880,6 +885,18 @@ function renderJobsTable() {
     return true;
   });
 
+  // Sort
+  const sortVal = document.getElementById("jobs-sort").value;
+  filtered.sort((a, b) => {
+    if(sortVal === "date_desc") return (b.planned_date || "").localeCompare(a.planned_date || "");
+    if(sortVal === "date_asc") return (a.planned_date || "").localeCompare(b.planned_date || "");
+    if(sortVal === "block_asc") {
+      const ba = getBlock(a.block_id), bb = getBlock(b.block_id);
+      return (ba?.block_name || "").localeCompare(bb?.block_name || "");
+    }
+    return 0;
+  });
+
   const tbody = document.getElementById("jobs-body");
   if(!filtered.length) {
     tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No active jobs. Create a new job to get started.</td></tr>';
@@ -1603,7 +1620,7 @@ async function submitEditJob(jobId) {
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
         logged_by: 'auto:job:'+jobId
-      }));
+      }).select());
     }
     const b=getBlock(j.block_id);
     const prodCount = jps.length || 1;
@@ -1999,7 +2016,7 @@ async function submitEditStatus(jobId) {
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
         logged_by: 'auto:job:'+jobId
-      }));
+      }).select());
     }
     const b=getBlock(j.block_id);
     const prodCount = jps.length || 1;
@@ -2123,7 +2140,7 @@ async function confirmInterventionDecision() {
         date_completed: compDate, next_spray_date: ls2?.next_spray_date || null,
         notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
         logged_by: 'intervention:job:'+jobId
-      }));
+      }).select());
     }
     closeModal();
     notify("Intervention logged for "+prodIds1.length+" product(s). Schedule unchanged.");
@@ -2156,7 +2173,7 @@ async function confirmInterventionDecision() {
         date_completed: compDate, next_spray_date: epNext,
         notes: 'Intervention spray (schedule reset). Job ID: '+jobId,
         logged_by: 'intervention:job:'+jobId
-      }));
+      }).select());
     }
     closeModal();
     notify("Schedule reset. Next spray: "+(newNextDate?fmtDateShort(newNextDate):'Not set'));
@@ -2183,7 +2200,7 @@ async function confirmInterventionDecision() {
         date_completed: compDate, next_spray_date: manualDate,
         notes: 'Intervention spray (manual date). Job ID: '+jobId,
         logged_by: 'intervention:job:'+jobId
-      }));
+      }).select());
     }
     closeModal();
     notify("Schedule updated. Next spray: "+fmtDateShort(manualDate));
@@ -2644,15 +2661,16 @@ async function migrateSingleToInventory(pndProductId) {
 async function migrateAllToInventory() {
   const unlinked = products.filter(p => !p.inventory_product_id);
   if(!unlinked.length) return;
-  if(!confirm('Migrate ' + unlinked.length + ' product' + (unlinked.length > 1 ? 's' : '') + ' to Inventory?')) return;
-  let count = 0;
-  for(const p of unlinked) {
-    const ok = await migrateToInventory(p.id);
-    if(ok) count++;
-  }
-  notify(count + ' product' + (count > 1 ? 's' : '') + ' migrated to Inventory');
-  renderProductsPage();
-  renderEnableProductsSection();
+  confirmAction('Migrate to Inventory', 'Migrate ' + unlinked.length + ' product' + (unlinked.length > 1 ? 's' : '') + ' to Inventory?', async function() {
+    let count = 0;
+    for(const p of unlinked) {
+      const ok = await migrateToInventory(p.id);
+      if(ok) count++;
+    }
+    notify(count + ' product' + (count > 1 ? 's' : '') + ' migrated to Inventory');
+    renderProductsPage();
+    renderEnableProductsSection();
+  }, false);
 }
 
 // Enable inventory product for spraying — creates a pnd_products row

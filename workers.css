@@ -1,12 +1,5 @@
 /* Workers-specific overrides */
 
-/* Gold primary button (overrides shared.css green) */
-.btn-primary { background: var(--gold); color: #1a1a1a; }
-.btn-primary:hover { background: var(--gold-light); }
-.btn-outline:hover { border-color: var(--gold); color: var(--gold); }
-.btn-danger { background: var(--critical-bg); color: var(--critical); border: 1px solid transparent; }
-.btn-danger:hover { border-color: var(--critical); }
-
 /* MAIN layout (workers uses .main not .main-content) */
 .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .page { display: none; flex: 1; padding: 24px; overflow-y: auto; }

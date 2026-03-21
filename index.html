@@ -831,14 +831,14 @@ async function saveUser() {
 async function deleteUser(userId) {
   const u = users.find(x => x.id === userId);
   if (!u) return;
-  if (!confirm('Delete user "' + u.displayName + '"?\n\nThis cannot be undone.')) return;
+  confirmAction('Delete User', 'Delete user "' + u.displayName + '"? This cannot be undone.', async function() {
+    const delResult = await sbQuery(sb.from("users").delete().eq("id", userId).select());
+    if (delResult === null) return;
 
-  const delResult = await sbQuery(sb.from("users").delete().eq("id", userId).select());
-  if (delResult === null) return;
-
-  users = users.filter(x => x.id !== userId);
-  notify(u.displayName + " deleted");
-  renderUsers();
+    users = users.filter(x => x.id !== userId);
+    notify(u.displayName + " deleted");
+    renderUsers();
+  }, true);
 }
 
 // ============================================================
@@ -939,16 +939,16 @@ function renderCropList() {
             <span style="flex:1;color:var(--text);">${esc(crop.name)} — ${esc(v.name)}</span>
             <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);">
               <span>Plant to Induce:</span>
-              <input type="number" class="inline-input" value="${v.days_to_induce != null ? v.days_to_induce : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" onchange="updateVarietyDaysToInduce('${v.id}', this.value)">
+              <input type="number" class="inline-input" id="vdi-${v.id}" value="${v.days_to_induce != null ? v.days_to_induce : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" oninput="document.getElementById('vdays-save-${v.id}').style.display='inline-flex'">
               <span>days</span>
-              <span class="save-tick" id="tick-vdi-${v.id}">&#10003;</span>
             </span>
             <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);">
               <span>Induce to Harvest:</span>
-              <input type="number" class="inline-input" value="${v.harvest_days_from_induction != null ? v.harvest_days_from_induction : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" onchange="updateVarietyHarvestDays('${v.id}', this.value)">
+              <input type="number" class="inline-input" id="vhd-${v.id}" value="${v.harvest_days_from_induction != null ? v.harvest_days_from_induction : ''}" placeholder="—" style="width:60px;text-align:center;font-size:11px;" oninput="document.getElementById('vdays-save-${v.id}').style.display='inline-flex'">
               <span>days</span>
-              <span class="save-tick" id="tick-vhd-${v.id}">&#10003;</span>
             </span>
+            <button class="btn btn-primary btn-sm" id="vdays-save-${v.id}" style="display:none;font-size:10px;" onclick="saveVarietyDays('${v.id}')">Save</button>
+            <span class="save-tick" id="tick-vdays-${v.id}">&#10003;</span>
             <button class="btn btn-outline btn-sm" onclick="editVarietyName('${v.id}','${esc(v.name)}')" style="font-size:10px;">Edit</button>
             <button class="btn btn-outline btn-sm" onclick="archiveVariety('${v.id}')" style="font-size:10px;color:var(--gold);">Archive</button>
           </div>
@@ -1005,11 +1005,12 @@ async function editCropName(id, oldName) {
 
 async function archiveCrop(id) {
   const crop = fcCrops.find(c => c.id === id);
-  if (!confirm('Archive "' + crop.name + '"? It will be hidden from dropdowns.')) return;
-  const result = await sbQuery(sb.from('crops').update({ archived: true }).eq('id', id).select());
-  if (result === null) return;
-  notify(crop.name + ' archived');
-  await loadFarmConfig(); renderCropList();
+  confirmAction('Archive Crop', 'Archive "' + crop.name + '"? It will be hidden from dropdowns.', async function() {
+    const result = await sbQuery(sb.from('crops').update({ archived: true }).eq('id', id).select());
+    if (result === null) return;
+    notify(crop.name + ' archived');
+    await loadFarmConfig(); renderCropList();
+  }, false);
 }
 
 async function restoreCrop(id) {
@@ -1029,22 +1030,22 @@ async function addVariety(cropId) {
   await loadFarmConfig(); renderCropList();
 }
 
-async function updateVarietyDaysToInduce(id, value) {
-  const days = value ? parseInt(value) : null;
-  const result = await sbQuery(sb.from('crop_varieties').update({ days_to_induce: days }).eq('id', id).select());
+async function saveVarietyDays(id) {
+  const vdiEl = document.getElementById('vdi-' + id);
+  const vhdEl = document.getElementById('vhd-' + id);
+  const saveBtn = document.getElementById('vdays-save-' + id);
+  if (!vdiEl || !vhdEl) return;
+  const dti = vdiEl.value ? parseInt(vdiEl.value) : null;
+  const hdfi = vhdEl.value ? parseInt(vhdEl.value) : null;
+  btnLoading(saveBtn, true);
+  const result = await sbQuery(sb.from('crop_varieties').update({ days_to_induce: dti, harvest_days_from_induction: hdfi }).eq('id', id).select());
+  btnLoading(saveBtn, false, 'Save');
   if (result === null) return;
   const v = fcVarieties.find(x => x.id === id);
-  if (v) v.days_to_induce = days;
-  showTick('tick-vdi-' + id);
-}
-
-async function updateVarietyHarvestDays(id, value) {
-  const days = value ? parseInt(value) : null;
-  const result = await sbQuery(sb.from('crop_varieties').update({ harvest_days_from_induction: days }).eq('id', id).select());
-  if (result === null) return;
-  const v = fcVarieties.find(x => x.id === id);
-  if (v) v.harvest_days_from_induction = days;
-  showTick('tick-vhd-' + id);
+  if (v) { v.days_to_induce = dti; v.harvest_days_from_induction = hdfi; }
+  saveBtn.style.display = 'none';
+  showTick('tick-vdays-' + id);
+  notify('Variety days saved');
 }
 
 async function editVarietyName(id, oldName) {
@@ -1059,7 +1060,13 @@ async function editVarietyName(id, oldName) {
 async function archiveVariety(id) {
   const assigned = fcBlockCrops.some(bc => bc.variety_id === id);
   if (assigned) {
-    if (!confirm("This variety is assigned to blocks. Archive it? (Existing assignments stay, but it won't appear in new dropdowns.)")) return;
+    confirmAction('Archive Variety', "This variety is assigned to blocks. Archive it? (Existing assignments stay, but it won't appear in new dropdowns.)", async function() {
+      const result = await sbQuery(sb.from('crop_varieties').update({ archived: true }).eq('id', id).select());
+      if (result === null) return;
+      notify('Variety archived');
+      await loadFarmConfig(); renderCropList();
+    }, false);
+    return;
   }
   const result = await sbQuery(sb.from('crop_varieties').update({ archived: true }).eq('id', id).select());
   if (result === null) return;
@@ -1090,11 +1097,12 @@ async function addCropStatus(cropId) {
 async function deleteCropStatus(id) {
   const inUse = fcBlockCrops.some(bc => bc.status_id === id);
   if (inUse) { notify('Cannot delete — status is in use by blocks', 'warning'); return; }
-  if (!confirm('Delete this status?')) return;
-  const result = await sbQuery(sb.from('crop_statuses').delete().eq('id', id).select());
-  if (result === null) return;
-  notify('Status removed');
-  await loadFarmConfig(); renderCropList();
+  confirmAction('Delete Status', 'Delete this crop status?', async function() {
+    const result = await sbQuery(sb.from('crop_statuses').delete().eq('id', id).select());
+    if (result === null) return;
+    notify('Status removed');
+    await loadFarmConfig(); renderCropList();
+  }, true);
 }
 
 // ============================================================
@@ -1165,7 +1173,7 @@ function renderBlockList() {
             <input type="number" class="inline-input" id="fc-qty-${bc.id}" value="${bc.quantity !== null ? bc.quantity : ''}" placeholder="Qty" style="width:80px;">
             <select class="inline-select" id="fc-st-${bc.id}" onchange="fcOnStatusChange('${bc.id}',this.value)"><option value="">— Status —</option>${statusOpts}</select>
             ${ageStr ? `<span style="font-size:11px;color:var(--text-dim);white-space:nowrap;">${ageStr}</span>` : ''}
-            <button class="btn btn-primary btn-sm" onclick="fcSaveBlockCrop('${bc.id}')" style="font-size:10px;">Save</button>
+            <button class="btn btn-primary btn-sm" id="fc-save-bc-${bc.id}" onclick="fcSaveBlockCrop('${bc.id}')" style="font-size:10px;">Save</button>
             ${isToReplant ? `<button class="btn btn-sm" onclick="fcOpenNewCycleModal('${bc.id}','${b.id}')" style="font-size:10px;background:var(--gold-pale);color:var(--gold);border:1px solid var(--gold);font-weight:700;">New Cycle</button>` : ''}
             <button class="btn btn-danger btn-sm" onclick="fcRemoveBlockCrop('${bc.id}','${b.id}')" style="font-size:10px;">&#10005;</button>
             <span class="save-tick" id="fc-tick-bc-${bc.id}">&#10003;</span>
@@ -1197,13 +1205,34 @@ function fcAgeFromPlanted(dp) {
 }
 
 
-async function fcUpdateBlock(id, field, value) {
+function fcUpdateBlock(id, field, value) {
   const upd = {};
   upd[field] = value === "" ? null : value;
-  const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
-  if (result === null) return;
-  const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
-  showTick('fc-tick-' + id);
+
+  // Confirm before deactivating a block
+  if (field === 'is_active' && !value) {
+    const bl = fcBlocks.find(b => b.id === id);
+    const blockName = bl ? bl.block_name : 'this block';
+    confirmAction('Deactivate Block?', 'Deactivate ' + blockName + '? It will be hidden from active lists.', async function() {
+      const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
+      if (result === null) { renderBlockList(); return; }
+      if (bl) Object.assign(bl, upd);
+      notify(blockName + ' deactivated');
+      renderBlockList();
+    });
+    // Revert checkbox until confirmed
+    var toggle = document.querySelector('input[onchange*="' + id + '"]');
+    if (toggle) toggle.checked = true;
+    return;
+  }
+
+  // Other updates proceed immediately
+  (async function() {
+    const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
+    if (result === null) return;
+    const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
+    showTick('fc-tick-' + id);
+  })();
 }
 
 async function fcAddBlock() {
@@ -1283,10 +1312,12 @@ async function fcExecuteDeleteBlock(blockId) {
 }
 
 async function fcSaveBlockCrop(id) {
+  const btn = document.getElementById('fc-save-bc-' + id);
+  if (btn) btnLoading(btn, true);
   const dpEl = document.getElementById('fc-dp-' + id);
   const qtyEl = document.getElementById('fc-qty-' + id);
   const stEl = document.getElementById('fc-st-' + id);
-  if(!dpEl || !qtyEl || !stEl) return;
+  if(!dpEl || !qtyEl || !stEl) { if (btn) btnLoading(btn, false, 'Save'); return; }
   const upd = {
     date_planted: dpEl.value || null,
     quantity: qtyEl.value === '' ? null : parseInt(qtyEl.value),
@@ -1294,7 +1325,7 @@ async function fcSaveBlockCrop(id) {
   };
   const bc = fcBlockCrops.find(x => x.id === id);
   const bcResult = await sbUpdateWithLock('block_crops', id, upd, bc ? bc.updated_at : null);
-  if (bcResult === null) return;
+  if (bcResult === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
   if (bc) Object.assign(bc, bcResult[0] || upd);
 
   // Upsert target_induce_date in growth_records when date_planted changes
@@ -1315,6 +1346,7 @@ async function fcSaveBlockCrop(id) {
     }
   }
 
+  if (btn) btnLoading(btn, false, 'Save');
   showTick('fc-tick-bc-' + id);
   notify('Saved');
 }
@@ -1572,11 +1604,12 @@ async function fcDoAddCrop(blockId) {
 }
 
 async function fcRemoveBlockCrop(id, blockId) {
-  if (!confirm('Remove this crop assignment?')) return;
-  const result = await sbQuery(sb.from('block_crops').delete().eq('id', id).select());
-  if (result === null) return;
-  notify('Removed');
-  await loadFarmConfig(); renderBlockList();
+  confirmAction('Remove Crop Assignment', 'Remove this crop assignment from the block?', async function() {
+    const result = await sbQuery(sb.from('block_crops').delete().eq('id', id).select());
+    if (result === null) return;
+    notify('Removed');
+    await loadFarmConfig(); renderBlockList();
+  }, true);
 }
 
 // ============================================================

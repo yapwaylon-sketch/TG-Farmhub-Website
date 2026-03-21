@@ -95,6 +95,7 @@
       <option value="all">All Varieties</option>
     </select>
     <button id="btn-harvest30" class="filter-btn" onclick="toggleHarvest30()">Harvest within 30 days</button>
+    <button class="filter-btn" id="btn-clear-filters" onclick="clearAllFilters()" style="display:none;">Clear Filters</button>
   </div>
 
   <!-- Growth Table -->
@@ -526,11 +527,13 @@ function populateFilters() {
 // ============================================================
 function onFilterStatus() {
   filterStatus = document.getElementById("filter-status").value;
+  updateClearFiltersBtn();
   renderOverview();
 }
 
 function onFilterVariety() {
   filterVariety = document.getElementById("filter-variety").value;
+  updateClearFiltersBtn();
   renderOverview();
 }
 
@@ -538,6 +541,23 @@ function toggleHarvest30() {
   filterHarvest30 = !filterHarvest30;
   const btn = document.getElementById("btn-harvest30");
   btn.classList.toggle("active", filterHarvest30);
+  updateClearFiltersBtn();
+  renderOverview();
+}
+
+function updateClearFiltersBtn() {
+  const hasFilter = filterStatus !== 'all' || filterVariety !== 'all' || filterHarvest30;
+  document.getElementById("btn-clear-filters").style.display = hasFilter ? '' : 'none';
+}
+
+function clearAllFilters() {
+  filterStatus = 'all';
+  filterVariety = 'all';
+  filterHarvest30 = false;
+  document.getElementById("filter-status").value = 'all';
+  document.getElementById("filter-variety").value = 'all';
+  document.getElementById("btn-harvest30").classList.remove("active");
+  updateClearFiltersBtn();
   renderOverview();
 }
 
