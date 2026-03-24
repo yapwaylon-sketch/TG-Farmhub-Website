@@ -2450,7 +2450,7 @@ async function openIngredientManager() {
         <button class="btn btn-sm" onclick="ingStartRename('${ing.id}')" id="ing-rename-btn-${ing.id}" style="font-size:11px;padding:2px 8px;">Rename</button>
         <button class="btn btn-sm" onclick="ingSaveRename('${ing.id}')" id="ing-save-btn-${ing.id}" style="display:none;font-size:11px;padding:2px 8px;background:rgba(74,124,63,0.2);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);">Save</button>
         <button class="btn btn-sm" onclick="ingCancelRename('${ing.id}')" id="ing-cancel-btn-${ing.id}" style="display:none;font-size:11px;padding:2px 8px;">Cancel</button>
-        ${count > 0 ? `<button class="btn btn-sm" onclick="ingStartMerge('${ing.id}')" id="ing-merge-btn-${ing.id}" style="font-size:11px;padding:2px 8px;background:rgba(232,160,32,0.2);color:#E8A020;border:1px solid rgba(232,160,32,0.3);">Merge</button>` : ''}
+        <button class="btn btn-sm" onclick="ingStartMerge('${ing.id}')" id="ing-merge-btn-${ing.id}" style="font-size:11px;padding:2px 8px;background:rgba(232,160,32,0.2);color:#E8A020;border:1px solid rgba(232,160,32,0.3);">Merge</button>
         <button class="btn btn-sm" onclick="ingDelete('${ing.id}')" style="font-size:11px;padding:2px 8px;${canDelete ? 'background:rgba(224,64,64,0.15);color:#f87171;border:1px solid rgba(224,64,64,0.3);' : 'opacity:0.3;cursor:not-allowed;'}" ${canDelete ? '' : 'disabled title="In use by ' + count + ' product(s)"'}>${canDelete ? 'Delete' : 'In Use'}</button>
       </td>
     </tr>`;
