@@ -2390,18 +2390,20 @@ function prodAddSelectedIngredient() {
 
 async function prodAddNewIngredient() {
   const nameInput = document.getElementById('prod-ingredient-new');
-  const name = nameInput.value.trim();
-  if (!name) { notify('Ingredient name required', 'warning'); return; }
-  const existing = pndIngredients.find(i => i.name.toLowerCase() === name.toLowerCase());
+  const ingName = nameInput.value.trim();
+  if (!ingName) { notify('Ingredient name required', 'warning'); return; }
+  const existing = pndIngredients.find(i => i.name.toLowerCase() === ingName.toLowerCase());
   if (existing) {
     if (!prodSelectedIngredients.some(x => x.id === existing.id)) {
       prodSelectedIngredients.push({ id: existing.id, name: existing.name });
     }
+    notify('"' + existing.name + '" added', 'success');
   } else {
-    const res = await sbQuery(sb.from("pnd_ingredients").insert({ name }).select());
-    if (res === null) return;
+    const res = await sbQuery(sb.from("pnd_ingredients").insert({ name: ingName }).select());
+    if (res === null) { notify('Failed to create ingredient', 'error'); return; }
     pndIngredients.push(res[0]);
     prodSelectedIngredients.push({ id: res[0].id, name: res[0].name });
+    notify('"' + ingName + '" created and added', 'success');
   }
   prodRenderIngredientPills();
   prodCancelNewIngredient();
