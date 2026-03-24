@@ -2920,13 +2920,7 @@ async function saveSupplier() {
       const oldName = s.name;
       Object.assign(s, { name, contact, phone, email, notes });
       await dbUpdateSupplier(s);
-      // Cascade: update supplier name in all transactions
-      if (oldName !== name) {
-        await cascadeSupplierRename(oldName, name);
-        notify(name + ' updated — all records updated from "' + oldName + '"');
-      } else {
-        notify(name + " updated");
-      }
+      notify(name + " updated");
     }
   } else {
     const newId = await dbNextId("S");
