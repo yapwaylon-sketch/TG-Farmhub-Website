@@ -3050,42 +3050,6 @@ async function saveEditProduct(id) {
   renderProductsPage();
 }
 
-async function addProduct() {
-  const name=document.getElementById("ap-name").value.trim();
-  const type=document.getElementById("ap-type").value;
-  const interval=document.getElementById("ap-interval").value; const intVal=interval===""?null:parseInt(interval);
-  const dAmt=document.getElementById("ap-dose-amt").value; const dAmtVal=dAmt===""?null:parseFloat(dAmt);
-  const dUnit=document.getElementById("ap-dose-unit").value||null;
-  const dPer=document.getElementById("ap-dose-per").value; const dPerVal=dPer===""?null:parseInt(dPer);
-  const sortOrder = products.length ? Math.max(...products.map(p => p.sort_order || 0)) + 1 : 1;
-  if(!validateRequired(["ap-name","ap-type"])) return;
-  // Resolve formulation: existing ID, new entry, or null
-  let formulationId = null;
-  const frmSel = document.getElementById("ap-formulation");
-  const frmNewName = document.getElementById("ap-formulation-new").value.trim();
-  if(frmNewName) {
-    const res = await sbQuery(sb.from("pnd_formulations").insert({name:frmNewName}).select());
-    if(res===null) return;
-    formulationId = res[0].id;
-    await loadFormulations();
-  } else if(frmSel.value && frmSel.value!=='__new__') {
-    formulationId = frmSel.value;
-  }
-
-  const pkgSize=document.getElementById("ap-pkg-size").value; const pkgSizeVal=pkgSize===""?null:parseFloat(pkgSize);
-  const pkgUnit=document.getElementById("ap-pkg-unit").value||null;
-  const pkgType=document.getElementById("ap-pkg-type").value||null;
-  const result = await sbQuery(sb.from("pnd_products").insert({product_name:name,formulation_id:formulationId,product_type:type,default_interval_days:intVal,default_dose_amount:dAmtVal,default_dose_unit:dUnit,default_dose_per_litres:dPerVal,sort_order:sortOrder,packaging_size:pkgSizeVal,packaging_unit:pkgUnit,packaging_type:pkgType}).select());
-  if(result===null) return;
-
-  notify("Product added");
-  ["ap-name","ap-interval","ap-dose-amt","ap-dose-per","ap-pkg-size"].forEach(id=>document.getElementById(id).value="");
-  ["ap-pkg-unit","ap-pkg-type"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("ap-formulation-new").value="";
-  await Promise.all([loadProducts(), loadProductIngredients()]);
-  renderProductsPage();
-}
-
 // ============================================================
 // REPORTS PAGE
 // ============================================================
