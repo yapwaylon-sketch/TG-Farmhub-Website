@@ -2529,6 +2529,53 @@ async function saveProduct() {
       await dbInsertTransaction(txn);
       transactions.unshift(txn);
     }
+    // Auto-create pnd_products for spray categories
+    const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'PGR', 'Adjuvant'];
+    if (sprayCategories.includes(category)) {
+      // Guard: check if pnd_products already exists for this inventory product (prevent duplicates)
+      const existingSpray = await sbQuery(sb.from('pnd_products').select('id').eq('inventory_product_id', newId));
+      if (!existingSpray || !existingSpray.length) {
+        const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant' };
+
+        // Get next sort_order
+        const maxSort = await sbQuery(sb.from('pnd_products').select('sort_order').order('sort_order', { ascending: false }).limit(1));
+        const nextSort = (maxSort && maxSort.length ? (maxSort[0].sort_order || 0) : 0) + 1;
+
+        // Find formulation ID using local pndFormulations array (already loaded at startup)
+        let formulationId = null;
+        if (formulation && typeof pndFormulations !== 'undefined') {
+          const match = pndFormulations.find(f => f.name.toLowerCase() === formulation.toLowerCase());
+          if (match) formulationId = match.id;
+        }
+
+        // Insert pnd_products row
+        const sprayResult = await sbQuery(sb.from('pnd_products').insert({
+          product_name: name,
+          product_type: typeMap[category] || 'pesticide',
+          formulation_id: formulationId,
+          inventory_product_id: newId,
+          packaging_size: packSize || null,
+          packaging_unit: packUnit || null,
+          packaging_type: packType || null,
+          sort_order: nextSort,
+          is_active: true,
+          default_dose_amount: null,
+          default_dose_unit: null,
+          default_dose_per_litres: null,
+          default_interval_days: null
+        }).select());
+
+        // Link active ingredients to pnd_product_ingredients
+        if (sprayResult && sprayResult.length && prodSelectedIngredients.length) {
+          const sprayProductId = sprayResult[0].id;
+          const rows = prodSelectedIngredients.map(i => ({
+            product_id: sprayProductId,
+            ingredient_id: i.id
+          }));
+          await sbQuery(sb.from('pnd_product_ingredients').insert(rows).select());
+        }
+      }
+    }
     notify(name + " added to inventory" + (openingQty > 0 ? " with opening stock of " + openingQty : ""));
   }
 
