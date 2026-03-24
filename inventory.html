@@ -2260,7 +2260,11 @@ function openProductModal() {
   populateSupplierCheckboxes([]);
   clearProductImage();
   document.getElementById("prod-image-file").value = "";
-  document.getElementById("product-modal").style.display = "flex";
+  const modal = document.getElementById("product-modal");
+  modal.style.display = "flex";
+  modal.scrollTop = 0;
+  const modalBox = modal.querySelector('.modal-box');
+  if (modalBox) modalBox.scrollTop = 0;
 }
 
 function openEditProduct(id) {
