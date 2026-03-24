@@ -17,15 +17,22 @@
 <div id="app">
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
-  <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;color:var(--gold-light);text-decoration:none;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
-    TG FarmHub
-  </a>
   <div class="sidebar-brand">
-    <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="TG" style="width:90%;height:90%;object-fit:contain;"></div>
-    <div>
-      <div class="sidebar-brand-text">PND Spray Tracker</div>
-      <div class="sidebar-brand-sub">Ladang PND</div>
+    <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+      <div class="sidebar-logo"><img src="assets/logo.png?v=2" alt="TG"></div>
+      <div>
+        <div class="sidebar-brand-text">Spray Tracker</div>
+        <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+          TG FarmHub
+        </div>
+      </div>
+    </a>
+    <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+      <button onclick="sessionStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
     </div>
   </div>
   <nav class="sidebar-nav" aria-label="Module navigation">
@@ -72,7 +79,7 @@
 
 <!-- PAGE: SUMMARY -->
 <div id="page-summary" class="page active">
-  <div class="print-header"><h2>Ladang PND — TG FarmHub</h2><p>Spray Summary Report — Generated <span class="print-date"></span></p></div>
+  <div class="print-header"><h2>TG Agro Fruits Sdn Bhd</h2><p>Spray Summary Report — Generated <span class="print-date"></span></p></div>
   <div class="page-header">
     <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Overview of all block spray statuses</div></div>
   </div>
@@ -149,6 +156,7 @@
     <div><div class="page-title">Spray Products</div><div class="page-subtitle">Products are managed in Inventory. Configure spray settings here.</div></div>
   </div>
   <div id="unlinked-products-banner" style="display:none;margin-bottom:12px;"></div>
+  <div id="needs-config-banner" style="display:none;margin-bottom:12px;"></div>
   <div class="data-table" style="margin-bottom:18px;">
     <div class="table-header">Spray Products</div>
     <div class="table-wrap">
@@ -237,7 +245,7 @@
 
 <!-- PAGE: REPORTS -->
 <div id="page-reports" class="page">
-  <div class="print-header"><h2>Ladang PND — TG FarmHub</h2><p id="print-report-info"></p></div>
+  <div class="print-header"><h2>TG Agro Fruits Sdn Bhd</h2><p id="print-report-info"></p></div>
   <div class="page-header">
     <div><div class="page-title">Reports</div><div class="page-subtitle">Generate and export spray data reports</div></div>
   </div>
@@ -1022,7 +1030,7 @@ function shareJobWhatsApp(jobId) {
   const msg = buildJobMessage(jobId);
   if(!msg) return;
   document.getElementById("modal-container").innerHTML = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay">
       <div class="modal-box" style="max-width:400px;">
         <div class="modal-header"><div class="modal-title">Send Job Summary</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div style="padding:16px;">
@@ -2570,6 +2578,15 @@ async function deleteOverride(id, blockId) {
 function renderProductsPage() {
   const tbody = document.getElementById("products-body");
 
+  const needsConfig = products.filter(p =>
+    p.inventory_product_id &&
+    p.is_active &&
+    (p.default_dose_amount === null || p.default_dose_amount === 0 ||
+     p.default_dose_unit === null || p.default_dose_unit === '' ||
+     p.default_dose_per_litres === null || p.default_dose_per_litres === 0 ||
+     p.default_interval_days === null || p.default_interval_days === 0)
+  );
+
   // Show unlinked products banner
   const unlinked = products.filter(p => !p.inventory_product_id);
   const banner = document.getElementById("unlinked-products-banner");
@@ -2598,6 +2615,30 @@ function renderProductsPage() {
     banner.style.display = 'none';
   }
 
+  // Show needs-spray-config banner
+  const configBannerEl = document.getElementById('needs-config-banner');
+  if (configBannerEl) {
+    if (needsConfig.length) {
+      let html = `<div style="background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.3);border-radius:10px;padding:14px 18px;margin-bottom:18px;">
+        <div style="font-weight:600;color:#E8A020;margin-bottom:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          ${needsConfig.length} product${needsConfig.length > 1 ? 's' : ''} need${needsConfig.length === 1 ? 's' : ''} spray configuration
+        </div>`;
+      for (const p of needsConfig) {
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(232,160,32,0.15);">
+          <span style="color:var(--white);font-size:13px;">${esc(p.product_name)}</span>
+          <button onclick="openSprayConfigModal('${p.id}')" class="btn btn-sm" style="background:rgba(232,160,32,0.2);color:#E8A020;border:1px solid rgba(232,160,32,0.4);font-size:12px;">Configure</button>
+        </div>`;
+      }
+      html += `</div>`;
+      configBannerEl.style.display = 'block';
+      configBannerEl.innerHTML = html;
+    } else {
+      configBannerEl.style.display = 'none';
+      configBannerEl.innerHTML = '';
+    }
+  }
+
   // Render product table — read-only info from inventory, editable spray config
   tbody.innerHTML = products.map(p => {
     const inv = p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
@@ -2610,9 +2651,12 @@ function renderProductsPage() {
     const stock = inv ? fmtNum(parseFloat(inv.current_stock) || 0) + ' ' + esc(inv.pack_unit || '') : '—';
     const stockColor = inv ? ((parseFloat(inv.current_stock) || 0) > 0 ? '#4ade80' : '#f87171') : 'var(--text-muted)';
     const linkedIcon = inv ? '' : '<span title="Not linked to inventory" style="color:#E8A020;font-size:10px;margin-left:4px;">⚠</span>';
+    const needsConfigIcon = needsConfig.some(nc => nc.id === p.id)
+      ? '<span title="Needs spray configuration" style="color:#E8A020;font-size:10px;margin-left:4px;">⚙</span>'
+      : '';
 
     return `<tr>
-      <td style="font-weight:600;white-space:nowrap;">${esc(pName)}${linkedIcon}</td>
+      <td style="font-weight:600;white-space:nowrap;">${esc(pName)}${linkedIcon}${needsConfigIcon}</td>
       <td style="font-size:11px;color:#8fcf80;">${esc(ai)}</td>
       <td style="font-size:12px;">${esc(formulation)}</td>
       <td style="font-size:12px;">${esc(category)}</td>
@@ -2622,6 +2666,92 @@ function renderProductsPage() {
       <td><span class="save-tick" id="tick-p-${p.id}">✓</span></td>
     </tr>`;
   }).join("");
+}
+
+function closeSprayConfigModal() {
+  const el = document.getElementById('spray-config-modal');
+  if (el) el.remove();
+}
+
+function openSprayConfigModal(productId) {
+  const p = products.find(x => x.id === productId);
+  if (!p) return;
+
+  closeSprayConfigModal();
+
+  const modalHtml = `
+    <div class="modal-overlay" id="spray-config-modal" onclick="if(event.target===this)return;">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-header">
+          <h3>Spray Config: ${esc(p.product_name)}</h3>
+          <button class="modal-close" onclick="closeSprayConfigModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-field">
+            <label>Default Dose Amount</label>
+            <input type="number" id="sc-dose-amt" value="${p.default_dose_amount || ''}" step="0.01" placeholder="e.g. 1.5">
+          </div>
+          <div class="form-field">
+            <label>Dose Unit</label>
+            <select id="sc-dose-unit">
+              <option value="">— Select —</option>
+              ${['g','ml','kg','L'].map(u => `<option value="${u}" ${p.default_dose_unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Per Litres (water)</label>
+            <input type="number" id="sc-dose-per" value="${p.default_dose_per_litres || ''}" placeholder="e.g. 100">
+          </div>
+          <div class="form-field">
+            <label>Spray Interval (days)</label>
+            <input type="number" id="sc-interval" value="${p.default_interval_days || ''}" placeholder="e.g. 14">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="closeSprayConfigModal()">Cancel</button>
+          <button class="btn btn-primary" id="sc-save-btn" onclick="saveSprayConfig('${p.id}')">Save Config</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function saveSprayConfig(productId) {
+  const doseAmt = parseFloat(document.getElementById('sc-dose-amt').value) || null;
+  const doseUnit = document.getElementById('sc-dose-unit').value || null;
+  const dosePer = parseFloat(document.getElementById('sc-dose-per').value) || null;
+  const interval = parseInt(document.getElementById('sc-interval').value) || null;
+
+  if (!doseAmt || !doseUnit || !dosePer || !interval) {
+    notify('Please fill in all fields: dose amount, unit, per litres, and interval', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('sc-save-btn');
+  if (btn) btnLoading(btn, true);
+
+  const result = await sbQuery(sb.from('pnd_products').update({
+    default_dose_amount: doseAmt,
+    default_dose_unit: doseUnit,
+    default_dose_per_litres: dosePer,
+    default_interval_days: interval
+  }).eq('id', productId).select());
+
+  if (result && result.length) {
+    const p = products.find(x => x.id === productId);
+    if (p) {
+      p.default_dose_amount = doseAmt;
+      p.default_dose_unit = doseUnit;
+      p.default_dose_per_litres = dosePer;
+      p.default_interval_days = interval;
+    }
+    notify(p ? p.product_name + ' spray config saved' : 'Spray config saved');
+    closeSprayConfigModal();
+    renderProductsPage();
+  }
+
+  if (btn) btnLoading(btn, false, 'Save Config');
 }
 
 // Migrate a spray product to Inventory (auto-create + link)
