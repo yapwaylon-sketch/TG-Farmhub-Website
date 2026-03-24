@@ -2485,7 +2485,7 @@ async function saveProduct() {
         await cascadeProductRename(editId, oldName, name);
       }
       // Cascade: sync to linked spray product (pnd_products)
-      const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant' };
+      const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant', 'Carbide': 'carbide' };
       const sprayUpdate = { product_name: name, product_type: typeMap[category] || 'pesticide', packaging_size: packSize || null, packaging_unit: packUnit || null, packaging_type: packType || null };
       await sbQuery(sb.from('pnd_products').update(sprayUpdate).eq('inventory_product_id', editId).select());
       // Sync AI to pnd_product_ingredients if AI changed
@@ -2531,12 +2531,12 @@ async function saveProduct() {
       transactions.unshift(txn);
     }
     // Auto-create pnd_products for spray categories
-    const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'PGR', 'Adjuvant'];
+    const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'PGR', 'Adjuvant', 'Carbide'];
     if (sprayCategories.includes(category)) {
       // Guard: check if pnd_products already exists for this inventory product (prevent duplicates)
       const existingSpray = await sbQuery(sb.from('pnd_products').select('id').eq('inventory_product_id', newId));
       if (!existingSpray || !existingSpray.length) {
-        const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant' };
+        const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant', 'Carbide': 'carbide' };
 
         // Get next sort_order
         const maxSort = await sbQuery(sb.from('pnd_products').select('sort_order').order('sort_order', { ascending: false }).limit(1));
