@@ -1404,16 +1404,43 @@ function renderOrderCards() {
         var toggleId = 'date-grp-' + status + '-' + dateKey;
 
         html += '<div class="so-date-group">';
-        html += '<div class="so-date-header' + (collapsed ? ' collapsed' : '') + '" onclick="this.classList.toggle(\'collapsed\');var g=document.getElementById(\'' + toggleId + '\');g.style.display=g.style.display===\'none\'?\'grid\':\'none\';">';
+        html += '<div class="so-date-header' + (collapsed ? ' collapsed' : '') + '" onclick="this.classList.toggle(\'collapsed\');var g=document.getElementById(\'' + toggleId + '\');g.style.display=g.style.display===\'none\'?\'\':\'none\';">';
         html += '<svg class="so-date-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>';
         html += '<span>' + dateLabel + '</span>';
         html += '<span class="so-date-count">' + dateCards.length + '</span>';
         html += '</div>';
-        html += '<div id="' + toggleId + '" class="sales-cards-grid" style="' + (collapsed ? 'display:none;' : '') + '">';
-        dateCards.forEach(function(o) {
-          html += soRenderCard(o, status, color, label);
-        });
-        html += '</div>';
+
+        if (isToday) {
+          // Today: full cards
+          html += '<div id="' + toggleId + '" class="sales-cards-grid" style="">';
+          dateCards.forEach(function(o) {
+            html += soRenderCard(o, status, color, label);
+          });
+          html += '</div>';
+        } else {
+          // Past dates: compact table rows
+          html += '<div id="' + toggleId + '" style="display:none;">';
+          html += '<table class="so-compact-table"><thead><tr>';
+          html += '<th>Doc #</th><th>Customer</th><th>Type</th><th>Items</th><th>Total</th><th>Payment</th>';
+          html += '</tr></thead><tbody>';
+          dateCards.forEach(function(o) {
+            var custName = getCustomerName(o.customer_id);
+            var itemCount = soItemsCount(o.id);
+            var total = parseFloat(o.grand_total) || 0;
+            var dLabel = docTypeLabel(o.doc_type);
+            var dBadge = docTypeBadgeClass(o.doc_type);
+            html += '<tr class="so-compact-row" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
+            html += '<td class="so-compact-doc">' + esc(o.doc_number || o.id) + '</td>';
+            html += '<td>' + esc(custName) + '</td>';
+            html += '<td><span class="badge ' + dBadge + '" style="font-size:10px;">' + dLabel + '</span></td>';
+            html += '<td>' + itemCount + '</td>';
+            html += '<td class="so-compact-total">' + formatRM(total) + '</td>';
+            html += '<td><span class="badge badge-' + esc(o.payment_status || 'unpaid') + '" style="font-size:10px;">' + soPaymentLabel(o.payment_status) + '</span></td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+          html += '</div>';
+        }
         html += '</div>';
       });
     } else {

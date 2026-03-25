@@ -70,6 +70,45 @@
   padding: 0 6px;
 }
 
+/* Compact table for past orders */
+.so-compact-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+.so-compact-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.so-compact-table th:nth-child(4),
+.so-compact-table th:nth-child(5) { text-align: right; }
+.so-compact-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.so-compact-row:hover { background: rgba(255,255,255,0.05); }
+.so-compact-row td {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  white-space: nowrap;
+}
+.so-compact-row td:nth-child(4),
+.so-compact-row td:nth-child(5) { text-align: right; }
+.so-compact-doc { font-weight: 700; color: var(--gold); }
+.so-compact-total { font-weight: 700; }
+@media (max-width: 600px) {
+  .so-compact-table th:nth-child(4),
+  .so-compact-row td:nth-child(4) { display: none; }
+}
+
 /* ============================================================
    SALES CARDS
    ============================================================ */
