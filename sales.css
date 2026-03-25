@@ -4,11 +4,78 @@
    ============================================================ */
 
 /* ============================================================
+   STATUS GROUPS
+   ============================================================ */
+.so-status-group {
+  margin-bottom: 20px;
+}
+.so-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-left: 4px solid;
+  background: rgba(255,255,255,0.03);
+  border-radius: 0 8px 8px 0;
+}
+.so-group-title {
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.so-group-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+/* Date sub-groups (for completed/cancelled) */
+.so-date-group { margin-bottom: 10px; }
+.so-date-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 6px;
+  user-select: none;
+}
+.so-date-header:hover { background: rgba(255,255,255,0.05); }
+.so-date-chevron { transition: transform 0.2s; flex-shrink: 0; }
+.so-date-header.collapsed .so-date-chevron { transform: rotate(-90deg); }
+.so-date-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.08);
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+/* ============================================================
    SALES CARDS
    ============================================================ */
 .sales-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 10px;
 }
 .sales-cards-grid .sales-card {
@@ -19,7 +86,7 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px 16px;
+  overflow: hidden;
   margin-bottom: 10px;
   transition: border-color 0.2s, transform 0.15s;
   cursor: pointer;
@@ -35,38 +102,69 @@
   border-color: var(--green-light);
 }
 
-.sales-card-header {
+.sales-card-status-banner {
+  padding: 6px 14px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+}
+.status-banner-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.sales-card-title {
-  font-size: 14px;
+.sales-card-customer {
+  font-size: 16px;
   font-weight: 700;
   color: var(--white);
+  padding: 10px 14px 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.sales-card-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  margin-bottom: 6px;
+}
+
+.sales-card-doc {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sales-card-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px 10px;
+  gap: 8px;
+}
+
 .sales-card-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-muted);
-  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 
 .sales-card-total {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--gold-light);
-  margin-bottom: 6px;
+  white-space: nowrap;
 }
 
 .sales-card-items {
@@ -293,10 +391,14 @@
 /* ============================================================
    BOTTOM ACTION BAR
    ============================================================ */
+/* Offset content for fixed bottom bar */
+.page-body { padding-bottom: 90px; }
+.main-content { padding-bottom: 80px !important; }
+
 .bottom-actions {
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: var(--sidebar-w, 220px);
   right: 0;
   background: var(--bg-card);
   border-top: 1px solid var(--border);
@@ -485,7 +587,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  padding: 16px 0;
+  padding: 8px 0;
   overflow-x: auto;
 }
 
@@ -495,12 +597,12 @@
   align-items: center;
   position: relative;
   flex: 1;
-  min-width: 60px;
+  min-width: 50px;
 }
 
 .timeline-dot {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid var(--border);
   background: var(--bg);
@@ -521,10 +623,10 @@
 }
 
 .timeline-step .timeline-label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-dim);
-  margin-top: 6px;
+  margin-top: 4px;
   text-align: center;
   white-space: nowrap;
 }
@@ -535,14 +637,14 @@
 
 .timeline-step.current .timeline-label {
   color: var(--gold-light);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .timeline-line {
   flex: 1;
-  height: 2px;
+  height: 3px;
   background: var(--border);
-  min-width: 20px;
+  min-width: 16px;
   align-self: center;
   margin-top: -10px;
 }
@@ -623,7 +725,7 @@
     padding-bottom: 80px;
   }
 
-  .sales-card-header {
+  .sales-card-info-row {
     flex-wrap: wrap;
   }
 
@@ -634,6 +736,7 @@
 
   .bottom-actions {
     padding: 8px 10px;
+    left: 0;
   }
 
   .bottom-actions .btn {
@@ -663,11 +766,11 @@
   }
 
   .status-timeline {
-    padding: 12px 0;
+    padding: 6px 0;
   }
 
   .timeline-step .timeline-label {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .aging-row {
@@ -677,18 +780,36 @@
 }
 
 @media (max-width: 400px) {
-  .sales-card {
-    padding: 10px 12px;
+  .sales-card-customer {
+    font-size: 14px;
   }
 
   .sales-card-total {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .sales-tab {
     padding: 8px 10px;
     font-size: 11px;
   }
+}
+
+/* ============================================================
+   DESKTOP (≥1024px) — larger sales card text
+   ============================================================ */
+@media (min-width: 1024px) {
+  .sales-card-customer { font-size: 18px; }
+  .sales-card-doc { font-size: 13px; }
+  .sales-card-meta { font-size: 13px; }
+  .sales-card-total { font-size: 20px; }
+  .status-banner-label { font-size: 14px; }
+  .so-group-title { font-size: 17px; }
+  .so-detail-section-title { font-size: 14px; }
+  .so-detail-section { padding: 14px 18px; }
+  .so-detail-value { font-size: 15px; }
+  .so-detail-label { font-size: 12px; }
+  .timeline-step .timeline-label { font-size: 13px; }
+  .sales-tab { font-size: 14px; padding: 10px 20px; }
 }
 
 /* ============================================================
@@ -801,17 +922,7 @@
   opacity: 1;
 }
 
-/* Line item rows */
-.order-item-row {
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  display: flex;
-  gap: 8px;
-}
-
+/* Line item rows (extends .order-item-row from above) */
 .oir-num {
   font-size: 12px;
   font-weight: 700;
@@ -943,8 +1054,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
@@ -952,15 +1063,15 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
 }
 
 .so-detail-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   margin-bottom: 12px;
 }
@@ -968,7 +1079,7 @@
 .so-detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px 24px;
+  gap: 6px 16px;
 }
 
 .so-detail-field {
@@ -978,14 +1089,14 @@
 .so-detail-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-dim);
-  margin-bottom: 2px;
+  color: var(--text-muted);
+  margin-bottom: 1px;
 }
 
 .so-detail-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--white);
   word-break: break-word;
 }
 
@@ -1086,6 +1197,90 @@
 .rpt-outstanding-green { color:var(--good); }
 .rpt-outstanding-gold { color:var(--gold-light); }
 .rpt-outstanding-red { color:var(--red); font-weight:700; }
+
+/* Calendar Picker */
+.cal-input {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 12px; border:1px solid var(--border); border-radius:8px;
+  background:var(--bg-card); color:var(--text); cursor:pointer;
+  transition:border-color .2s;
+}
+.cal-input:hover { border-color:var(--green-light); }
+.cal-input svg { color:var(--text-muted); flex-shrink:0; }
+.cal-input-text { font-size:14px; }
+.cal-input-text.has-value { color:var(--text); }
+.cal-input-text:not(.has-value) { color:var(--text-muted); }
+
+.cal-popup {
+  position:fixed; z-index:1050;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,0.5);
+  padding:16px; width:300px;
+  animation: calFadeIn .15s ease-out;
+}
+@keyframes calFadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+.cal-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.cal-header-title {
+  font-size:15px; font-weight:700; color:var(--text);
+  cursor:pointer; padding:4px 8px; border-radius:6px;
+  transition:background .15s;
+}
+.cal-header-title:hover { background:rgba(255,255,255,0.06); }
+.cal-nav {
+  width:32px; height:32px; border:none; border-radius:8px;
+  background:transparent; color:var(--text-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s, color .15s; font-size:18px;
+}
+.cal-nav:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.cal-close-btn { font-size:20px; margin-left:8px; }
+
+.cal-weekdays {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  text-align:center; margin-bottom:4px;
+}
+.cal-weekday {
+  font-size:11px; font-weight:600; color:var(--text-muted);
+  text-transform:uppercase; padding:4px 0;
+}
+
+.cal-days {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  gap:2px;
+}
+.cal-day {
+  width:100%; aspect-ratio:1; border:none; border-radius:50%;
+  background:transparent; color:var(--text); cursor:pointer;
+  font-size:13px; font-weight:500;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s, color .15s;
+}
+.cal-day:hover { background:rgba(74,124,63,0.25); }
+.cal-day.other-month { color:var(--text-muted); opacity:0.4; }
+.cal-day.today {
+  border:2px solid var(--green-light);
+  font-weight:700;
+}
+.cal-day.selected {
+  background:var(--green); color:#fff; font-weight:700;
+}
+.cal-day.selected.today { border-color:var(--green); }
+
+.cal-footer {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+}
+.cal-footer-btn {
+  border:none; background:transparent; color:var(--green-light);
+  cursor:pointer; font-size:13px; font-weight:600; padding:4px 8px;
+  border-radius:6px; transition:background .15s;
+}
+.cal-footer-btn:hover { background:rgba(74,124,63,0.15); }
+.cal-footer-btn.clear { color:var(--text-muted); }
 
 @media print {
   .report-btns, #rpt-actions, #rpt-filters { display:none !important; }
