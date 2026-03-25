@@ -16,7 +16,7 @@
   padding: 8px 12px;
   margin-bottom: 10px;
   border-left: 4px solid;
-  background: rgba(255,255,255,0.03);
+  background: var(--overlay-subtle);
   border-radius: 0 8px 8px 0;
 }
 .so-group-title {
@@ -53,14 +53,14 @@
   border-radius: 6px;
   user-select: none;
 }
-.so-date-header:hover { background: rgba(255,255,255,0.05); }
+.so-date-header:hover { background: var(--overlay-light); }
 .so-date-chevron { transition: transform 0.2s; flex-shrink: 0; }
 .so-date-header.collapsed .so-date-chevron { transform: rotate(-90deg); }
 .so-date-count {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
-  background: rgba(255,255,255,0.08);
+  background: var(--overlay-medium);
   min-width: 20px;
   height: 20px;
   border-radius: 10px;
@@ -92,12 +92,12 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.so-compact-row:hover { background: rgba(255,255,255,0.05); }
+.so-compact-row:hover { background: var(--overlay-light); }
 .so-compact-row td {
   padding: 8px 10px;
   font-size: 12px;
   color: var(--text);
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid var(--overlay-subtle);
   white-space: nowrap;
 }
 .so-compact-row td:nth-child(4),
@@ -1268,14 +1268,14 @@
   cursor:pointer; padding:4px 8px; border-radius:6px;
   transition:background .15s;
 }
-.cal-header-title:hover { background:rgba(255,255,255,0.06); }
+.cal-header-title:hover { background:var(--overlay-light); }
 .cal-nav {
   width:32px; height:32px; border:none; border-radius:8px;
   background:transparent; color:var(--text-muted); cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   transition:background .15s, color .15s; font-size:18px;
 }
-.cal-nav:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.cal-nav:hover { background:var(--overlay-medium); color:var(--text); }
 .cal-close-btn { font-size:20px; margin-left:8px; }
 
 .cal-weekdays {
@@ -1305,7 +1305,7 @@
   font-weight:700;
 }
 .cal-day.selected {
-  background:var(--green); color:#fff; font-weight:700;
+  background:var(--green); color:#1A0E2E; font-weight:700;
 }
 .cal-day.selected.today { border-color:var(--green); }
 

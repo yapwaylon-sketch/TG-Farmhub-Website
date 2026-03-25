@@ -1,14 +1,14 @@
 /* Spray-tracker-specific table styles */
 tr:last-child td { border-bottom:none; }
-th.product-group { text-align:center; color:#F0D060; font-size:11px; font-weight:800; border-left:2px solid rgba(255,255,255,0.15); }
+th.product-group { text-align:center; color:var(--gold); font-size:11px; font-weight:800; border-left:2px solid var(--border); }
 th.product-sub { text-align:center; font-size:9px; border-left:1px solid var(--border); }
 td.spray-cell { text-align:center; font-size:12px; border-left:1px solid var(--border); }
-td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
+td.spray-cell.pg-divider { border-left:2px solid var(--border); }
 
 /* Summary tabs */
 .sum-tab { padding:7px 16px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--bg-card); color:var(--text-muted); cursor:pointer; transition:all 0.15s; }
 .sum-tab:hover { border-color:var(--green); color:var(--text); }
-.sum-tab.active { background:var(--green); color:#fff; border-color:var(--green); }
+.sum-tab.active { background:var(--green); color:#1A0E2E; border-color:var(--green); }
 
 /* Job type toggle */
 .jt-toggle { display:flex; gap:0; border-radius:8px; overflow:hidden; border:1px solid var(--border); }
@@ -86,3 +86,13 @@ td.spray-cell.pg-divider { border-left:2px solid rgba(255,255,255,0.15); }
   .print-header p { font-size:11px; color:#666; }
 }
 .print-header { display:none; }
+
+/* DESKTOP (>=1024px) */
+@media (min-width: 1024px) {
+  .page-title { font-size: 28px; }
+  .summary-card .sc-value { font-size: 28px; }
+  td, th { font-size: 14px; padding: 10px 14px; }
+  input, select, textarea { font-size: 14px; }
+  .btn { font-size: 14px; }
+  .sum-tab { font-size: 14px; }
+}

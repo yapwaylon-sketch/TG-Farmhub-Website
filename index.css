@@ -46,10 +46,11 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 }
 .hub-brand { display: flex; align-items: center; gap: 14px; }
 .hub-logo {
-  width: 48px; height: 48px; background: linear-gradient(135deg, var(--green), var(--green-light));
-  border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  font-size: 24px; box-shadow: 0 4px 12px rgba(74,124,63,0.3);
+  width: 84px; height: 84px; background: transparent;
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; overflow: hidden;
 }
+.hub-logo img { width:100%; height:100%; object-fit:contain; }
 .hub-title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--gold); font-weight: 700; }
 .hub-subtitle { font-size: 11px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; }
 .hub-user { display: flex; align-items: center; gap: 12px; }
@@ -174,7 +175,7 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 
 /* ===== FARM CONFIG ===== */
 .fc-tab { flex: 1; padding: 10px 16px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; font-family: inherit; background: var(--bg-input); color: var(--text-muted); transition: all 0.15s; }
-.fc-tab.active { background: var(--green); color: white; }
+.fc-tab.active { background: var(--green); color: #1A0E2E; }
 .fc-tab:hover:not(.active) { background: var(--bg-hover); }
 .crop-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
 .crop-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
