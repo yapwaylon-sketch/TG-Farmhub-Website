@@ -1590,11 +1590,9 @@ function soRenderDetail() {
     html += '<button class="btn btn-primary" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
     html += 'View Document</button>';
-    if (o.doc_type !== 'delivery_order') {
-      html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
-      html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
-      html += 'A4 Document</button>';
-    }
+    html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
+    html += 'A4 Document</button>';
   }
 
   html += '</div>';
@@ -4802,7 +4800,9 @@ function soGenerateDocA4(orderId) {
   soDocCurrentOrderId = orderId;
   var cust = customers.find(function(c) { return c.id === o.customer_id; });
   var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+  var isDO = o.doc_type === 'delivery_order';
   var docNumber = esc(o.doc_number || o.id) + ' (A4)';
+  var docLabel = isDO ? 'DELIVERY ORDER' : 'CASH SALES';
   var preparedBy = currentUser ? esc(currentUser.displayName) : '—';
 
   // Build single page content (reused for both copies)
@@ -4822,7 +4822,7 @@ function soGenerateDocA4(orderId) {
     html += '<hr class="a4-divider">';
 
     // Title
-    html += '<div class="a4-title">DELIVERY ORDER</div>';
+    html += '<div class="a4-title">' + docLabel + '</div>';
     html += '<div class="a4-doc-number">' + docNumber + '</div>';
     html += '<div class="a4-copy-label">' + copyLabel + '</div>';
 
@@ -4890,10 +4890,14 @@ function soGenerateDocA4(orderId) {
     html += '</div>';
 
     // Payment
-    var payStatus = o.payment_status || 'unpaid';
-    var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
     html += '<div style="font-size:12px;margin-bottom:8px;">';
-    html += '<strong>Payment:</strong> CASH &nbsp;&nbsp;&nbsp; <strong>Status:</strong> ' + payLabel;
+    if (isDO) {
+      html += '<strong>Payment:</strong> CREDIT';
+    } else {
+      var payStatus = o.payment_status || 'unpaid';
+      var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
+      html += '<strong>Payment:</strong> CASH &nbsp;&nbsp;&nbsp; <strong>Status:</strong> ' + payLabel;
+    }
     html += '</div>';
 
     // Signature Section
