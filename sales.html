@@ -1638,6 +1638,13 @@ function soRenderDetail() {
     html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
   }
 
+  // Delete button for cancelled orders (admin only)
+  if (o.status === 'cancelled' && currentUser && currentUser.role === 'admin') {
+    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);gap:6px;" onclick="soDeleteOrder(\'' + esc(o.id) + '\')">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    html += 'Delete Order</button>';
+  }
+
   // Document buttons for completed orders
   if (o.status === 'completed') {
     html += '<button class="btn btn-primary" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
@@ -2222,6 +2229,27 @@ function soCancelOrder(orderId) {
   confirmAction('Cancel Order?', 'This will cancel the order. This action cannot be undone.', async function() {
     var ok = await soUpdateStatus(orderId, 'cancelled');
     if (ok) { notify('Order cancelled', 'success'); soRenderDetail(); }
+  }, true);
+}
+
+function soDeleteOrder(orderId) {
+  if (!currentUser || currentUser.role !== 'admin') { notify('Admin access required', 'warning'); return; }
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o || o.status !== 'cancelled') { notify('Only cancelled orders can be deleted', 'warning'); return; }
+  var custName = getCustomerName(o.customer_id);
+  confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order and its items. This cannot be undone.', async function() {
+    // Delete order items first
+    var r1 = await sbQuery(sb.from('order_items').delete().eq('order_id', orderId));
+    if (r1 && r1.error) { notify('Failed to delete items: ' + r1.error.message, 'error'); return; }
+    // Delete the order
+    var r2 = await sbQuery(sb.from('sales_orders').delete().eq('id', orderId));
+    if (r2 && r2.error) { notify('Failed to delete order: ' + r2.error.message, 'error'); return; }
+    // Remove from local arrays
+    orders = orders.filter(function(x) { return x.id !== orderId; });
+    orderItems = orderItems.filter(function(x) { return x.order_id !== orderId; });
+    notify('Order deleted', 'success');
+    soDetailOrderId = null;
+    renderOrders();
   }, true);
 }
 
