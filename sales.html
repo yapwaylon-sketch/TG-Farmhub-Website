@@ -5139,6 +5139,9 @@ function soGenerateDoc(orderId) {
     html += '<div class="doc-info-label">Driver:</div><div class="doc-info-value">' + esc(driver ? driver.name : '\u2014') + '</div>';
   }
   html += '</div>';
+  if (o.notes) {
+    html += '<div style="font-size:10px;margin-bottom:6px;padding:4px 6px;border:1px dashed #000;background:#f9f9f9;"><strong>Note:</strong> ' + esc(o.notes) + '</div>';
+  }
 
   // Items list
   var subtotal = 0;
@@ -5256,6 +5259,9 @@ function soGenerateDocA4(orderId) {
       html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
     }
     html += '</div>';
+    if (o.notes) {
+      html += '<div style="font-size:12px;margin-bottom:12px;padding:8px 12px;border:1px dashed #999;border-radius:4px;background:#faf8f0;"><strong>Note:</strong> ' + esc(o.notes) + '</div>';
+    }
 
     // Items Table
     var subtotal = 0;
