@@ -1089,59 +1089,108 @@ function renderDashboard() {
   var today = todayStr();
   var html = '';
 
-  // --- Summary Cards ---
+  // --- Data gathering ---
   var ordersToday = orders.filter(function(o) { return o.order_date === today; }).length;
 
-  var pendingPrep = orders.filter(function(o) { return o.status === 'pending' || o.status === 'preparing'; }).length;
-
-  var readyCount = orders.filter(function(o) { return o.status === 'prepared'; }).length;
-
-  var outstandingTotal = 0;
+  var unpaidCS = 0;
   orders.forEach(function(o) {
     if (o.status === 'completed' && o.doc_type !== 'delivery_order' && o.payment_status !== 'paid') {
-      outstandingTotal += (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0);
+      unpaidCS += (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0);
     }
   });
 
-  var uninvoicedDOCount = 0;
-  var uninvoicedDOTotal = 0;
+  var uninvoicedDO = 0;
   orders.forEach(function(o) {
     if (o.doc_type === 'delivery_order' && !o.qb_invoice_no && o.status !== 'cancelled') {
-      uninvoicedDOCount++;
-      uninvoicedDOTotal += parseFloat(o.grand_total) || 0;
+      uninvoicedDO += parseFloat(o.grand_total) || 0;
     }
   });
 
-  html += '<div class="cards-grid" style="grid-template-columns:repeat(5,1fr);">';
+  var totalOwed = unpaidCS + uninvoicedDO;
 
+  // Product breakdowns
+  var toPrepOrders = orders.filter(function(o) { return o.status === 'pending' || o.status === 'preparing'; });
+  var readyOrders = orders.filter(function(o) { return o.status === 'prepared' || o.status === 'delivering'; });
+
+  function getProductBreakdown(orderList) {
+    var products = {};
+    orderList.forEach(function(o) {
+      var items = orderItems.filter(function(i) { return i.order_id === o.id; });
+      items.forEach(function(item) {
+        var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+        var variety = soGetProductVariety(item.product_id);
+        var name = '';
+        if (variety && variety !== '—') name += variety + ' ';
+        name += prod ? prod.name : '—';
+        var unit = prod ? (prod.unit || '') : '';
+        var key = name + '|' + unit;
+        if (!products[key]) products[key] = { name: name, unit: unit, qty: 0 };
+        products[key].qty += parseFloat(item.quantity) || 0;
+      });
+    });
+    return Object.keys(products).map(function(k) { return products[k]; }).sort(function(a, b) { return b.qty - a.qty; });
+  }
+
+  var toPrepProducts = getProductBreakdown(toPrepOrders);
+  var readyProducts = getProductBreakdown(readyOrders);
+
+  // --- Row 1: Financial summary (compact) ---
+  html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
+  html += '<div class="summary-card" style="flex:1;min-width:100px;cursor:pointer;" onclick="switchTab(\'payments\')">';
+  html += '<div class="sc-label">Unpaid CS</div>';
+  html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:100px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+  html += '<div class="sc-label">Uninvoiced DO</div>';
+  html += '<div class="sc-value" style="font-size:18px;color:#5B9BD5;">' + formatRM(uninvoicedDO) + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:100px;border-color:var(--gold);">';
+  html += '<div class="sc-label">Total Owed</div>';
+  html += '<div class="sc-value" style="font-size:18px;color:var(--critical);">' + formatRM(totalOwed) + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:80px;">';
+  html += '<div class="sc-label">Today</div>';
+  html += '<div class="sc-value" style="font-size:18px;">' + ordersToday + '</div>';
+  html += '</div>';
+  html += '</div>';
+
+  // --- Row 2: Operational cards (side by side) ---
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">';
+
+  // To Prepare card
+  html += '<div class="summary-card" style="cursor:pointer;" onclick="soFilterStatus=\'pending\';switchTab(\'orders\')">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+  html += '<div class="sc-label" style="margin:0;">To Prepare</div>';
+  html += '<span style="font-size:13px;font-weight:800;color:' + (toPrepOrders.length > 0 ? 'var(--critical)' : 'var(--good)') + ';">' + toPrepOrders.length + ' orders</span>';
+  html += '</div>';
+  if (toPrepProducts.length) {
+    toPrepProducts.forEach(function(p) {
+      html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--overlay-subtle);">';
+      html += '<span style="color:var(--text);">' + esc(p.name) + '</span>';
+      html += '<span style="font-weight:700;">' + p.qty + '' + esc(p.unit) + '</span>';
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--text-muted);">Nothing to prepare</div>';
+  }
+  html += '</div>';
+
+  // Ready / In Delivery card
   html += '<div class="summary-card">';
-  html += '<div class="sc-label">Orders Today</div>';
-  html += '<div class="sc-value">' + ordersToday + '</div>';
-  html += '<div class="sc-sub">' + today + '</div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+  html += '<div class="sc-label" style="margin:0;">Ready / Delivering</div>';
+  html += '<span style="font-size:13px;font-weight:800;color:var(--good);">' + readyOrders.length + ' orders</span>';
   html += '</div>';
-
-  html += '<div class="summary-card" style="cursor:pointer;' + (pendingPrep > 0 ? 'border-color:var(--red);' : '') + '" onclick="soFilterStatus=\'pending\';switchTab(\'orders\')">';
-  html += '<div class="sc-label">Pending Prep</div>';
-  html += '<div class="sc-value"' + (pendingPrep > 0 ? ' style="color:var(--red);"' : '') + '>' + pendingPrep + '</div>';
-  html += '<div class="sc-sub">Pending + Preparing</div>';
-  html += '</div>';
-
-  html += '<div class="summary-card">';
-  html += '<div class="sc-label">Ready</div>';
-  html += '<div class="sc-value">' + readyCount + '</div>';
-  html += '<div class="sc-sub">Prepared for pickup/delivery</div>';
-  html += '</div>';
-
-  html += '<div class="summary-card" style="cursor:pointer;border-color:var(--gold);" onclick="switchTab(\'payments\')">';
-  html += '<div class="sc-label">Outstanding (CS)</div>';
-  html += '<div class="sc-value" style="color:var(--gold);">' + formatRM(outstandingTotal) + '</div>';
-  html += '<div class="sc-sub">Cash Sales unpaid</div>';
-  html += '</div>';
-
-  html += '<div class="summary-card" style="cursor:pointer;' + (uninvoicedDOCount > 0 ? 'border-color:#5B9BD5;' : '') + '" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Delivery Order (Uninvoiced)</div>';
-  html += '<div class="sc-value" style="color:#5B9BD5;">' + uninvoicedDOCount + '</div>';
-  html += '<div class="sc-sub">' + formatRM(uninvoicedDOTotal) + '</div>';
+  if (readyProducts.length) {
+    readyProducts.forEach(function(p) {
+      html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--overlay-subtle);">';
+      html += '<span style="color:var(--text);">' + esc(p.name) + '</span>';
+      html += '<span style="font-weight:700;">' + p.qty + '' + esc(p.unit) + '</span>';
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--text-muted);">Nothing ready</div>';
+  }
   html += '</div>';
 
   html += '</div>';
