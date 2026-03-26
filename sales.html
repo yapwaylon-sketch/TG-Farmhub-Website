@@ -429,6 +429,46 @@
   </div>
 </div>
 
+<!-- STATEMENT OPTIONS MODAL -->
+<div id="so-stmt-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Generate Statement</div>
+      <button class="modal-close" onclick="closeModal('so-stmt-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:16px;">
+      <input type="hidden" id="stmt-customer-id" value="">
+      <div id="stmt-customer-name" style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:12px;"></div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>FROM</label>
+          <input type="date" id="stmt-date-from" style="width:100%;">
+        </div>
+        <div class="form-field">
+          <label>TO</label>
+          <input type="date" id="stmt-date-to" style="width:100%;">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>TRANSACTION TYPE</label>
+        <select id="stmt-type" style="width:100%;">
+          <option value="all">All Transactions</option>
+          <option value="outstanding">Outstanding Only</option>
+          <option value="cash_sales">Cash Sales Only</option>
+          <option value="delivery_order">Delivery Orders Only</option>
+          <option value="paid">Paid Only</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('so-stmt-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="soGenerateStatementConfirm()">Generate</button>
+    </div>
+  </div>
+</div>
+
 <!-- PREPARED QTY ADJUSTMENT MODAL -->
 <div id="so-prepqty-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:500px;max-height:85vh;display:flex;flex-direction:column;">
@@ -5654,14 +5694,46 @@ function soGenerateStatement(customerId) {
   var cust = customers.find(function(c) { return c.id === customerId; });
   if (!cust) { notify('Customer not found', 'warning'); return; }
 
+  document.getElementById('stmt-customer-id').value = customerId;
+  document.getElementById('stmt-customer-name').textContent = cust.name;
+  // Default: last 3 months to today
+  var today = todayStr();
+  var threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  document.getElementById('stmt-date-from').value = threeMonthsAgo.toISOString().split('T')[0];
+  document.getElementById('stmt-date-to').value = today;
+  document.getElementById('stmt-type').value = 'outstanding';
+  document.getElementById('so-stmt-modal').style.display = 'flex';
+}
+
+function soGenerateStatementConfirm() {
+  var customerId = document.getElementById('stmt-customer-id').value;
+  var cust = customers.find(function(c) { return c.id === customerId; });
+  if (!cust) return;
+
+  var dateFrom = document.getElementById('stmt-date-from').value;
+  var dateTo = document.getElementById('stmt-date-to').value;
+  var stmtType = document.getElementById('stmt-type').value;
+
   var custOrders = orders.filter(function(o) {
-    return o.customer_id === customerId && o.status === 'completed' && o.payment_status !== 'paid';
+    if (o.customer_id !== customerId || o.status !== 'completed') return false;
+    if (dateFrom && o.order_date < dateFrom) return false;
+    if (dateTo && o.order_date > dateTo) return false;
+    if (stmtType === 'outstanding') return orderBalance(o) > 0;
+    if (stmtType === 'cash_sales') return o.doc_type !== 'delivery_order';
+    if (stmtType === 'delivery_order') return o.doc_type === 'delivery_order';
+    if (stmtType === 'paid') return orderBalance(o) <= 0;
+    return true; // 'all'
   });
-  // Sort oldest first
   custOrders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
 
+  closeModal('so-stmt-modal');
+
+  var typeLabels = { all: 'All Transactions', outstanding: 'Outstanding', cash_sales: 'Cash Sales', delivery_order: 'Delivery Orders', paid: 'Paid' };
+  var stmtLabel = typeLabels[stmtType] || 'All';
+  var periodLabel = (dateFrom ? fmtDate(dateFrom) : 'Start') + ' to ' + (dateTo ? fmtDate(dateTo) : 'Present');
   var preparedBy = currentUser ? esc(currentUser.displayName) : '—';
-  var totalOutstanding = 0;
+  var totalAmount = 0, totalPaid = 0, totalOutstanding = 0;
 
   var html = '<div class="a4-page">';
 
@@ -5679,7 +5751,7 @@ function soGenerateStatement(customerId) {
 
   // Title
   html += '<div class="a4-title">STATEMENT OF ACCOUNT</div>';
-  html += '<div class="a4-copy-label">As at ' + fmtDate(todayStr()) + '</div>';
+  html += '<div class="a4-copy-label">' + stmtLabel + ' &mdash; ' + periodLabel + '</div>';
 
   // Customer Info
   html += '<div class="a4-info-grid">';
@@ -5696,43 +5768,51 @@ function soGenerateStatement(customerId) {
   }
   html += '</div>';
 
-  // Outstanding orders table
+  // Orders table
   html += '<table class="a4-items-table">';
-  html += '<thead><tr><th>Doc #</th><th>Date</th><th>Age</th><th style="text-align:right;">Total (RM)</th><th style="text-align:right;">Paid (RM)</th><th style="text-align:right;">Balance (RM)</th></tr></thead>';
+  html += '<thead><tr><th>Doc #</th><th>Type</th><th>Date</th><th>Age</th><th style="text-align:right;">Total (RM)</th><th style="text-align:right;">Paid (RM)</th><th style="text-align:right;">Balance (RM)</th></tr></thead>';
   html += '<tbody>';
 
   if (custOrders.length === 0) {
-    html += '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">No outstanding orders</td></tr>';
+    html += '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No transactions found for this period</td></tr>';
   } else {
     custOrders.forEach(function(o) {
       var total = parseFloat(o.grand_total) || 0;
       var paid = parseFloat(o.amount_paid) || 0;
       var bal = total - paid;
-      totalOutstanding += bal;
+      totalAmount += total;
+      totalPaid += paid;
+      totalOutstanding += Math.max(0, bal);
       var days = daysBetween(o.order_date);
+      var typeLabel = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
 
       html += '<tr>';
       html += '<td style="font-weight:700;">' + esc(o.doc_number || o.id) + '</td>';
+      html += '<td>' + typeLabel + '</td>';
       html += '<td>' + fmtDate(o.order_date) + '</td>';
-      html += '<td>' + days + ' days</td>';
+      html += '<td>' + days + 'd</td>';
       html += '<td style="text-align:right;">' + total.toFixed(2) + '</td>';
       html += '<td style="text-align:right;">' + paid.toFixed(2) + '</td>';
-      html += '<td style="text-align:right;font-weight:700;">' + bal.toFixed(2) + '</td>';
+      html += '<td style="text-align:right;font-weight:700;">' + (bal > 0 ? bal.toFixed(2) : '<span style="color:#060;">Paid</span>') + '</td>';
       html += '</tr>';
     });
   }
   html += '</tbody></table>';
 
-  // Total
+  // Summary totals
   html += '<div class="a4-totals">';
+  html += '<div>Total: <strong>RM ' + totalAmount.toFixed(2) + '</strong></div>';
+  html += '<div>Paid: <strong style="color:#060;">RM ' + totalPaid.toFixed(2) + '</strong></div>';
   html += '<div class="a4-grand-total">TOTAL OUTSTANDING: RM ' + totalOutstanding.toFixed(2) + '</div>';
   html += '</div>';
 
-  // Payment reminder
-  html += '<div style="margin-top:20px;font-size:12px;color:#555;line-height:1.6;">';
-  html += '<strong>Payment Reminder:</strong> Please arrange payment at your earliest convenience. ';
-  html += 'Payment can be made via cash or bank transfer.';
-  html += '</div>';
+  // Payment reminder (only if outstanding > 0)
+  if (totalOutstanding > 0) {
+    html += '<div style="margin-top:20px;font-size:12px;color:#555;line-height:1.6;">';
+    html += '<strong>Payment Reminder:</strong> Please arrange payment at your earliest convenience. ';
+    html += 'Payment can be made via cash or bank transfer.';
+    html += '</div>';
+  }
 
   // Prepared by
   html += '<div style="margin-top:30px;font-size:12px;">';
@@ -5740,7 +5820,7 @@ function soGenerateStatement(customerId) {
   html += '</div>';
 
   html += '<div class="a4-footer">TG Agro Fruits Sdn Bhd<br>Thank you for your business</div>';
-  html += '</div>'; // close a4-page
+  html += '</div>';
 
   // Show in A4 modal
   document.getElementById('so-doc-content').style.display = 'none';
