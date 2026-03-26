@@ -2854,24 +2854,67 @@ function scRenderDetail() {
     html += '<div class="so-detail-section">';
     html += '<div class="so-detail-section-title">Payment History (' + custPayments.length + ')</div>';
     custPayments.sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); });
-    html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-    html += '<thead><tr><th>Date</th><th>Order</th><th>Method</th><th>Reference</th><th style="text-align:right;">Amount</th><th>Slip</th></tr></thead><tbody>';
+
+    // Group payments by date
+    var payByDate = {};
+    var payDateOrder = [];
     custPayments.forEach(function(p) {
-      var o = orders.find(function(x) { return x.id === p.order_id; });
-      var methodLabel = p.method === 'bank_transfer' ? 'Bank Transfer' : (p.method === 'cheque' ? 'Cheque' : 'Cash');
-      html += '<tr>';
-      html += '<td>' + fmtDateNice(p.payment_date) + '</td>';
-      html += '<td style="font-weight:600;">' + esc(o ? (o.doc_number || o.id) : '\u2014') + '</td>';
-      html += '<td>' + esc(methodLabel) + '</td>';
-      html += '<td>' + esc(p.reference || '\u2014') + '</td>';
-      html += '<td style="text-align:right;font-weight:600;color:var(--green-light);">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
-      html += '<td style="white-space:nowrap;">';
-      html += '<a href="javascript:void(0)" onclick="soReprintPayment(\'' + esc(p.id) + '\')" style="color:var(--purple);font-size:11px;">Reprint</a>';
-      if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:11px;margin-left:4px;">Slip</a>';
-      html += '</td>';
-      html += '</tr>';
+      var d = p.payment_date || 'unknown';
+      if (!payByDate[d]) { payByDate[d] = []; payDateOrder.push(d); }
+      payByDate[d].push(p);
     });
-    html += '</tbody></table></div>';
+
+    payDateOrder.forEach(function(dateKey, di) {
+      var group = payByDate[dateKey];
+      var groupTotal = 0;
+      group.forEach(function(p) { groupTotal += parseFloat(p.amount) || 0; });
+      var methodLabels = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque' };
+
+      // Collect unique methods in this date group
+      var methodSummary = {};
+      group.forEach(function(p) {
+        var methods = (p.method || 'cash').split('+');
+        methods.forEach(function(m) {
+          if (!methodSummary[m]) methodSummary[m] = 0;
+          // For split payments, we can't split amount per method from stored data, so just note the method
+          methodSummary[m] += parseFloat(p.amount) || 0;
+        });
+      });
+      var methodStr = Object.keys(methodSummary).map(function(m) { return methodLabels[m] || m; }).join(' + ');
+
+      var toggleId = 'pay-hist-' + di;
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden;">';
+
+      // Date header row
+      html += '<div onclick="var e=document.getElementById(\'' + toggleId + '\');e.style.display=e.style.display===\'none\'?\'\':\'none\';" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<svg class="so-date-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>';
+      html += '<div>';
+      html += '<div style="font-weight:700;font-size:13px;color:var(--text);">' + fmtDate(dateKey) + '</div>';
+      html += '<div style="font-size:11px;color:var(--text-muted);">' + methodStr + ' &middot; ' + group.length + ' order' + (group.length > 1 ? 's' : '') + '</div>';
+      html += '</div></div>';
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<span style="font-size:15px;font-weight:800;color:var(--good);">+' + formatRM(groupTotal) + '</span>';
+      html += '<a href="javascript:void(0)" onclick="event.stopPropagation();soReprintPaymentGroup(\'' + esc(c.id) + '\',\'' + esc(dateKey) + '\')" style="color:var(--purple);font-size:11px;font-weight:600;">Reprint</a>';
+      html += '</div>';
+      html += '</div>';
+
+      // Expandable detail
+      html += '<div id="' + toggleId + '" style="display:none;border-top:1px solid var(--border);padding:8px 14px;">';
+      group.forEach(function(p) {
+        var o = orders.find(function(x) { return x.id === p.order_id; });
+        var mLabel = (p.method || 'cash').split('+').map(function(m) { return methodLabels[m] || m; }).join(' + ');
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--overlay-subtle);">';
+        html += '<div>';
+        html += '<span style="font-weight:600;font-size:12px;">' + esc(o ? (o.doc_number || o.id) : '\u2014') + '</span>';
+        html += ' <span style="font-size:11px;color:var(--text-muted);">' + mLabel + (p.reference ? ' (' + esc(p.reference) + ')' : '') + '</span>';
+        html += '</div>';
+        html += '<span style="font-weight:700;font-size:12px;color:var(--good);">+' + formatRM(parseFloat(p.amount) || 0) + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '</div>';
+    });
     html += '</div>';
   }
 
@@ -5449,6 +5492,37 @@ function soOpenWhatsAppDoc() {
 // ============================================================
 // REPRINT PAYMENT RECEIPT
 // ============================================================
+function soReprintPaymentGroup(customerId, dateKey) {
+  var cust = customers.find(function(c) { return c.id === customerId; });
+  var custOrders = orders.filter(function(o) { return o.customer_id === customerId; });
+  var groupPayments = payments.filter(function(p) {
+    if (p.payment_date !== dateKey) return false;
+    return custOrders.some(function(o) { return o.id === p.order_id; });
+  });
+  if (!groupPayments.length) { notify('No payments found', 'warning'); return; }
+
+  var totalAmount = 0;
+  var slipOrders = [];
+  var methodMap = {};
+  groupPayments.forEach(function(p) {
+    totalAmount += parseFloat(p.amount) || 0;
+    var o = orders.find(function(x) { return x.id === p.order_id; });
+    slipOrders.push({ doc_number: o ? (o.doc_number || o.id) : '—', total: o ? o.grand_total : 0, applied: p.amount, balance: o ? orderBalance(o) : 0 });
+    var methods = (p.method || 'cash').split('+');
+    methods.forEach(function(m) {
+      if (!methodMap[m]) methodMap[m] = { method: m, amount: 0, reference: '' };
+      methodMap[m].amount += parseFloat(p.amount) || 0;
+      if (p.reference && !methodMap[m].reference) methodMap[m].reference = p.reference;
+    });
+  });
+  var lines = Object.keys(methodMap).map(function(k) { return methodMap[k]; });
+
+  soGeneratePaymentSlip({
+    amount: totalAmount, lines: lines, date: dateKey,
+    customerName: cust ? cust.name : '—', customerId: customerId, orders: slipOrders
+  });
+}
+
 function soReprintPayment(paymentId) {
   var p = payments.find(function(x) { return x.id === paymentId; });
   if (!p) { notify('Payment not found', 'warning'); return; }
