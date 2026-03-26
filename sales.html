@@ -773,29 +773,26 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
+    <div style="padding:0 16px 16px;">
     <div id="pay-order-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
     <input type="hidden" id="pay-order-id" value="">
-    <div class="form-field">
-      <label>AMOUNT (RM)</label>
-      <input type="number" id="pay-amount" step="0.01" min="0.01" placeholder="0.00" style="width:100%;">
+
+    <!-- Payment Lines (split payment support) -->
+    <div class="form-field" style="margin-bottom:8px;">
+      <label>PAYMENT LINES</label>
+      <div id="pay-lines-container"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="payAddLine()" style="margin-top:6px;gap:4px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Payment Method
+      </button>
     </div>
-    <div class="form-row">
-      <div class="form-field">
-        <label>PAYMENT DATE</label>
-        <input type="date" id="pay-date" style="width:100%;">
-      </div>
-      <div class="form-field">
-        <label>METHOD</label>
-        <select id="pay-method" style="width:100%;">
-          <option value="cash">Cash</option>
-          <option value="bank_transfer">Bank Transfer</option>
-          <option value="cheque">Cheque</option>
-        </select>
-      </div>
+    <div style="text-align:right;font-size:14px;font-weight:700;color:var(--gold);margin-bottom:12px;">
+      Total: <span id="pay-total-display">RM 0.00</span>
     </div>
+
     <div class="form-field">
-      <label>REFERENCE (optional)</label>
-      <input type="text" id="pay-reference" placeholder="Bank ref / cheque number" style="width:100%;">
+      <label>PAYMENT DATE</label>
+      <input type="date" id="pay-date" style="width:100%;">
     </div>
     <div class="form-field">
       <label>TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
@@ -812,6 +809,7 @@
     <div class="form-field">
       <label>NOTES (optional)</label>
       <textarea id="pay-notes" rows="2" placeholder="Payment notes" style="width:100%;"></textarea>
+    </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('pay-modal')">Cancel</button>
@@ -3394,6 +3392,55 @@ function paySelectedOrders(groupIdx) {
   payOpenModalMulti(orderIds, total);
 }
 
+// ── Payment Lines (split payment support) ──
+var payLinesData = [];
+
+function payAddLine(method, amount, reference) {
+  payLinesData.push({ id: Date.now() + Math.random(), method: method || 'cash', amount: amount || '', reference: reference || '' });
+  payRenderLines();
+}
+
+function payRemoveLine(lineId) {
+  payLinesData = payLinesData.filter(function(l) { return l.id !== lineId; });
+  if (!payLinesData.length) payAddLine();
+  else payRenderLines();
+}
+
+function payRenderLines() {
+  var container = document.getElementById('pay-lines-container');
+  if (!container) return;
+  var html = '';
+  payLinesData.forEach(function(line, idx) {
+    html += '<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:6px;">';
+    html += '<div style="flex:1;min-width:90px;"><select onchange="payLinesData[' + idx + '].method=this.value" style="width:100%;padding:6px 8px;font-size:12px;">';
+    html += '<option value="cash"' + (line.method === 'cash' ? ' selected' : '') + '>Cash</option>';
+    html += '<option value="bank_transfer"' + (line.method === 'bank_transfer' ? ' selected' : '') + '>Bank Transfer</option>';
+    html += '<option value="cheque"' + (line.method === 'cheque' ? ' selected' : '') + '>Cheque</option>';
+    html += '</select></div>';
+    html += '<div style="flex:1;min-width:80px;"><input type="number" step="0.01" min="0" placeholder="Amount" value="' + (line.amount || '') + '" onchange="payLinesData[' + idx + '].amount=this.value;payUpdateTotal()" oninput="payLinesData[' + idx + '].amount=this.value;payUpdateTotal()" style="width:100%;padding:6px 8px;font-size:12px;"></div>';
+    html += '<div style="flex:1;min-width:80px;"><input type="text" placeholder="Ref (opt)" value="' + esc(line.reference || '') + '" onchange="payLinesData[' + idx + '].reference=this.value" style="width:100%;padding:6px 8px;font-size:12px;"></div>';
+    if (payLinesData.length > 1) {
+      html += '<button type="button" onclick="payRemoveLine(' + line.id + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:4px;">&times;</button>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  payUpdateTotal();
+}
+
+function payUpdateTotal() {
+  var total = 0;
+  payLinesData.forEach(function(l) { total += parseFloat(l.amount) || 0; });
+  var display = document.getElementById('pay-total-display');
+  if (display) display.textContent = formatRM(total);
+}
+
+function payGetTotalAmount() {
+  var total = 0;
+  payLinesData.forEach(function(l) { total += parseFloat(l.amount) || 0; });
+  return total;
+}
+
 function payOpenModalMulti(orderIds, totalBalance) {
   var modal = document.getElementById('pay-modal');
   var firstOrder = orders.find(function(o) { return o.id === orderIds[0]; });
@@ -3405,11 +3452,9 @@ function payOpenModalMulti(orderIds, totalBalance) {
     '<strong>' + esc(cust ? cust.name : '\u2014') + '</strong><br>' +
     '<span style="font-size:12px;color:var(--text-muted);">' + orderIds.length + ' orders selected</span><br>' +
     'Total outstanding: <strong style="color:var(--gold);">' + formatRM(totalBalance) + '</strong>';
-  document.getElementById('pay-amount').value = totalBalance.toFixed(2);
-  document.getElementById('pay-amount').max = totalBalance.toFixed(2);
+  payLinesData = [];
+  payAddLine('cash', totalBalance.toFixed(2));
   document.getElementById('pay-date').value = todayStr();
-  document.getElementById('pay-method').value = 'cash';
-  document.getElementById('pay-reference').value = '';
   document.getElementById('pay-notes').value = '';
   payClearSlip();
   modal.style.display = 'flex';
@@ -3426,11 +3471,9 @@ function payOpenModal(orderId) {
   document.getElementById('pay-order-info').innerHTML =
     '<div style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + ' \u2014 ' + esc(cust ? cust.name : '\u2014') + '</div>' +
     '<div>Total: ' + formatRM(parseFloat(o.grand_total) || 0) + ' &middot; Paid: ' + formatRM(parseFloat(o.amount_paid) || 0) + ' &middot; <strong>Balance: ' + formatRM(balance) + '</strong></div>';
-  document.getElementById('pay-amount').value = balance.toFixed(2);
-  document.getElementById('pay-amount').max = balance.toFixed(2);
+  payLinesData = [];
+  payAddLine('cash', balance.toFixed(2));
   document.getElementById('pay-date').value = todayStr();
-  document.getElementById('pay-method').value = 'cash';
-  document.getElementById('pay-reference').value = '';
   document.getElementById('pay-notes').value = '';
   payClearSlip();
   document.getElementById('pay-modal').style.display = 'flex';
@@ -3439,11 +3482,13 @@ function payOpenModal(orderId) {
 // Save payment
 async function paySavePayment() {
   var orderIdRaw = document.getElementById('pay-order-id').value;
-  var amount = parseFloat(document.getElementById('pay-amount').value);
+  var amount = payGetTotalAmount();
   var payDate = document.getElementById('pay-date').value;
-  var method = document.getElementById('pay-method').value;
-  var reference = document.getElementById('pay-reference').value.trim();
   var notes = document.getElementById('pay-notes').value.trim();
+  // Build combined method/reference for DB storage
+  var validLines = payLinesData.filter(function(l) { return parseFloat(l.amount) > 0; });
+  var method = validLines.map(function(l) { return l.method; }).join('+');
+  var reference = validLines.map(function(l) { return l.reference || ''; }).filter(function(r) { return r; }).join(', ');
 
   if (!amount || amount <= 0) { notify('Enter a valid amount', 'warning'); return; }
   if (!payDate) { notify('Select payment date', 'warning'); return; }
@@ -3515,9 +3560,12 @@ async function paySavePayment() {
     renderCurrentTab();
 
     // Show payment received slip
+    var slipCustomerId = null;
+    var firstOrd = orders.find(function(x) { return x.id === orderIds[0]; });
+    if (firstOrd) slipCustomerId = firstOrd.customer_id;
     soGeneratePaymentSlip({
-      amount: amount, method: method, reference: reference, date: payDate,
-      customerName: slipCustomerName, orders: slipOrders
+      amount: amount, lines: validLines, date: payDate,
+      customerName: slipCustomerName, customerId: slipCustomerId, orders: slipOrders
     });
   } catch(e) {
     btnLoading(btn, false, 'Save Payment');
@@ -5407,12 +5455,16 @@ function soReprintPayment(paymentId) {
   var o = orders.find(function(x) { return x.id === p.order_id; });
   var cust = o ? customers.find(function(c) { return c.id === o.customer_id; }) : null;
 
+  // Reconstruct lines from stored method (may be "cash+bank_transfer" for split)
+  var methods = (p.method || 'cash').split('+');
+  var refs = (p.reference || '').split(', ');
+  var lines = methods.map(function(m, i) { return { method: m, amount: methods.length === 1 ? p.amount : 0, reference: refs[i] || '' }; });
+  // For legacy single-method payments, amount is the full amount
+  if (lines.length === 1) lines[0].amount = p.amount;
+
   soGeneratePaymentSlip({
-    amount: p.amount,
-    method: p.method,
-    reference: p.reference,
-    date: p.payment_date,
-    customerName: cust ? cust.name : '—',
+    amount: p.amount, lines: lines, date: p.payment_date,
+    customerName: cust ? cust.name : '—', customerId: o ? o.customer_id : null,
     orders: [{ doc_number: o ? (o.doc_number || o.id) : '—', total: o ? o.grand_total : 0, applied: p.amount, balance: o ? orderBalance(o) : 0 }]
   });
 }
@@ -5421,7 +5473,8 @@ function soReprintPayment(paymentId) {
 // PAYMENT RECEIVED SLIP
 // ============================================================
 function soGeneratePaymentSlip(paymentInfo) {
-  // paymentInfo: { amount, method, reference, date, customerName, orders: [{doc_number, total, paid, balance}] }
+  // paymentInfo: { amount, lines: [{method, amount, reference}], date, customerName, customerId, orders: [{doc_number, total, applied, balance}] }
+  var methodLabels = { cash: 'Cash', bank_transfer: 'Bank Transfer', cheque: 'Cheque' };
   var html = '';
   html += '<div class="doc-logo"><img src="assets/logo.png?v=2" alt="TG"></div>';
   html += '<div class="doc-header"><h2>TG AGRO FRUITS SDN. BHD.</h2></div>';
@@ -5432,34 +5485,79 @@ function soGeneratePaymentSlip(paymentInfo) {
   html += '<div class="doc-info-grid">';
   html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(paymentInfo.customerName) + '</div>';
   html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(paymentInfo.date) + '</div>';
-  html += '<div class="doc-info-label">Method:</div><div class="doc-info-value">' + esc(paymentInfo.method === 'bank_transfer' ? 'Bank Transfer' : 'Cash') + '</div>';
-  if (paymentInfo.reference) {
-    html += '<div class="doc-info-label">Reference:</div><div class="doc-info-value">' + esc(paymentInfo.reference) + '</div>';
-  }
   html += '</div>';
 
-  // Orders covered
+  // Amount Received breakdown by method
+  html += '<div style="border:1px solid #000;padding:6px 8px;margin:6px 0;background:#f9f9f9;">';
+  html += '<div style="font-size:10px;font-weight:700;margin-bottom:4px;">AMOUNT RECEIVED:</div>';
+  var lines = paymentInfo.lines || [];
+  if (lines.length === 0) {
+    // Legacy: single method fallback
+    var m = paymentInfo.method || 'cash';
+    lines = [{ method: m, amount: paymentInfo.amount, reference: paymentInfo.reference }];
+  }
+  lines.forEach(function(line) {
+    var lineAmt = parseFloat(line.amount) || 0;
+    if (lineAmt <= 0) return;
+    html += '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">';
+    html += '<span>' + (methodLabels[line.method] || line.method) + (line.reference ? ' (' + esc(line.reference) + ')' : '') + '</span>';
+    html += '<span style="font-weight:700;">RM ' + lineAmt.toFixed(2) + '</span>';
+    html += '</div>';
+  });
+  html += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;margin-top:4px;padding-top:4px;border-top:1px solid #000;">';
+  html += '<span>TOTAL</span><span>RM ' + parseFloat(paymentInfo.amount).toFixed(2) + '</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // Allocation table
+  html += '<hr class="doc-divider">';
+  html += '<div style="font-size:10px;font-weight:700;margin-bottom:4px;">ALLOCATION:</div>';
   html += '<table style="width:100%;border-collapse:collapse;margin:4px 0;">';
-  html += '<thead><tr><th style="text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Order</th>';
-  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Total</th>';
-  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Applied</th>';
-  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Balance</th>';
+  html += '<thead><tr>';
+  html += '<th style="text-align:left;font-size:9px;font-weight:700;border-bottom:1px solid #000;padding:2px;">Order</th>';
+  html += '<th style="text-align:right;font-size:9px;font-weight:700;border-bottom:1px solid #000;padding:2px;">Total</th>';
+  html += '<th style="text-align:right;font-size:9px;font-weight:700;border-bottom:1px solid #000;padding:2px;">Applied</th>';
+  html += '<th style="text-align:right;font-size:9px;font-weight:700;border-bottom:1px solid #000;padding:2px;">Balance</th>';
   html += '</tr></thead><tbody>';
 
   paymentInfo.orders.forEach(function(po) {
+    var bal = parseFloat(po.balance) || 0;
     html += '<tr>';
-    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;font-weight:600;">' + esc(po.doc_number) + '</td>';
-    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;">' + parseFloat(po.total).toFixed(2) + '</td>';
-    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;font-weight:600;">' + parseFloat(po.applied).toFixed(2) + '</td>';
-    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;">' + parseFloat(po.balance).toFixed(2) + '</td>';
+    html += '<td style="padding:2px;border-bottom:1px dotted #999;font-size:10px;font-weight:600;">' + esc(po.doc_number) + '</td>';
+    html += '<td style="padding:2px;border-bottom:1px dotted #999;font-size:10px;text-align:right;">' + parseFloat(po.total).toFixed(2) + '</td>';
+    html += '<td style="padding:2px;border-bottom:1px dotted #999;font-size:10px;text-align:right;font-weight:600;">' + parseFloat(po.applied).toFixed(2) + '</td>';
+    html += '<td style="padding:2px;border-bottom:1px dotted #999;font-size:10px;text-align:right;">' + (bal <= 0 ? '<span style="color:#060;">PAID</span>' : bal.toFixed(2)) + '</td>';
     html += '</tr>';
   });
   html += '</tbody></table>';
 
-  // Total amount
-  html += '<div class="doc-totals">';
-  html += '<div class="doc-grand-total">AMOUNT RECEIVED: RM ' + parseFloat(paymentInfo.amount).toFixed(2) + '</div>';
-  html += '</div>';
+  // Remaining outstanding orders for this customer
+  if (paymentInfo.customerId) {
+    var remainingOrders = orders.filter(function(o) {
+      return o.customer_id === paymentInfo.customerId && o.status === 'completed' && o.payment_status !== 'paid';
+    });
+    if (remainingOrders.length > 0) {
+      var totalOutstanding = 0;
+      html += '<hr class="doc-divider">';
+      html += '<div style="font-size:10px;font-weight:700;margin-bottom:4px;">REMAINING OUTSTANDING:</div>';
+      remainingOrders.forEach(function(o) {
+        var bal = orderBalance(o);
+        if (bal <= 0) return;
+        totalOutstanding += bal;
+        var days = daysBetween(o.order_date);
+        html += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">';
+        html += '<span>' + esc(o.doc_number || o.id) + ' <span style="color:#666;">(' + days + 'd)</span></span>';
+        html += '<span style="font-weight:600;">RM ' + bal.toFixed(2) + '</span>';
+        html += '</div>';
+      });
+      html += '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-top:4px;padding-top:4px;border-top:2px solid #000;">';
+      html += '<span>Total Outstanding</span><span>RM ' + totalOutstanding.toFixed(2) + '</span>';
+      html += '</div>';
+    } else {
+      html += '<hr class="doc-divider">';
+      html += '<div style="font-size:11px;font-weight:700;text-align:center;color:#060;">ALL ORDERS FULLY PAID</div>';
+    }
+  }
 
   html += '<div class="doc-footer">TG Agro Fruits Sdn Bhd<br>Thank you for your payment</div>';
 
