@@ -981,7 +981,7 @@ var soEditOrderId = null;
 })();
 
 // TAB SWITCHING
-function switchTab(tab) {
+function switchTab(tab, skipHistory) {
   // Reset detail views when switching tabs
   soDetailOrderId = null;
   scDetailCustomerId = null;
@@ -992,8 +992,21 @@ function switchTab(tab) {
   if (page) page.classList.add('active');
   var nav = document.getElementById('nav-' + tab);
   if (nav) nav.classList.add('active');
+  if (!skipHistory) history.pushState({ tab: tab }, '', '#' + tab);
   renderCurrentTab();
 }
+
+// Browser back button: go to previous tab instead of leaving page
+window.addEventListener('popstate', function(e) {
+  if (e.state && e.state.tab) {
+    switchTab(e.state.tab, true);
+  } else {
+    // No more history — stay on dashboard
+    switchTab('dashboard', true);
+  }
+});
+// Set initial history state
+history.replaceState({ tab: 'dashboard' }, '', '#dashboard');
 
 function renderCurrentTab() {
   switch(currentTab) {
@@ -1262,6 +1275,25 @@ function renderDashboard() {
         html += 'No delivery date';
       }
       html += '</div>';
+
+      // Item list
+      var oItems = orderItems.filter(function(i) { return i.order_id === o.id; });
+      if (oItems.length) {
+        html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">';
+        oItems.forEach(function(item) {
+          var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+          var variety = soGetProductVariety(item.product_id);
+          var name = '';
+          if (variety && variety !== '—') name += variety + ' ';
+          name += prod ? prod.name : '—';
+          var unit = prod ? (prod.unit || '') : '';
+          html += '<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0;">';
+          html += '<span style="color:var(--text-muted);">' + esc(name) + '</span>';
+          html += '<span style="font-weight:600;">' + (item.quantity || 0) + esc(unit) + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
 
       html += '</div>';
     });
