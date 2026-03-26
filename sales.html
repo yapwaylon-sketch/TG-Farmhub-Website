@@ -2624,6 +2624,42 @@ function scOpenDetail(id) {
   renderCustomers();
 }
 
+function scToggleAllOutstanding(checked) {
+  var cbs = document.querySelectorAll('.sc-out-cb');
+  cbs.forEach(function(cb) { cb.checked = checked; });
+  scUpdateOutSelection();
+}
+
+function scUpdateOutSelection() {
+  var cbs = document.querySelectorAll('.sc-out-cb:checked');
+  var btn = document.getElementById('sc-pay-sel-btn');
+  if (!btn) return;
+  if (cbs.length > 0) {
+    var total = 0;
+    cbs.forEach(function(cb) { total += parseFloat(cb.dataset.balance) || 0; });
+    btn.textContent = 'Pay Selected (' + cbs.length + ') — ' + formatRM(total);
+    btn.style.display = 'inline-flex';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function scPaySelected() {
+  var cbs = document.querySelectorAll('.sc-out-cb:checked');
+  if (!cbs.length) { notify('No orders selected', 'warning'); return; }
+  var orderIds = [];
+  var total = 0;
+  cbs.forEach(function(cb) {
+    orderIds.push(cb.dataset.orderId);
+    total += parseFloat(cb.dataset.balance) || 0;
+  });
+  if (orderIds.length === 1) {
+    payOpenModal(orderIds[0]);
+  } else {
+    payOpenModalMulti(orderIds, total);
+  }
+}
+
 function scBackToList() {
   scDetailCustomerId = null;
   renderCustomers();
@@ -2782,15 +2818,21 @@ function scRenderDetail() {
   // ── Outstanding Orders ──
   var outstandingOrders = custOrders.filter(function(o) { return o.payment_status !== 'paid' && o.doc_type !== 'delivery_order'; });
   if (outstandingOrders.length) {
+    var custOutTotal = 0;
+    outstandingOrders.forEach(function(o) { custOutTotal += orderBalance(o); });
     html += '<div class="so-detail-section">';
-    html += '<div class="so-detail-section-title">Outstanding Cash Sales (' + outstandingOrders.length + ')</div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    html += '<div class="so-detail-section-title" style="margin-bottom:0;">Outstanding Cash Sales (' + outstandingOrders.length + ') — ' + formatRM(custOutTotal) + '</div>';
+    html += '<button class="btn btn-primary btn-sm" id="sc-pay-sel-btn" onclick="scPaySelected()" style="display:none;gap:4px;">Pay Selected</button>';
+    html += '</div>';
     html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-    html += '<thead><tr><th>Doc #</th><th>Date</th><th>Age</th><th style="text-align:right;">Total</th><th style="text-align:right;">Paid</th><th style="text-align:right;">Balance</th><th></th></tr></thead><tbody>';
+    html += '<thead><tr><th style="width:30px;"><input type="checkbox" onchange="scToggleAllOutstanding(this.checked)"></th><th>Doc #</th><th>Date</th><th>Age</th><th style="text-align:right;">Total</th><th style="text-align:right;">Paid</th><th style="text-align:right;">Balance</th><th></th></tr></thead><tbody>';
     outstandingOrders.forEach(function(o) {
       var bal = orderBalance(o);
       var days = daysBetween(o.order_date);
       var dayColor = days <= 7 ? 'var(--green-light)' : (days <= 14 ? 'var(--gold)' : 'var(--red)');
       html += '<tr>';
+      html += '<td><input type="checkbox" class="sc-out-cb" data-order-id="' + esc(o.id) + '" data-balance="' + bal.toFixed(2) + '" onchange="scUpdateOutSelection()"></td>';
       html += '<td style="font-weight:600;">' + esc(o.doc_number || o.id) + '</td>';
       html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
       html += '<td><span style="color:' + dayColor + ';font-weight:600;">' + days + 'd</span></td>';
