@@ -2361,7 +2361,7 @@ function soDeleteOrder(orderId) {
   var custName = getCustomerName(o.customer_id);
   confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order and its items. This cannot be undone.', async function() {
     // Delete order items first
-    var r1 = await sbQuery(sb.from('order_items').delete().eq('order_id', orderId));
+    var r1 = await sbQuery(sb.from('sales_order_items').delete().eq('order_id', orderId));
     if (r1 && r1.error) { notify('Failed to delete items: ' + r1.error.message, 'error'); return; }
     // Delete the order
     var r2 = await sbQuery(sb.from('sales_orders').delete().eq('id', orderId));
