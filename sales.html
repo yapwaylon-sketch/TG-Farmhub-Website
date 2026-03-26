@@ -392,6 +392,43 @@
   </div>
 </div>
 
+<!-- WALK-IN QUICK COMPLETE MODAL -->
+<div id="so-walkin-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Complete Walk-In Sale</div>
+      <button class="modal-close" onclick="closeModal('so-walkin-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:16px;">
+      <input type="hidden" id="so-walkin-order-id" value="">
+      <div id="so-walkin-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;"></div>
+
+      <div class="form-field" style="margin-bottom:12px;">
+        <label>PAYMENT METHOD</label>
+        <select id="so-walkin-method" style="width:100%;">
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+        </select>
+      </div>
+      <div class="form-field" style="margin-bottom:14px;">
+        <label>REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="text" id="so-walkin-reference" placeholder="Bank ref / receipt number" style="width:100%;">
+      </div>
+
+      <div class="form-field" style="margin-bottom:14px;">
+        <label>PHOTO <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="file" id="so-walkin-photo" accept="image/*" capture="environment" style="width:100%;">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('so-walkin-modal')">Cancel</button>
+      <button class="btn btn-primary" id="so-walkin-confirm-btn" onclick="soWalkInConfirm()">Complete & Print Receipt</button>
+    </div>
+  </div>
+</div>
+
 <!-- PREPARED QTY ADJUSTMENT MODAL -->
 <div id="so-prepqty-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:500px;max-height:85vh;display:flex;flex-direction:column;">
@@ -2232,6 +2269,81 @@ async function soDelPayConfirm() {
   } catch(e) {
     btnLoading(btn, false, 'Confirm Payment & Print');
     notify('Payment failed: ' + e.message, 'error');
+  }
+}
+
+// ============================================================
+// WALK-IN QUICK COMPLETE
+// ============================================================
+function soShowWalkInComplete(orderId) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var total = parseFloat(o.grand_total) || 0;
+  document.getElementById('so-walkin-order-id').value = orderId;
+  document.getElementById('so-walkin-info').innerHTML =
+    '<div style="font-weight:700;color:var(--text);font-size:15px;">' + esc(o.doc_number || o.id) + '</div>' +
+    '<div style="font-size:18px;font-weight:800;color:var(--gold);margin-top:4px;">Total: ' + formatRM(total) + '</div>';
+  document.getElementById('so-walkin-method').value = 'cash';
+  document.getElementById('so-walkin-reference').value = '';
+  document.getElementById('so-walkin-photo').value = '';
+  document.getElementById('so-walkin-modal').style.display = 'flex';
+}
+
+async function soWalkInConfirm() {
+  var orderId = document.getElementById('so-walkin-order-id').value;
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+
+  var method = document.getElementById('so-walkin-method').value;
+  var reference = document.getElementById('so-walkin-reference').value.trim();
+  var photoInput = document.getElementById('so-walkin-photo');
+  var total = parseFloat(o.grand_total) || 0;
+
+  var btn = document.getElementById('so-walkin-confirm-btn');
+  btnLoading(btn, true);
+
+  try {
+    // 1. Upload photo if provided
+    if (photoInput.files && photoInput.files[0]) {
+      await soProcessPhotoFile(photoInput.files[0], orderId, 'prep_photo');
+    }
+
+    // 2. Set status directly to completed
+    await sbQuery(sb.from('sales_orders').update({ status: 'completed' }).eq('id', orderId).select());
+    var localOrder = orders.find(function(x) { return x.id === orderId; });
+    if (localOrder) localOrder.status = 'completed';
+
+    // 3. Record full payment
+    var paymentId = await dbNextId('SY');
+    var payData = {
+      id: paymentId,
+      order_id: orderId,
+      amount: total,
+      payment_date: todayStr(),
+      method: method,
+      reference: reference || null,
+      notes: 'Walk-in sale — paid immediately',
+      created_by: currentUser ? currentUser.id : null
+    };
+    var payResult = await sbQuery(sb.from('sales_payments').insert(payData).select());
+    if (payResult) payments.unshift(payResult[0] || payData);
+
+    // 4. Update payment status to paid
+    await sbQuery(sb.from('sales_orders').update({ amount_paid: total, payment_status: 'paid' }).eq('id', orderId).select());
+    if (localOrder) { localOrder.amount_paid = total; localOrder.payment_status = 'paid'; }
+
+    btnLoading(btn, false, 'Complete & Print Receipt');
+    closeModal('so-walkin-modal');
+    notify('Walk-in sale completed & paid', 'success');
+
+    // Open document for printing
+    soDetailOrderId = orderId;
+    switchTab('orders');
+    soRenderDetail();
+    soGenerateDoc(orderId);
+  } catch(e) {
+    btnLoading(btn, false, 'Complete & Print Receipt');
+    notify('Error: ' + e.message, 'error');
   }
 }
 
@@ -4803,9 +4915,16 @@ async function soSaveOrder() {
 
       btnLoading(btn, false, 'Create Order');
       closeModal('so-modal');
-      notify('Order ' + orderId + ' created');
-      switchTab('orders');
-      renderOrders();
+
+      if (soIsWalkIn) {
+        // Walk-in: skip all stages, show quick completion modal
+        notify('Walk-in order ' + docNumber + ' created');
+        soShowWalkInComplete(orderId);
+      } else {
+        notify('Order ' + docNumber + ' created');
+        switchTab('orders');
+        renderOrders();
+      }
     }
   } catch (e) {
     btnLoading(btn, false, isEdit ? 'Save Changes' : 'Create Order');
