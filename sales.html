@@ -5605,31 +5605,30 @@ function soGeneratePaymentSlip(paymentInfo) {
   });
   html += '</tbody></table>';
 
-  // Remaining outstanding orders for this customer
+  // Remaining outstanding orders for this customer (check actual balance, not just status)
   if (paymentInfo.customerId) {
-    var remainingOrders = orders.filter(function(o) {
-      return o.customer_id === paymentInfo.customerId && o.status === 'completed' && o.payment_status !== 'paid';
+    var totalOutstanding = 0;
+    var outstandingRows = '';
+    orders.forEach(function(o) {
+      if (o.customer_id !== paymentInfo.customerId || o.status !== 'completed') return;
+      var bal = orderBalance(o);
+      if (bal <= 0) return;
+      totalOutstanding += bal;
+      var days = daysBetween(o.order_date);
+      outstandingRows += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">';
+      outstandingRows += '<span>' + esc(o.doc_number || o.id) + ' <span style="color:#666;">(' + days + 'd)</span></span>';
+      outstandingRows += '<span style="font-weight:600;">RM ' + bal.toFixed(2) + '</span>';
+      outstandingRows += '</div>';
     });
-    if (remainingOrders.length > 0) {
-      var totalOutstanding = 0;
-      html += '<hr class="doc-divider">';
+    html += '<hr class="doc-divider">';
+    if (totalOutstanding > 0) {
       html += '<div style="font-size:10px;font-weight:700;margin-bottom:4px;">REMAINING OUTSTANDING:</div>';
-      remainingOrders.forEach(function(o) {
-        var bal = orderBalance(o);
-        if (bal <= 0) return;
-        totalOutstanding += bal;
-        var days = daysBetween(o.order_date);
-        html += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">';
-        html += '<span>' + esc(o.doc_number || o.id) + ' <span style="color:#666;">(' + days + 'd)</span></span>';
-        html += '<span style="font-weight:600;">RM ' + bal.toFixed(2) + '</span>';
-        html += '</div>';
-      });
+      html += outstandingRows;
       html += '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-top:4px;padding-top:4px;border-top:2px solid #000;">';
       html += '<span>Total Outstanding</span><span>RM ' + totalOutstanding.toFixed(2) + '</span>';
       html += '</div>';
     } else {
-      html += '<hr class="doc-divider">';
-      html += '<div style="font-size:11px;font-weight:700;text-align:center;color:#060;">ALL ORDERS FULLY PAID</div>';
+      html += '<div style="font-size:11px;font-weight:700;text-align:center;color:#060;">NO OUTSTANDING BALANCE</div>';
     }
   }
 
