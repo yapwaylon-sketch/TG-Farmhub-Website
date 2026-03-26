@@ -12,21 +12,28 @@
 <script src="shared.js"></script>
 </head>
 <body>
-<div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<div id="tg-loading" style="position:fixed;inset:0;background:#FAF6EF;z-index:99999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;"><span style="color:#6B4C8A;font-size:28px;font-weight:800;font-family:sans-serif;letter-spacing:1px;">Loading Module</span><span style="color:#D4AF37;font-size:13px;font-family:sans-serif;">TG Agro Fruits</span></div>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 <div id="app">
 
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
-  <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;color:var(--gold-light);text-decoration:none;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
-    TG FarmHub
-  </a>
   <div class="sidebar-brand">
-    <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="TG" style="width:90%;height:90%;object-fit:contain;"></div>
-    <div>
-      <div class="sidebar-brand-text">Growth Tracker</div>
-      <div class="sidebar-brand-sub">Ladang PND</div>
+    <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+      <div class="sidebar-logo"><img src="assets/logo.png?v=2" alt="TG"></div>
+      <div>
+        <div class="sidebar-brand-text">Growth Tracker</div>
+        <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+          TG FarmHub
+        </div>
+      </div>
+    </a>
+    <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+      <button onclick="sessionStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
     </div>
   </div>
   <nav class="sidebar-nav" aria-label="Module navigation">
@@ -107,18 +114,18 @@
           <tr>
             <th class="sortable" onclick="sortGrowth('block_name')">Block<span id="sort-block_name"></span></th>
             <th class="sortable" onclick="sortGrowth('status_name')">Status<span id="sort-status_name"></span></th>
-            <th class="sortable" onclick="sortGrowth('dap')">Age<span id="sort-dap"></span></th>
+            <th class="sortable" onclick="sortGrowth('dap')">Age (d)<span id="sort-dap"></span></th>
             <th class="sortable" onclick="sortGrowth('variety_name')">Variety<span id="sort-variety_name"></span></th>
             <th class="sortable" onclick="sortGrowth('quantity')">Plants<span id="sort-quantity"></span></th>
-            <th class="sortable" onclick="sortGrowth('date_planted')">Date Planted<span id="sort-date_planted"></span></th>
+            <th class="sortable" onclick="sortGrowth('date_planted')">Planted<span id="sort-date_planted"></span></th>
             <th class="sortable" onclick="sortGrowth('target_induce_date')">Target Induce<span id="sort-target_induce_date"></span></th>
-            <th class="sortable" onclick="sortGrowth('days_to_induce')">Days to Induce<span id="sort-days_to_induce"></span></th>
+            <th class="sortable" onclick="sortGrowth('days_to_induce')">To Induce (d)<span id="sort-days_to_induce"></span></th>
             <th class="sortable" onclick="sortGrowth('date_induced_start')">Induce Start<span id="sort-date_induced_start"></span></th>
             <th class="sortable" onclick="sortGrowth('date_induced_end')">Induce End<span id="sort-date_induced_end"></span></th>
-            <th class="sortable" onclick="sortGrowth('days_after_induce')">Days After Induce<span id="sort-days_after_induce"></span></th>
-            <th class="sortable" onclick="sortGrowth('harvest_days')">Harvest Days<span id="sort-harvest_days"></span></th>
+            <th class="sortable" onclick="sortGrowth('days_after_induce')">After Induce (d)<span id="sort-days_after_induce"></span></th>
+            <th class="sortable" onclick="sortGrowth('harvest_days')">Harvest (d)<span id="sort-harvest_days"></span></th>
             <th>Harvest Window</th>
-            <th class="sortable" onclick="sortGrowth('days_to_harvest')">Days to Harvest<span id="sort-days_to_harvest"></span></th>
+            <th class="sortable" onclick="sortGrowth('days_to_harvest')">To Harvest (d)<span id="sort-days_to_harvest"></span></th>
             <th>Remarks</th>
           </tr>
         </thead>

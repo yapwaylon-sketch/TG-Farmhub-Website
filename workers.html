@@ -12,7 +12,7 @@
 <script src="shared.js"></script>
 </head>
 <body>
-<div id="tg-loading" style="position:fixed;inset:0;background:#1A1F1A;z-index:99999;display:flex;justify-content:center;align-items:center;"><span style="color:#E8A020;font-size:14px;font-family:sans-serif;">Loading...</span></div>
+<div id="tg-loading" style="position:fixed;inset:0;background:#FAF6EF;z-index:99999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;"><span style="color:#6B4C8A;font-size:28px;font-weight:800;font-family:sans-serif;letter-spacing:1px;">Loading Module</span><span style="color:#D4AF37;font-size:13px;font-family:sans-serif;">TG Agro Fruits</span></div>
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- LOGIN (fallback if no session) -->
@@ -30,15 +30,22 @@
 <div id="app" style="display:none;">
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:11px;color:var(--gold-light);text-decoration:none;border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
-      TG FarmHub
-    </a>
     <div class="sidebar-brand">
-      <div class="sidebar-logo"><img src="data:image/png;base64,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" alt="TG"></div>
-      <div>
-        <div class="sidebar-brand-text">Worker Management</div>
-        <div class="sidebar-brand-sub">Ladang PND</div>
+      <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+        <div class="sidebar-logo"><img src="assets/logo.png?v=2" alt="TG"></div>
+        <div>
+          <div class="sidebar-brand-text">Workers</div>
+          <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+            TG FarmHub
+          </div>
+        </div>
+      </a>
+      <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+        <button onclick="sessionStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </button>
       </div>
     </div>
     <nav class="sidebar-nav" aria-label="Module navigation">
