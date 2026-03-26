@@ -1227,37 +1227,45 @@ function renderDashboard() {
     var statusColors = {
       pending: '#3A7AC8', preparing: '#E8A020', prepared: '#4A7C3F', delivering: '#8C5AD2'
     };
-    html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-    html += '<thead><tr><th>Customer</th><th>Doc #</th><th>Status</th><th>Assigned To</th><th>Order Date</th><th>Delivery</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;">';
     activeOrders.forEach(function(o) {
       var delivDate = o.delivery_date || '';
       var isOverdue = delivDate && delivDate < today;
       var isToday = delivDate === today;
-      var rowStyle = isOverdue ? ' style="border-left:3px solid var(--red);"' : (isToday ? ' style="border-left:3px solid var(--gold);"' : '');
+      var color = statusColors[o.status] || '#888';
+      var borderStyle = isOverdue ? 'border-left:3px solid var(--red);' : (isToday ? 'border-left:3px solid var(--gold);' : 'border-left:3px solid ' + color + ';');
 
-      html += '<tr' + rowStyle + ' style="cursor:pointer;' + (isOverdue ? 'border-left:3px solid var(--red);' : (isToday ? 'border-left:3px solid var(--gold);' : '')) + '" onclick="soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();">';
-      html += '<td style="font-weight:600;">' + esc(getCustomerName(o.customer_id)) + '</td>';
-      html += '<td>' + esc(o.doc_number || o.id) + '</td>';
-      html += '<td><span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span></td>';
-      var aw = o.assigned_worker_id ? allWorkers.find(function(w) { return w.id === o.assigned_worker_id; }) : null;
-      html += '<td style="color:var(--green-light);">' + esc(aw ? aw.name : '\u2014') + '</td>';
-      html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
-      html += '<td>';
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;' + borderStyle + '" onclick="soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();">';
+
+      // Row 1: Customer + Total
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">';
+      html += '<div style="font-weight:700;font-size:13px;color:var(--text);line-height:1.2;">' + esc(getCustomerName(o.customer_id)) + '</div>';
+      html += '<div style="font-weight:800;font-size:14px;color:var(--text);white-space:nowrap;margin-left:8px;">' + formatRM(parseFloat(o.grand_total) || 0) + '</div>';
+      html += '</div>';
+
+      // Row 2: Doc# + Status badge
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+      html += '<span style="font-size:12px;font-weight:600;color:var(--purple);">' + esc(o.doc_number || o.id) + '</span>';
+      html += '<span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span>';
+      html += '</div>';
+
+      // Row 3: Delivery date
+      html += '<div style="font-size:11px;color:var(--text-muted);">';
       if (isOverdue) {
         var overdueDays = daysBetween(delivDate);
-        html += '<span style="color:var(--red);font-weight:700;">' + esc(delivDate) + ' (' + overdueDays + 'd overdue)</span>';
+        html += '<span style="color:var(--red);font-weight:700;">Delivery: ' + fmtDate(delivDate) + ' (' + overdueDays + 'd overdue)</span>';
       } else if (isToday) {
-        html += '<span style="color:var(--gold);font-weight:700;">TODAY</span>';
+        html += '<span style="color:var(--gold);font-weight:700;">Delivery: TODAY</span>';
       } else if (delivDate) {
-        html += esc(delivDate);
+        html += 'Delivery: ' + fmtDate(delivDate);
       } else {
-        html += '\u2014';
+        html += 'No delivery date';
       }
-      html += '</td>';
-      html += '<td style="text-align:right;font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
-      html += '</tr>';
+      html += '</div>';
+
+      html += '</div>';
     });
-    html += '</tbody></table></div>';
+    html += '</div>';
   }
   html += '</div>';
 
