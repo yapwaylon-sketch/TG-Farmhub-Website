@@ -968,7 +968,6 @@ function daysBetween(dateStr) {
 }
 
 function getCustomerName(customerId) {
-  if (!customerId) return 'Walk-In Customer';
   var c = customers.find(function(x) { return x.id === customerId; });
   return c ? c.name : '\u2014';
 }
@@ -4346,7 +4345,7 @@ var soSelectedCustomer = null;
 
 var soIsWalkIn = false;
 
-function soToggleWalkIn() {
+async function soToggleWalkIn() {
   soIsWalkIn = !soIsWalkIn;
   var btn = document.getElementById('so-walkin-btn');
   var custSection = document.getElementById('so-cust-section');
@@ -4355,17 +4354,28 @@ function soToggleWalkIn() {
     btn.style.color = '#1A0E2E';
     btn.style.borderColor = 'var(--gold)';
     custSection.style.display = 'none';
-    soSelectedCustomer = null;
+    // Find or create Walk-In Customer
+    var walkIn = customers.find(function(c) { return c.name === 'Walk-In Customer'; });
+    if (!walkIn) {
+      var wId = await dbNextId('SC');
+      var wData = { id: wId, name: 'Walk-In Customer', phone: null, contact_person: null, address: null, type: 'individual', channel: 'walkin', payment_terms: 'cash', notes: 'Auto-created for walk-in sales', is_active: true };
+      var wResult = await sbQuery(sb.from('sales_customers').insert(wData).select());
+      if (wResult) { walkIn = wResult[0] || wData; customers.push(walkIn); }
+    }
+    if (walkIn) soSelectCustomer(walkIn.id);
     document.getElementById('so-doc-type').value = 'cash_sales';
     document.getElementById('so-fulfillment').value = 'collection';
     document.getElementById('so-channel').value = 'walkin';
     document.getElementById('so-delivery-date').value = todayStr();
     calUpdateDisplay('so-delivery-date', todayStr());
+    // Re-hide customer section (soSelectCustomer shows the badge)
+    custSection.style.display = 'none';
   } else {
     btn.style.background = '';
     btn.style.color = '';
     btn.style.borderColor = '';
     custSection.style.display = '';
+    soClearCustomer();
   }
 }
 
@@ -4729,7 +4739,7 @@ async function soSaveOrder() {
 
       var orderData = {
         id: orderId,
-        customer_id: soIsWalkIn ? null : soSelectedCustomer.id,
+        customer_id: soSelectedCustomer.id,
         order_date: document.getElementById('so-order-date').value || todayStr(),
         delivery_date: deliveryDate,
         delivery_time: document.getElementById('so-delivery-time').value || null,
