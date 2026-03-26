@@ -626,8 +626,18 @@
       </button>
     </div>
 
+    <!-- Walk-In Toggle -->
+    <div class="so-section" style="padding-bottom:0;">
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-outline btn-sm" id="so-walkin-btn" onclick="soToggleWalkIn()" style="gap:6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          Walk-In Sale
+        </button>
+      </div>
+    </div>
+
     <!-- Section A: Customer -->
-    <div class="so-section">
+    <div class="so-section" id="so-cust-section">
       <div class="so-section-label">CUSTOMER</div>
       <div id="so-cust-selected" style="display:none;"></div>
       <div id="so-cust-search-wrap" style="position:relative;">
@@ -958,6 +968,7 @@ function daysBetween(dateStr) {
 }
 
 function getCustomerName(customerId) {
+  if (!customerId) return 'Walk-In Customer';
   var c = customers.find(function(x) { return x.id === customerId; });
   return c ? c.name : '\u2014';
 }
@@ -4333,11 +4344,37 @@ function rptPrint() {
 var soItems = [];
 var soSelectedCustomer = null;
 
+var soIsWalkIn = false;
+
+function soToggleWalkIn() {
+  soIsWalkIn = !soIsWalkIn;
+  var btn = document.getElementById('so-walkin-btn');
+  var custSection = document.getElementById('so-cust-section');
+  if (soIsWalkIn) {
+    btn.style.background = 'var(--gold)';
+    btn.style.color = '#1A0E2E';
+    btn.style.borderColor = 'var(--gold)';
+    custSection.style.display = 'none';
+    soSelectedCustomer = null;
+    document.getElementById('so-doc-type').value = 'cash_sales';
+    document.getElementById('so-fulfillment').value = 'collection';
+    document.getElementById('so-channel').value = 'walkin';
+    document.getElementById('so-delivery-date').value = todayStr();
+    calUpdateDisplay('so-delivery-date', todayStr());
+  } else {
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    custSection.style.display = '';
+  }
+}
+
 function openNewOrderModal(editOrderId) {
   soEditOrderId = editOrderId || null;
   soItems = [];
   soSelectedCustomer = null;
   soAppliedDebitNotes = [];
+  soIsWalkIn = false;
 
   // Reset fields
   document.getElementById('so-cust-search').value = '';
@@ -4345,6 +4382,9 @@ function openNewOrderModal(editOrderId) {
   document.getElementById('so-cust-selected').style.display = 'none';
   document.getElementById('so-cust-selected').innerHTML = '';
   document.getElementById('so-cust-search-wrap').style.display = 'block';
+  document.getElementById('so-cust-section').style.display = '';
+  var wBtn = document.getElementById('so-walkin-btn');
+  wBtn.style.background = ''; wBtn.style.color = ''; wBtn.style.borderColor = '';
   document.getElementById('so-order-date').value = todayStr();
   calUpdateDisplay('so-order-date', todayStr());
   document.getElementById('so-delivery-date').value = '';
@@ -4616,11 +4656,12 @@ function soCalcTotals() {
 
 async function soSaveOrder() {
   // Validate
-  if (!soSelectedCustomer) { notify('Please select a customer', 'warning'); return; }
+  if (!soIsWalkIn && !soSelectedCustomer) { notify('Please select a customer', 'warning'); return; }
   var validItems = soItems.filter(function(i) { return i.productId && parseFloat(i.quantity) > 0; });
   if (!validItems.length) { notify('Please add at least one item with a product and quantity', 'warning'); return; }
 
   var deliveryDate = document.getElementById('so-delivery-date').value;
+  if (soIsWalkIn && !deliveryDate) deliveryDate = todayStr();
   if (!deliveryDate) { notify('Please set a delivery date', 'warning'); return; }
 
   var btn = document.getElementById('so-save-btn');
@@ -4688,7 +4729,7 @@ async function soSaveOrder() {
 
       var orderData = {
         id: orderId,
-        customer_id: soSelectedCustomer.id,
+        customer_id: soIsWalkIn ? null : soSelectedCustomer.id,
         order_date: document.getElementById('so-order-date').value || todayStr(),
         delivery_date: deliveryDate,
         delivery_time: document.getElementById('so-delivery-time').value || null,
