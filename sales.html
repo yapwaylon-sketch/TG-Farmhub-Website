@@ -2703,7 +2703,12 @@ function scRenderDetail() {
   if (c.address) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Address</div><div style="color:var(--text);">' + esc(c.address) + '</div></div>';
   if (c.notes) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Notes</div><div style="color:var(--text);">' + esc(c.notes) + '</div></div>';
   html += '</div>';
-  html += '<div style="margin-top:10px;"><button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + esc(c.id) + '\')">Edit Customer</button></div>';
+  html += '<div style="margin-top:10px;display:flex;gap:8px;">';
+  html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + esc(c.id) + '\')">Edit Customer</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="soGenerateStatement(\'' + esc(c.id) + '\')" style="gap:4px;border-color:var(--gold);color:var(--gold);">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+  html += 'Print Statement</button>';
+  html += '</div>';
   html += '</div>';
 
   // ── Summary Cards ──
@@ -3461,6 +3466,8 @@ async function paySavePayment() {
 
     var remaining = amount;
     var isFirst = true;
+    var slipOrders = []; // Track allocation for payment slip
+    var slipCustomerName = '';
 
     for (var i = 0; i < orderIds.length && remaining > 0.001; i++) {
       var oid = orderIds[i];
@@ -3468,6 +3475,11 @@ async function paySavePayment() {
       if (!o) continue;
       var bal = orderBalance(o);
       if (bal <= 0) continue;
+
+      if (!slipCustomerName) {
+        var slipCust = customers.find(function(c) { return c.id === o.customer_id; });
+        slipCustomerName = slipCust ? slipCust.name : '—';
+      }
 
       var payAmount = Math.min(remaining, bal);
       remaining -= payAmount;
@@ -3492,12 +3504,20 @@ async function paySavePayment() {
       payments.unshift(result[0] || payData);
       recalcPaymentStatus(oid);
       await sbQuery(sb.from('sales_orders').update({ amount_paid: o.amount_paid, payment_status: o.payment_status }).eq('id', oid).select());
+
+      slipOrders.push({ doc_number: o.doc_number || o.id, total: o.grand_total, applied: payAmount, balance: orderBalance(o) });
     }
 
     btnLoading(btn, false, 'Save Payment');
     closeModal('pay-modal');
     notify('Payment of ' + formatRM(amount) + ' recorded across ' + orderIds.length + ' order' + (orderIds.length > 1 ? 's' : ''), 'success');
     renderCurrentTab();
+
+    // Show payment received slip
+    soGeneratePaymentSlip({
+      amount: amount, method: method, reference: reference, date: payDate,
+      customerName: slipCustomerName, orders: slipOrders
+    });
   } catch(e) {
     btnLoading(btn, false, 'Save Payment');
     notify('Failed to save payment: ' + e.message, 'error');
@@ -5375,6 +5395,163 @@ function soOpenWhatsAppDoc() {
 
   closeModal('so-doc-share-modal');
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ============================================================
+// PAYMENT RECEIVED SLIP
+// ============================================================
+function soGeneratePaymentSlip(paymentInfo) {
+  // paymentInfo: { amount, method, reference, date, customerName, orders: [{doc_number, total, paid, balance}] }
+  var html = '';
+  html += '<div class="doc-logo"><img src="assets/logo.png?v=2" alt="TG"></div>';
+  html += '<div class="doc-header"><h2>TG AGRO FRUITS SDN. BHD.</h2></div>';
+  html += '<hr class="doc-divider">';
+  html += '<div class="doc-title">PAYMENT RECEIVED</div>';
+  html += '<hr class="doc-divider">';
+
+  html += '<div class="doc-info-grid">';
+  html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(paymentInfo.customerName) + '</div>';
+  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(paymentInfo.date) + '</div>';
+  html += '<div class="doc-info-label">Method:</div><div class="doc-info-value">' + esc(paymentInfo.method === 'bank_transfer' ? 'Bank Transfer' : 'Cash') + '</div>';
+  if (paymentInfo.reference) {
+    html += '<div class="doc-info-label">Reference:</div><div class="doc-info-value">' + esc(paymentInfo.reference) + '</div>';
+  }
+  html += '</div>';
+
+  // Orders covered
+  html += '<table style="width:100%;border-collapse:collapse;margin:4px 0;">';
+  html += '<thead><tr><th style="text-align:left;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Order</th>';
+  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Total</th>';
+  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Applied</th>';
+  html += '<th style="text-align:right;font-size:10px;font-weight:700;border-bottom:1px solid #000;border-top:1px solid #000;padding:3px 2px;">Balance</th>';
+  html += '</tr></thead><tbody>';
+
+  paymentInfo.orders.forEach(function(po) {
+    html += '<tr>';
+    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;font-weight:600;">' + esc(po.doc_number) + '</td>';
+    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;">' + parseFloat(po.total).toFixed(2) + '</td>';
+    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;font-weight:600;">' + parseFloat(po.applied).toFixed(2) + '</td>';
+    html += '<td style="padding:3px 2px;border-bottom:1px dotted #999;font-size:11px;text-align:right;">' + parseFloat(po.balance).toFixed(2) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Total amount
+  html += '<div class="doc-totals">';
+  html += '<div class="doc-grand-total">AMOUNT RECEIVED: RM ' + parseFloat(paymentInfo.amount).toFixed(2) + '</div>';
+  html += '</div>';
+
+  html += '<div class="doc-footer">TG Agro Fruits Sdn Bhd<br>Thank you for your payment</div>';
+
+  document.getElementById('so-doc-a4-content').style.display = 'none';
+  document.getElementById('so-doc-modal').classList.remove('a4-mode');
+  document.getElementById('so-doc-content').style.display = '';
+  document.getElementById('so-doc-content').innerHTML = html;
+  document.getElementById('so-doc-modal').style.display = 'flex';
+}
+
+// ============================================================
+// CUSTOMER STATEMENT (A4)
+// ============================================================
+function soGenerateStatement(customerId) {
+  var cust = customers.find(function(c) { return c.id === customerId; });
+  if (!cust) { notify('Customer not found', 'warning'); return; }
+
+  var custOrders = orders.filter(function(o) {
+    return o.customer_id === customerId && o.status === 'completed' && o.payment_status !== 'paid';
+  });
+  // Sort oldest first
+  custOrders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
+
+  var preparedBy = currentUser ? esc(currentUser.displayName) : '—';
+  var totalOutstanding = 0;
+
+  var html = '<div class="a4-page">';
+
+  // Letterhead
+  html += '<div class="a4-letterhead">';
+  html += '<img src="assets/logo.png?v=2" alt="TG">';
+  html += '<div class="a4-letterhead-text">';
+  html += '<h2>TG AGRO FRUITS SDN. BHD.</h2>';
+  html += '<p>(201401034124 / 1110222-T)</p>';
+  html += '<p>Lot 189, Kampung Riam Jaya, Airport Road,</p>';
+  html += '<p>98000 Miri, Sarawak</p>';
+  html += '<p>Tel: 012-3286661</p>';
+  html += '</div></div>';
+  html += '<hr class="a4-divider">';
+
+  // Title
+  html += '<div class="a4-title">STATEMENT OF ACCOUNT</div>';
+  html += '<div class="a4-copy-label">As at ' + fmtDate(todayStr()) + '</div>';
+
+  // Customer Info
+  html += '<div class="a4-info-grid">';
+  html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value" style="font-weight:700;">' + esc(cust.name) + '</div>';
+  html += '<div class="a4-info-label">Date:</div><div class="a4-info-value">' + fmtDate(todayStr()) + '</div>';
+  if (cust.phone) {
+    html += '<div class="a4-info-label">Phone:</div><div class="a4-info-value">' + esc(cust.phone) + '</div>';
+  } else {
+    html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
+  }
+  html += '<div class="a4-info-label">Terms:</div><div class="a4-info-value">' + (cust.payment_terms === 'credit' ? 'Credit' : 'Cash') + '</div>';
+  if (cust.address) {
+    html += '<div class="a4-info-label">Address:</div><div class="a4-info-value" style="grid-column:span 3;">' + esc(cust.address) + '</div>';
+  }
+  html += '</div>';
+
+  // Outstanding orders table
+  html += '<table class="a4-items-table">';
+  html += '<thead><tr><th>Doc #</th><th>Date</th><th>Age</th><th style="text-align:right;">Total (RM)</th><th style="text-align:right;">Paid (RM)</th><th style="text-align:right;">Balance (RM)</th></tr></thead>';
+  html += '<tbody>';
+
+  if (custOrders.length === 0) {
+    html += '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px;">No outstanding orders</td></tr>';
+  } else {
+    custOrders.forEach(function(o) {
+      var total = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      var bal = total - paid;
+      totalOutstanding += bal;
+      var days = daysBetween(o.order_date);
+
+      html += '<tr>';
+      html += '<td style="font-weight:700;">' + esc(o.doc_number || o.id) + '</td>';
+      html += '<td>' + fmtDate(o.order_date) + '</td>';
+      html += '<td>' + days + ' days</td>';
+      html += '<td style="text-align:right;">' + total.toFixed(2) + '</td>';
+      html += '<td style="text-align:right;">' + paid.toFixed(2) + '</td>';
+      html += '<td style="text-align:right;font-weight:700;">' + bal.toFixed(2) + '</td>';
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table>';
+
+  // Total
+  html += '<div class="a4-totals">';
+  html += '<div class="a4-grand-total">TOTAL OUTSTANDING: RM ' + totalOutstanding.toFixed(2) + '</div>';
+  html += '</div>';
+
+  // Payment reminder
+  html += '<div style="margin-top:20px;font-size:12px;color:#555;line-height:1.6;">';
+  html += '<strong>Payment Reminder:</strong> Please arrange payment at your earliest convenience. ';
+  html += 'Payment can be made via cash or bank transfer.';
+  html += '</div>';
+
+  // Prepared by
+  html += '<div style="margin-top:30px;font-size:12px;">';
+  html += '<strong>Prepared By:</strong> ' + preparedBy;
+  html += '</div>';
+
+  html += '<div class="a4-footer">TG Agro Fruits Sdn Bhd<br>Thank you for your business</div>';
+  html += '</div>'; // close a4-page
+
+  // Show in A4 modal
+  document.getElementById('so-doc-content').style.display = 'none';
+  document.getElementById('so-doc-a4-content').innerHTML = html;
+  document.getElementById('so-doc-a4-content').style.display = 'block';
+  document.getElementById('so-doc-modal').classList.add('a4-mode');
+  soDocCurrentOrderId = null;
+  document.getElementById('so-doc-modal').style.display = 'flex';
 }
 
 // ============================================================
