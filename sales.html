@@ -1685,8 +1685,8 @@ function soRenderDetail() {
     html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
   }
 
-  // Delete button for cancelled orders (admin only)
-  if (o.status === 'cancelled' && currentUser && currentUser.role === 'admin') {
+  // Delete button for cancelled/completed orders (admin only)
+  if ((o.status === 'cancelled' || o.status === 'completed') && currentUser && currentUser.role === 'admin') {
     html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);gap:6px;" onclick="soDeleteOrder(\'' + esc(o.id) + '\')">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
     html += 'Delete Order</button>';
@@ -2357,10 +2357,13 @@ function soCancelOrder(orderId) {
 function soDeleteOrder(orderId) {
   if (!currentUser || currentUser.role !== 'admin') { notify('Admin access required', 'warning'); return; }
   var o = orders.find(function(x) { return x.id === orderId; });
-  if (!o || o.status !== 'cancelled') { notify('Only cancelled orders can be deleted', 'warning'); return; }
+  if (!o || (o.status !== 'cancelled' && o.status !== 'completed')) { notify('Only cancelled or completed orders can be deleted', 'warning'); return; }
   var custName = getCustomerName(o.customer_id);
-  confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order and its items. This cannot be undone.', async function() {
-    // Delete order items first
+  confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order, its items, and any payments. This cannot be undone.', async function() {
+    // Delete payments first
+    await sbQuery(sb.from('sales_payments').delete().eq('order_id', orderId));
+    payments = payments.filter(function(x) { return x.order_id !== orderId; });
+    // Delete order items
     var r1 = await sbQuery(sb.from('sales_order_items').delete().eq('order_id', orderId));
     if (r1 && r1.error) { notify('Failed to delete items: ' + r1.error.message, 'error'); return; }
     // Delete the order
