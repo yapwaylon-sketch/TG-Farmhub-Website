@@ -1510,8 +1510,27 @@ function soRenderCard(o, status, color, label) {
   h += '<div class="sales-card-bottom"><div class="sales-card-meta">';
   h += '<span>' + esc(o.order_date || '\u2014') + '</span>';
   if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + '</span>';
-  h += '<span>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</span>';
   h += '</div><div class="sales-card-total">' + formatRM(total) + '</div></div>';
+
+  // Item list
+  var oItems = orderItems.filter(function(i) { return i.order_id === o.id; });
+  if (oItems.length) {
+    h += '<div style="padding:6px 14px 10px;border-top:1px solid var(--border);">';
+    oItems.forEach(function(item) {
+      var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+      var variety = soGetProductVariety(item.product_id);
+      var name = '';
+      if (variety && variety !== '—') name += variety + ' ';
+      name += prod ? prod.name : '—';
+      var unit = prod ? (prod.unit || '') : '';
+      h += '<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0;">';
+      h += '<span style="color:var(--text-muted);">' + esc(name) + '</span>';
+      h += '<span style="font-weight:600;">' + (item.quantity || 0) + esc(unit) + '</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
   h += '</div>';
   return h;
 }
