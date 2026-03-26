@@ -2867,9 +2867,9 @@ function scRenderDetail() {
       html += '<td>' + esc(methodLabel) + '</td>';
       html += '<td>' + esc(p.reference || '\u2014') + '</td>';
       html += '<td style="text-align:right;font-weight:600;color:var(--green-light);">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
-      html += '<td>';
-      if (p.slip_url) html += '<a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);">View</a>';
-      else html += '\u2014';
+      html += '<td style="white-space:nowrap;">';
+      html += '<a href="javascript:void(0)" onclick="soReprintPayment(\'' + esc(p.id) + '\')" style="color:var(--purple);font-size:11px;">Reprint</a>';
+      if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:11px;margin-left:4px;">Slip</a>';
       html += '</td>';
       html += '</tr>';
     });
@@ -3292,7 +3292,8 @@ function renderPayments() {
               html += '<tr style="background:var(--bg-hover);font-size:11px;">';
               html += '<td></td>';
               html += '<td colspan="3" style="padding-left:8px;color:var(--text-muted);">' + fmtDateShort(p.payment_date) + ' &middot; ' + methodLabel + (p.reference ? ' (' + esc(p.reference) + ')' : '');
-              if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:10px;">View Slip</a>';
+              html += ' <a href="javascript:void(0)" onclick="soReprintPayment(\'' + esc(p.id) + '\')" style="color:var(--purple);font-size:10px;margin-left:4px;">Reprint</a>';
+              if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:10px;margin-left:4px;">Slip</a>';
               html += '</td>';
               html += '<td colspan="3" style="text-align:right;color:var(--green-light);font-weight:600;">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
               html += '<td colspan="2"></td>';
@@ -5395,6 +5396,25 @@ function soOpenWhatsAppDoc() {
 
   closeModal('so-doc-share-modal');
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ============================================================
+// REPRINT PAYMENT RECEIPT
+// ============================================================
+function soReprintPayment(paymentId) {
+  var p = payments.find(function(x) { return x.id === paymentId; });
+  if (!p) { notify('Payment not found', 'warning'); return; }
+  var o = orders.find(function(x) { return x.id === p.order_id; });
+  var cust = o ? customers.find(function(c) { return c.id === o.customer_id; }) : null;
+
+  soGeneratePaymentSlip({
+    amount: p.amount,
+    method: p.method,
+    reference: p.reference,
+    date: p.payment_date,
+    customerName: cust ? cust.name : '—',
+    orders: [{ doc_number: o ? (o.doc_number || o.id) : '—', total: o ? o.grand_total : 0, applied: p.amount, balance: o ? orderBalance(o) : 0 }]
+  });
 }
 
 // ============================================================
