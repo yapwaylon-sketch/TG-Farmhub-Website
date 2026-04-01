@@ -5476,6 +5476,17 @@ function soGenerateDoc(orderId) {
   }
   html += '</div>';
 
+  // Bank details (cash sales only)
+  if (!isDO) {
+    html += '<div style="margin-top:8px;padding:6px;border:1px solid #000;font-size:9px;line-height:1.5;">';
+    html += '<strong>Payment via Bank Transfer:</strong><br>';
+    html += 'Public Bank Berhad<br>';
+    html += 'A/C: 3243036710<br>';
+    html += 'TG Agro Fruits Sdn Bhd<br>';
+    html += '<em>Please WhatsApp your payment slip to 012-3286661 once transferred. Thank you.</em>';
+    html += '</div>';
+  }
+
   // Footer
   html += '<div class="doc-footer">';
   html += 'TG Agro Fruits Sdn Bhd<br>';
