@@ -1725,9 +1725,11 @@ function printPayrollList() {
   const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
   const periodLabel = period ? monthNames[period.month] + " " + period.year : "";
 
-  const totalSalary = payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_pay)||0), 0);
-  const salaryToPay = payrollEntries.reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
-  const balanceToPay = payrollEntries.filter(pe => (pe.payment_status || "unpaid") === "unpaid").reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
+  // Exclude deactivated workers
+  const printEntries = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return !w || w.active !== false; });
+  const totalSalary = printEntries.reduce((s,pe) => s + (parseFloat(pe.total_pay)||0), 0);
+  const salaryToPay = printEntries.reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
+  const balanceToPay = printEntries.filter(pe => (pe.payment_status || "unpaid") === "unpaid").reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
 
   let printHtml = '<html><head><title>Payroll — ' + periodLabel + '</title>';
   printHtml += '<style>body{font-family:Arial,sans-serif;padding:20px;color:#222;}';
@@ -1751,9 +1753,9 @@ function printPayrollList() {
   printHtml += '</div>';
   printHtml += '<table><thead><tr><th>#</th><th>Worker</th><th>Days</th><th>Base Wage</th><th>OT</th><th>Resp.</th><th>Contract</th><th>Deductions</th><th style="text-align:right;">Net Pay</th><th>Status</th></tr></thead><tbody>';
 
-  payrollEntries.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+  printEntries.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
   let rowNum = 0;
-  for (const pe of payrollEntries) {
+  for (const pe of printEntries) {
     rowNum++;
     const isPaid = (pe.payment_status || "unpaid") === "paid";
     printHtml += '<tr>';
@@ -1771,11 +1773,11 @@ function printPayrollList() {
   }
 
   printHtml += '<tr class="total-row"><td></td><td>TOTAL (' + rowNum + ')</td><td></td>';
-  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
-  printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(printEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(printEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(printEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(printEntries.reduce((s,pe) => s + (parseFloat(pe.task_total)||0), 0)) + '</td>';
+  printHtml += '<td>RM ' + fmtNum2(printEntries.reduce((s,pe) => s + (parseFloat(pe.total_deductions)||0), 0)) + '</td>';
   printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmtNum2(salaryToPay) + '</td>';
   printHtml += '<td></td></tr>';
   printHtml += '</tbody></table></body></html>';
@@ -2322,7 +2324,7 @@ function printAllPayslips() {
   const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
   const periodLabel = period ? monthNames[period.month] + " " + period.year : "";
 
-  const sorted = [...payrollEntries].sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+  const sorted = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return !w || w.active !== false; }).sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
 
   let printHtml = '<html><head><title>All Payslips — ' + periodLabel + '</title>';
   printHtml += '<style>';
