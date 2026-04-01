@@ -2539,7 +2539,10 @@ function soDeleteOrder(orderId) {
   if (!o || (o.status !== 'cancelled' && o.status !== 'completed')) { notify('Only cancelled or completed orders can be deleted', 'warning'); return; }
   var custName = getCustomerName(o.customer_id);
   confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order, its items, and any payments. This cannot be undone.', async function() {
-    // Delete payments first
+    // Delete returns/debit notes first
+    await sbQuery(sb.from('sales_returns').delete().eq('order_id', orderId));
+    returns = returns.filter(function(x) { return x.order_id !== orderId; });
+    // Delete payments
     await sbQuery(sb.from('sales_payments').delete().eq('order_id', orderId));
     payments = payments.filter(function(x) { return x.order_id !== orderId; });
     // Delete order items
