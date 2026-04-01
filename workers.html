@@ -1726,7 +1726,7 @@ function printPayrollList() {
   const periodLabel = period ? monthNames[period.month] + " " + period.year : "";
 
   // Exclude deactivated workers
-  const printEntries = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return !w || w.active !== false; });
+  const printEntries = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return w && w.active; });
   const totalSalary = printEntries.reduce((s,pe) => s + (parseFloat(pe.total_pay)||0), 0);
   const salaryToPay = printEntries.reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
   const balanceToPay = printEntries.filter(pe => (pe.payment_status || "unpaid") === "unpaid").reduce((s,pe) => s + (parseFloat(pe.final_pay)||0), 0);
@@ -2324,7 +2324,7 @@ function printAllPayslips() {
   const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
   const periodLabel = period ? monthNames[period.month] + " " + period.year : "";
 
-  const sorted = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return !w || w.active !== false; }).sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+  const sorted = payrollEntries.filter(pe => { const w = workers.find(x => x.id === pe.worker_id); return w && w.active; }).sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
 
   let printHtml = '<html><head><title>All Payslips — ' + periodLabel + '</title>';
   printHtml += '<style>';
