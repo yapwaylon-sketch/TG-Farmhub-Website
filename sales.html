@@ -3198,7 +3198,7 @@ function spOpenModal(editId) {
 
   // Populate variety dropdown
   var varSel = document.getElementById('sp-variety');
-  varSel.innerHTML = varieties.map(function(v) { return '<option value="' + v.id + '">' + esc(v.name) + '</option>'; }).join('');
+  varSel.innerHTML = '<option value="">— No Variety —</option>' + varieties.map(function(v) { return '<option value="' + v.id + '">' + esc(v.name) + '</option>'; }).join('');
 
   if (editId) {
     title.textContent = 'Edit Product';
@@ -3240,13 +3240,12 @@ async function spSaveProduct() {
   var boxQty = category.endsWith('_box') ? (parseInt(document.getElementById('sp-box-qty').value) || null) : null;
 
   if (!name) { notify('Product name required', 'warning'); return; }
-  if (!varietyId) { notify('Please select a variety', 'warning'); return; }
 
   var btn = document.getElementById('sp-save-btn');
   btnLoading(btn, true);
 
   var data = {
-    variety_id: varietyId, name: name, name_bm: nameBM || null, category: category,
+    variety_id: varietyId || null, name: name, name_bm: nameBM || null, category: category,
     unit: unit, default_price: price, box_quantity: boxQty
   };
 
