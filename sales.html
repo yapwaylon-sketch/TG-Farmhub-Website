@@ -1295,7 +1295,7 @@ function renderDashboard() {
         var color = statusColors[o.status] || '#888';
         var borderStyle = isOverdue ? 'border-left:3px solid var(--red);' : (isToday ? 'border-left:3px solid var(--gold);' : 'border-left:3px solid ' + color + ';');
 
-        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;' + borderStyle + '" onclick="soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();">';
+        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;' + borderStyle + '" onclick="soGoToOrder(\'' + esc(o.id) + '\');">';
 
         html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">';
         html += '<div style="font-weight:700;font-size:13px;color:var(--text);line-height:1.2;">' + esc(getCustomerName(o.customer_id)) + '</div>';
@@ -1645,6 +1645,21 @@ function renderOrderCards() {
 
 function soOpenDetail(orderId) {
   soDetailOrderId = orderId;
+  soRenderDetail();
+}
+
+function soGoToOrder(orderId) {
+  // Navigate to order detail from any tab without resetting
+  currentTab = 'orders';
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var page = document.getElementById('page-orders');
+  if (page) page.classList.add('active');
+  var nav = document.getElementById('nav-orders');
+  if (nav) nav.classList.add('active');
+  history.pushState({ tab: 'orders' }, '', '#orders');
+  soDetailOrderId = orderId;
+  scDetailCustomerId = null;
   soRenderDetail();
 }
 
@@ -3591,7 +3606,7 @@ function renderPayments() {
           html += '<td>';
           if (bal > 0) html += '<input type="checkbox" class="pay-cb pay-cb-' + idx + '" data-order-id="' + esc(o.id) + '" data-balance="' + bal.toFixed(2) + '" id="' + cbId + '" onchange="payUpdateSelection(' + idx + ')">';
           html += '</td>';
-          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
+          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soGoToOrder(\'' + esc(o.id) + '\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
           html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
           html += '<td><span style="color:' + dayColor + ';font-weight:600;">' + days + 'd</span></td>';
           html += '<td style="text-align:right;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
@@ -3640,7 +3655,7 @@ function renderPayments() {
 
         g.doOrders.forEach(function(o) {
           html += '<tr>';
-          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
+          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soGoToOrder(\'' + esc(o.id) + '\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
           html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
           html += '<td style="text-align:right;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
           html += '<td>' + esc(o.qb_invoice_number || '\u2014') + '</td>';
