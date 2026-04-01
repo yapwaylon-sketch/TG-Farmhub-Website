@@ -251,9 +251,18 @@
         <input type="number" id="sp-price" step="0.01" min="0" placeholder="0.00" style="width:100%;">
       </div>
     </div>
-    <div class="form-field" id="sp-box-qty-field" style="display:none;">
-      <label>PIECES PER BOX</label>
-      <input type="number" id="sp-box-qty" min="1" placeholder="e.g., 5 or 10" style="width:100%;">
+    <div class="form-row">
+      <div class="form-field">
+        <label>PACKING INFO <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="number" id="sp-box-qty" min="1" step="1" placeholder="e.g., 5 or 500" style="width:100%;">
+      </div>
+      <div class="form-field">
+        <label>PACKING UNIT</label>
+        <select id="sp-box-unit" style="width:100%;">
+          <option value="pcs">pcs per box</option>
+          <option value="g">grams per unit</option>
+        </select>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('sp-modal')">Cancel</button>
@@ -3156,7 +3165,8 @@ function renderProducts() {
         ? '<span class="badge badge-muted">Inactive</span>'
         : '<span class="badge badge-success">Active</span>';
       var toggleLabel = p.is_active === false ? 'Activate' : 'Deactivate';
-      var boxInfo = p.box_quantity ? ' (' + p.box_quantity + ' pcs)' : '';
+      var boxUnitLabel = p.box_unit === 'g' ? 'g' : 'pcs';
+      var boxInfo = p.box_quantity ? ' (' + p.box_quantity + boxUnitLabel + '/unit)' : '';
       html += '<tr' + dimStyle + '>';
       html += '<td><strong>' + esc(p.name) + '</strong>' + (boxInfo ? '<span style="color:var(--text-muted);font-size:11px;">' + esc(boxInfo) + '</span>' : '') + '</td>';
       html += '<td><span class="badge badge-outline">' + esc(spCategoryLabel(p.category)) + '</span></td>';
@@ -3184,10 +3194,8 @@ function spCategoryLabel(cat) {
   return labels[cat] || cat || '-';
 }
 
-// Show/hide box quantity field based on category
 function spCategoryChange() {
-  var cat = document.getElementById('sp-category').value;
-  document.getElementById('sp-box-qty-field').style.display = cat.endsWith('_box') ? 'block' : 'none';
+  // No-op — packing info always visible now
 }
 
 function spOpenModal(editId) {
@@ -3212,6 +3220,7 @@ function spOpenModal(editId) {
       document.getElementById('sp-unit').value = p.unit || 'kg';
       document.getElementById('sp-price').value = p.default_price || '';
       document.getElementById('sp-box-qty').value = p.box_quantity || '';
+      document.getElementById('sp-box-unit').value = p.box_unit || 'pcs';
     }
   } else {
     title.textContent = 'Add Product';
@@ -3222,6 +3231,7 @@ function spOpenModal(editId) {
     document.getElementById('sp-unit').value = 'kg';
     document.getElementById('sp-price').value = '';
     document.getElementById('sp-box-qty').value = '';
+    document.getElementById('sp-box-unit').value = 'pcs';
   }
 
   spCategoryChange();
@@ -3237,7 +3247,8 @@ async function spSaveProduct() {
   var category = document.getElementById('sp-category').value;
   var unit = document.getElementById('sp-unit').value;
   var price = parseFloat(document.getElementById('sp-price').value) || 0;
-  var boxQty = category.endsWith('_box') ? (parseInt(document.getElementById('sp-box-qty').value) || null) : null;
+  var boxQty = parseInt(document.getElementById('sp-box-qty').value) || null;
+  var boxUnit = document.getElementById('sp-box-unit').value;
 
   if (!name) { notify('Product name required', 'warning'); return; }
 
@@ -3246,7 +3257,7 @@ async function spSaveProduct() {
 
   var data = {
     variety_id: varietyId || null, name: name, name_bm: nameBM || null, category: category,
-    unit: unit, default_price: price, box_quantity: boxQty
+    unit: unit, default_price: price, box_quantity: boxQty, box_unit: boxQty ? boxUnit : null
   };
 
   if (editId) {
@@ -5327,6 +5338,7 @@ function soGenerateDoc(orderId) {
     var fullName = '';
     if (prodVariety && prodVariety !== '\u2014') fullName += prodVariety + ' ';
     fullName += prodName;
+    if (prod && prod.box_quantity) fullName += ' (' + prod.box_quantity + (prod.box_unit === 'g' ? 'g' : 'pcs') + ')';
     var lineTotal = parseFloat(item.line_total) || 0;
     subtotal += lineTotal;
     var qtyStr = (item.quantity || 0) + prodUnit;
@@ -5449,6 +5461,7 @@ function soGenerateDocA4(orderId) {
       var fullName = '';
       if (prodVariety && prodVariety !== '—') fullName += prodVariety + ' ';
       fullName += prodName;
+      if (prod && prod.box_quantity) fullName += ' (' + prod.box_quantity + (prod.box_unit === 'g' ? 'g' : 'pcs') + ')';
       var lineTotal = parseFloat(item.line_total) || 0;
       subtotal += lineTotal;
       var qty = item.quantity || 0;
