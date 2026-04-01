@@ -3591,7 +3591,7 @@ function renderPayments() {
           html += '<td>';
           if (bal > 0) html += '<input type="checkbox" class="pay-cb pay-cb-' + idx + '" data-order-id="' + esc(o.id) + '" data-balance="' + bal.toFixed(2) + '" id="' + cbId + '" onchange="payUpdateSelection(' + idx + ')">';
           html += '</td>';
-          html += '<td><span style="font-weight:600;">' + esc(o.doc_number || o.id) + '</span></td>';
+          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
           html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
           html += '<td><span style="color:' + dayColor + ';font-weight:600;">' + days + 'd</span></td>';
           html += '<td style="text-align:right;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
@@ -3640,7 +3640,7 @@ function renderPayments() {
 
         g.doOrders.forEach(function(o) {
           html += '<tr>';
-          html += '<td><span style="font-weight:600;">' + esc(o.doc_number || o.id) + '</span></td>';
+          html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();soDetailOrderId=\'' + esc(o.id) + '\';switchTab(\'orders\');soRenderDetail();" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(o.doc_number || o.id) + '</a></td>';
           html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
           html += '<td style="text-align:right;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
           html += '<td>' + esc(o.qb_invoice_number || '\u2014') + '</td>';
