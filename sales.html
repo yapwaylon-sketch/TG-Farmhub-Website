@@ -4404,7 +4404,7 @@ function rptRenderFilters() {
     var v = varieties.find(function(x) { return x.id === p.variety_id; });
     return '<option value="' + esc(p.id) + '">' + esc((v ? v.name + ' — ' : '') + p.name) + '</option>';
   }).join('');
-  var varOpts = varieties.map(function(v) { return '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>'; }).join('');
+  var varOpts = varieties.map(function(v) { return '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>'; }).join('') + '<option value="_none">No Variety</option>';
   var catOpts = ['whole_crown','whole_no_crown','slice','peeled','slice_box','chunk_box','ring_box'].map(function(c) {
     return '<option value="' + c + '">' + esc(spCategoryLabel(c)) + '</option>';
   }).join('');
@@ -4511,7 +4511,8 @@ function rptGenerate() {
       var pid = it.product_id;
       var prod = salesProducts.find(function(p) { return p.id === pid; });
       if (!prod) return;
-      if (varFilter && prod.variety_id !== varFilter) return;
+      if (varFilter === '_none' && prod.variety_id) return;
+      if (varFilter && varFilter !== '_none' && prod.variety_id !== varFilter) return;
       if (catFilter && prod.category !== catFilter) return;
       if (!byProduct[pid]) byProduct[pid] = { qty: 0, revenue: 0 };
       var qty = parseFloat(it.quantity) || 0;
@@ -5034,7 +5035,7 @@ function soRenderItems() {
     }
     productOpts += '<optgroup label="' + esc(vName) + '">';
     grouped[vid].forEach(function(p) {
-      productOpts += '<option value="' + p.id + '">' + esc(vName) + ' \u2014 ' + esc(p.name) + '</option>';
+      productOpts += '<option value="' + p.id + '">' + (vid !== 'none' ? esc(vName) + ' \u2014 ' : '') + esc(p.name) + '</option>';
     });
     productOpts += '</optgroup>';
   });
