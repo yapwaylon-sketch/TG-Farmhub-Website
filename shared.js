@@ -12,7 +12,7 @@ var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ============================================================
 // Session Security
 // ============================================================
-var INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+var INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 minutes
 var inactivityTimer = null;
 
 function startInactivityTimer() {
@@ -37,8 +37,31 @@ function clearInactivityTimer() {
 // Default logout — modules can override
 function doLogout() {
   clearInactivityTimer();
-  sessionStorage.removeItem("tgfarmhub_user");
+  if (window._sessionCheckInterval) clearInterval(window._sessionCheckInterval);
+  localStorage.removeItem("tgfarmhub_user");
+  localStorage.removeItem("tgfarmhub_session_token");
   window.location.href = "index.html";
+}
+
+// Multi-device session check (shared across modules)
+function startSessionCheck() {
+  if (window._sessionCheckInterval) clearInterval(window._sessionCheckInterval);
+  window._sessionCheckInterval = setInterval(async function() {
+    var stored = localStorage.getItem("tgfarmhub_user");
+    if (!stored) return;
+    var user;
+    try { user = JSON.parse(stored); } catch(e) { return; }
+    var localToken = localStorage.getItem("tgfarmhub_session_token");
+    if (!localToken || !user.id) return;
+    try {
+      var result = await sbQuery(sb.from("users").select("session_token").eq("id", user.id));
+      if (result && result[0] && result[0].session_token !== localToken) {
+        clearInterval(window._sessionCheckInterval);
+        notify("Logged out — another device signed in", "warning");
+        setTimeout(doLogout, 2000);
+      }
+    } catch(e) {}
+  }, 30000);
 }
 
 // ============================================================
@@ -261,30 +284,36 @@ function confirmAction(title, message, onConfirm, danger) {
   modal.id = "tg-confirm-modal";
   modal.className = "modal-overlay";
   modal.style.display = "flex";
-  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-
   var btnClass = danger ? "btn-danger" : "btn-primary";
   var confirmLabel = danger ? "Delete" : "Confirm";
+
+  function closeConfirm() {
+    var box = modal.querySelector(".modal-box");
+    if (box) releaseFocus(box);
+    modal.remove();
+  }
 
   modal.innerHTML =
     '<div class="modal-box" style="max-width:400px;">' +
       '<div class="modal-header">' +
         '<div class="modal-title">' + esc(title) + '</div>' +
-        '<button class="modal-close" onclick="document.getElementById(\'tg-confirm-modal\').remove()">' +
+        '<button class="modal-close" id="tg-confirm-close">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
       '</div>' +
       '<div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:20px;">' + esc(message) + '</div>' +
       '<div class="modal-actions">' +
-        '<button class="btn btn-outline" onclick="document.getElementById(\'tg-confirm-modal\').remove()">Cancel</button>' +
+        '<button class="btn btn-outline" id="tg-confirm-cancel">Cancel</button>' +
         '<button class="btn ' + btnClass + '" id="tg-confirm-btn">' + confirmLabel + '</button>' +
       '</div>' +
     '</div>';
 
   document.body.appendChild(modal);
 
+  document.getElementById("tg-confirm-close").onclick = closeConfirm;
+  document.getElementById("tg-confirm-cancel").onclick = closeConfirm;
   document.getElementById("tg-confirm-btn").onclick = function() {
-    modal.remove();
+    closeConfirm();
     if (onConfirm) onConfirm();
   };
 
@@ -304,6 +333,7 @@ function trapFocus(modalEl) {
   first.focus();
   modalEl._trapHandler = function(e) {
     if (e.key === "Escape") {
+      releaseFocus(modalEl);
       modalEl.style.display = "none";
       return;
     }

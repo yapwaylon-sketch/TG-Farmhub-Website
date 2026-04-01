@@ -26,8 +26,8 @@
       <input type="text" id="login-username" placeholder="Username" autocomplete="off" autocapitalize="off">
     </div>
     <div class="login-field">
-      <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6"
-        onkeydown="if(event.key==='Enter')doLogin();">
+      <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+        onkeydown="if(event.key==='Enter')doLogin();" oninput="if(this.value.length===6)doLogin();">
     </div>
     <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%;justify-content:center;padding:12px;margin-top:6px;font-size:14px;">Sign In</button>
     <div class="login-divider"><span>or</span></div>
@@ -420,6 +420,12 @@ async function doLogin() {
   currentUser = user;
   storeSession(user);
 
+  // Generate session token for multi-device detection
+  var token = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  localStorage.setItem("tgfarmhub_session_token", token);
+  await sbQuery(sb.from("users").update({ session_token: token }).eq("id", user.id));
+  startSessionCheck();
+
   // Check if force PIN update needed
   if (user.forcePinUpdate) {
     openForcePinUpdate();
@@ -427,6 +433,27 @@ async function doLogin() {
     showHub();
   }
   startInactivityTimer();
+}
+
+// Multi-device session check — runs every 30 seconds
+var sessionCheckInterval = null;
+function startSessionCheck() {
+  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
+  sessionCheckInterval = setInterval(async function() {
+    if (!currentUser) return;
+    var localToken = localStorage.getItem("tgfarmhub_session_token");
+    if (!localToken) return;
+    var result = await sbQuery(sb.from("users").select("session_token").eq("id", currentUser.id));
+    if (result && result[0] && result[0].session_token !== localToken) {
+      clearInterval(sessionCheckInterval);
+      notify("You have been logged out — another device signed in", "warning");
+      setTimeout(function() {
+        localStorage.removeItem("tgfarmhub_user");
+        localStorage.removeItem("tgfarmhub_session_token");
+        window.location.href = "index.html";
+      }, 2000);
+    }
+  }, 30000);
 }
 
 function handleFailedLogin() {
@@ -478,14 +505,15 @@ async function submitNewPin() {
 }
 
 function storeSession(user) {
-  sessionStorage.setItem("tgfarmhub_user", JSON.stringify({
+  localStorage.setItem("tgfarmhub_user", JSON.stringify({
     id: user.id, username: user.username, displayName: user.displayName,
     role: user.role, permissions: user.permissions
   }));
+  localStorage.setItem("tgfarmhub_last_username", user.username);
 }
 
 function tryRestoreSession() {
-  const stored = sessionStorage.getItem("tgfarmhub_user");
+  const stored = localStorage.getItem("tgfarmhub_user");
   if (!stored) return false;
   try {
     const data = JSON.parse(stored);
@@ -496,7 +524,7 @@ function tryRestoreSession() {
       return true;
     }
   } catch (e) {}
-  sessionStorage.removeItem("tgfarmhub_user");
+  localStorage.removeItem("tgfarmhub_user");
   return false;
 }
 
@@ -530,7 +558,7 @@ async function submitChangePin() {
 async function doLogout() {
   currentUser = null;
   clearInactivityTimer();
-  sessionStorage.removeItem("tgfarmhub_user");
+  localStorage.removeItem("tgfarmhub_user");
   await sb.auth.signOut().catch(() => {});
   location.reload();
 }
@@ -871,17 +899,23 @@ async function init() {
       startInactivityTimer();
     } else if (tryRestoreSession()) {
       if (currentUser.forcePinUpdate) {
-        // Don't auto-restore into PIN update — require fresh login
         currentUser = null;
-        sessionStorage.removeItem("tgfarmhub_user");
+        localStorage.removeItem("tgfarmhub_user");
         document.getElementById("login-screen").style.display = "flex";
       } else {
         showHub();
         startInactivityTimer();
+        startSessionCheck();
       }
     } else {
       var tgl = document.getElementById("tg-loading"); if (tgl) tgl.remove();
       document.getElementById("login-screen").style.display = "flex";
+      // Pre-fill last username
+      var lastUser = localStorage.getItem("tgfarmhub_last_username");
+      if (lastUser) {
+        document.getElementById("login-username").value = lastUser;
+        document.getElementById("login-pin").focus();
+      }
     }
     if (loginBtn) loginBtn.disabled = false;
   } catch (e) {
