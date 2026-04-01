@@ -1642,7 +1642,10 @@ function renderPayrollEntries() {
   html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
   html += '<div style="font-size:16px;font-weight:700;color:var(--white);">' + (periodLabel || "Select a period") + '</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
-  if (payrollEntries.length > 0) html += '<button class="btn btn-outline" onclick="printPayrollList()">🖨 Print</button>';
+  if (payrollEntries.length > 0) {
+    html += '<button class="btn btn-outline" onclick="printPayrollList()">🖨 Print Summary</button>';
+    html += '<button class="btn btn-outline" onclick="printAllPayslips()">🖨 Print All Payslips</button>';
+  }
   if (!isClosed) {
     html += '<button class="btn btn-outline" onclick="openAddWorkerModal()">+ Add Worker</button>';
     html += '<button class="btn btn-primary" onclick="initPayrollForAll()">Initialize All Workers</button>';
@@ -1746,12 +1749,15 @@ function printPayrollList() {
   printHtml += '<div>Salary to be Paid (Net): <span>RM ' + fmtNum2(salaryToPay) + '</span></div>';
   printHtml += '<div>Balance to Pay: <span>RM ' + fmtNum2(balanceToPay) + '</span></div>';
   printHtml += '</div>';
-  printHtml += '<table><thead><tr><th>Worker</th><th>Days</th><th>Base Wage</th><th>OT</th><th>Resp.</th><th>Contract</th><th>Deductions</th><th style="text-align:right;">Net Pay</th><th>Status</th></tr></thead><tbody>';
+  printHtml += '<table><thead><tr><th>#</th><th>Worker</th><th>Days</th><th>Base Wage</th><th>OT</th><th>Resp.</th><th>Contract</th><th>Deductions</th><th style="text-align:right;">Net Pay</th><th>Status</th></tr></thead><tbody>';
 
   payrollEntries.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+  let rowNum = 0;
   for (const pe of payrollEntries) {
+    rowNum++;
     const isPaid = (pe.payment_status || "unpaid") === "paid";
     printHtml += '<tr>';
+    printHtml += '<td style="color:#888;">' + rowNum + '</td>';
     printHtml += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + '</td>';
     printHtml += '<td>' + (pe.days_worked || 0) + '</td>';
     printHtml += '<td>RM ' + fmtNum2(pe.daily_wage) + '</td>';
@@ -1764,7 +1770,7 @@ function printPayrollList() {
     printHtml += '</tr>';
   }
 
-  printHtml += '<tr class="total-row"><td>TOTAL</td><td></td>';
+  printHtml += '<tr class="total-row"><td></td><td>TOTAL (' + rowNum + ')</td><td></td>';
   printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.daily_wage)||0), 0)) + '</td>';
   printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.ot_pay)||0), 0)) + '</td>';
   printHtml += '<td>RM ' + fmtNum2(payrollEntries.reduce((s,pe) => s + (parseFloat(pe.responsibility_total)||0), 0)) + '</td>';
@@ -2209,6 +2215,24 @@ function openPaySlip(peId) {
   html += '<span>TG FarmHub — Worker Management</span>';
   html += '</div>';
 
+  // Long-term loan summary
+  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  if (wLoans.length > 0) {
+    html += '<div class="slip-section-title" style="margin-top:12px;">Long-Term Loans</div>';
+    html += '<table><thead><tr><th>Purpose</th><th style="text-align:right;">Loan Amount</th><th style="text-align:right;">Repaid</th><th style="text-align:right;">Balance</th></tr></thead><tbody>';
+    let totalLoanBal = 0;
+    wLoans.forEach(l => {
+      const bal = parseFloat(l.balance) || ((parseFloat(l.amount)||0) - (parseFloat(l.total_repaid)||0));
+      totalLoanBal += bal;
+      html += '<tr><td>' + (l.purpose || '—') + '</td>';
+      html += '<td style="text-align:right;">' + fmtNum2(l.amount) + '</td>';
+      html += '<td style="text-align:right;">' + fmtNum2(l.total_repaid || 0) + '</td>';
+      html += '<td style="text-align:right;font-weight:600;">' + fmtNum2(bal) + '</td></tr>';
+    });
+    html += '<tr class="slip-total-row"><td colspan="3" style="text-align:right;">Total Loan Outstanding</td><td style="text-align:right;">RM ' + fmtNum2(totalLoanBal) + '</td></tr>';
+    html += '</tbody></table>';
+  }
+
   // Signature lines
   html += '<div style="margin-top:40px;display:flex;justify-content:space-between;">';
   html += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:180px;margin-bottom:4px;"></div><span style="font-size:11px;color:#666;">Worker Signature</span></div>';
@@ -2221,6 +2245,113 @@ function openPaySlip(peId) {
 
 function printSlip() {
   window.print();
+}
+
+function buildSlipHtml(pe) {
+  const period = payrollPeriods.find(p => p.id === pe.period_id);
+  const w = workers.find(x => x.id === pe.worker_id);
+  const workerTasks = taskEntries.filter(te => te.payroll_entry_id === pe.id && (te.total || 0) > 0);
+  const monthNames = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const periodLabel = period ? monthNames[period.month] + " " + period.year : pe.period_id;
+
+  let h = '<div style="font-size:16px;font-weight:800;margin-bottom:2px;">TG — Home of Sarawak Gold</div>';
+  h += '<div style="font-size:10px;color:#666;margin-bottom:6px;">Pay Slip — ' + periodLabel + '</div>';
+
+  h += '<table><tbody>';
+  h += '<tr><td style="width:22%;font-weight:600;font-size:9px;">Name</td><td style="font-size:9px;">' + (pe.worker_name || pe.worker_id) + '</td>';
+  h += '<td style="width:22%;font-weight:600;font-size:9px;">ID</td><td style="font-size:9px;">' + pe.worker_id + '</td></tr>';
+  h += '<tr><td style="font-weight:600;font-size:9px;">Role</td><td style="font-size:9px;">' + (w ? (w.role || '—') : '—') + '</td>';
+  h += '<td style="font-weight:600;font-size:9px;">Gender</td><td style="font-size:9px;">' + (w ? (w.gender || '—') : '—') + '</td></tr>';
+  h += '</tbody></table>';
+
+  // Earnings
+  h += '<div style="font-size:10px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Earnings</div>';
+  h += '<table><tbody>';
+  h += '<tr><td style="font-size:9px;">Base Wage</td><td style="font-size:9px;text-align:center;">' + (pe.days_worked||0) + 'd × RM' + fmtNum2(pe.pay_rate) + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.daily_wage) + '</td></tr>';
+  if ((pe.ot_hours||0) > 0) h += '<tr><td style="font-size:9px;">OT</td><td style="font-size:9px;text-align:center;">' + pe.ot_hours + 'h</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.ot_pay) + '</td></tr>';
+  const entryResps = payrollResponsibilities.filter(pr => pr.payroll_entry_id === pe.id);
+  entryResps.forEach(pr => { h += '<tr><td style="font-size:9px;">' + pr.responsibility_name + '</td><td></td><td style="font-size:9px;text-align:right;">' + fmtNum2(pr.rate) + '</td></tr>'; });
+  workerTasks.forEach(te => { h += '<tr><td style="font-size:9px;">Contract: ' + (te.task_name||te.task_type_id) + '</td><td style="font-size:9px;text-align:center;">' + ((te.quantity&&te.rate) ? te.quantity+'×'+fmtNum2(te.rate) : '') + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(te.total) + '</td></tr>'; });
+  h += '<tr style="font-weight:700;border-top:1px solid #999;"><td colspan="2" style="font-size:9px;text-align:right;">Total Earnings</td><td style="font-size:9px;text-align:right;">RM ' + fmtNum2(pe.total_pay) + '</td></tr>';
+  h += '</tbody></table>';
+
+  // Deductions
+  const hasDeductions = (pe.deduct_advance||0) + (pe.deduct_loan||0) + (pe.deduct_shop||0) + (pe.deduct_other||0) > 0;
+  if (hasDeductions) {
+    h += '<div style="font-size:10px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Deductions</div>';
+    h += '<table><tbody>';
+    const slipAdvances = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === pe.period_id);
+    ['Canteen','Cigarettes','Salary Advance','Overpayment'].forEach(cat => {
+      const t = slipAdvances.filter(a => a.category === cat).reduce((s,a) => s + (parseFloat(a.amount)||0), 0);
+      if (t > 0) h += '<tr><td style="font-size:9px;">' + cat + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(t) + '</td></tr>';
+    });
+    if (slipAdvances.length === 0 && (pe.deduct_advance||0) > 0) h += '<tr><td style="font-size:9px;">Advances</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
+    if ((pe.deduct_loan||0) > 0) h += '<tr><td style="font-size:9px;">Loan Repayment</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_loan) + '</td></tr>';
+    if ((pe.deduct_shop||0) > 0) h += '<tr><td style="font-size:9px;">Shop/Store</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_shop) + '</td></tr>';
+    if ((pe.deduct_other||0) > 0) h += '<tr><td style="font-size:9px;">Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_other) + '</td></tr>';
+    h += '<tr style="font-weight:700;border-top:1px solid #999;"><td style="font-size:9px;text-align:right;">Total Deductions</td><td style="font-size:9px;text-align:right;">RM ' + fmtNum2(pe.total_deductions) + '</td></tr>';
+    h += '</tbody></table>';
+  }
+
+  // Net Pay
+  h += '<div style="margin-top:6px;padding:4px 0;border-top:2px solid #000;border-bottom:2px solid #000;display:flex;justify-content:space-between;font-size:12px;font-weight:800;">';
+  h += '<span>NET PAY</span><span>RM ' + fmtNum2(pe.final_pay) + '</span></div>';
+
+  // Loans
+  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  if (wLoans.length > 0) {
+    h += '<div style="font-size:9px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Loans</div>';
+    h += '<table><tbody>';
+    let totalLoanBal = 0;
+    wLoans.forEach(l => { const bal = parseFloat(l.balance)||((parseFloat(l.amount)||0)-(parseFloat(l.total_repaid)||0)); totalLoanBal += bal; h += '<tr><td style="font-size:8px;">' + (l.purpose||'—') + '</td><td style="font-size:8px;text-align:right;">Bal: RM ' + fmtNum2(bal) + '</td></tr>'; });
+    h += '<tr style="font-weight:700;border-top:1px solid #999;"><td style="font-size:8px;text-align:right;">Total Loan Outstanding</td><td style="font-size:8px;text-align:right;">RM ' + fmtNum2(totalLoanBal) + '</td></tr>';
+    h += '</tbody></table>';
+  }
+
+  // Signatures
+  h += '<div style="margin-top:20px;display:flex;justify-content:space-between;font-size:8px;">';
+  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:120px;margin-bottom:2px;"></div>Worker</div>';
+  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:120px;margin-bottom:2px;"></div>Employer</div>';
+  h += '</div>';
+
+  return h;
+}
+
+function printAllPayslips() {
+  const period = payrollPeriods.find(p => p.id === currentPeriodId);
+  const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+  const periodLabel = period ? monthNames[period.month] + " " + period.year : "";
+
+  const sorted = [...payrollEntries].sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
+
+  let printHtml = '<html><head><title>All Payslips — ' + periodLabel + '</title>';
+  printHtml += '<style>';
+  printHtml += 'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#222;}';
+  printHtml += '@page{size:A4 landscape;margin:8mm;}';
+  printHtml += '.page{display:flex;gap:10mm;width:100%;page-break-after:always;}';
+  printHtml += '.page:last-child{page-break-after:auto;}';
+  printHtml += '.slip{width:50%;padding:8mm;border:1px solid #ccc;box-sizing:border-box;}';
+  printHtml += 'table{width:100%;border-collapse:collapse;margin:2px 0;}';
+  printHtml += 'th,td{padding:2px 4px;border:none;vertical-align:top;}';
+  printHtml += '</style></head><body>';
+
+  // 2 slips per page
+  for (let i = 0; i < sorted.length; i += 2) {
+    printHtml += '<div class="page">';
+    printHtml += '<div class="slip">' + buildSlipHtml(sorted[i]) + '</div>';
+    if (i + 1 < sorted.length) {
+      printHtml += '<div class="slip">' + buildSlipHtml(sorted[i+1]) + '</div>';
+    } else {
+      printHtml += '<div class="slip"></div>';
+    }
+    printHtml += '</div>';
+  }
+
+  printHtml += '</body></html>';
+  const printWin = window.open("", "_blank");
+  printWin.document.write(printHtml);
+  printWin.document.close();
+  printWin.print();
 }
 
 // ============================================================
