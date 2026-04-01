@@ -6080,8 +6080,14 @@ function soGenerateStatementConfirm() {
   // Payment reminder (only if outstanding > 0)
   if (totalOutstanding > 0) {
     html += '<div style="margin-top:20px;font-size:12px;color:#555;line-height:1.6;">';
-    html += '<strong>Payment Reminder:</strong> Please arrange payment at your earliest convenience. ';
-    html += 'Payment can be made via cash or bank transfer.';
+    html += '<strong>Payment Reminder:</strong> Please arrange payment at your earliest convenience.';
+    html += '</div>';
+    html += '<div style="margin-top:10px;padding:8px 12px;border:1px solid #999;border-radius:4px;font-size:11px;line-height:1.6;">';
+    html += '<strong>Payment via Bank Transfer:</strong><br>';
+    html += 'Public Bank Berhad<br>';
+    html += 'A/C: 3243036710<br>';
+    html += 'TG Agro Fruits Sdn Bhd<br>';
+    html += '<em>Please WhatsApp your payment slip to 012-3286661 once transferred. Thank you.</em>';
     html += '</div>';
   }
 
