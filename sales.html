@@ -1811,6 +1811,7 @@ function soRenderDetail() {
     html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'preparing') {
     html += '<button class="btn btn-primary" id="btn-mark-prepared" onclick="soMarkPrepared(\'' + esc(o.id) + '\')">Mark Prepared</button>';
+    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
     html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'prepared') {
     if (o.fulfillment === 'delivery') {
@@ -1818,9 +1819,11 @@ function soRenderDetail() {
     } else {
       html += '<button class="btn btn-primary" id="btn-mark-collected" onclick="soMarkCollected(\'' + esc(o.id) + '\')">Mark Collected</button>';
     }
+    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
     html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'delivering') {
     html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
+    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
   }
 
   // Delete button for cancelled/completed orders (admin only)
@@ -2363,14 +2366,101 @@ function soMarkCollected(orderId) {
   });
 }
 
+var soDeliveryQtyOrderId = null;
+
 async function soMarkDelivered(orderId) {
+  // Show quantity confirmation first (driver adjusts for damage in transit)
+  soDeliveryQtyOrderId = orderId;
+  var items = orderItems.filter(function(i) { return i.order_id === orderId; });
+
+  var html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adjust quantities if items were damaged or short. Changes update the order total.</div>';
+  html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
+  html += '<thead><tr><th>Product</th><th style="text-align:right;">Prepared</th><th style="text-align:right;width:100px;">Delivered</th><th>Unit</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
+
+  items.forEach(function(item, idx) {
+    var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+    var name = soGetProductName(item.product_id);
+    var unit = prod ? (prod.unit || '') : '';
+    var price = parseFloat(item.unit_price) || 0;
+    var qty = item.quantity || 0;
+
+    html += '<tr>';
+    html += '<td style="font-weight:600;">' + esc(name) + '</td>';
+    html += '<td style="text-align:right;color:var(--text-muted);">' + qty + '</td>';
+    html += '<td style="text-align:right;"><input type="number" class="delqty-input" data-item-id="' + esc(item.id) + '" data-price="' + price + '" value="' + qty + '" min="0" step="any" oninput="soDelQtyRecalc()" style="width:80px;text-align:right;padding:4px 6px;font-size:13px;"></td>';
+    html += '<td>' + esc(unit) + '</td>';
+    html += '<td style="text-align:right;">' + price.toFixed(2) + '</td>';
+    html += '<td style="text-align:right;font-weight:600;" id="delqty-line-' + idx + '">' + (qty * price).toFixed(2) + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('so-prepqty-items').innerHTML = html;
+  document.getElementById('so-prepqty-total').textContent = '';
+  soDelQtyRecalc();
+  document.getElementById('so-prepqty-modal').querySelector('.modal-title').textContent = 'Confirm Delivery Quantities';
+  document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Deliver';
+  document.getElementById('so-prepqty-confirm').onclick = soDelQtyConfirm;
+  document.getElementById('so-prepqty-modal').style.display = 'flex';
+}
+
+function soDelQtyRecalc() {
+  var inputs = document.querySelectorAll('.delqty-input');
+  var total = 0;
+  inputs.forEach(function(inp, idx) {
+    var qty = parseFloat(inp.value) || 0;
+    var price = parseFloat(inp.dataset.price) || 0;
+    var line = qty * price;
+    total += line;
+    var lineEl = document.getElementById('delqty-line-' + idx);
+    if (lineEl) lineEl.textContent = line.toFixed(2);
+  });
+  document.getElementById('so-prepqty-total').textContent = 'Total: RM ' + total.toFixed(2);
+}
+
+async function soDelQtyConfirm() {
+  var orderId = soDeliveryQtyOrderId;
+  var btn = document.getElementById('so-prepqty-confirm');
+  btnLoading(btn, true);
+
+  // Update each item's quantity + line_total
+  var inputs = document.querySelectorAll('.delqty-input');
+  var newSubtotal = 0;
+  for (var i = 0; i < inputs.length; i++) {
+    var inp = inputs[i];
+    var itemId = inp.dataset.itemId;
+    var newQty = parseFloat(inp.value) || 0;
+    var price = parseFloat(inp.dataset.price) || 0;
+    var newLine = newQty * price;
+    newSubtotal += newLine;
+
+    await sbQuery(sb.from('sales_order_items').update({ quantity: newQty, line_total: newLine }).eq('id', itemId).select());
+    var localItem = orderItems.find(function(x) { return x.id === itemId; });
+    if (localItem) { localItem.quantity = newQty; localItem.line_total = newLine; }
+  }
+
+  // Update order totals
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (o) {
+    var returnsTotal = parseFloat(o.returns_total) || 0;
+    var newGrand = Math.max(0, newSubtotal - returnsTotal);
+    await sbQuery(sb.from('sales_orders').update({ subtotal: newSubtotal, grand_total: newGrand }).eq('id', orderId).select());
+    o.subtotal = newSubtotal;
+    o.grand_total = newGrand;
+  }
+
+  btnLoading(btn, false, 'Confirm & Deliver');
+  closeModal('so-prepqty-modal');
+
+  // Reset modal handlers back to prep flow
+  document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Continue';
+  document.getElementById('so-prepqty-confirm').onclick = soPrepQtyConfirm;
+
+  // Now proceed with delivery photo + complete
   soShowPhotoModal('Delivery Photo', 'Take a photo of the delivery?', orderId, 'delivery', async function(photoUrl) {
-    var btn = document.getElementById('btn-mark-delivered');
-    if (btn) btnLoading(btn, true);
     var extra = photoUrl ? { delivery_photo_url: photoUrl } : {};
     var ok = await soUpdateStatus(orderId, 'completed', extra);
-    if (btn) btnLoading(btn, false, 'Mark Delivered');
-    if (ok) { notify('Order delivered' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); soShowDelPayModal(orderId); }
+    if (ok) { notify('Order delivered', 'success'); soRenderDetail(); soShowDelPayModal(orderId); }
   });
 }
 
@@ -2563,7 +2653,7 @@ function soDeleteOrder(orderId) {
 function soEditOrder(orderId) {
   var o = orders.find(function(x) { return x.id === orderId; });
   if (!o) return;
-  if (o.status !== 'pending') { notify('Only pending orders can be edited', 'warning'); return; }
+  if (o.status === 'completed' || o.status === 'cancelled') { notify('Cannot edit ' + o.status + ' orders', 'warning'); return; }
   openNewOrderModal(orderId);
 }
 
