@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png?v=2">
 <title>Deliveries — TG FarmHub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -235,7 +235,7 @@ body { overflow: auto; height: auto; min-height: 100vh; }
 <!-- Document View (full-screen overlay) -->
 <div id="doc-view">
   <div class="doc-toolbar">
-    <button class="btn-doc btn-print" onclick="window.print()">&#128424; Print</button>
+    <button class="btn-doc btn-print" onclick="printDoc()">&#128424; Print</button>
     <button class="btn-doc btn-share" onclick="shareDoc()">&#128172; Share</button>
     <button class="btn-doc btn-done" onclick="closeDoc()">Done</button>
   </div>
@@ -317,10 +317,10 @@ function showApp() {
 // ═══════════════════════════════════════════════════════════════
 async function loadAllData() {
   var results = await Promise.all([
-    sbQuery(sb.from('sales_orders').select('*').in('status', ['delivering', 'completed']).order('created_at', { ascending: false })),
-    sbQuery(sb.from('sales_order_items').select('*')),
-    sbQuery(sb.from('sales_customers').select('*')),
-    sbQuery(sb.from('sales_products').select('*')),
+    sbQuery(sb.from('sales_orders').select('*').eq('company_id', 'tg_agro_fruits').in('status', ['delivering', 'completed']).order('created_at', { ascending: false })),
+    sbQuery(sb.from('sales_order_items').select('*').eq('company_id', 'tg_agro_fruits')),
+    sbQuery(sb.from('sales_customers').select('*').eq('company_id', 'tg_agro_fruits')),
+    sbQuery(sb.from('sales_products').select('*').eq('company_id', 'tg_agro_fruits')),
     sbQuery(sb.from('crop_varieties').select('id,name')),
     sbQuery(sb.from('workers').select('id,name'))
   ]);
@@ -567,8 +567,7 @@ function showDoc(orderId) {
 
   // Header
   html += '<div class="doc-header">';
-  html += '<h2>TG GROUP SDN BHD</h2>';
-  html += '<p>LADANG PND</p>';
+  html += '<h2>TG AGRO FRUITS SDN BHD</h2>';
   html += '</div>';
 
   // Title
@@ -653,7 +652,7 @@ function showDoc(orderId) {
 
   // Footer
   html += '<div class="doc-footer">';
-  html += 'TG Group Sdn Bhd | Ladang PND<br>';
+  html += 'TG Agro Fruits Sdn Bhd<br>';
   html += 'Thank you for your business';
   html += '</div>';
 
@@ -665,6 +664,26 @@ function showDoc(orderId) {
 function closeDoc() {
   document.getElementById('doc-view').style.display = 'none';
   docCurrentOrder = null;
+}
+
+async function printDoc() {
+  // On mobile, use RawBT for thermal printing
+  if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    var docEl = document.getElementById('doc-content');
+    if (!docEl) { notify('No document to print', 'warning'); return; }
+    notify('Preparing print...', 'info', 2000);
+    try {
+      var canvas = await html2canvas(docEl, {
+        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+      });
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      window.location.href = 'rawbt:' + dataUrl;
+    } catch (e) {
+      notify('Print failed: ' + e.message, 'error');
+    }
+    return;
+  }
+  window.print();
 }
 
 async function shareDoc() {

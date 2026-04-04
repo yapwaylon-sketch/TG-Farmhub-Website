@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png?v=2">
 <title>PND Sales — Packing Station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -402,7 +402,7 @@ body {
   <!-- Header -->
   <div class="header-row">
     <header class="app-header">
-      <img src="https://tgfarmhub.com/assets/logo.png" alt="TG Agro Fruits" class="header-logo">
+      <img src="https://tgfarmhub.com/assets/logo.png?v=2" alt="TG Agro Fruits" class="header-logo">
       <div class="header-text">
         <div class="header-title">
           <span>PND Sales — Packing Station</span>
@@ -479,10 +479,10 @@ let rotateTimer = null;
 let paused = false;
 
 const STATUS_CONFIG = [
-  { key: "pending",              label: "PENDING",              emoji: "\u23F3", cssClass: "sg-pending",              borderClass: "border-pending" },
+  { key: "pending",              label: "ORDER RECEIVED",       emoji: "\u23F3", cssClass: "sg-pending",              borderClass: "border-pending" },
   { key: "preparing",           label: "PREPARING",            emoji: "\uD83D\uDD04", cssClass: "sg-preparing",            borderClass: "border-preparing" },
   { key: "prepared",            label: "PREPARED",             emoji: "\u2705", cssClass: "sg-prepared",             borderClass: "border-prepared" },
-  { key: "out_for_delivery",    label: "OUT FOR DELIVERY",     emoji: "\uD83D\uDE9A", cssClass: "sg-out-delivery",         borderClass: "border-out-delivery" },
+  { key: "out_for_delivery",    label: "READY FOR DELIVERY",   emoji: "\uD83D\uDE9A", cssClass: "sg-out-delivery",         borderClass: "border-out-delivery" },
   { key: "awaiting_collection", label: "AWAITING COLLECTION",  emoji: "\uD83C\uDFEA", cssClass: "sg-awaiting-collection",  borderClass: "border-awaiting-collection" }
 ];
 
@@ -501,10 +501,10 @@ async function loadData() {
   const { today, tomorrow } = getTodayAndTomorrow();
 
   const [ordersData, itemsData, customersData, productsData, varietiesData] = await Promise.all([
-    sbGet("sales_orders", "*", "delivery_date=gte." + today + "&delivery_date=lte." + tomorrow + "&order=delivery_date,delivery_time"),
-    sbGet("sales_order_items", "*"),
-    sbGet("sales_customers", "id,name"),
-    sbGet("sales_products", "id,name,variety_id"),
+    sbGet("sales_orders", "*", "company_id=eq.tg_agro_fruits&delivery_date=gte." + today + "&delivery_date=lte." + tomorrow + "&order=delivery_date,delivery_time"),
+    sbGet("sales_order_items", "*", "company_id=eq.tg_agro_fruits"),
+    sbGet("sales_customers", "id,name", "company_id=eq.tg_agro_fruits"),
+    sbGet("sales_products", "id,name,variety_id", "company_id=eq.tg_agro_fruits"),
     sbGet("crop_varieties", "id,name")
   ]);
 
