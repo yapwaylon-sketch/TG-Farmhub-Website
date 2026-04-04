@@ -357,13 +357,70 @@ function releaseFocus(modalEl) {
 // Generate next ID via DB function
 async function dbNextId(prefix) {
   try {
-    var result = await sb.rpc("next_id", { p_prefix: prefix });
+    var code = getCompanyCode();
+    var result = await sb.rpc("next_id", { p_prefix: prefix, p_company_code: code });
     if (result.error) throw result.error;
     return result.data;
   } catch(e) {
     console.error("ID gen error:", e);
-    return prefix + String(Date.now()).slice(-6);
+    var code = getCompanyCode();
+    return code + '-' + prefix + String(Date.now()).slice(-6);
   }
+}
+
+// ============================================================
+// COMPANY MANAGEMENT
+// ============================================================
+const COMPANIES = {
+  tg_agro_fruits: { id: 'tg_agro_fruits', name: 'TG Agro Fruits Sdn Bhd', short: 'TG Agro Fruits', code: 'AF' },
+  tg_agribusiness: { id: 'tg_agribusiness', name: 'TG Agribusiness Sdn Bhd', short: 'TG Agribusiness', code: 'AB' }
+};
+
+const MODULE_COMPANY = {
+  sales: 'tg_agro_fruits',
+  inventory: 'tg_agribusiness',
+  workers: 'tg_agribusiness',
+  spraytracker: 'tg_agribusiness',
+  growthtracker: 'tg_agribusiness',
+  farmconfig: 'shared',
+  seedlings: 'tg_agribusiness'
+};
+
+function getCompanyId() {
+  return localStorage.getItem('tgfarmhub_company') || 'tg_agro_fruits';
+}
+
+function setCompanyId(companyId) {
+  localStorage.setItem('tgfarmhub_company', companyId);
+}
+
+function getCompany() {
+  return COMPANIES[getCompanyId()];
+}
+
+function getCompanyCode() {
+  return getCompany().code;
+}
+
+function isModuleVisible(moduleKey) {
+  var mapping = MODULE_COMPANY[moduleKey];
+  if (!mapping || mapping === 'shared') return true;
+  return mapping === getCompanyId();
+}
+
+// Inject company switcher into sidebar (called by each module on load)
+function injectCompanySwitcher() {
+  var container = document.getElementById('company-switcher');
+  if (!container) return;
+  var current = getCompany();
+  container.innerHTML = '<div class="company-switcher">' +
+    Object.values(COMPANIES).map(function(c) {
+      var isActive = c.id === current.id;
+      return '<button class="company-btn' + (isActive ? ' active' : '') + '"' +
+        ' onclick="' + (isActive ? '' : "setCompanyId('" + c.id + "');location.href='index.html" + (window.currentUser ? "?session=" + currentUser.id : "") + "'") + '"' +
+        '>' + c.short + '</button>';
+    }).join('') +
+    '</div>';
 }
 
 // Close modal by ID

@@ -153,6 +153,45 @@ body {
 .sidebar-sync:hover { color:var(--text-muted); }
 .sidebar-sync svg { width:14px; height:14px; }
 
+/* ---- Company Switcher ---- */
+.company-switcher {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 4px;
+}
+.company-switcher .company-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.3;
+  transition: all 0.15s;
+}
+.company-switcher .company-btn:hover {
+  border-color: var(--text-muted);
+}
+.company-switcher .company-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+@media (max-width: 768px) {
+  .company-switcher {
+    padding: 6px 10px;
+  }
+  .company-switcher .company-btn {
+    font-size: 9px;
+    padding: 6px 3px;
+  }
+}
+
 .sidebar-user {
   padding: 10px 16px;
   border-top: 1px solid var(--border);
