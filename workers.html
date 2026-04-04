@@ -48,6 +48,7 @@
         </button>
       </div>
     </div>
+    <div id="company-switcher"></div>
     <nav class="sidebar-nav" aria-label="Module navigation">
       <div class="nav-item active" data-page="workers" onclick="navigateTo('workers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -68,6 +69,10 @@
       <div class="nav-item" data-page="roles" onclick="navigateTo('roles')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
         <span class="nav-label">Roles</span>
+      </div>
+      <div class="nav-item" data-page="changelog" onclick="navigateTo('changelog')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="nav-label">Changelog</span>
       </div>
     </nav>
     <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
@@ -103,9 +108,14 @@
       </div>
       <div class="stat-grid" id="worker-stats"></div>
       <div class="card">
+        <div style="display:flex;justify-content:flex-end;padding:0 4px 8px;">
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="toggleHiddenCols()">
+            <span id="toggle-cols-label">Show More Columns</span>
+          </button>
+        </div>
         <div style="overflow-x:auto;">
-        <table class="data-table">
-          <thead><tr><th onclick="sortWorkers('name')" style="cursor:pointer;">Name <span id="sort-name"></span></th><th onclick="sortWorkers('gender')" style="cursor:pointer;">Gender <span id="sort-gender"></span></th><th onclick="sortWorkers('pay_rate')" style="cursor:pointer;">Pay Rate <span id="sort-pay_rate"></span></th><th onclick="sortWorkers('role')" style="cursor:pointer;">Role <span id="sort-role"></span></th><th onclick="sortWorkers('tenure')" style="cursor:pointer;">Tenure <span id="sort-tenure"></span></th><th onclick="sortWorkers('advance')" style="cursor:pointer;">Advances <span id="sort-advance"></span></th><th onclick="sortWorkers('loan')" style="cursor:pointer;">Loan <span id="sort-loan"></span></th><th onclick="sortWorkers('active')" style="cursor:pointer;">Status <span id="sort-active"></span></th><th></th></tr></thead>
+        <table class="data-table" id="worker-table">
+          <thead><tr><th onclick="sortWorkers('name')" style="cursor:pointer;">Name <span id="sort-name"></span></th><th onclick="sortWorkers('gender')" style="cursor:pointer;">Gender <span id="sort-gender"></span></th><th onclick="sortWorkers('pay_rate')" style="cursor:pointer;">Pay Rate <span id="sort-pay_rate"></span></th><th onclick="sortWorkers('role')" style="cursor:pointer;">Role <span id="sort-role"></span></th><th onclick="sortWorkers('resp')" style="cursor:pointer;">Responsibilities <span id="sort-resp"></span></th><th onclick="sortWorkers('canteen')" style="cursor:pointer;background:rgba(232,160,32,0.10);">Canteen <span id="sort-canteen"></span></th><th onclick="sortWorkers('cigs')" style="cursor:pointer;background:rgba(232,160,32,0.10);">Cigarettes <span id="sort-cigs"></span></th><th onclick="sortWorkers('salAdv')" style="cursor:pointer;background:rgba(232,160,32,0.10);">Sal. Advance <span id="sort-salAdv"></span></th><th class="col-hidden" onclick="sortWorkers('overpay')" style="cursor:pointer;background:rgba(232,160,32,0.10);">Overpayment <span id="sort-overpay"></span></th><th class="col-hidden" onclick="sortWorkers('carryFwd')" style="cursor:pointer;background:rgba(232,160,32,0.10);">Carried Fwd <span id="sort-carryFwd"></span></th><th onclick="sortWorkers('totalAdv')" style="cursor:pointer;background:rgba(232,96,96,0.12);">Total Advances <span id="sort-totalAdv"></span></th><th onclick="sortWorkers('tenure')" style="cursor:pointer;">Tenure <span id="sort-tenure"></span></th><th onclick="sortWorkers('loan')" style="cursor:pointer;">Loan <span id="sort-loan"></span></th><th onclick="sortWorkers('active')" style="cursor:pointer;">Status <span id="sort-active"></span></th><th></th></tr></thead>
           <tbody id="worker-tbody"></tbody>
         </table>
         </div>
@@ -132,6 +142,18 @@
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:14px;font-weight:700;color:var(--white);margin-bottom:14px;">Employment History</div>
         <div id="profile-stints"></div>
+      </div>
+
+      <!-- Default Responsibilities -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white);">Monthly Responsibilities</div>
+            <div style="font-size:12px;color:var(--text-muted);">Auto-added to payroll each month</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAddDefaultResp()">+ Add</button>
+        </div>
+        <div id="profile-default-resps"></div>
       </div>
 
       <!-- Salary Advances -->
@@ -220,6 +242,35 @@
               <option value="deductions">Deductions</option>
             </select>
           </div>
+          <div class="form-field" style="margin-bottom:0;min-width:180px;position:relative;">
+            <label>Expense Report</label>
+            <button class="btn btn-outline" style="width:100%;text-align:left;font-size:13px;padding:7px 10px;" onclick="toggleExpenseFilter()">
+              <span id="sum-expense-label">Select Expenses…</span>
+            </button>
+            <div id="sum-expense-dropdown" style="display:none;position:absolute;z-index:1050;background:#FFFFFF;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:4px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);font-weight:600;">
+                <input type="checkbox" id="sum-expense-all" onchange="toggleExpenseAll(this)"> Select All
+              </label>
+              <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="sum-expense-cb" value="Canteen" onchange="updateExpenseSelection()"> Canteen
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="sum-expense-cb" value="Cigarettes" onchange="updateExpenseSelection()"> Cigarettes
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="sum-expense-cb" value="Salary Advance" onchange="updateExpenseSelection()"> Salary Advance
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="sum-expense-cb" value="Overpayment" onchange="updateExpenseSelection()"> Overpayment
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="sum-expense-cb" value="Carried Forward" onchange="updateExpenseSelection()"> Carried Forward
+              </label>
+              <div style="border-top:1px solid var(--border);margin:6px 0 4px;"></div>
+              <button class="btn btn-primary" style="width:100%;padding:6px;font-size:12px;" onclick="generateExpenseReport()">Generate Report</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -241,6 +292,69 @@
       <!-- Detail Table -->
       <div class="card" style="overflow-x:auto;">
         <div id="summary-table-content"></div>
+      </div>
+    </div>
+
+    <!-- CHANGELOG PAGE -->
+    <div id="page-changelog" class="page">
+      <div class="page-header">
+        <h1 class="page-title">Changelog</h1>
+        <button class="btn btn-outline" onclick="exportChangelogCSV()">📥 CSV</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="card" style="margin-bottom:16px;padding:14px 16px;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="form-field" style="margin-bottom:0;min-width:140px;">
+            <label>From</label>
+            <input type="date" id="cl-from" onchange="loadChangelog()">
+          </div>
+          <div class="form-field" style="margin-bottom:0;min-width:140px;">
+            <label>To</label>
+            <input type="date" id="cl-to" onchange="loadChangelog()">
+          </div>
+          <div class="form-field" style="margin-bottom:0;min-width:180px;position:relative;">
+            <label>Type</label>
+            <button class="btn btn-outline" style="width:100%;text-align:left;font-size:13px;padding:7px 10px;" onclick="toggleChangelogFilter()">
+              <span id="cl-type-label">All Types</span>
+            </button>
+            <div id="cl-type-dropdown" style="display:none;position:absolute;z-index:1050;background:#FFFFFF;border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:4px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);font-weight:600;">
+                <input type="checkbox" id="cl-type-all" checked onchange="toggleChangelogAll(this)"> Select All
+              </label>
+              <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="cl-type-cb" value="workers" checked onchange="updateChangelogSelection()"> Workers
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="cl-type-cb" value="payroll_entries" checked onchange="updateChangelogSelection()"> Payroll
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="cl-type-cb" value="salary_advances" checked onchange="updateChangelogSelection()"> Salary Advances
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="cl-type-cb" value="worker_loans" checked onchange="updateChangelogSelection()"> Loans
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:13px;color:var(--text);">
+                <input type="checkbox" class="cl-type-cb" value="loan_repayments" checked onchange="updateChangelogSelection()"> Repayments
+              </label>
+            </div>
+          </div>
+          <div class="form-field" style="margin-bottom:0;min-width:140px;">
+            <label>Changed By</label>
+            <select id="cl-user" onchange="loadChangelog()">
+              <option value="all">All Users</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div id="changelog-stats" class="stat-grid" style="margin-bottom:16px;"></div>
+
+      <!-- Table -->
+      <div class="card" style="overflow-x:auto;">
+        <div id="changelog-table-content"></div>
       </div>
     </div>
 
@@ -268,6 +382,18 @@
         <table class="data-table">
           <thead><tr><th>Role Name</th><th>Built-in</th><th>Workers</th><th></th></tr></thead>
           <tbody id="role-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="page-header" style="margin-top:28px;">
+        <h1 class="page-title">Responsibility Types</h1>
+        <button class="btn btn-primary" onclick="openRespTypeModal()">+ Add Responsibility</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Monthly extra payments assigned per worker in Payroll (e.g. Mechanic RM300)</p>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Default Rate (RM)</th><th>Status</th><th></th></tr></thead>
+          <tbody id="resp-type-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -358,6 +484,47 @@
   </div>
 </div>
 
+<!-- RESPONSIBILITY TYPE MODAL -->
+<div id="resp-type-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title" id="resp-type-modal-title">Add Responsibility</h3>
+      <button class="modal-close" onclick="closeModal('resp-type-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="rt-edit-id">
+    <div class="form-field"><label>Name</label><input type="text" id="rt-name" placeholder="e.g. Mechanic"></div>
+    <div class="form-field"><label>Default Rate (RM/month)</label><input type="number" id="rt-rate" step="1" placeholder="e.g. 300"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('resp-type-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRespType()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- DEFAULT RESPONSIBILITY MODAL -->
+<div id="default-resp-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Add Responsibility</h3>
+      <button class="modal-close" onclick="closeModal('default-resp-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="form-field">
+      <label>Responsibility</label>
+      <select id="dr-resp-name" onchange="onDefaultRespSelect(this)">
+        <option value="">— Select —</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Monthly Rate (RM)</label>
+      <input type="number" id="dr-rate" step="1" placeholder="e.g. 300">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('default-resp-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDefaultResp()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- NEW PERIOD MODAL -->
 <div id="period-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:360px;" onclick="event.stopPropagation()">
@@ -416,6 +583,38 @@
   </div>
 </div>
 
+<!-- PAY WORKER MODAL -->
+<div id="pay-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title" id="pay-modal-title">Pay Worker</h3>
+      <button class="modal-close" onclick="closeModal('pay-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="pay-pe-id">
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Earnings</span><span id="pay-total-pay" style="font-weight:700;">RM 0.00</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Deductions</span><span id="pay-total-deduct" style="color:var(--critical);font-weight:700;">- RM 0.00</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;border-top:1px solid var(--border);padding-top:8px;margin-top:8px;"><span>Net Pay</span><span id="pay-net" style="color:var(--gold);">RM 0.00</span></div>
+    </div>
+    <div id="pay-negative-note" style="display:none;background:rgba(229,62,62,0.12);border:1px solid var(--critical);border-radius:8px;padding:10px;margin-bottom:14px;font-size:12px;color:var(--critical);"></div>
+    <div id="pay-cash-section">
+      <div class="form-field"><label>Cash Handed (RM)</label><input type="number" id="pay-cash" step="1" oninput="calcPayOverpay()" placeholder="e.g. 1550"></div>
+      <div id="pay-overpay-row" style="display:none;background:rgba(232,160,32,0.12);border:1px solid var(--gold);border-radius:8px;padding:10px;margin-bottom:14px;font-size:12px;color:var(--gold);">
+        <div style="display:flex;justify-content:space-between;font-weight:700;"><span>Overpayment</span><span id="pay-overpay-amount">RM 0.00</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Will be carried to next month as deduction</div>
+      </div>
+    </div>
+    <div id="pay-loan-section" style="display:none;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;border-top:1px solid var(--border);padding-top:12px;">LOAN REPAYMENT (optional)</div>
+      <div id="pay-loan-list"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('pay-modal')">Cancel</button>
+      <button class="btn btn-primary" id="pay-confirm-btn" onclick="confirmPayWorker()">Confirm Payment</button>
+    </div>
+  </div>
+</div>
+
 <!-- SALARY ADVANCE MODAL -->
 <div id="advance-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
@@ -424,14 +623,14 @@
       <button class="modal-close" onclick="closeModal('advance-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div id="advance-warning" style="display:none;background:rgba(232,160,32,0.15);border:1px solid var(--gold);border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:var(--gold);"></div>
-    <div class="form-field"><label>Category</label><select id="advance-category">
+    <div class="form-field"><label>Category</label><select id="advance-category" onchange="autoSelectAdvancePeriod()">
       <option value="Canteen">Canteen</option>
       <option value="Cigarettes">Cigarettes</option>
       <option value="Salary Advance" selected>Salary Advance</option>
     </select></div>
     <div class="form-row">
       <div class="form-field"><label>Amount (RM)</label><input type="number" id="advance-amount" step="1" placeholder="e.g. 200" oninput="checkAdvanceWarning()"></div>
-      <div class="form-field"><label>Date</label><input type="date" id="advance-date"></div>
+      <div class="form-field"><label>Date</label><input type="date" id="advance-date" onchange="autoSelectAdvancePeriod()"></div>
     </div>
     <div class="form-field"><label>Deduct From Period</label><select id="advance-period"></select></div>
     <div class="form-field"><label>Reason (optional)</label><input type="text" id="advance-reason" placeholder="e.g. rice, cooking oil..."></div>
@@ -557,17 +756,22 @@
       <div style="font-size:12px;font-weight:700;color:var(--critical);margin-bottom:10px;">DEDUCTIONS</div>
       <div id="pe-advance-breakdown" style="margin-bottom:10px;"></div>
       <div class="form-row">
-        <div class="form-field"><label>Canteen</label><input type="number" id="pe-d-canteen" step="1" oninput="calcPayroll()"></div>
-        <div class="form-field"><label>Cigarettes</label><input type="number" id="pe-d-cigs" step="1" oninput="calcPayroll()"></div>
+        <div class="form-field"><label>Canteen</label><input type="number" id="pe-d-canteen" readonly tabindex="-1" style="opacity:0.7;cursor:not-allowed;"></div>
+        <div class="form-field"><label>Cigarettes</label><input type="number" id="pe-d-cigs" readonly tabindex="-1" style="opacity:0.7;cursor:not-allowed;"></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Salary Advance</label><input type="number" id="pe-d-advance" step="1" oninput="calcPayroll()"></div>
-        <div class="form-field"><label>Overpayment (prev)</label><input type="number" id="pe-d-overpay" step="1" oninput="calcPayroll()"></div>
+        <div class="form-field"><label>Salary Advance</label><input type="number" id="pe-d-advance" readonly tabindex="-1" style="opacity:0.7;cursor:not-allowed;"></div>
+        <div class="form-field"><label>Overpayment (prev)</label><input type="number" id="pe-d-overpay" readonly tabindex="-1" style="opacity:0.7;cursor:not-allowed;"></div>
       </div>
       <div class="form-row">
+        <div class="form-field"><label>Carried Forward</label><input type="number" id="pe-d-carryfwd" readonly tabindex="-1" style="opacity:0.7;cursor:not-allowed;"></div>
         <div class="form-field"><label>Other</label><input type="number" id="pe-dother" step="1" oninput="calcPayroll()"></div>
-        <div class="form-field"><label>Other Deduction Note</label><input type="text" id="pe-dothernote" placeholder="Describe other deduction..."></div>
       </div>
+      <div class="form-row">
+        <div class="form-field"><label>Other Deduction Note</label><input type="text" id="pe-dothernote" placeholder="Describe other deduction..."></div>
+        <div class="form-field"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Advance deductions are read-only — edit at worker's Advances page</div>
       <input type="hidden" id="pe-dadv">
       <input type="hidden" id="pe-dshop">
       <div style="text-align:right;font-weight:700;color:var(--critical);">Total Deductions: RM <span id="pe-deducttotal">0.00</span></div>
@@ -578,14 +782,8 @@
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Pay</span><span id="pe-totalpay" style="font-weight:700;">RM 0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Total Deductions</span><span id="pe-deductsummary" style="color:var(--critical);font-weight:700;">- RM 0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;color:var(--gold);border-top:1px solid var(--border);padding-top:8px;margin-top:8px;"><span>Final Pay</span><span id="pe-finalpay">RM 0.00</span></div>
-      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">
-        <div class="form-row" style="margin-bottom:0;">
-          <div class="form-field" style="margin-bottom:0;"><label>Cash Handed (RM)</label><input type="number" id="pe-cashhanded" step="1" oninput="calcOverpayment()" placeholder="e.g. 1550"></div>
-          <div class="form-field" style="margin-bottom:0;"><label>Overpayment (auto)</label><input type="text" id="pe-overpay-result" readonly style="color:var(--gold);"></div>
-        </div>
-        <div id="pe-overpay-note" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none;"></div>
-      </div>
     </div>
+    <input type="hidden" id="pe-cashhanded" value="0">
 
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal('pe-modal')">Cancel</button>
@@ -650,6 +848,7 @@ const OT_DIVISOR = 9.5; // OT formula: (pay_rate / 9.5) × ot_hours
 let workers = [];
 let taskTypes = [];
 let responsibilityTypes = [];
+let workerDefaultResps = [];
 let payrollPeriods = [];
 let payrollEntries = [];
 let taskEntries = [];
@@ -663,6 +862,7 @@ let salaryAdvances = [];
 let profileWorkerId = null;
 let workerSortCol = 'name';
 let workerSortAsc = true;
+let showHiddenCols = false;
 let currentUser = null;
 let currentPage = "workers";
 let currentPeriodId = null;
@@ -809,6 +1009,7 @@ function showApp() {
   startInactivityTimer();
   document.getElementById("app").style.display = "flex";
   injectUserBadge(currentUser);
+  injectCompanySwitcher();
   navigateTo("workers");
 }
 
@@ -823,10 +1024,11 @@ function navigateTo(page) {
   const nav = document.querySelector('.nav-item[data-page="' + page + '"]');
   if (nav) nav.classList.add("active");
   if (page === "workers") renderWorkerList();
-  if (page === "payroll") renderPayrollPage();
+  if (page === "payroll") { renderPayrollPage(); if (currentPeriodId) loadPayrollPeriod(); }
   if (page === "summary") { setTimeout(function() { renderSummaryPage(); }, 50); }
   if (page === "tasks") renderTaskTypes();
   if (page === "roles") renderRoles();
+  if (page === "changelog") initChangelogPage();
   if (page === "profile") renderWorkerProfile();
 }
 
@@ -835,7 +1037,21 @@ function getWorkerLoanBalance(workerId) {
 }
 
 function getWorkerPendingAdvances(workerId) {
-  return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  const pid = getCurrentPeriodId();
+  return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending' && a.period_id === pid).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+}
+
+function getWorkerRespTotal(workerId) {
+  return workerDefaultResps.filter(r => r.worker_id === workerId).reduce((s, r) => s + (parseFloat(r.rate) || 0), 0);
+}
+
+function getWorkerRespNames(workerId) {
+  return workerDefaultResps.filter(r => r.worker_id === workerId).map(r => r.responsibility_name + ' RM' + fmtNum2(r.rate)).join(', ');
+}
+
+function getWorkerAdvByCat(workerId, category) {
+  const pid = getCurrentPeriodId();
+  return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending' && a.period_id === pid && a.category === category).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
 }
 
 function getWorkerPendingAdvancesForPeriod(workerId, periodId) {
@@ -859,27 +1075,34 @@ async function loadAllData() {
     return data || [];
   }
 
-  const [w, tt, rt, pp, wr, tu, wl, lr, es, sa] = await Promise.all([
-    safeLoad(sb.from("workers").select("*").order("name")),
-    safeLoad(sb.from("task_types").select("*").order("sort_order")),
-    safeLoad(sb.from("responsibility_types").select("*").order("name")),
-    safeLoad(sb.from("payroll_periods").select("*").order("year", { ascending: false }).order("month", { ascending: false })),
-    safeLoad(sb.from("worker_roles").select("*").order("sort_order")),
-    safeLoad(sb.from("task_units").select("*").order("sort_order")),
-    safeLoad(sb.from("worker_loans").select("*").order("date_issued", { ascending: false })),
-    safeLoad(sb.from("loan_repayments").select("*").order("date", { ascending: false })),
-    safeLoad(sb.from("employment_stints").select("*").order("start_date", { ascending: false })),
-    safeLoad(sb.from("salary_advances").select("*").order("date_given", { ascending: false })),
+  const [w, tt, rt, pp, wr, tu, wl, lr, es, sa, wdr] = await Promise.all([
+    safeLoad(sb.from("workers").select("*").eq("company_id", getCompanyId()).order("name")),
+    safeLoad(sb.from("task_types").select("*").eq("company_id", getCompanyId()).order("sort_order")),
+    safeLoad(sb.from("responsibility_types").select("*").eq("company_id", getCompanyId()).order("name")),
+    safeLoad(sb.from("payroll_periods").select("*").eq("company_id", getCompanyId()).order("year", { ascending: false }).order("month", { ascending: false })),
+    safeLoad(sb.from("worker_roles").select("*").eq("company_id", getCompanyId()).order("sort_order")),
+    safeLoad(sb.from("task_units").select("*").eq("company_id", getCompanyId()).order("sort_order")),
+    safeLoad(sb.from("worker_loans").select("*").eq("company_id", getCompanyId()).order("date_issued", { ascending: false })),
+    safeLoad(sb.from("loan_repayments").select("*").eq("company_id", getCompanyId()).order("date", { ascending: false })),
+    safeLoad(sb.from("employment_stints").select("*").eq("company_id", getCompanyId()).order("start_date", { ascending: false })),
+    safeLoad(sb.from("salary_advances").select("*").eq("company_id", getCompanyId()).order("date_given", { ascending: false })),
+    safeLoad(sb.from("worker_default_responsibilities").select("*").eq("company_id", getCompanyId())),
   ]);
   workers = w; taskTypes = tt; responsibilityTypes = rt; payrollPeriods = pp;
   workerRoles = wr; taskUnits = tu; workerLoans = wl; loanRepayments = lr; employmentStints = es;
-  salaryAdvances = sa;
+  salaryAdvances = sa; workerDefaultResps = wdr;
   console.log("Data loaded:", { workers: workers.length, loans: workerLoans.length, stints: employmentStints.length, advances: salaryAdvances.length });
 }
 
 // ============================================================
 // WORKERS PAGE
 // ============================================================
+function toggleHiddenCols() {
+  showHiddenCols = !showHiddenCols;
+  document.getElementById("toggle-cols-label").textContent = showHiddenCols ? "Hide Extra Columns" : "Show More Columns";
+  renderWorkerList();
+}
+
 function sortWorkers(col) {
   if (workerSortCol === col) workerSortAsc = !workerSortAsc;
   else { workerSortCol = col; workerSortAsc = true; }
@@ -896,9 +1119,12 @@ function renderWorkerList() {
   var filtered = workers.filter(w => !search || w.name.toLowerCase().includes(search));
   const active = workers.filter(w => w.active);
 
-  // Sort
+  // Sort — inactive workers always at bottom, then by selected column
   var dir = workerSortAsc ? 1 : -1;
   filtered.sort(function(a, b) {
+    // Inactive always at the bottom
+    if (a.active && !b.active) return -1;
+    if (!a.active && b.active) return 1;
     var va, vb;
     switch (workerSortCol) {
       case "name": va = a.name.toLowerCase(); vb = b.name.toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
@@ -906,59 +1132,101 @@ function renderWorkerList() {
       case "pay_rate": return ((parseFloat(a.pay_rate)||0) - (parseFloat(b.pay_rate)||0)) * dir;
       case "role": va = (a.role||"").toLowerCase(); vb = (b.role||"").toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
       case "tenure": var sa2 = getCurrentStint(a.id), sb2 = getCurrentStint(b.id); va = sa2 ? new Date(sa2.start_date).getTime() : 0; vb = sb2 ? new Date(sb2.start_date).getTime() : 0; return (va - vb) * dir;
-      case "advance": return (getWorkerPendingAdvances(a.id) - getWorkerPendingAdvances(b.id)) * dir;
+      case "resp": return (getWorkerRespTotal(a.id) - getWorkerRespTotal(b.id)) * dir;
+      case "canteen": return (getWorkerAdvByCat(a.id, 'Canteen') - getWorkerAdvByCat(b.id, 'Canteen')) * dir;
+      case "cigs": return (getWorkerAdvByCat(a.id, 'Cigarettes') - getWorkerAdvByCat(b.id, 'Cigarettes')) * dir;
+      case "salAdv": return (getWorkerAdvByCat(a.id, 'Salary Advance') - getWorkerAdvByCat(b.id, 'Salary Advance')) * dir;
+      case "overpay": return (getWorkerAdvByCat(a.id, 'Overpayment') - getWorkerAdvByCat(b.id, 'Overpayment')) * dir;
+      case "carryFwd": return (getWorkerAdvByCat(a.id, 'Carried Forward') - getWorkerAdvByCat(b.id, 'Carried Forward')) * dir;
+      case "totalAdv": return (getWorkerPendingAdvances(a.id) - getWorkerPendingAdvances(b.id)) * dir;
       case "loan": return (getWorkerLoanBalance(a.id) - getWorkerLoanBalance(b.id)) * dir;
       case "active": va = a.active ? 0 : 1; vb = b.active ? 0 : 1; return (va - vb) * dir;
       default: return 0;
     }
   });
 
-  const pendingAdv = salaryAdvances.filter(a => a.status === 'pending');
-  const advCanteen = pendingAdv.filter(a => a.category === 'Canteen').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-  const advCigs = pendingAdv.filter(a => a.category === 'Cigarettes').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-  const advSalary = pendingAdv.filter(a => a.category === 'Salary Advance').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-  const advOverpay = pendingAdv.filter(a => a.category === 'Overpayment').reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-  const advTotal = advCanteen + advCigs + advSalary + advOverpay;
   document.getElementById("worker-stats").innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Workers</div><div class="stat-value">${workers.length}</div></div>
     <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:var(--good);">${active.length}</div></div>
     <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:var(--critical);">${workers.length - active.length}</div></div>
     <div class="stat-card"><div class="stat-label">Avg Pay Rate</div><div class="stat-value">RM ${active.length ? fmtNum2(active.reduce((s,w) => s + (parseFloat(w.pay_rate)||0), 0) / active.length) : "0.00"}</div></div>
-    <div class="stat-card"><div class="stat-label">Canteen</div><div class="stat-value" style="color:${advCanteen > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advCanteen)}</div></div>
-    <div class="stat-card"><div class="stat-label">Cigarettes</div><div class="stat-value" style="color:${advCigs > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advCigs)}</div></div>
-    <div class="stat-card"><div class="stat-label">Salary Advance</div><div class="stat-value" style="color:${advSalary > 0 ? 'var(--gold)' : 'var(--text-dim)'};">RM ${fmtNum2(advSalary)}</div></div>
-    <div class="stat-card"><div class="stat-label">Overpayment</div><div class="stat-value" style="color:${advOverpay > 0 ? 'var(--text-muted)' : 'var(--text-dim)'};">RM ${fmtNum2(advOverpay)}</div></div>
   `;
 
   // Sort indicators
-  ["name","gender","pay_rate","role","tenure","advance","loan","active"].forEach(function(c) {
+  ["name","gender","pay_rate","role","resp","canteen","cigs","salAdv","overpay","carryFwd","totalAdv","tenure","loan","active"].forEach(function(c) {
     var el = document.getElementById("sort-" + c);
     if (el) el.textContent = workerSortCol === c ? (workerSortAsc ? "\u25B2" : "\u25BC") : "";
   });
 
   const tbody = document.getElementById("worker-tbody");
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:40px;">No workers found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;color:var(--text-dim);padding:40px;">No workers found</td></tr>';
     return;
   }
+  const isAdminUser = currentUser && currentUser.role === "admin";
+  const advBg = 'background:rgba(232,160,32,0.06);';
+  const totalAdvBg = 'background:rgba(232,96,96,0.08);';
+  const hiddenCls = showHiddenCols ? '' : ' col-hidden';
+
+  // Accumulate totals
+  let sumCanteen = 0, sumCigs = 0, sumSalAdv = 0, sumOverpay = 0, sumCarryFwd = 0, sumTotalAdv = 0, sumResp = 0, sumLoan = 0;
+
   tbody.innerHTML = filtered.map(w => {
-    const advBal = getWorkerPendingAdvances(w.id);
     const loanBal = getWorkerLoanBalance(w.id);
+    const respTotal = getWorkerRespTotal(w.id);
+    const respNames = getWorkerRespNames(w.id);
+    const canteen = getWorkerAdvByCat(w.id, 'Canteen');
+    const cigs = getWorkerAdvByCat(w.id, 'Cigarettes');
+    const salAdv = getWorkerAdvByCat(w.id, 'Salary Advance');
+    const overpay = getWorkerAdvByCat(w.id, 'Overpayment');
+    const carryFwd = getWorkerAdvByCat(w.id, 'Carried Forward');
+    const totalAdv = getWorkerPendingAdvances(w.id);
+    const rowDim = !w.active ? 'opacity:0.55;' : '';
+
+    sumCanteen += canteen; sumCigs += cigs; sumSalAdv += salAdv; sumOverpay += overpay; sumCarryFwd += carryFwd;
+    sumTotalAdv += totalAdv; sumResp += respTotal; sumLoan += loanBal;
+
     return `
-    <tr onclick="openWorkerProfile('${w.id}')" style="cursor:pointer;">
+    <tr onclick="openWorkerProfile('${w.id}')" style="cursor:pointer;${rowDim}">
       <td style="font-weight:600;">${w.name}</td>
       <td>${w.gender ? '<span class="badge badge-' + w.gender.toLowerCase() + '">' + w.gender + '</span>' : '—'}</td>
       <td>RM ${fmtNum2(w.pay_rate)}</td>
       <td style="color:var(--text-muted);">${w.role || '—'}</td>
+      <td style="font-size:11px;">${respTotal > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(respTotal) + '</span><br><span style="color:var(--text-muted);font-size:10px;">' + esc(respNames) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td style="${advBg}">${canteen > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(canteen) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td style="${advBg}">${cigs > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(cigs) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td style="${advBg}">${salAdv > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(salAdv) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td class="${hiddenCls}" style="${advBg}">${overpay > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(overpay) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td class="${hiddenCls}" style="${advBg}">${carryFwd > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmtNum2(carryFwd) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
+      <td style="${totalAdvBg}font-weight:700;">${totalAdv > 0 ? '<span style="color:var(--critical);">RM ' + fmtNum2(totalAdv) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td style="font-size:11px;color:var(--text-muted);">${getWorkerTenure(w.id)}</td>
-      <td>${advBal > 0 ? '<span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(advBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td>${loanBal > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmtNum2(loanBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td><span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span></td>
-      <td style="text-align:right;" onclick="event.stopPropagation();">
+      <td style="text-align:right;white-space:nowrap;" onclick="event.stopPropagation();">
         <button class="btn btn-outline btn-sm" onclick="openEditWorker('${w.id}')">Edit</button>
+        ${!w.active && isAdminUser ? '<button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="openDeleteWorker(\'' + w.id + '\')">Delete</button>' : ''}
       </td>
     </tr>
   `}).join("");
+
+  // Totals row
+  const tStyle = 'font-weight:700;border-top:2px solid var(--border);font-size:12px;';
+  tbody.innerHTML += `
+    <tr style="${tStyle}">
+      <td colspan="4" style="color:var(--gold);font-weight:700;">TOTAL</td>
+      <td>${sumResp > 0 ? '<span style="color:var(--gold);">RM ' + fmtNum2(sumResp) + '</span>' : '—'}</td>
+      <td style="${advBg}color:var(--gold);font-weight:700;">${sumCanteen > 0 ? 'RM ' + fmtNum2(sumCanteen) : '—'}</td>
+      <td style="${advBg}color:var(--gold);font-weight:700;">${sumCigs > 0 ? 'RM ' + fmtNum2(sumCigs) : '—'}</td>
+      <td style="${advBg}color:var(--gold);font-weight:700;">${sumSalAdv > 0 ? 'RM ' + fmtNum2(sumSalAdv) : '—'}</td>
+      <td class="${hiddenCls}" style="${advBg}color:var(--gold);font-weight:700;">${sumOverpay > 0 ? 'RM ' + fmtNum2(sumOverpay) : '—'}</td>
+      <td class="${hiddenCls}" style="${advBg}color:var(--critical);font-weight:700;">${sumCarryFwd > 0 ? 'RM ' + fmtNum2(sumCarryFwd) : '—'}</td>
+      <td style="${totalAdvBg}color:var(--critical);font-weight:700;">${sumTotalAdv > 0 ? 'RM ' + fmtNum2(sumTotalAdv) : '—'}</td>
+      <td></td>
+      <td style="color:var(--critical);font-weight:700;">${sumLoan > 0 ? 'RM ' + fmtNum2(sumLoan) : '—'}</td>
+      <td></td>
+      <td></td>
+    </tr>
+  `;
 }
 
 // ============================================================
@@ -1076,6 +1344,7 @@ async function saveWorker() {
     const newId = await dbNextId("W");
     data.id = newId;
     data.created_at = new Date().toISOString();
+    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from("workers").insert(data).select());
     if (result === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
     workers.push(data);
@@ -1083,7 +1352,7 @@ async function saveWorker() {
     // Create initial employment stint
     if (active && join_date) {
       const stintId = await dbNextId("ES");
-      const stintData = { id: stintId, worker_id: newId, start_date: join_date, end_date: null, is_current: true, leave_reason: "" };
+      const stintData = { id: stintId, worker_id: newId, start_date: join_date, end_date: null, is_current: true, leave_reason: "", company_id: getCompanyId() };
       await sbQuery(sb.from("employment_stints").insert(stintData).select());
       employmentStints.unshift(stintData);
     }
@@ -1094,7 +1363,7 @@ async function saveWorker() {
   if (document.getElementById("w-role").value === "__custom__" && role) {
     if (!workerRoles.some(r => r.name.toLowerCase() === role.toLowerCase())) {
       const roleId = await dbNextId("WR");
-      const roleData = { id: roleId, name: role, sort_order: workerRoles.length + 1, is_default: false };
+      const roleData = { id: roleId, name: role, sort_order: workerRoles.length + 1, is_default: false, company_id: getCompanyId() };
       await sbQuery(sb.from("worker_roles").insert(roleData).select());
       workerRoles.push(roleData);
     }
@@ -1170,7 +1439,7 @@ async function confirmReactivate() {
 
   // Create new stint
   const stintId = await dbNextId("ES");
-  const stintData = { id: stintId, worker_id: id, start_date: startDate, end_date: null, is_current: true, leave_reason: "" };
+  const stintData = { id: stintId, worker_id: id, start_date: startDate, end_date: null, is_current: true, leave_reason: "", company_id: getCompanyId() };
   await sbQuery(sb.from("employment_stints").insert(stintData).select());
   employmentStints.unshift(stintData);
 
@@ -1181,6 +1450,110 @@ async function confirmReactivate() {
   notify(w.name + " reactivated — new stint started");
   renderWorkerList();
   if (profileWorkerId === id) renderWorkerProfile();
+}
+
+// ============================================================
+// DELETE WORKER (Admin only)
+// ============================================================
+function openDeleteWorker(workerId) {
+  const w = workers.find(x => x.id === workerId);
+  if (!w) return;
+
+  // Count related records
+  const peCount = payrollEntries.filter(pe => pe.worker_id === workerId).length;
+  const advCount = salaryAdvances.filter(a => a.worker_id === workerId).length;
+  const loanCount = workerLoans.filter(l => l.worker_id === workerId).length;
+  const stintCount = employmentStints.filter(s => s.worker_id === workerId).length;
+  const taskCount = taskEntries.filter(te => te.worker_id === workerId).length;
+
+  let msg = '<div style="margin-bottom:14px;">Delete <strong>' + esc(w.name) + '</strong> from the system?</div>';
+
+  if (peCount + advCount + loanCount + stintCount + taskCount > 0) {
+    msg += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:var(--bg);border-radius:8px;padding:10px;">';
+    msg += '<div style="font-weight:600;margin-bottom:4px;">Historical records found:</div>';
+    if (peCount > 0) msg += '<div>• ' + peCount + ' payroll entries</div>';
+    if (advCount > 0) msg += '<div>• ' + advCount + ' salary advances</div>';
+    if (loanCount > 0) msg += '<div>• ' + loanCount + ' loans</div>';
+    if (stintCount > 0) msg += '<div>• ' + stintCount + ' employment stints</div>';
+    if (taskCount > 0) msg += '<div>• ' + taskCount + ' contract/task entries</div>';
+    msg += '</div>';
+  }
+
+  msg += '<div style="display:flex;flex-direction:column;gap:8px;">';
+  msg += '<button class="btn btn-danger" style="width:100%;justify-content:center;" onclick="executeDeleteWorker(\'' + workerId + '\', true)">Delete Worker + All Historical Records</button>';
+  msg += '<button class="btn btn-outline" style="width:100%;justify-content:center;color:var(--gold);border-color:var(--gold);" onclick="executeDeleteWorker(\'' + workerId + '\', false)">Remove Worker Only (keep past records)</button>';
+  msg += '<button class="btn btn-outline" style="width:100%;justify-content:center;" onclick="closeModal(\'confirm-modal\')">Cancel</button>';
+  msg += '</div>';
+
+  // Use a custom modal since confirmAction doesn't support multiple buttons
+  const overlay = document.getElementById("confirm-modal") || createDeleteConfirmModal();
+  document.getElementById("confirm-modal-body").innerHTML = msg;
+  document.getElementById("confirm-modal-title").textContent = "Delete Worker";
+  overlay.style.display = "flex";
+}
+
+function createDeleteConfirmModal() {
+  const div = document.createElement("div");
+  div.id = "confirm-modal";
+  div.className = "modal-overlay";
+  div.innerHTML = '<div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">' +
+    '<div class="modal-header"><h3 class="modal-title" id="confirm-modal-title">Delete Worker</h3>' +
+    '<button class="modal-close" onclick="closeModal(\'confirm-modal\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+    '<div id="confirm-modal-body"></div></div>';
+  document.body.appendChild(div);
+  return div;
+}
+
+async function executeDeleteWorker(workerId, deleteHistory) {
+  const w = workers.find(x => x.id === workerId);
+  if (!w) return;
+  const wName = w.name;
+
+  closeModal("confirm-modal");
+  notify("Deleting " + wName + "...");
+
+  if (deleteHistory) {
+    // Delete all related records: loan_repayments → worker_loans, task_entries, payroll_responsibilities, payroll_entries, salary_advances, employment_stints, then worker
+    // Loan repayments first (FK to worker_loans)
+    const wLoans = workerLoans.filter(l => l.worker_id === workerId);
+    for (const loan of wLoans) {
+      await sbQuery(sb.from("loan_repayments").delete().eq("loan_id", loan.id));
+    }
+    loanRepayments = loanRepayments.filter(r => !wLoans.find(l => l.id === r.loan_id));
+
+    await sbQuery(sb.from("worker_loans").delete().eq("worker_id", workerId));
+    workerLoans = workerLoans.filter(l => l.worker_id !== workerId);
+
+    await sbQuery(sb.from("task_entries").delete().eq("worker_id", workerId));
+    taskEntries = taskEntries.filter(te => te.worker_id !== workerId);
+
+    await sbQuery(sb.from("payroll_responsibilities").delete().eq("worker_id", workerId));
+    payrollResponsibilities = payrollResponsibilities.filter(pr => pr.worker_id !== workerId);
+
+    await sbQuery(sb.from("payroll_entries").delete().eq("worker_id", workerId));
+    payrollEntries = payrollEntries.filter(pe => pe.worker_id !== workerId);
+
+    await sbQuery(sb.from("salary_advances").delete().eq("worker_id", workerId));
+    salaryAdvances = salaryAdvances.filter(a => a.worker_id !== workerId);
+
+    await sbQuery(sb.from("employment_stints").delete().eq("worker_id", workerId));
+    employmentStints = employmentStints.filter(s => s.worker_id !== workerId);
+  }
+
+  // Delete the worker record
+  await sbQuery(sb.from("workers").delete().eq("id", workerId));
+  workers = workers.filter(x => x.id !== workerId);
+
+  await auditLog("workers", workerId, "delete", (deleteHistory ? "Deleted with all history" : "Deleted (history kept)") + ": " + wName);
+
+  // If viewing this worker's profile, go back to list
+  if (profileWorkerId === workerId) {
+    profileWorkerId = null;
+    navigateTo("workers");
+  }
+
+  notify(wName + " deleted" + (deleteHistory ? " with all records" : " — past records preserved"));
+  renderWorkerList();
 }
 
 function renderProfileStints() {
@@ -1330,6 +1703,7 @@ async function saveTaskType() {
     data.is_default = false;
     data.active = true;
     data.sort_order = taskTypes.length + 1;
+    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from("task_types").insert(data).select());
     if (result === null) return;
     taskTypes.push(data);
@@ -1340,7 +1714,7 @@ async function saveTaskType() {
   if (document.getElementById("tt-unit").value === "__custom__" && unit) {
     if (!taskUnits.some(u => u.name.toLowerCase() === unit.toLowerCase())) {
       const unitId = await dbNextId("TU");
-      const unitData = { id: unitId, name: unit, sort_order: taskUnits.length + 1, is_default: false };
+      const unitData = { id: unitId, name: unit, sort_order: taskUnits.length + 1, is_default: false, company_id: getCompanyId() };
       await sbQuery(sb.from("task_units").insert(unitData).select());
       taskUnits.push(unitData);
     }
@@ -1381,6 +1755,7 @@ function renderRoles() {
       </tr>
     `;
   }).join("");
+  renderRespTypes();
 }
 
 function openRoleModal(r) {
@@ -1413,7 +1788,7 @@ async function saveRole() {
   } else {
     if (workerRoles.some(r => r.name.toLowerCase() === name.toLowerCase())) { notify("Role already exists", "warning"); return; }
     const newId = await dbNextId("WR");
-    const data = { id: newId, name, sort_order: workerRoles.length + 1, is_default: false };
+    const data = { id: newId, name, sort_order: workerRoles.length + 1, is_default: false, company_id: getCompanyId() };
     var result = await sbQuery(sb.from("worker_roles").insert(data).select());
     if (result === null) return;
     workerRoles.push(data);
@@ -1435,6 +1810,87 @@ async function deleteRole(id) {
     notify(r.name + " deleted");
     renderRoles();
   }, true);
+}
+
+// ============================================================
+// RESPONSIBILITY TYPES MANAGEMENT
+// ============================================================
+function renderRespTypes() {
+  const tbody = document.getElementById("resp-type-tbody");
+  tbody.innerHTML = responsibilityTypes.map(r => `
+    <tr>
+      <td style="font-weight:600;">${esc(r.name)}</td>
+      <td>RM ${fmtNum2(r.default_rate)}</td>
+      <td>${r.active ? '<span style="color:var(--good);font-weight:600;">Active</span>' : '<span style="color:var(--text-dim);">Inactive</span>'}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-outline btn-sm" onclick="openEditRespType('${r.id}')">Edit</button>
+        <button class="btn ${r.active ? 'btn-danger' : 'btn-primary'} btn-sm" onclick="toggleRespType('${r.id}')">${r.active ? 'Deactivate' : 'Activate'}</button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function openRespTypeModal(r) {
+  document.getElementById("rt-edit-id").value = r ? r.id : "";
+  document.getElementById("resp-type-modal-title").textContent = r ? "Edit Responsibility" : "Add Responsibility";
+  document.getElementById("rt-name").value = r ? r.name : "";
+  document.getElementById("rt-rate").value = r ? r.default_rate : "";
+  document.getElementById("resp-type-modal").style.display = "flex";
+}
+
+function openEditRespType(id) {
+  const r = responsibilityTypes.find(x => x.id === id);
+  if (r) openRespTypeModal(r);
+}
+
+async function saveRespType() {
+  const editId = document.getElementById("rt-edit-id").value;
+  const name = document.getElementById("rt-name").value.trim();
+  const rate = parseFloat(document.getElementById("rt-rate").value) || 0;
+
+  if (!name) { notify("Name is required", "warning"); return; }
+  if (rate <= 0) { notify("Rate must be greater than 0", "warning"); return; }
+
+  if (editId) {
+    const r = responsibilityTypes.find(x => x.id === editId);
+    if (!r) return;
+    const oldName = r.name;
+    const result = await sbQuery(sb.from("responsibility_types").update({ name, default_rate: rate }).eq("id", editId).select());
+    if (result === null) return;
+
+    // Cascade rename to linked tables
+    if (oldName !== name) {
+      await sbQuery(sb.from("worker_default_responsibilities").update({ responsibility_name: name }).eq("responsibility_name", oldName).select());
+      workerDefaultResps.filter(d => d.responsibility_name === oldName).forEach(d => d.responsibility_name = name);
+
+      await sbQuery(sb.from("payroll_responsibilities").update({ responsibility_name: name }).eq("responsibility_name", oldName).select());
+    }
+
+    r.name = name;
+    r.default_rate = rate;
+    notify(name + " updated" + (oldName !== name ? " — renamed from " + oldName + ", all records updated" : ""));
+  } else {
+    if (responsibilityTypes.some(r => r.name.toLowerCase() === name.toLowerCase())) { notify("Already exists", "warning"); return; }
+    const newId = await dbNextId("R");
+    const data = { id: newId, name, default_rate: rate, active: true, company_id: getCompanyId() };
+    const result = await sbQuery(sb.from("responsibility_types").insert(data).select());
+    if (result === null) return;
+    responsibilityTypes.push(data);
+    notify(name + " added");
+  }
+  closeModal("resp-type-modal");
+  renderRespTypes();
+}
+
+async function toggleRespType(id) {
+  const r = responsibilityTypes.find(x => x.id === id);
+  if (!r) return;
+  const newActive = !r.active;
+  const result = await sbQuery(sb.from("responsibility_types").update({ active: newActive }).eq("id", id).select());
+  if (result === null) return;
+  r.active = newActive;
+  notify(r.name + (newActive ? " activated" : " deactivated"));
+  renderRespTypes();
 }
 
 // ============================================================
@@ -1468,9 +1924,10 @@ async function confirmNewPeriod() {
 // ============================================================
 // PAYROLL — ADD WORKER TO PERIOD
 // ============================================================
-function openAddWorkerModal() {
+async function openAddWorkerModal() {
   if (!currentPeriodId) return;
-  const existing = new Set(payrollEntries.map(pe => pe.worker_id));
+  const dbExisting = await sbQuery(sb.from("payroll_entries").select("worker_id").eq("period_id", currentPeriodId));
+  const existing = new Set((dbExisting || []).concat(payrollEntries).map(pe => pe.worker_id));
   const available = workers.filter(w => !existing.has(w.id));
   if (available.length === 0) { notify("All workers already have entries in this period", "warning"); return; }
   const sel = document.getElementById("addworker-select");
@@ -1494,6 +1951,7 @@ async function confirmAddWorker() {
     pay_rate: payRate, days_worked: 0, daily_wage: 0, ot_hours: 0, ot_pay: 0,
     responsibility_total: 0, deduct_advance: 0, deduct_loan: 0, deduct_shop: 0, deduct_other: 0,
     total_deductions: 0, task_total: 0, total_pay: 0, final_pay: 0,
+    company_id: getCompanyId(),
   };
   var result = await sbQuery(sb.from("payroll_entries").insert(entry).select());
   if (result === null) return;
@@ -1596,7 +2054,7 @@ function renderPayrollPage() {
 
 async function createPeriod(year, month) {
   const id = "PP-" + year + "-" + String(month).padStart(2, "0");
-  var result = await sbQuery(sb.from("payroll_periods").insert({ id, year, month, status: "open" }).select());
+  var result = await sbQuery(sb.from("payroll_periods").insert({ id, year, month, status: "open", company_id: getCompanyId() }).select());
   if (result === null) return;
   payrollPeriods.unshift({ id, year, month, status: "open" });
   notify("Period " + year + "-" + String(month).padStart(2, "0") + " created");
@@ -1610,16 +2068,53 @@ async function loadPayrollPeriod() {
   if (!periodId) { document.getElementById("payroll-content").innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Select a payroll period</p></div>'; return; }
   currentPeriodId = periodId;
 
-  const [peData, teData, prData] = await Promise.all([
+  const [peData, teData, prData, saData] = await Promise.all([
     sbQuery(sb.from("payroll_entries").select("*").eq("period_id", periodId)),
     sbQuery(sb.from("task_entries").select("*").eq("period_id", periodId)),
     sbQuery(sb.from("payroll_responsibilities").select("*").eq("period_id", periodId)),
+    sbQuery(sb.from("salary_advances").select("*").eq("company_id", getCompanyId()).order("date_given", { ascending: false })),
   ]);
   payrollEntries = peData || [];
   taskEntries = teData || [];
   payrollResponsibilities = prData || [];
+  salaryAdvances = saData || [];
+
+  // Auto-sync pending advances into payroll entries that haven't been manually adjusted
+  await autoSyncAdvancesToPayroll(periodId);
 
   renderPayrollEntries();
+}
+
+// Auto-sync salary advances into payroll entries — advances table is source of truth
+async function autoSyncAdvancesToPayroll(periodId) {
+  const CATS = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment', 'Carried Forward'];
+  let updated = 0;
+  for (const pe of payrollEntries) {
+    // Skip entries already paid — payment was confirmed with those amounts
+    if ((pe.payment_status || "unpaid") === "paid") continue;
+    // Sum all advances (pending + deducted) for this worker+period
+    const advForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && (a.status === 'pending' || a.status === 'deducted') && a.period_id === periodId);
+    let totalAdv = 0;
+    for (const cat of CATS) {
+      totalAdv += advForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+    }
+
+    // Check if the stored deduct_advance matches the current advance total
+    const currentAdv = parseFloat(pe.deduct_advance) || 0;
+    if (currentAdv === totalAdv) continue; // already in sync
+
+    const totalPay = (parseFloat(pe.daily_wage) || 0) + (parseFloat(pe.ot_pay) || 0) + (parseFloat(pe.responsibility_total) || 0) + (parseFloat(pe.task_total) || 0);
+    const totalDeduct = totalAdv + (parseFloat(pe.deduct_other) || 0);
+    const finalPay = totalPay - totalDeduct;
+
+    const updateData = { deduct_advance: totalAdv, total_deductions: totalDeduct, final_pay: finalPay, updated_at: new Date().toISOString() };
+    var result = await sbQuery(sb.from("payroll_entries").update(updateData).eq("id", pe.id).select());
+    if (result) {
+      Object.assign(pe, updateData);
+      updated++;
+    }
+  }
+  if (updated > 0) notify(updated + " entries synced with advances");
 }
 
 function renderPayrollEntries() {
@@ -1670,19 +2165,23 @@ function renderPayrollEntries() {
     payrollEntries.sort((a,b) => (a.worker_name||"").localeCompare(b.worker_name||""));
     for (const pe of payrollEntries) {
       const isPaid = (pe.payment_status || "unpaid") === "paid";
-      const pendAdv = getWorkerPendingAdvancesForPeriod(pe.worker_id, currentPeriodId);
-      const advIndicator = pendAdv > 0 ? ' <span style="font-size:10px;color:var(--gold);font-weight:400;" title="Pending salary advance">⚠ RM ' + fmtNum2(pendAdv) + ' adv</span>' : '';
       html += '<tr>';
-      html += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + advIndicator + '</td>';
+      html += '<td style="font-weight:600;">' + (pe.worker_name || pe.worker_id) + '</td>';
       html += '<td>' + (pe.days_worked || 0) + '</td>';
       html += '<td>RM ' + fmtNum2(pe.daily_wage) + '</td>';
       html += '<td>' + (pe.ot_hours ? pe.ot_hours + 'h = RM ' + fmtNum2(pe.ot_pay) : '—') + '</td>';
       html += '<td>RM ' + fmtNum2(pe.responsibility_total || 0) + '</td>';
       html += '<td>RM ' + fmtNum2(pe.task_total) + '</td>';
       html += '<td style="color:var(--critical);">RM ' + fmtNum2(pe.total_deductions) + '</td>';
-      html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(pe.final_pay) + '</td>';
-      html += '<td><span class="badge ' + (isPaid ? 'badge-active' : 'badge-inactive') + '" style="cursor:pointer;" onclick="togglePaymentStatus(\'' + pe.id + '\')">' + (isPaid ? 'Paid' : 'Unpaid') + '</span></td>';
-      html += '<td style="text-align:right;white-space:nowrap;" class="no-print"><button class="btn btn-outline btn-sm" onclick="openPaySlip(\'' + pe.id + '\')" style="margin-right:4px;">Slip</button><button class="btn btn-outline btn-sm" onclick="openPayrollEntry(\'' + pe.id + '\')" ' + (isClosed ? 'disabled' : '') + '>Edit</button></td>';
+      const netPay = parseFloat(pe.final_pay) || 0;
+      html += '<td style="text-align:right;font-weight:700;color:' + (netPay < 0 ? 'var(--critical)' : 'var(--gold)') + ';">RM ' + fmtNum2(pe.final_pay) + '</td>';
+      html += '<td><span class="badge ' + (isPaid ? 'badge-active' : 'badge-inactive') + '">' + (isPaid ? 'Paid' : 'Unpaid') + '</span></td>';
+      html += '<td style="text-align:right;white-space:nowrap;" class="no-print">';
+      html += '<button class="btn btn-outline btn-sm" onclick="openPaySlip(\'' + pe.id + '\')" style="margin-right:4px;">Slip</button>';
+      html += '<button class="btn btn-outline btn-sm" onclick="openPayrollEntry(\'' + pe.id + '\')" style="margin-right:4px;" ' + (isClosed ? 'disabled' : '') + '>Edit</button>';
+      if (!isPaid && !isClosed) html += '<button class="btn btn-primary btn-sm" onclick="openPayModal(\'' + pe.id + '\')">Pay</button>';
+      if (isPaid && !isClosed) html += '<button class="btn btn-outline btn-sm" style="color:var(--text-muted);border-color:var(--border);" onclick="undoPayment(\'' + pe.id + '\')">Undo</button>';
+      html += '</td>';
       html += '</tr>';
     }
 
@@ -1704,19 +2203,283 @@ function renderPayrollEntries() {
   content.innerHTML = html;
 }
 
-// Toggle paid/unpaid status
-async function togglePaymentStatus(peId) {
+// ============================================================
+// PAY WORKER MODAL
+// ============================================================
+function openPayModal(peId) {
   const pe = payrollEntries.find(x => x.id === peId);
   if (!pe) return;
-  const newStatus = (pe.payment_status || "unpaid") === "paid" ? "unpaid" : "paid";
-  const paidAt = newStatus === "paid" ? new Date().toISOString() : null;
+  document.getElementById("pay-pe-id").value = peId;
+  document.getElementById("pay-modal-title").textContent = "Pay — " + (pe.worker_name || pe.worker_id);
 
-  var result = await sbQuery(sb.from("payroll_entries").update({ payment_status: newStatus, paid_at: paidAt }).eq("id", peId).select());
-  if (result === null) return;
+  const totalPay = parseFloat(pe.total_pay) || 0;
+  const totalDeduct = parseFloat(pe.total_deductions) || 0;
+  const netPay = parseFloat(pe.final_pay) || 0;
 
-  pe.payment_status = newStatus;
+  document.getElementById("pay-total-pay").textContent = "RM " + fmtNum2(totalPay);
+  document.getElementById("pay-total-deduct").textContent = "- RM " + fmtNum2(totalDeduct);
+  const netEl = document.getElementById("pay-net");
+  netEl.textContent = "RM " + fmtNum2(netPay);
+  netEl.style.color = netPay < 0 ? 'var(--critical)' : 'var(--gold)';
+
+  const negNote = document.getElementById("pay-negative-note");
+  const cashSection = document.getElementById("pay-cash-section");
+  if (netPay < 0) {
+    negNote.innerHTML = 'Net pay is negative. Payment = <strong>RM 0.00</strong><br>RM ' + fmtNum2(Math.abs(netPay)) + ' will be carried forward to next month as hutang.';
+    negNote.style.display = "block";
+    cashSection.style.display = "none";
+  } else {
+    negNote.style.display = "none";
+    cashSection.style.display = "block";
+    document.getElementById("pay-cash").value = "";
+    document.getElementById("pay-overpay-row").style.display = "none";
+  }
+
+  // Populate active loans for this worker
+  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  const loanSection = document.getElementById("pay-loan-section");
+  const loanList = document.getElementById("pay-loan-list");
+  if (wLoans.length > 0) {
+    loanSection.style.display = "block";
+    loanList.innerHTML = wLoans.map(l => {
+      const bal = parseFloat(l.balance) || ((parseFloat(l.amount)||0) - (parseFloat(l.total_repaid)||0));
+      return '<div style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px;border-left:3px solid var(--critical);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<span style="font-weight:600;font-size:12px;">' + esc(l.purpose || 'Loan') + '</span>' +
+        '<span style="font-size:11px;color:var(--critical);">Balance: RM ' + fmtNum2(bal) + '</span>' +
+        '</div>' +
+        '<div class="form-field" style="margin-bottom:0;"><input type="number" id="pay-loan-' + l.id + '" step="1" placeholder="Repayment amount (optional)" max="' + bal + '" style="font-size:12px;"></div>' +
+        '</div>';
+    }).join("");
+  } else {
+    loanSection.style.display = "none";
+    loanList.innerHTML = "";
+  }
+
+  document.getElementById("pay-modal").style.display = "flex";
+}
+
+function calcPayOverpay() {
+  const peId = document.getElementById("pay-pe-id").value;
+  const pe = payrollEntries.find(x => x.id === peId);
+  if (!pe) return;
+  const netPay = parseFloat(pe.final_pay) || 0;
+  const cash = parseFloat(document.getElementById("pay-cash").value) || 0;
+  const overpayRow = document.getElementById("pay-overpay-row");
+
+  if (cash > 0 && cash > netPay) {
+    document.getElementById("pay-overpay-amount").textContent = "RM " + fmtNum2(cash - netPay);
+    overpayRow.style.display = "block";
+  } else {
+    overpayRow.style.display = "none";
+  }
+}
+
+async function confirmPayWorker() {
+  const btn = document.getElementById("pay-confirm-btn");
+  const peId = document.getElementById("pay-pe-id").value;
+  const pe = payrollEntries.find(x => x.id === peId);
+  if (!pe) return;
+
+  const period = payrollPeriods.find(p => p.id === pe.period_id);
+  const periodLabel = period ? MONTH_NAMES[period.month] + " " + period.year : "";
+  const netPay = parseFloat(pe.final_pay) || 0;
+  const cashHanded = netPay < 0 ? 0 : (parseFloat(document.getElementById("pay-cash").value) || 0);
+
+  if (netPay > 0 && cashHanded <= 0) { notify("Enter cash handed amount", "warning"); return; }
+
+  btnLoading(btn, true);
+
+  // Mark as paid
+  const paidAt = new Date().toISOString();
+  var result = await sbQuery(sb.from("payroll_entries").update({ payment_status: "paid", paid_at: paidAt, cash_handed: cashHanded }).eq("id", peId).select());
+  if (result === null) { btnLoading(btn, false, "Confirm Payment"); return; }
+  pe.payment_status = "paid";
   pe.paid_at = paidAt;
+  pe.cash_handed = cashHanded;
+
+  // Mark pending advances as deducted
+  const pendingAdv = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'pending' && a.period_id === pe.period_id);
+  for (const adv of pendingAdv) {
+    await sbQuery(sb.from("salary_advances").update({ status: 'deducted' }).eq("id", adv.id).select());
+    adv.status = 'deducted';
+  }
+
+  // Handle negative salary — carry forward
+  if (netPay < 0) {
+    await createCarryForward(pe, Math.abs(netPay));
+  }
+
+  // Handle overpayment — carry forward
+  if (cashHanded > 0 && cashHanded > netPay) {
+    await createOverpaymentAdvance(pe, cashHanded - netPay);
+  }
+
+  // Process loan repayments
+  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  let loanRepayTotal = 0;
+  for (const loan of wLoans) {
+    const repayEl = document.getElementById("pay-loan-" + loan.id);
+    if (!repayEl) continue;
+    const repayAmt = parseFloat(repayEl.value) || 0;
+    if (repayAmt <= 0) continue;
+    const bal = parseFloat(loan.balance) || 0;
+    const actualRepay = Math.min(repayAmt, bal);
+    if (actualRepay <= 0) continue;
+
+    // Insert repayment record
+    const repayId = await dbNextId("LR");
+    const repayData = { id: repayId, loan_id: loan.id, worker_id: pe.worker_id, amount: actualRepay, date: new Date().toISOString().slice(0, 10), notes: "Deducted from " + periodLabel + " salary", company_id: getCompanyId() };
+    await sbQuery(sb.from("loan_repayments").insert(repayData).select());
+    loanRepayments.unshift(repayData);
+
+    // Update loan balance
+    const newRepaid = (parseFloat(loan.total_repaid) || 0) + actualRepay;
+    const newBalance = parseFloat(loan.amount) - newRepaid;
+    const newStatus = newBalance <= 0 ? "settled" : "active";
+    await sbQuery(sb.from("worker_loans").update({ total_repaid: newRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loan.id).select());
+    loan.total_repaid = newRepaid;
+    loan.balance = Math.max(0, newBalance);
+    loan.status = newStatus;
+    loanRepayTotal += actualRepay;
+  }
+
+  btnLoading(btn, false, "Confirm Payment");
+  closeModal("pay-modal");
+  let payMsg = (pe.worker_name || pe.worker_id) + " — Paid";
+  if (cashHanded > 0) payMsg += " (RM " + fmtNum2(cashHanded) + " cash)";
+  if (loanRepayTotal > 0) payMsg += " + RM " + fmtNum2(loanRepayTotal) + " loan repayment";
+  notify(payMsg);
   renderPayrollEntries();
+}
+
+// Undo payment — revert to unpaid
+async function undoPayment(peId) {
+  const pe = payrollEntries.find(x => x.id === peId);
+  if (!pe) return;
+
+  confirmAction("Undo Payment", "Revert " + (pe.worker_name || pe.worker_id) + " to Unpaid?", async function() {
+    var result = await sbQuery(sb.from("payroll_entries").update({ payment_status: "unpaid", paid_at: null, cash_handed: 0 }).eq("id", peId).select());
+    if (result === null) return;
+    pe.payment_status = "unpaid";
+    pe.paid_at = null;
+    pe.cash_handed = 0;
+
+    // Revert deducted advances back to pending
+    const deductedAdv = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === pe.period_id);
+    for (const adv of deductedAdv) {
+      await sbQuery(sb.from("salary_advances").update({ status: 'pending' }).eq("id", adv.id).select());
+      adv.status = 'pending';
+    }
+
+    // Remove carry-forward / overpayment advances we created for next month
+    const finalPay = parseFloat(pe.final_pay) || 0;
+    const curPeriod = payrollPeriods.find(p => p.id === pe.period_id);
+    if (curPeriod) {
+      const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
+      const nextYear = curPeriod.month === 12 ? curPeriod.year + 1 : curPeriod.year;
+      const nextPeriod = payrollPeriods.find(p => p.year === nextYear && p.month === nextMonth);
+      if (nextPeriod) {
+        // Remove carry-forward
+        const cfAdv = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Carried Forward' && a.status === 'pending' && a.period_id === nextPeriod.id && a.reason && a.reason.startsWith('Hutang dari'));
+        if (cfAdv) {
+          await sbQuery(sb.from("salary_advances").delete().eq("id", cfAdv.id));
+          salaryAdvances = salaryAdvances.filter(a => a.id !== cfAdv.id);
+        }
+        // Remove overpayment
+        const opAdv = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Overpayment' && a.status === 'pending' && a.period_id === nextPeriod.id && a.reason && a.reason.startsWith('Cash overpayment from'));
+        if (opAdv) {
+          await sbQuery(sb.from("salary_advances").delete().eq("id", opAdv.id));
+          salaryAdvances = salaryAdvances.filter(a => a.id !== opAdv.id);
+        }
+      }
+    }
+
+    // Reverse loan repayments made during this payment
+    const period = payrollPeriods.find(p => p.id === pe.period_id);
+    const periodLabel = period ? MONTH_NAMES[period.month] + " " + period.year : "";
+    if (periodLabel) {
+      const payRepayments = loanRepayments.filter(r => r.worker_id === pe.worker_id && r.notes && r.notes === "Deducted from " + periodLabel + " salary");
+      for (const repay of payRepayments) {
+        const loan = workerLoans.find(l => l.id === repay.loan_id);
+        // Delete the repayment record
+        await sbQuery(sb.from("loan_repayments").delete().eq("id", repay.id));
+        loanRepayments = loanRepayments.filter(r => r.id !== repay.id);
+        // Restore loan balance
+        if (loan) {
+          const newRepaid = Math.max(0, (parseFloat(loan.total_repaid) || 0) - (parseFloat(repay.amount) || 0));
+          const newBalance = parseFloat(loan.amount) - newRepaid;
+          const newStatus = newBalance <= 0 ? "settled" : "active";
+          await sbQuery(sb.from("worker_loans").update({ total_repaid: newRepaid, balance: Math.max(0, newBalance), status: newStatus }).eq("id", loan.id).select());
+          loan.total_repaid = newRepaid;
+          loan.balance = Math.max(0, newBalance);
+          loan.status = newStatus;
+        }
+      }
+    }
+
+    notify((pe.worker_name || pe.worker_id) + " reverted to Unpaid");
+    renderPayrollEntries();
+  }, true);
+}
+
+// Helper: create carry-forward advance for negative salary
+async function createCarryForward(pe, amount) {
+  const curPeriod = payrollPeriods.find(p => p.id === pe.period_id);
+  if (!curPeriod) return;
+  const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
+  const nextYear = curPeriod.month === 12 ? curPeriod.year + 1 : curPeriod.year;
+  let nextPeriod = payrollPeriods.find(p => p.year === nextYear && p.month === nextMonth);
+  if (!nextPeriod) {
+    const npId = "PP-" + nextYear + "-" + String(nextMonth).padStart(2, "0");
+    var npResult = await sbQuery(sb.from("payroll_periods").insert({ id: npId, year: nextYear, month: nextMonth, status: "open", company_id: getCompanyId() }).select());
+    if (npResult) { nextPeriod = { id: npId, year: nextYear, month: nextMonth, status: "open" }; payrollPeriods.push(nextPeriod); }
+  }
+  if (!nextPeriod) return;
+  const existing = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Carried Forward' && a.status === 'pending' && a.period_id === nextPeriod.id && a.reason && a.reason.startsWith('Hutang dari'));
+  if (existing) {
+    await sbQuery(sb.from("salary_advances").update({ amount: amount }).eq("id", existing.id).select());
+    existing.amount = amount;
+  } else {
+    const cfId = await dbNextId("SA");
+    const cfData = {
+      id: cfId, worker_id: pe.worker_id, amount: amount, date_given: new Date().toISOString().slice(0, 10),
+      period_id: nextPeriod.id, reason: 'Hutang dari ' + MONTH_NAMES[curPeriod.month] + ' ' + curPeriod.year + ' (gaji negatif)',
+      category: 'Carried Forward', status: 'pending', created_at: new Date().toISOString(), company_id: getCompanyId()
+    };
+    await sbQuery(sb.from("salary_advances").insert(cfData).select());
+    salaryAdvances.unshift(cfData);
+  }
+  notify((pe.worker_name || pe.worker_id) + " — RM " + fmtNum2(amount) + " carried forward to " + MONTH_NAMES[nextPeriod.month] + " " + nextPeriod.year, "warning");
+}
+
+// Helper: create overpayment advance for next month
+async function createOverpaymentAdvance(pe, overpayAmt) {
+  const curPeriod = payrollPeriods.find(p => p.id === pe.period_id);
+  if (!curPeriod) return;
+  const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
+  const nextYear = curPeriod.month === 12 ? curPeriod.year + 1 : curPeriod.year;
+  let nextPeriod = payrollPeriods.find(p => p.year === nextYear && p.month === nextMonth);
+  if (!nextPeriod) {
+    const npId = "PP-" + nextYear + "-" + String(nextMonth).padStart(2, "0");
+    var npResult = await sbQuery(sb.from("payroll_periods").insert({ id: npId, year: nextYear, month: nextMonth, status: "open", company_id: getCompanyId() }).select());
+    if (npResult) { nextPeriod = { id: npId, year: nextYear, month: nextMonth, status: "open" }; payrollPeriods.push(nextPeriod); }
+  }
+  if (!nextPeriod) return;
+  const existing = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Overpayment' && a.status === 'pending' && a.period_id === nextPeriod.id && a.reason && a.reason.startsWith('Cash overpayment from'));
+  if (existing) {
+    await sbQuery(sb.from("salary_advances").update({ amount: overpayAmt }).eq("id", existing.id).select());
+    existing.amount = overpayAmt;
+  } else {
+    const opId = await dbNextId("SA");
+    const opData = {
+      id: opId, worker_id: pe.worker_id, amount: overpayAmt, date_given: new Date().toISOString().slice(0, 10),
+      period_id: nextPeriod.id, reason: 'Cash overpayment from ' + MONTH_NAMES[curPeriod.month] + ' ' + curPeriod.year + ' payroll',
+      category: 'Overpayment', status: 'pending', created_at: new Date().toISOString(), company_id: getCompanyId()
+    };
+    await sbQuery(sb.from("salary_advances").insert(opData).select());
+    salaryAdvances.unshift(opData);
+  }
 }
 
 // Print payroll list
@@ -1767,7 +2530,8 @@ function printPayrollList() {
     printHtml += '<td>RM ' + fmtNum2(pe.responsibility_total || 0) + '</td>';
     printHtml += '<td>RM ' + fmtNum2(pe.task_total) + '</td>';
     printHtml += '<td>RM ' + fmtNum2(pe.total_deductions) + '</td>';
-    printHtml += '<td style="text-align:right;font-weight:700;">RM ' + fmtNum2(pe.final_pay) + '</td>';
+    const printNetPay = parseFloat(pe.final_pay) || 0;
+    printHtml += '<td style="text-align:right;font-weight:700;' + (printNetPay < 0 ? 'color:#c00;' : '') + '">RM ' + fmtNum2(pe.final_pay) + '</td>';
     printHtml += '<td class="' + (isPaid ? 'paid' : 'unpaid') + '">' + (isPaid ? 'Paid' : 'Unpaid') + '</td>';
     printHtml += '</tr>';
   }
@@ -1791,8 +2555,11 @@ function printPayrollList() {
 async function initPayrollForAll() {
   if (!currentPeriodId) return;
   const activeWorkers = workers.filter(w => w.active);
-  const existing = new Set(payrollEntries.map(pe => pe.worker_id));
-  const toCreate = activeWorkers.filter(w => !existing.has(w.id));
+
+  // Check DB directly for existing entries (not just in-memory) to avoid duplicate key errors
+  const dbExisting = await sbQuery(sb.from("payroll_entries").select("worker_id").eq("period_id", currentPeriodId));
+  const existingIds = new Set((dbExisting || []).map(pe => pe.worker_id));
+  const toCreate = activeWorkers.filter(w => !existingIds.has(w.id));
 
   if (toCreate.length === 0) { notify("All active workers already have entries", "warning"); return; }
 
@@ -1809,6 +2576,7 @@ async function initPayrollForAll() {
       responsibility_total: 0,
       deduct_advance: 0, deduct_loan: 0, deduct_shop: 0, deduct_other: 0,
       total_deductions: 0, task_total: 0, total_pay: 0, final_pay: 0,
+      company_id: getCompanyId(),
     });
   }
 
@@ -1837,38 +2605,29 @@ function openPayrollEntry(peId) {
   // Load dynamic responsibilities for this entry
   peRespData = [];
   const entryResps = payrollResponsibilities.filter(pr => pr.payroll_entry_id === peId);
-  entryResps.forEach(pr => { peRespData.push({ name: pr.responsibility_name, rate: parseFloat(pr.rate) || 0 }); });
+  if (entryResps.length > 0) {
+    entryResps.forEach(pr => { peRespData.push({ name: pr.responsibility_name, rate: parseFloat(pr.rate) || 0 }); });
+  } else {
+    // Auto-populate from worker's default responsibilities
+    const defaults = workerDefaultResps.filter(r => r.worker_id === pe.worker_id);
+    defaults.forEach(dr => { peRespData.push({ name: dr.responsibility_name, rate: parseFloat(dr.rate) || 0 }); });
+  }
   renderRespRows();
 
-  // Deductions — auto-populate 4 advance categories from pending salary advances
-  const ADVANCE_CATS = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment'];
-  const catFieldMap = { 'Canteen': 'pe-d-canteen', 'Cigarettes': 'pe-d-cigs', 'Salary Advance': 'pe-d-advance', 'Overpayment': 'pe-d-overpay' };
-  const pendingForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'pending' && a.period_id === currentPeriodId);
-  const hasSavedDeductions = (pe.deduct_advance > 0) || (pe.deduct_shop > 0);
+  // Deductions — always populate from salary_advances table (pending + deducted for this period)
+  const ADVANCE_CATS = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment', 'Carried Forward'];
+  const catFieldMap = { 'Canteen': 'pe-d-canteen', 'Cigarettes': 'pe-d-cigs', 'Salary Advance': 'pe-d-advance', 'Overpayment': 'pe-d-overpay', 'Carried Forward': 'pe-d-carryfwd' };
+  const advForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && (a.status === 'pending' || a.status === 'deducted') && a.period_id === currentPeriodId);
 
   ADVANCE_CATS.forEach(cat => {
     const fieldId = catFieldMap[cat];
-    const pendingSum = pendingForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-    // Auto-populate only if no saved deductions yet
-    document.getElementById(fieldId).value = !hasSavedDeductions && pendingSum > 0 ? pendingSum : "";
+    const catSum = advForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+    document.getElementById(fieldId).value = catSum > 0 ? catSum : "";
   });
-
-  // If there are saved deductions, try to restore from advances that were already deducted
-  if (hasSavedDeductions) {
-    const deductedForWorker = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === currentPeriodId);
-    ADVANCE_CATS.forEach(cat => {
-      const fieldId = catFieldMap[cat];
-      const catSum = deductedForWorker.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-      if (catSum > 0) document.getElementById(fieldId).value = catSum;
-    });
-  }
 
   renderAdvanceBreakdown(pe.worker_id);
   document.getElementById("pe-dother").value = pe.deduct_other || "";
   document.getElementById("pe-dothernote").value = pe.deduct_other_note || "";
-  document.getElementById("pe-cashhanded").value = pe.cash_handed || "";
-  document.getElementById("pe-overpay-result").value = "";
-  document.getElementById("pe-overpay-note").style.display = "none";
 
   // Task (Contract) entries
   const workerTasks = taskEntries.filter(te => te.payroll_entry_id === peId);
@@ -1940,15 +2699,16 @@ function calcPayroll() {
   for (const tid in peTaskData) { taskTotal += peTaskData[tid].total || 0; }
   document.getElementById("pe-tasktotal").textContent = fmtNum2(taskTotal);
 
-  // Deductions — 4 advance categories + other
+  // Deductions — 5 advance categories + other
   const dCanteen = parseFloat(document.getElementById("pe-d-canteen").value) || 0;
   const dCigs = parseFloat(document.getElementById("pe-d-cigs").value) || 0;
   const dAdvance = parseFloat(document.getElementById("pe-d-advance").value) || 0;
   const dOverpay = parseFloat(document.getElementById("pe-d-overpay").value) || 0;
+  const dCarryFwd = parseFloat(document.getElementById("pe-d-carryfwd").value) || 0;
   const dOther = parseFloat(document.getElementById("pe-dother").value) || 0;
-  const totalDeduct = dCanteen + dCigs + dAdvance + dOverpay + dOther;
+  const totalDeduct = dCanteen + dCigs + dAdvance + dOverpay + dCarryFwd + dOther;
   // Keep hidden fields in sync for backward compat
-  document.getElementById("pe-dadv").value = dCanteen + dCigs + dAdvance + dOverpay;
+  document.getElementById("pe-dadv").value = dCanteen + dCigs + dAdvance + dOverpay + dCarryFwd;
   document.getElementById("pe-dshop").value = 0;
   document.getElementById("pe-deducttotal").textContent = fmtNum2(totalDeduct);
 
@@ -1957,29 +2717,9 @@ function calcPayroll() {
   const finalPay = totalPay - totalDeduct;
   document.getElementById("pe-totalpay").textContent = "RM " + fmtNum2(totalPay);
   document.getElementById("pe-deductsummary").textContent = "- RM " + fmtNum2(totalDeduct);
-  document.getElementById("pe-finalpay").textContent = "RM " + fmtNum2(finalPay);
-  calcOverpayment();
-}
-
-function calcOverpayment() {
-  const cashHanded = parseFloat(document.getElementById("pe-cashhanded").value) || 0;
-  const finalPayText = document.getElementById("pe-finalpay").textContent.replace(/[^0-9.]/g, "");
-  const finalPay = parseFloat(finalPayText) || 0;
-  const resultEl = document.getElementById("pe-overpay-result");
-  const noteEl = document.getElementById("pe-overpay-note");
-
-  if (cashHanded > 0 && cashHanded > finalPay) {
-    const overpay = cashHanded - finalPay;
-    resultEl.value = "RM " + fmtNum2(overpay);
-    noteEl.textContent = "RM " + fmtNum2(overpay) + " will be carried to next month as Overpayment advance";
-    noteEl.style.display = "block";
-  } else if (cashHanded > 0 && cashHanded === finalPay) {
-    resultEl.value = "RM 0.00 — Exact";
-    noteEl.style.display = "none";
-  } else {
-    resultEl.value = "";
-    noteEl.style.display = "none";
-  }
+  const finalPayEl = document.getElementById("pe-finalpay");
+  finalPayEl.textContent = "RM " + fmtNum2(finalPay);
+  finalPayEl.style.color = finalPay < 0 ? 'var(--critical)' : 'var(--gold)';
 }
 
 async function savePayrollEntry() {
@@ -2000,7 +2740,8 @@ async function savePayrollEntry() {
   const dCigs = parseFloat(document.getElementById("pe-d-cigs").value) || 0;
   const dAdvance = parseFloat(document.getElementById("pe-d-advance").value) || 0;
   const dOverpay = parseFloat(document.getElementById("pe-d-overpay").value) || 0;
-  const dAdv = dCanteen + dCigs + dAdvance + dOverpay;
+  const dCarryFwd = parseFloat(document.getElementById("pe-d-carryfwd").value) || 0;
+  const dAdv = dCanteen + dCigs + dAdvance + dOverpay + dCarryFwd;
   const dShop = 0;
   const dOther = parseFloat(document.getElementById("pe-dother").value) || 0;
   const dOtherNote = document.getElementById("pe-dothernote").value.trim();
@@ -2039,44 +2780,6 @@ async function savePayrollEntry() {
   if (result === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
   Object.assign(pe, updateData);
 
-  // Mark pending salary advances as deducted for this worker+period
-  if (dAdv > 0) {
-    const pendingAdv = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'pending' && a.period_id === currentPeriodId);
-    for (const adv of pendingAdv) {
-      await sbQuery(sb.from("salary_advances").update({ status: 'deducted' }).eq("id", adv.id).select());
-      adv.status = 'deducted';
-    }
-  }
-
-  // Auto-create Overpayment advance for next month if cash handed > final pay
-  if (cashHanded > 0 && cashHanded > finalPay) {
-    const overpayAmt = cashHanded - finalPay;
-    // Find or create next month's period
-    const curPeriod = payrollPeriods.find(p => p.id === currentPeriodId);
-    let nextPeriodId = null;
-    if (curPeriod) {
-      const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
-      const nextYear = curPeriod.month === 12 ? curPeriod.year + 1 : curPeriod.year;
-      const nextP = payrollPeriods.find(p => p.year === nextYear && p.month === nextMonth);
-      nextPeriodId = nextP ? nextP.id : currentPeriodId; // fallback to current if next doesn't exist
-    }
-    // Remove any existing overpayment advance we previously created for this worker+next period from this save
-    const existingOp = salaryAdvances.find(a => a.worker_id === pe.worker_id && a.category === 'Overpayment' && a.status === 'pending' && a.period_id === nextPeriodId && a.reason && a.reason.startsWith('Cash overpayment from'));
-    if (existingOp) {
-      await sbQuery(sb.from("salary_advances").update({ amount: overpayAmt }).eq("id", existingOp.id).select());
-      existingOp.amount = overpayAmt;
-    } else {
-      const opId = await dbNextId("SA");
-      const opData = {
-        id: opId, worker_id: pe.worker_id, amount: overpayAmt, date_given: new Date().toISOString().slice(0, 10),
-        period_id: nextPeriodId, reason: 'Cash overpayment from ' + (curPeriod ? MONTH_NAMES[curPeriod.month] : '') + ' payroll',
-        category: 'Overpayment', status: 'pending', created_at: new Date().toISOString()
-      };
-      await sbQuery(sb.from("salary_advances").insert(opData).select());
-      salaryAdvances.unshift(opData);
-    }
-  }
-
   // Sync pay rate to worker profile
   const w = workers.find(x => x.id === pe.worker_id);
   if (w && w.pay_rate != payRate) {
@@ -2094,6 +2797,7 @@ async function savePayrollEntry() {
     const prData = {
       id: prId, payroll_entry_id: peId, period_id: currentPeriodId,
       worker_id: pe.worker_id, responsibility_name: rd.name, rate: rd.rate || 0,
+      company_id: getCompanyId(),
     };
     await sbQuery(sb.from("payroll_responsibilities").insert(prData).select());
     payrollResponsibilities.push(prData);
@@ -2108,6 +2812,7 @@ async function savePayrollEntry() {
       id: teId, payroll_entry_id: peId, period_id: currentPeriodId,
       worker_id: pe.worker_id, task_type_id: tid, task_name: t ? t.name : tid,
       quantity: d.quantity || 0, rate: d.rate || 0, total: d.total || 0,
+      company_id: getCompanyId(),
     };
     await sbQuery(sb.from("task_entries").upsert(teData, { onConflict: "period_id,worker_id,task_type_id" }).select());
     const existIdx = taskEntries.findIndex(te => te.id === teId);
@@ -2140,6 +2845,8 @@ function openPaySlip(peId) {
   const periodLabel = period ? monthNames[period.month] + " " + period.year : pe.period_id;
 
   let html = '';
+  // Confidential banner
+  html += '<div style="background:#b91c1c;color:#fff;text-align:center;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;border-radius:4px;">SULIT — Dokumen Sulit, Dilarang Berkongsi</div>';
   // Header
   html += '<div class="slip-header">';
   html += '<h2>TG — Home of Sarawak Gold</h2>';
@@ -2190,10 +2897,10 @@ function openPaySlip(peId) {
     html += '<table><thead><tr><th>Description</th><th style="text-align:right;">Amount (RM)</th></tr></thead><tbody>';
     // Get deducted advances for this period to show category breakdown
     const slipAdvances = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === pe.period_id);
-    const slipCats = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment'];
+    const slipCats = ['Canteen', 'Cigarettes', 'Salary Advance', 'Overpayment', 'Carried Forward'];
     slipCats.forEach(cat => {
       const catTotal = slipAdvances.filter(a => a.category === cat).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
-      if (catTotal > 0) html += '<tr><td>' + cat + '</td><td style="text-align:right;">' + fmtNum2(catTotal) + '</td></tr>';
+      if (catTotal > 0) html += '<tr><td>' + (cat === 'Carried Forward' ? 'Hutang Bulan Lalu' : cat) + '</td><td style="text-align:right;">' + fmtNum2(catTotal) + '</td></tr>';
     });
     // Fallback: if no advance records but deduct_advance > 0, show as lump
     if (slipAdvances.length === 0 && (pe.deduct_advance || 0) > 0) {
@@ -2208,8 +2915,12 @@ function openPaySlip(peId) {
 
   // Final pay
   html += '<table style="margin-top:8px;"><tbody>';
-  html += '<tr class="slip-final"><td>NET PAY</td><td style="text-align:right;">RM ' + fmtNum2(pe.final_pay) + '</td></tr>';
+  const slipFinalPay = parseFloat(pe.final_pay) || 0;
+  html += '<tr class="slip-final"><td>NET PAY</td><td style="text-align:right;' + (slipFinalPay < 0 ? 'color:#e53e3e;' : '') + '">RM ' + fmtNum2(pe.final_pay) + '</td></tr>';
   html += '</tbody></table>';
+  if (slipFinalPay < 0) {
+    html += '<div style="background:#fff3cd;border:1px solid #e8a020;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:11px;color:#856404;">⚠ Hutang dibawa ke bulan hadapan: <strong>RM ' + fmtNum2(Math.abs(slipFinalPay)) + '</strong></div>';
+  }
 
   // Footer
   html += '<div style="margin-top:24px;display:flex;justify-content:space-between;font-size:10px;color:#999;">';
@@ -2217,21 +2928,22 @@ function openPaySlip(peId) {
   html += '<span>TG FarmHub — Worker Management</span>';
   html += '</div>';
 
-  // Long-term loan summary
-  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
-  if (wLoans.length > 0) {
+  // Long-term loan summary — outstanding balance + blank boxes for manual write-in
+  const slipLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  if (slipLoans.length > 0) {
     html += '<div class="slip-section-title" style="margin-top:12px;">Long-Term Loans</div>';
-    html += '<table><thead><tr><th>Purpose</th><th style="text-align:right;">Loan Amount</th><th style="text-align:right;">Repaid</th><th style="text-align:right;">Balance</th></tr></thead><tbody>';
+    html += '<table><thead><tr><th>Purpose</th><th style="text-align:right;">Outstanding</th><th style="text-align:right;width:100px;">Repayment</th><th style="text-align:right;width:100px;">Balance After</th></tr></thead><tbody>';
     let totalLoanBal = 0;
-    wLoans.forEach(l => {
+    slipLoans.forEach(l => {
       const bal = parseFloat(l.balance) || ((parseFloat(l.amount)||0) - (parseFloat(l.total_repaid)||0));
       totalLoanBal += bal;
       html += '<tr><td>' + (l.purpose || '—') + '</td>';
-      html += '<td style="text-align:right;">' + fmtNum2(l.amount) + '</td>';
-      html += '<td style="text-align:right;">' + fmtNum2(l.total_repaid || 0) + '</td>';
-      html += '<td style="text-align:right;font-weight:600;">' + fmtNum2(bal) + '</td></tr>';
+      html += '<td style="text-align:right;font-weight:600;">' + fmtNum2(bal) + '</td>';
+      html += '<td style="text-align:right;"><div style="border:1px solid #999;border-radius:4px;min-height:20px;min-width:80px;display:inline-block;"></div></td>';
+      html += '<td style="text-align:right;"><div style="border:1px solid #999;border-radius:4px;min-height:20px;min-width:80px;display:inline-block;"></div></td></tr>';
     });
-    html += '<tr class="slip-total-row"><td colspan="3" style="text-align:right;">Total Loan Outstanding</td><td style="text-align:right;">RM ' + fmtNum2(totalLoanBal) + '</td></tr>';
+    html += '<tr class="slip-total-row"><td style="text-align:right;">Total Outstanding</td>';
+    html += '<td style="text-align:right;">RM ' + fmtNum2(totalLoanBal) + '</td><td></td><td></td></tr>';
     html += '</tbody></table>';
   }
 
@@ -2255,67 +2967,98 @@ function buildSlipHtml(pe) {
   const workerTasks = taskEntries.filter(te => te.payroll_entry_id === pe.id && (te.total || 0) > 0);
   const monthNames = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const periodLabel = period ? monthNames[period.month] + " " + period.year : pe.period_id;
+  const fs = 'font-size:11px;'; // base font
+  const fsAmt = 'font-size:12px;'; // amounts
 
-  let h = '<div style="font-size:16px;font-weight:800;margin-bottom:2px;">TG — Home of Sarawak Gold</div>';
-  h += '<div style="font-size:10px;color:#666;margin-bottom:6px;">Pay Slip — ' + periodLabel + '</div>';
+  // Confidential banner
+  let h = '<div style="background:#b91c1c;color:#fff;text-align:center;padding:4px 8px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">SULIT — Dokumen Sulit, Dilarang Berkongsi</div>';
+  // Header row — company left, worker right
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:6px;">';
+  h += '<div><div style="font-size:15px;font-weight:800;letter-spacing:0.5px;">TG AGRO FRUITS SDN BHD</div>';
+  h += '<div style="font-size:11px;color:#666;margin-top:1px;">Pay Slip — <strong>' + periodLabel + '</strong></div></div>';
+  h += '<div style="text-align:right;">';
+  h += '<div style="font-size:16px;font-weight:800;">' + (pe.worker_name || pe.worker_id) + '</div>';
+  h += '<div style="font-size:11px;color:#555;">' + pe.worker_id + ' · ' + (w ? (w.role || '—') : '—') + '</div>';
+  h += '</div></div>';
 
+  // Earnings + Deductions side by side
+  h += '<div style="display:flex;gap:16px;">';
+
+  // LEFT: Earnings (wider — 60%)
+  h += '<div style="flex:3;">';
+  h += '<div style="font-size:11px;font-weight:700;margin:0 0 4px;padding-bottom:2px;border-bottom:1px solid #ccc;">EARNINGS</div>';
   h += '<table><tbody>';
-  h += '<tr><td style="width:22%;font-weight:600;font-size:9px;">Name</td><td style="font-size:9px;">' + (pe.worker_name || pe.worker_id) + '</td>';
-  h += '<td style="width:22%;font-weight:600;font-size:9px;">ID</td><td style="font-size:9px;">' + pe.worker_id + '</td></tr>';
-  h += '<tr><td style="font-weight:600;font-size:9px;">Role</td><td style="font-size:9px;">' + (w ? (w.role || '—') : '—') + '</td>';
-  h += '<td style="font-weight:600;font-size:9px;">Gender</td><td style="font-size:9px;">' + (w ? (w.gender || '—') : '—') + '</td></tr>';
-  h += '</tbody></table>';
-
-  // Earnings
-  h += '<div style="font-size:10px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Earnings</div>';
-  h += '<table><tbody>';
-  h += '<tr><td style="font-size:9px;">Base Wage</td><td style="font-size:9px;text-align:center;">' + (pe.days_worked||0) + 'd × RM' + fmtNum2(pe.pay_rate) + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.daily_wage) + '</td></tr>';
-  if ((pe.ot_hours||0) > 0) h += '<tr><td style="font-size:9px;">OT</td><td style="font-size:9px;text-align:center;">' + pe.ot_hours + 'h</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.ot_pay) + '</td></tr>';
+  h += '<tr><td style="' + fs + '">Base Wage</td><td style="' + fs + 'text-align:center;">' + (pe.days_worked||0) + ' days × RM ' + fmtNum2(pe.pay_rate) + '</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pe.daily_wage) + '</td></tr>';
+  if ((pe.ot_hours||0) > 0) h += '<tr><td style="' + fs + '">Overtime</td><td style="' + fs + 'text-align:center;">' + pe.ot_hours + 'h × RM ' + fmtNum2((pe.pay_rate||0)/OT_DIVISOR) + '</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pe.ot_pay) + '</td></tr>';
   const entryResps = payrollResponsibilities.filter(pr => pr.payroll_entry_id === pe.id);
-  entryResps.forEach(pr => { h += '<tr><td style="font-size:9px;">' + pr.responsibility_name + '</td><td></td><td style="font-size:9px;text-align:right;">' + fmtNum2(pr.rate) + '</td></tr>'; });
-  workerTasks.forEach(te => { h += '<tr><td style="font-size:9px;">Contract: ' + (te.task_name||te.task_type_id) + '</td><td style="font-size:9px;text-align:center;">' + ((te.quantity&&te.rate) ? te.quantity+'×'+fmtNum2(te.rate) : '') + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(te.total) + '</td></tr>'; });
-  h += '<tr style="font-weight:700;border-top:1px solid #999;"><td colspan="2" style="font-size:9px;text-align:right;">Total Earnings</td><td style="font-size:9px;text-align:right;">RM ' + fmtNum2(pe.total_pay) + '</td></tr>';
+  entryResps.forEach(pr => { h += '<tr><td style="' + fs + '">' + pr.responsibility_name + '</td><td></td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pr.rate) + '</td></tr>'; });
+  workerTasks.forEach(te => { h += '<tr><td style="' + fs + '">Contract: ' + (te.task_name||te.task_type_id) + '</td><td style="' + fs + 'text-align:center;">' + ((te.quantity&&te.rate) ? te.quantity+' × RM '+fmtNum2(te.rate) : '') + '</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(te.total) + '</td></tr>'; });
+  h += '<tr style="border-top:1.5px solid #000;"><td colspan="2" style="' + fs + 'text-align:right;font-weight:800;">Total Earnings</td><td style="' + fsAmt + 'text-align:right;font-weight:800;">RM ' + fmtNum2(pe.total_pay) + '</td></tr>';
   h += '</tbody></table>';
-
-  // Deductions
-  const hasDeductions = (pe.deduct_advance||0) + (pe.deduct_loan||0) + (pe.deduct_shop||0) + (pe.deduct_other||0) > 0;
-  if (hasDeductions) {
-    h += '<div style="font-size:10px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Deductions</div>';
-    h += '<table><tbody>';
-    const slipAdvances = salaryAdvances.filter(a => a.worker_id === pe.worker_id && a.status === 'deducted' && a.period_id === pe.period_id);
-    ['Canteen','Cigarettes','Salary Advance','Overpayment'].forEach(cat => {
-      const t = slipAdvances.filter(a => a.category === cat).reduce((s,a) => s + (parseFloat(a.amount)||0), 0);
-      if (t > 0) h += '<tr><td style="font-size:9px;">' + cat + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(t) + '</td></tr>';
-    });
-    if (slipAdvances.length === 0 && (pe.deduct_advance||0) > 0) h += '<tr><td style="font-size:9px;">Advances</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
-    if ((pe.deduct_loan||0) > 0) h += '<tr><td style="font-size:9px;">Loan Repayment</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_loan) + '</td></tr>';
-    if ((pe.deduct_shop||0) > 0) h += '<tr><td style="font-size:9px;">Shop/Store</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_shop) + '</td></tr>';
-    if ((pe.deduct_other||0) > 0) h += '<tr><td style="font-size:9px;">Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="font-size:9px;text-align:right;">' + fmtNum2(pe.deduct_other) + '</td></tr>';
-    h += '<tr style="font-weight:700;border-top:1px solid #999;"><td style="font-size:9px;text-align:right;">Total Deductions</td><td style="font-size:9px;text-align:right;">RM ' + fmtNum2(pe.total_deductions) + '</td></tr>';
-    h += '</tbody></table>';
-  }
-
-  // Net Pay
-  h += '<div style="margin-top:6px;padding:4px 0;border-top:2px solid #000;border-bottom:2px solid #000;display:flex;justify-content:space-between;font-size:12px;font-weight:800;">';
-  h += '<span>NET PAY</span><span>RM ' + fmtNum2(pe.final_pay) + '</span></div>';
-
-  // Loans
-  const wLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
-  if (wLoans.length > 0) {
-    h += '<div style="font-size:9px;font-weight:700;margin:6px 0 2px;border-bottom:1px solid #ccc;">Loans</div>';
-    h += '<table><tbody>';
-    let totalLoanBal = 0;
-    wLoans.forEach(l => { const bal = parseFloat(l.balance)||((parseFloat(l.amount)||0)-(parseFloat(l.total_repaid)||0)); totalLoanBal += bal; h += '<tr><td style="font-size:8px;">' + (l.purpose||'—') + '</td><td style="font-size:8px;text-align:right;">Bal: RM ' + fmtNum2(bal) + '</td></tr>'; });
-    h += '<tr style="font-weight:700;border-top:1px solid #999;"><td style="font-size:8px;text-align:right;">Total Loan Outstanding</td><td style="font-size:8px;text-align:right;">RM ' + fmtNum2(totalLoanBal) + '</td></tr>';
-    h += '</tbody></table>';
-  }
-
-  // Signatures
-  h += '<div style="margin-top:20px;display:flex;justify-content:space-between;font-size:8px;">';
-  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:120px;margin-bottom:2px;"></div>Worker</div>';
-  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:120px;margin-bottom:2px;"></div>Employer</div>';
   h += '</div>';
 
+  // RIGHT: Deductions (40%)
+  h += '<div style="flex:2;">';
+  h += '<div style="font-size:11px;font-weight:700;margin:0 0 4px;padding-bottom:2px;border-bottom:1px solid #ccc;">DEDUCTIONS</div>';
+  const hasDeductions = (pe.deduct_advance||0) + (pe.deduct_loan||0) + (pe.deduct_shop||0) + (pe.deduct_other||0) > 0;
+  if (hasDeductions) {
+    h += '<table><tbody>';
+    const slipAdvances = salaryAdvances.filter(a => a.worker_id === pe.worker_id && (a.status === 'deducted' || a.status === 'pending') && a.period_id === pe.period_id);
+    ['Canteen','Cigarettes','Salary Advance','Overpayment','Carried Forward'].forEach(cat => {
+      const t = slipAdvances.filter(a => a.category === cat).reduce((s,a) => s + (parseFloat(a.amount)||0), 0);
+      if (t > 0) h += '<tr><td style="' + fs + '">' + (cat === 'Carried Forward' ? 'Hutang Bulan Lalu' : cat) + '</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(t) + '</td></tr>';
+    });
+    if (slipAdvances.length === 0 && (pe.deduct_advance||0) > 0) h += '<tr><td style="' + fs + '">Advances</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pe.deduct_advance) + '</td></tr>';
+    if ((pe.deduct_loan||0) > 0) h += '<tr><td style="' + fs + '">Loan Repayment</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pe.deduct_loan) + '</td></tr>';
+    if ((pe.deduct_other||0) > 0) h += '<tr><td style="' + fs + '">Other' + (pe.deduct_other_note ? ' (' + pe.deduct_other_note + ')' : '') + '</td><td style="' + fsAmt + 'text-align:right;font-weight:600;">' + fmtNum2(pe.deduct_other) + '</td></tr>';
+    h += '<tr style="border-top:1.5px solid #000;"><td style="' + fs + 'text-align:right;font-weight:800;">Total Deductions</td><td style="' + fsAmt + 'text-align:right;font-weight:800;">RM ' + fmtNum2(pe.total_deductions) + '</td></tr>';
+    h += '</tbody></table>';
+  } else {
+    h += '<div style="' + fs + 'color:#999;padding:4px 0;">None</div>';
+  }
+  h += '</div>';
+  h += '</div>'; // end earnings+deductions row
+
+  // NET PAY — prominent
+  const printFinalPay = parseFloat(pe.final_pay) || 0;
+  h += '<div style="margin-top:8px;padding:6px 8px;border:2px solid #000;display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:800;background:#f5f5f5;">';
+  h += '<span>NET PAY</span><span' + (printFinalPay < 0 ? ' style="color:#c00;"' : '') + '>RM ' + fmtNum2(pe.final_pay) + '</span></div>';
+  if (printFinalPay < 0) {
+    h += '<div style="font-size:10px;color:#856404;margin-top:3px;">⚠ Hutang dibawa ke bulan hadapan: RM ' + fmtNum2(Math.abs(printFinalPay)) + '</div>';
+  }
+
+  // Bottom row: Loans left + Signatures right
+  const printLoans = workerLoans.filter(l => l.worker_id === pe.worker_id && l.status === 'active');
+  h += '<div style="display:flex;gap:16px;margin-top:8px;align-items:flex-end;">';
+
+  // Loans
+  h += '<div style="flex:1;">';
+  if (printLoans.length > 0) {
+    h += '<div style="font-size:11px;font-weight:700;margin:0 0 4px;padding-bottom:2px;border-bottom:1px solid #ccc;">LOANS</div>';
+    h += '<table><thead><tr><th style="font-size:10px;text-align:left;">Purpose</th><th style="font-size:10px;text-align:right;">Outstanding</th><th style="font-size:10px;text-align:center;width:90px;">Repayment</th><th style="font-size:10px;text-align:center;width:90px;">Balance After</th></tr></thead><tbody>';
+    let totalLoanBal = 0;
+    printLoans.forEach(l => {
+      const bal = parseFloat(l.balance)||((parseFloat(l.amount)||0)-(parseFloat(l.total_repaid)||0));
+      totalLoanBal += bal;
+      h += '<tr><td style="font-size:10px;">' + (l.purpose||'—') + '</td>';
+      h += '<td style="font-size:11px;text-align:right;font-weight:700;">' + fmtNum2(bal) + '</td>';
+      h += '<td style="text-align:center;"><div style="border:1px solid #999;height:18px;width:80px;display:inline-block;"></div></td>';
+      h += '<td style="text-align:center;"><div style="border:1px solid #999;height:18px;width:80px;display:inline-block;"></div></td></tr>';
+    });
+    if (printLoans.length > 1) {
+      h += '<tr style="border-top:1px solid #999;"><td style="font-size:10px;text-align:right;font-weight:700;">Total</td><td style="font-size:11px;text-align:right;font-weight:700;">RM ' + fmtNum2(totalLoanBal) + '</td><td></td><td></td></tr>';
+    }
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+
+  // Signatures
+  h += '<div style="display:flex;gap:20px;padding-bottom:2px;flex-shrink:0;">';
+  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:130px;margin-bottom:2px;"></div><span style="font-size:9px;color:#666;">Worker Signature</span></div>';
+  h += '<div style="text-align:center;"><div style="border-top:1px solid #333;width:130px;margin-bottom:2px;"></div><span style="font-size:9px;color:#666;">Employer Signature</span></div>';
+  h += '</div>';
+
+  h += '</div>'; // end bottom row
   return h;
 }
 
@@ -2329,15 +3072,16 @@ function printAllPayslips() {
   let printHtml = '<html><head><title>All Payslips — ' + periodLabel + '</title>';
   printHtml += '<style>';
   printHtml += 'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#222;}';
-  printHtml += '@page{size:A4 landscape;margin:8mm;}';
-  printHtml += '.page{display:flex;gap:10mm;width:100%;page-break-after:always;}';
+  printHtml += '@page{size:A4 portrait;margin:5mm 8mm;}';
+  printHtml += '.page{display:flex;flex-direction:column;height:100vh;page-break-after:always;}';
   printHtml += '.page:last-child{page-break-after:auto;}';
-  printHtml += '.slip{width:50%;padding:8mm;border:1px solid #ccc;box-sizing:border-box;}';
-  printHtml += 'table{width:100%;border-collapse:collapse;margin:2px 0;}';
-  printHtml += 'th,td{padding:2px 4px;border:none;vertical-align:top;}';
+  printHtml += '.slip{flex:1;padding:5mm 8mm;border-bottom:1px dashed #999;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;}';
+  printHtml += '.slip:last-child{border-bottom:none;}';
+  printHtml += 'table{width:100%;border-collapse:collapse;margin:1px 0;}';
+  printHtml += 'th,td{padding:3px 6px;border:none;vertical-align:top;}';
   printHtml += '</style></head><body>';
 
-  // 2 slips per page
+  // 2 slips per page — top and bottom (portrait A4)
   for (let i = 0; i < sorted.length; i += 2) {
     printHtml += '<div class="page">';
     printHtml += '<div class="slip">' + buildSlipHtml(sorted[i]) + '</div>';
@@ -2432,6 +3176,7 @@ async function renderWorkerProfile() {
   }
 
   // Render sub-sections with individual error handling
+  try { renderProfileDefaultResps(); } catch(e) { console.error("Default resps render error:", e); }
   try { renderProfileAdvances(); } catch(e) { console.error("Advances render error:", e); }
   try { renderProfileLoans(); } catch(e) { console.error("Loans render error:", e); }
   try { renderProfileStints(); } catch(e) { console.error("Stints render error:", e); }
@@ -2443,6 +3188,79 @@ function detailRow(label, value) {
     '<span style="font-size:12px;color:var(--text-muted);">' + label + '</span>' +
     '<span style="font-size:12px;font-weight:600;color:var(--white);text-align:right;">' + value + '</span>' +
     '</div>';
+}
+
+// ============================================================
+// PROFILE — DEFAULT RESPONSIBILITIES
+// ============================================================
+function renderProfileDefaultResps() {
+  const container = document.getElementById("profile-default-resps");
+  if (!container || !profileWorkerId) return;
+
+  const resps = workerDefaultResps.filter(r => r.worker_id === profileWorkerId);
+
+  if (resps.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:8px 0;">No responsibilities assigned</div>';
+    return;
+  }
+
+  let html = '<table class="data-table"><thead><tr><th>Responsibility</th><th>Monthly Rate</th><th></th></tr></thead><tbody>';
+  resps.forEach(r => {
+    html += '<tr>';
+    html += '<td style="font-weight:600;">' + esc(r.responsibility_name) + '</td>';
+    html += '<td style="color:var(--gold);">RM ' + fmtNum2(r.rate) + '</td>';
+    html += '<td style="text-align:right;"><button class="btn btn-danger btn-sm" onclick="removeDefaultResp(\'' + r.id + '\')">Remove</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function openAddDefaultResp() {
+  const sel = document.getElementById("dr-resp-name");
+  const existing = workerDefaultResps.filter(r => r.worker_id === profileWorkerId).map(r => r.responsibility_name);
+  const available = responsibilityTypes.filter(r => r.active && !existing.includes(r.name));
+
+  sel.innerHTML = '<option value="">— Select —</option>' +
+    available.map(r => '<option value="' + esc(r.name) + '" data-rate="' + r.default_rate + '">' + esc(r.name) + ' (RM ' + fmtNum2(r.default_rate) + ')</option>').join('');
+  document.getElementById("dr-rate").value = "";
+  document.getElementById("default-resp-modal").style.display = "flex";
+}
+
+function onDefaultRespSelect(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.rate) {
+    document.getElementById("dr-rate").value = opt.dataset.rate;
+  }
+}
+
+async function saveDefaultResp() {
+  const name = document.getElementById("dr-resp-name").value;
+  const rate = parseFloat(document.getElementById("dr-rate").value) || 0;
+
+  if (!name) { notify("Select a responsibility", "warning"); return; }
+  if (rate <= 0) { notify("Rate must be greater than 0", "warning"); return; }
+
+  const newId = await dbNextId("WDR");
+  const data = { id: newId, worker_id: profileWorkerId, responsibility_name: name, rate, company_id: getCompanyId() };
+  const result = await sbQuery(sb.from("worker_default_responsibilities").insert(data).select());
+  if (result === null) return;
+  workerDefaultResps.push(data);
+
+  closeModal("default-resp-modal");
+  renderProfileDefaultResps();
+  notify(name + " added — RM " + fmtNum2(rate) + "/month");
+}
+
+async function removeDefaultResp(id) {
+  const r = workerDefaultResps.find(x => x.id === id);
+  if (!r) return;
+  confirmAction('Remove Responsibility', 'Remove "' + r.responsibility_name + '" (RM ' + fmtNum2(r.rate) + '/month) from this worker?', async function() {
+    await sbQuery(sb.from("worker_default_responsibilities").delete().eq("id", id));
+    workerDefaultResps = workerDefaultResps.filter(x => x.id !== id);
+    renderProfileDefaultResps();
+    notify(r.responsibility_name + " removed");
+  }, true);
 }
 
 function renderProfileLoans() {
@@ -2562,7 +3380,7 @@ async function renderProfilePayHistory() {
     html += '<td>RM ' + fmtNum2(resp) + '</td>';
     html += '<td>RM ' + fmtNum2(contract) + '</td>';
     html += '<td style="color:var(--critical);">RM ' + fmtNum2(deduct) + '</td>';
-    html += '<td style="text-align:right;font-weight:700;color:var(--gold);">RM ' + fmtNum2(net) + '</td></tr>';
+    html += '<td style="text-align:right;font-weight:700;color:' + (net < 0 ? 'var(--critical)' : 'var(--gold)') + ';">RM ' + fmtNum2(net) + '</td></tr>';
   }
 
   html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
@@ -2616,9 +3434,9 @@ function renderProfileAdvances() {
     if (a.reason) html += ' · ' + a.reason;
     html += '</div>';
     html += '</div>';
-    if (isPending && isAdmin) {
+    if (isAdmin) {
       html += '<div style="display:flex;gap:4px;">';
-      html += '<button class="btn btn-outline btn-sm" onclick="openEditAdvanceModal(\'' + a.id + '\')">Edit</button>';
+      if (isPending) html += '<button class="btn btn-outline btn-sm" onclick="openEditAdvanceModal(\'' + a.id + '\')">Edit</button>';
       html += '<button class="btn btn-danger btn-sm" onclick="deleteAdvance(\'' + a.id + '\')">Delete</button>';
       html += '</div>';
     }
@@ -2627,20 +3445,47 @@ function renderProfileAdvances() {
   }).join("");
 }
 
-function openNewAdvanceModal() {
+// Ensure prev + current + next month payroll periods exist for advance dropdown
+async function ensureAdvancePeriods() {
+  const now = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth() + 1;
+  const prevM = curM === 1 ? 12 : curM - 1;
+  const prevY = curM === 1 ? curY - 1 : curY;
+  const nextM = curM === 12 ? 1 : curM + 1;
+  const nextY = curM === 12 ? curY + 1 : curY;
+  const periods = [[prevY, prevM], [curY, curM], [nextY, nextM]];
+  for (const [y, m] of periods) {
+    if (!payrollPeriods.find(p => p.year === y && p.month === m)) {
+      const id = "PP-" + y + "-" + String(m).padStart(2, "0");
+      var result = await sbQuery(sb.from("payroll_periods").insert({ id, year: y, month: m, status: "open", company_id: getCompanyId() }).select());
+      if (result) payrollPeriods.push({ id, year: y, month: m, status: "open" });
+    }
+  }
+}
+
+async function openNewAdvanceModal() {
   document.getElementById("advance-amount").value = "";
   document.getElementById("advance-date").value = new Date().toISOString().slice(0, 10);
   document.getElementById("advance-reason").value = "";
   document.getElementById("advance-category").value = "Salary Advance";
   document.getElementById("advance-modal").dataset.editId = "";
-  document.getElementById("advance-modal-title").textContent = "Record Advance / Purchase";
+  const advWorker = workers.find(x => x.id === profileWorkerId);
+  document.getElementById("advance-modal-title").textContent = "Record Advance / Purchase — " + (advWorker ? advWorker.name : "");
   document.getElementById("advance-warning").style.display = "none";
 
-  // Populate period dropdown — open periods only, default to current month
-  const openPeriods = payrollPeriods.filter(p => p.status !== 'closed').sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month));
-  const curPeriodId = getCurrentPeriodId();
-  document.getElementById("advance-period").innerHTML = openPeriods.map(p =>
-    '<option value="' + p.id + '"' + (p.id === curPeriodId ? ' selected' : '') + '>' + MONTH_NAMES[p.month] + ' ' + p.year + '</option>'
+  // Populate period dropdown — prev + current + next month, default based on category
+  await ensureAdvancePeriods();
+  const now = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth() + 1;
+  const prevM = curM === 1 ? 12 : curM - 1;
+  const prevY = curM === 1 ? curY - 1 : curY;
+  const nextM = curM === 12 ? 1 : curM + 1;
+  const nextY = curM === 12 ? curY + 1 : curY;
+  const advPeriods = payrollPeriods.filter(p => (p.year === prevY && p.month === prevM) || (p.year === curY && p.month === curM) || (p.year === nextY && p.month === nextM)).sort((a, b) => (a.year * 100 + a.month) - (b.year * 100 + b.month));
+  // Salary Advance defaults to current month, others to next month
+  const defaultPeriod = advPeriods.find(p => p.year === curY && p.month === curM);
+  document.getElementById("advance-period").innerHTML = advPeriods.map(p =>
+    '<option value="' + p.id + '"' + (defaultPeriod && p.id === defaultPeriod.id ? ' selected' : '') + '>' + MONTH_NAMES[p.month] + ' ' + p.year + '</option>'
   ).join("");
 
   document.getElementById("advance-modal").style.display = "flex";
@@ -2673,6 +3518,34 @@ function checkAdvanceWarning() {
   }
 }
 
+// Auto-select deduct period based on category + date
+// Salary Advance → same month as date, Canteen/Cigarettes → next month
+function autoSelectAdvancePeriod() {
+  const dateVal = document.getElementById("advance-date").value;
+  if (!dateVal) return;
+  const category = document.getElementById("advance-category").value;
+  const d = new Date(dateVal + "T00:00:00");
+  const dateMonth = d.getMonth() + 1;
+  const dateYear = d.getFullYear();
+  let targetMonth, targetYear;
+  if (category === 'Salary Advance') {
+    // Deduct from the SAME month
+    targetMonth = dateMonth;
+    targetYear = dateYear;
+  } else {
+    // Canteen, Cigarettes, others → deduct from NEXT month
+    targetMonth = dateMonth === 12 ? 1 : dateMonth + 1;
+    targetYear = dateMonth === 12 ? dateYear + 1 : dateYear;
+  }
+  const targetPeriod = payrollPeriods.find(p => p.year === targetYear && p.month === targetMonth);
+  const sel = document.getElementById("advance-period");
+  if (targetPeriod) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === targetPeriod.id) { sel.value = targetPeriod.id; return; }
+    }
+  }
+}
+
 async function saveAdvance() {
   const editId = document.getElementById("advance-modal").dataset.editId || "";
   const amount = parseFloat(document.getElementById("advance-amount").value) || 0;
@@ -2695,7 +3568,7 @@ async function saveAdvance() {
     notify(category + " updated");
   } else {
     const newId = await dbNextId("SA");
-    const data = { id: newId, worker_id: profileWorkerId, amount, date_given, period_id, reason, category, status: "pending", created_at: new Date().toISOString() };
+    const data = { id: newId, worker_id: profileWorkerId, amount, date_given, period_id, reason, category, status: "pending", created_at: new Date().toISOString(), company_id: getCompanyId() };
     var result = await sbQuery(sb.from("salary_advances").insert(data).select());
     if (result === null) return;
     salaryAdvances.unshift(data);
@@ -2709,7 +3582,7 @@ async function saveAdvance() {
   renderProfileAdvances();
 }
 
-function openEditAdvanceModal(advId) {
+async function openEditAdvanceModal(advId) {
   const a = salaryAdvances.find(x => x.id === advId);
   if (!a) return;
   document.getElementById("advance-amount").value = a.amount;
@@ -2717,11 +3590,19 @@ function openEditAdvanceModal(advId) {
   document.getElementById("advance-reason").value = a.reason || "";
   document.getElementById("advance-category").value = a.category || "Salary Advance";
   document.getElementById("advance-modal").dataset.editId = advId;
-  document.getElementById("advance-modal-title").textContent = "Edit " + (a.category || "Advance");
+  const editAdvWorker = workers.find(x => x.id === profileWorkerId);
+  document.getElementById("advance-modal-title").textContent = "Edit " + (a.category || "Advance") + " — " + (editAdvWorker ? editAdvWorker.name : "");
 
-  // Populate period dropdown
-  const openPeriods = payrollPeriods.filter(p => p.status !== 'closed' || p.id === a.period_id).sort((a2, b) => (a2.year * 100 + a2.month) - (b.year * 100 + b.month));
-  document.getElementById("advance-period").innerHTML = openPeriods.map(p =>
+  // Populate period dropdown — prev + current + next month, plus the advance's own period
+  await ensureAdvancePeriods();
+  const now = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth() + 1;
+  const prevM = curM === 1 ? 12 : curM - 1;
+  const prevY = curM === 1 ? curY - 1 : curY;
+  const nextM = curM === 12 ? 1 : curM + 1;
+  const nextY = curM === 12 ? curY + 1 : curY;
+  const editPeriods = payrollPeriods.filter(p => (p.year === prevY && p.month === prevM) || (p.year === curY && p.month === curM) || (p.year === nextY && p.month === nextM) || p.id === a.period_id).sort((a2, b) => (a2.year * 100 + a2.month) - (b.year * 100 + b.month));
+  document.getElementById("advance-period").innerHTML = editPeriods.map(p =>
     '<option value="' + p.id + '"' + (p.id === a.period_id ? ' selected' : '') + '>' + MONTH_NAMES[p.month] + ' ' + p.year + '</option>'
   ).join("");
 
@@ -2809,7 +3690,7 @@ async function _doSaveLoan(editId, purpose, amount, date_issued, notes) {
     notify("Loan updated");
   } else {
     const newId = await dbNextId("WL");
-    const data = { id: newId, worker_id: profileWorkerId, purpose, amount, date_issued, total_repaid: 0, balance: amount, status: "active", notes };
+    const data = { id: newId, worker_id: profileWorkerId, purpose, amount, date_issued, total_repaid: 0, balance: amount, status: "active", notes, company_id: getCompanyId() };
     var result = await sbQuery(sb.from("worker_loans").insert(data).select());
     if (result === null) return;
     workerLoans.unshift(data);
@@ -2866,7 +3747,7 @@ async function saveRepayment() {
     // NEW repayment
     if (amount > parseFloat(loan.balance)) { notify("Amount exceeds outstanding balance (RM " + fmtNum2(loan.balance) + ")", "warning"); return; }
     const repayId = await dbNextId("LR");
-    const repayData = { id: repayId, loan_id: loanId, worker_id: profileWorkerId, amount, date, notes };
+    const repayData = { id: repayId, loan_id: loanId, worker_id: profileWorkerId, amount, date, notes, company_id: getCompanyId() };
     var result = await sbQuery(sb.from("loan_repayments").insert(repayData).select());
     if (result === null) return;
     loanRepayments.unshift(repayData);
@@ -2952,6 +3833,344 @@ async function deleteRepayment(repayId, loanId) {
 let summaryTrendChart = null;
 let summaryPieChart = null;
 let summaryData = []; // cached for export
+
+// ============================================================
+// EXPENSE REPORT FILTER & GENERATION
+// ============================================================
+let expenseDropdownOpen = false;
+
+function toggleExpenseFilter() {
+  const dd = document.getElementById("sum-expense-dropdown");
+  expenseDropdownOpen = !expenseDropdownOpen;
+  dd.style.display = expenseDropdownOpen ? "block" : "none";
+}
+
+document.addEventListener("click", function(e) {
+  if (!expenseDropdownOpen) return;
+  const dd = document.getElementById("sum-expense-dropdown");
+  const btn = dd.previousElementSibling;
+  if (!dd.contains(e.target) && !btn.contains(e.target)) {
+    dd.style.display = "none";
+    expenseDropdownOpen = false;
+  }
+});
+
+function toggleExpenseAll(cb) {
+  document.querySelectorAll(".sum-expense-cb").forEach(c => c.checked = cb.checked);
+  updateExpenseSelection();
+}
+
+function updateExpenseSelection() {
+  const cbs = document.querySelectorAll(".sum-expense-cb");
+  const checked = [...cbs].filter(c => c.checked);
+  const allCb = document.getElementById("sum-expense-all");
+  allCb.checked = checked.length === cbs.length;
+  const label = document.getElementById("sum-expense-label");
+  if (checked.length === 0) label.textContent = "Select Expenses…";
+  else if (checked.length === cbs.length) label.textContent = "All Expenses";
+  else label.textContent = checked.map(c => c.value).join(", ");
+}
+
+async function generateExpenseReport() {
+  const cbs = [...document.querySelectorAll(".sum-expense-cb")].filter(c => c.checked);
+  if (cbs.length === 0) { notify("Select at least one expense type", "warning"); return; }
+
+  const selectedCats = cbs.map(c => c.value);
+
+  // Close dropdown
+  document.getElementById("sum-expense-dropdown").style.display = "none";
+  expenseDropdownOpen = false;
+
+  // Get period range
+  const fromId = document.getElementById("sum-from").value;
+  const toId = document.getElementById("sum-to").value;
+  const workerId = document.getElementById("sum-worker").value;
+
+  if (!fromId || !toId) { notify("Select a period range", "warning"); return; }
+
+  const fromP = payrollPeriods.find(p => p.id === fromId);
+  const toP = payrollPeriods.find(p => p.id === toId);
+  if (!fromP || !toP) return;
+
+  const fromVal = fromP.year * 100 + fromP.month;
+  const toVal = toP.year * 100 + toP.month;
+
+  const periodsInRange = payrollPeriods
+    .filter(p => (p.year * 100 + p.month) >= fromVal && (p.year * 100 + p.month) <= toVal)
+    .sort((a,b) => (a.year*100+a.month) - (b.year*100+b.month));
+
+  if (periodsInRange.length === 0) { notify("No periods in range", "warning"); return; }
+
+  const periodIds = periodsInRange.map(p => p.id);
+
+  // Fetch salary_advances for selected periods and categories
+  let query = sb.from("salary_advances").select("*").eq("company_id", getCompanyId()).in("period_id", periodIds).in("category", selectedCats);
+  if (workerId !== "all") query = query.eq("worker_id", workerId);
+  const advances = await sbQuery(query.order("date_given", { ascending: true })) || [];
+
+  if (advances.length === 0) {
+    document.getElementById("summary-table-content").innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><p>No expense records found for selected filters</p></div>';
+    return;
+  }
+
+  // Build report: group by worker, show category breakdown
+  const byWorker = {};
+  const catTotals = {};
+  selectedCats.forEach(c => catTotals[c] = 0);
+
+  advances.forEach(a => {
+    const wid = a.worker_id;
+    if (!byWorker[wid]) byWorker[wid] = { name: '', cats: {} };
+    selectedCats.forEach(c => { if (!byWorker[wid].cats[c]) byWorker[wid].cats[c] = 0; });
+    const amt = parseFloat(a.amount) || 0;
+    byWorker[wid].cats[a.category] = (byWorker[wid].cats[a.category] || 0) + amt;
+    catTotals[a.category] += amt;
+    const w = workers.find(x => x.id === wid);
+    byWorker[wid].name = w ? w.name : wid;
+  });
+
+  const grandTotal = Object.values(catTotals).reduce((s, v) => s + v, 0);
+  const periodLabel = MONTH_NAMES[fromP.month].slice(0,3) + ' ' + fromP.year +
+    (fromId !== toId ? ' — ' + MONTH_NAMES[toP.month].slice(0,3) + ' ' + toP.year : '');
+
+  // Render table
+  let html = '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+  html += '<div><span style="font-size:14px;font-weight:700;color:var(--gold);">Expense Report</span>';
+  html += '<span style="font-size:12px;color:var(--text-muted);margin-left:10px;">' + periodLabel + '</span></div>';
+  html += '<button class="btn btn-outline" style="font-size:12px;padding:4px 10px;" onclick="exportExpenseCSV()">📥 CSV</button>';
+  html += '</div>';
+
+  html += '<table class="data-table"><thead><tr>';
+  html += '<th style="width:30px;">#</th><th>Worker</th>';
+  selectedCats.forEach(c => html += '<th style="text-align:right;">' + esc(c) + '</th>');
+  html += '<th style="text-align:right;font-weight:700;">Total</th>';
+  html += '</tr></thead><tbody>';
+
+  const sortedWorkers = Object.entries(byWorker).sort((a,b) => a[1].name.localeCompare(b[1].name));
+  let rowNum = 0;
+
+  sortedWorkers.forEach(([wid, data]) => {
+    rowNum++;
+    const workerTotal = selectedCats.reduce((s, c) => s + (data.cats[c] || 0), 0);
+    html += '<tr>';
+    html += '<td style="color:var(--text-dim);">' + rowNum + '</td>';
+    html += '<td style="font-weight:600;">' + esc(data.name) + '</td>';
+    selectedCats.forEach(c => {
+      const val = data.cats[c] || 0;
+      html += '<td style="text-align:right;' + (val > 0 ? 'color:var(--critical);' : 'color:var(--text-dim);') + '">RM ' + fmtNum2(val) + '</td>';
+    });
+    html += '<td style="text-align:right;font-weight:700;color:var(--critical);">RM ' + fmtNum2(workerTotal) + '</td>';
+    html += '</tr>';
+  });
+
+  // Totals row
+  html += '<tr style="border-top:2px solid var(--gold);font-weight:700;">';
+  html += '<td></td><td style="color:var(--gold);">TOTAL</td>';
+  selectedCats.forEach(c => {
+    html += '<td style="text-align:right;color:var(--critical);">RM ' + fmtNum2(catTotals[c]) + '</td>';
+  });
+  html += '<td style="text-align:right;color:var(--gold);">RM ' + fmtNum2(grandTotal) + '</td>';
+  html += '</tr>';
+  html += '</tbody></table>';
+
+  document.getElementById("summary-table-content").innerHTML = html;
+
+  // Cache for CSV export
+  window._expenseReportData = { selectedCats, byWorker: sortedWorkers, catTotals, grandTotal, periodLabel };
+}
+
+function exportExpenseCSV() {
+  const d = window._expenseReportData;
+  if (!d) { notify("No expense report to export", "warning"); return; }
+
+  const headers = ["#", "Worker", ...d.selectedCats, "Total"];
+  const rows = d.byWorker.map(([wid, data], i) => {
+    const workerTotal = d.selectedCats.reduce((s, c) => s + (data.cats[c] || 0), 0);
+    return [i + 1, '"' + data.name + '"', ...d.selectedCats.map(c => (data.cats[c] || 0).toFixed(2)), workerTotal.toFixed(2)].join(",");
+  });
+  // Add total row
+  rows.push(["", "TOTAL", ...d.selectedCats.map(c => d.catTotals[c].toFixed(2)), d.grandTotal.toFixed(2)].join(","));
+
+  const csv = headers.join(",") + "\n" + rows.join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "expense_report_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
+  notify("Expense CSV exported");
+}
+
+// ============================================================
+// CHANGELOG
+// ============================================================
+let changelogDropdownOpen = false;
+let changelogData = [];
+
+const CL_TABLE_LABELS = {
+  workers: 'Workers',
+  payroll_entries: 'Payroll',
+  salary_advances: 'Salary Advances',
+  worker_loans: 'Loans',
+  loan_repayments: 'Repayments'
+};
+
+function toggleChangelogFilter() {
+  const dd = document.getElementById("cl-type-dropdown");
+  changelogDropdownOpen = !changelogDropdownOpen;
+  dd.style.display = changelogDropdownOpen ? "block" : "none";
+}
+
+document.addEventListener("click", function(e) {
+  if (!changelogDropdownOpen) return;
+  const dd = document.getElementById("cl-type-dropdown");
+  const btn = dd.previousElementSibling;
+  if (!dd.contains(e.target) && !btn.contains(e.target)) {
+    dd.style.display = "none";
+    changelogDropdownOpen = false;
+  }
+});
+
+function toggleChangelogAll(cb) {
+  document.querySelectorAll(".cl-type-cb").forEach(c => c.checked = cb.checked);
+  updateChangelogSelection();
+}
+
+function updateChangelogSelection() {
+  const cbs = document.querySelectorAll(".cl-type-cb");
+  const checked = [...cbs].filter(c => c.checked);
+  const allCb = document.getElementById("cl-type-all");
+  allCb.checked = checked.length === cbs.length;
+  const label = document.getElementById("cl-type-label");
+  if (checked.length === 0) label.textContent = "None selected";
+  else if (checked.length === cbs.length) label.textContent = "All Types";
+  else label.textContent = checked.map(c => CL_TABLE_LABELS[c.value]).join(", ");
+  loadChangelog();
+}
+
+function initChangelogPage() {
+  // Default date range: last 30 days
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 30);
+  document.getElementById("cl-from").value = from.toISOString().slice(0, 10);
+  document.getElementById("cl-to").value = now.toISOString().slice(0, 10);
+  loadChangelog();
+}
+
+async function loadChangelog() {
+  const fromDate = document.getElementById("cl-from").value;
+  const toDate = document.getElementById("cl-to").value;
+  const userId = document.getElementById("cl-user").value;
+  const selectedTypes = [...document.querySelectorAll(".cl-type-cb")].filter(c => c.checked).map(c => c.value);
+
+  if (!fromDate || !toDate || selectedTypes.length === 0) {
+    document.getElementById("changelog-stats").innerHTML = '';
+    document.getElementById("changelog-table-content").innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Select filters to view changelog</p></div>';
+    return;
+  }
+
+  // Query audit_log — add 1 day to toDate for inclusive range
+  const toDatePlusOne = new Date(toDate);
+  toDatePlusOne.setDate(toDatePlusOne.getDate() + 1);
+
+  let query = sb.from("audit_log").select("*")
+    .in("table_name", selectedTypes)
+    .gte("changed_at", fromDate)
+    .lt("changed_at", toDatePlusOne.toISOString().slice(0, 10))
+    .order("changed_at", { ascending: false });
+
+  if (userId !== "all") query = query.eq("changed_by", userId);
+
+  const data = await sbQuery(query) || [];
+  changelogData = data;
+
+  // Populate "Changed By" dropdown (only once with unique users)
+  const userSelect = document.getElementById("cl-user");
+  const currentVal = userSelect.value;
+  const uniqueUsers = [...new Set(data.map(d => d.changed_by))].sort();
+  userSelect.innerHTML = '<option value="all">All Users</option>' +
+    uniqueUsers.map(u => '<option value="' + esc(u) + '"' + (u === currentVal ? ' selected' : '') + '>' + esc(u) + '</option>').join('');
+
+  // Stats
+  const byType = {};
+  selectedTypes.forEach(t => byType[t] = 0);
+  data.forEach(d => byType[d.table_name] = (byType[d.table_name] || 0) + 1);
+
+  document.getElementById("changelog-stats").innerHTML =
+    '<div class="stat-card"><div class="stat-label">Total Changes</div><div class="stat-value">' + data.length + '</div></div>' +
+    selectedTypes.map(t =>
+      '<div class="stat-card"><div class="stat-label">' + CL_TABLE_LABELS[t] + '</div><div class="stat-value" style="color:' + (byType[t] > 0 ? 'var(--gold)' : 'var(--text-dim)') + ';">' + (byType[t] || 0) + '</div></div>'
+    ).join('');
+
+  // Table
+  if (data.length === 0) {
+    document.getElementById("changelog-table-content").innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>No changes found for selected filters</p></div>';
+    return;
+  }
+
+  let html = '<table class="data-table"><thead><tr>';
+  html += '<th style="width:30px;">#</th><th>Date & Time</th><th>Changed By</th><th>Type</th><th>Action</th><th>Record</th><th>Changes</th>';
+  html += '</tr></thead><tbody>';
+
+  data.forEach((d, i) => {
+    const dt = new Date(d.changed_at);
+    const dateStr = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    // Resolve record name
+    let recordLabel = d.record_id;
+    if (d.table_name === 'workers' || d.table_name === 'payroll_entries') {
+      const w = workers.find(x => x.id === d.record_id);
+      if (w) recordLabel = w.name + ' (' + d.record_id + ')';
+    }
+
+    const actionColor = d.action === 'delete' ? 'var(--critical)' : d.action === 'create' ? 'var(--good)' : 'var(--gold)';
+
+    html += '<tr>';
+    html += '<td style="color:var(--text-dim);">' + (i + 1) + '</td>';
+    html += '<td style="white-space:nowrap;font-size:12px;">' + dateStr + '<br><span style="color:var(--text-muted);">' + timeStr + '</span></td>';
+    html += '<td>' + esc(d.changed_by) + '</td>';
+    html += '<td><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg-hover);font-weight:600;">' + esc(CL_TABLE_LABELS[d.table_name] || d.table_name) + '</span></td>';
+    html += '<td style="color:' + actionColor + ';font-weight:600;text-transform:capitalize;">' + esc(d.action) + '</td>';
+    html += '<td style="font-size:12px;">' + esc(recordLabel) + '</td>';
+    html += '<td style="font-size:12px;max-width:300px;word-break:break-word;">' + esc(d.changes || '') + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById("changelog-table-content").innerHTML = html;
+}
+
+function exportChangelogCSV() {
+  if (!changelogData || changelogData.length === 0) { notify("No changelog data to export", "warning"); return; }
+
+  const headers = ["#", "Date", "Time", "Changed By", "Type", "Action", "Record ID", "Changes"];
+  const rows = changelogData.map((d, i) => {
+    const dt = new Date(d.changed_at);
+    return [
+      i + 1,
+      dt.toISOString().slice(0, 10),
+      dt.toISOString().slice(11, 16),
+      '"' + (d.changed_by || '') + '"',
+      '"' + (CL_TABLE_LABELS[d.table_name] || d.table_name) + '"',
+      d.action,
+      '"' + d.record_id + '"',
+      '"' + (d.changes || '').replace(/"/g, '""') + '"'
+    ].join(",");
+  });
+
+  const csv = headers.join(",") + "\n" + rows.join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "changelog_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
+  notify("Changelog CSV exported");
+}
 
 async function renderSummaryPage() {
   // Populate filter dropdowns
