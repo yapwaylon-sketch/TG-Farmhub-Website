@@ -1268,14 +1268,26 @@ function renderDashboard() {
     }
   });
 
-  var uninvoicedDO = 0;
+  var uninvoicedDOCount = 0, uninvoicedDOAmount = 0;
   orders.forEach(function(o) {
     if (o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed') {
-      uninvoicedDO += parseFloat(o.grand_total) || 0;
+      uninvoicedDOCount++;
+      uninvoicedDOAmount += parseFloat(o.grand_total) || 0;
     }
   });
 
-  var totalOwed = unpaidCS + uninvoicedDO;
+  var outstandingInvoices = 0, overdueCount = 0, overdueAmount = 0;
+  invoices.forEach(function(inv) {
+    if (inv.status === 'issued' && inv.payment_status !== 'paid') {
+      outstandingInvoices += invoiceBalance(inv);
+    }
+    if (isInvoiceOverdue(inv)) {
+      overdueCount++;
+      overdueAmount += invoiceBalance(inv);
+    }
+  });
+
+  var totalOwed = unpaidCS + outstandingInvoices + uninvoicedDOAmount;
 
   // Product breakdowns
   var toPrepOrders = orders.filter(function(o) { return o.status === 'pending' || o.status === 'preparing'; });
@@ -1305,19 +1317,27 @@ function renderDashboard() {
 
   // --- Row 1: Financial summary (compact) ---
   html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
-  html += '<div class="summary-card" style="flex:1;min-width:100px;cursor:pointer;" onclick="switchTab(\'payments\')">';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'payments\')">';
   html += '<div class="sc-label">Unpaid CS</div>';
   html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
   html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:100px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Uninvoiced DO</div>';
-  html += '<div class="sc-value" style="font-size:18px;color:#5B9BD5;">' + formatRM(uninvoicedDO) + '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+  html += '<div class="sc-label">Outstanding Invoices</div>';
+  html += '<div class="sc-value" style="font-size:18px;color:#5B9BD5;">' + formatRM(outstandingInvoices) + '</div>';
   html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:100px;border-color:var(--gold);">';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+  html += '<div class="sc-label">Overdue Invoices</div>';
+  html += '<div class="sc-value" style="font-size:16px;color:' + (overdueCount > 0 ? 'var(--critical)' : 'var(--text-muted)') + ';">' + overdueCount + (overdueCount > 0 ? ' (' + formatRM(overdueAmount) + ')' : '') + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+  html += '<div class="sc-label">Uninvoiced DOs</div>';
+  html += '<div class="sc-value" style="font-size:16px;color:#5B9BD5;">' + uninvoicedDOCount + (uninvoicedDOCount > 0 ? ' (' + formatRM(uninvoicedDOAmount) + ')' : '') + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;border-color:var(--gold);">';
   html += '<div class="sc-label">Total Owed</div>';
   html += '<div class="sc-value" style="font-size:18px;color:var(--critical);">' + formatRM(totalOwed) + '</div>';
   html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:80px;">';
+  html += '<div class="summary-card" style="flex:1;min-width:70px;">';
   html += '<div class="sc-label">Today</div>';
   html += '<div class="sc-value" style="font-size:18px;">' + ordersToday + '</div>';
   html += '</div>';
