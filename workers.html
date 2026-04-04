@@ -1081,7 +1081,7 @@ async function loadAllData() {
     safeLoad(sb.from("responsibility_types").select("*").eq("company_id", getCompanyId()).order("name")),
     safeLoad(sb.from("payroll_periods").select("*").eq("company_id", getCompanyId()).order("year", { ascending: false }).order("month", { ascending: false })),
     safeLoad(sb.from("worker_roles").select("*").eq("company_id", getCompanyId()).order("sort_order")),
-    safeLoad(sb.from("task_units").select("*").eq("company_id", getCompanyId()).order("sort_order")),
+    safeLoad(sb.from("task_units").select("*").order("sort_order")),
     safeLoad(sb.from("worker_loans").select("*").eq("company_id", getCompanyId()).order("date_issued", { ascending: false })),
     safeLoad(sb.from("loan_repayments").select("*").eq("company_id", getCompanyId()).order("date", { ascending: false })),
     safeLoad(sb.from("employment_stints").select("*").eq("company_id", getCompanyId()).order("start_date", { ascending: false })),
