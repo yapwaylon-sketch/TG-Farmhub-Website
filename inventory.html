@@ -60,6 +60,7 @@
         </button>
       </div>
     </div>
+    <div id="company-switcher"></div>
     <nav class="sidebar-nav" aria-label="Module navigation">
       <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -838,10 +839,10 @@ function mapTxnFromDb(row) {
 async function loadAllData() {
   const [uData, pData, sData, wData, tData, iData, fData] = await Promise.all([
     sbQuery(sb.from("users").select("*")),
-    sbQuery(sb.from("products").select("*")),
-    sbQuery(sb.from("suppliers").select("*")),
+    sbQuery(sb.from("products").select("*").eq("company_id", getCompanyId())),
+    sbQuery(sb.from("suppliers").select("*").eq("company_id", getCompanyId())),
     sbQuery(sb.from("workers").select("*")),
-    sbQuery(sb.from("transactions").select("*").order("date", { ascending: false })),
+    sbQuery(sb.from("transactions").select("*").eq("company_id", getCompanyId()).order("date", { ascending: false })),
     sbQuery(sb.from("pnd_ingredients").select("*").order("name")),
     sbQuery(sb.from("pnd_formulations").select("*").order("name")),
   ]);
@@ -882,7 +883,8 @@ async function dbInsertProduct(p) {
     active_ingredient: p.activeIngredient, formulation: p.formulation,
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
-    supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
+    supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || "",
+    company_id: getCompanyId()
   }).select());
   return result !== null;
 }
@@ -909,7 +911,8 @@ async function dbInsertTransaction(t) {
     type: t.type, quantity: t.quantity, supplier: t.supplier || "",
     taken_by: t.takenBy || "", invoice_no: t.invoiceNo || "",
     recorded_by: t.recordedBy, unit_cost: t.unitCost || 0,
-    total_cost: t.totalCost || 0, notes: t.notes || ""
+    total_cost: t.totalCost || 0, notes: t.notes || "",
+    company_id: getCompanyId()
   }).select());
   return result !== null;
 }
@@ -933,7 +936,8 @@ async function dbDeleteTransaction(id) {
 async function dbInsertSupplier(s) {
   var result = await sbQuery(sb.from("suppliers").insert({
     id: s.id, name: s.name, contact: s.contact || "", phone: s.phone || "",
-    email: s.email || "", notes: s.notes || "", product_ids: s.productIds || []
+    email: s.email || "", notes: s.notes || "", product_ids: s.productIds || [],
+    company_id: getCompanyId()
   }).select());
   return result !== null;
 }
@@ -1032,6 +1036,7 @@ function showApp() {
   updateUserDisplay();
   applyPermissions();
   injectUserBadge(currentUser);
+  injectCompanySwitcher();
 }
 
 function updateUserDisplay() {
