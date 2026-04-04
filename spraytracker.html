@@ -35,6 +35,7 @@
       </button>
     </div>
   </div>
+  <div id="company-switcher"></div>
   <nav class="sidebar-nav" aria-label="Module navigation">
     <div class="nav-item active" data-page="summary" onclick="navigateTo('summary')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -305,6 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadAll();
   renderCurrentPage();
   document.getElementById("tg-loading").style.display = "none";
+  injectCompanySwitcher();
   startAutoRefresh();
   startInactivityTimer();
 });
@@ -362,7 +364,7 @@ async function loadBlocks() {
   if(data) blocks = data;
 }
 async function loadProducts() {
-  const data = await sbQuery(sb.from("pnd_products").select("*,pnd_formulations(id,name)").order("sort_order"));
+  const data = await sbQuery(sb.from("pnd_products").select("*,pnd_formulations(id,name)").eq("company_id", getCompanyId()).order("sort_order"));
   if(data) products = data;
 }
 async function loadWorkers() {
@@ -370,56 +372,56 @@ async function loadWorkers() {
   if(data) workers = data;
 }
 async function loadJobs() {
-  const data = await sbQuery(sb.from("pnd_jobs").select("*").order("planned_date", {ascending:true}));
+  const data = await sbQuery(sb.from("pnd_jobs").select("*").eq("company_id", getCompanyId()).order("planned_date", {ascending:true}));
   if(data) jobs = data;
 }
 async function loadOverrides() {
-  const data = await sbQuery(sb.from("pnd_block_product_overrides").select("*"));
+  const data = await sbQuery(sb.from("pnd_block_product_overrides").select("*").eq("company_id", getCompanyId()));
   if(data) overrides = data;
 }
 async function loadIngredients() {
-  const data = await sbQuery(sb.from("pnd_ingredients").select("*").order("name"));
+  const data = await sbQuery(sb.from("pnd_ingredients").select("*").eq("company_id", getCompanyId()).order("name"));
   if(data) ingredients = data;
 }
 async function loadFormulations() {
-  const data = await sbQuery(sb.from("pnd_formulations").select("*").order("name"));
+  const data = await sbQuery(sb.from("pnd_formulations").select("*").eq("company_id", getCompanyId()).order("name"));
   if(data) formulations = data;
 }
 async function loadProductIngredients() {
-  const data = await sbQuery(sb.from("pnd_product_ingredients").select("*,pnd_ingredients(id,name)"));
+  const data = await sbQuery(sb.from("pnd_product_ingredients").select("*,pnd_ingredients(id,name)").eq("company_id", getCompanyId()));
   if(data) productIngredients = data;
 }
 function getProductIngredients(productId) {
   return productIngredients.filter(pi => pi.product_id === productId).map(pi => pi.pnd_ingredients);
 }
 async function loadJobProducts() {
-  const data = await sbQuery(sb.from("pnd_job_products").select("*"));
+  const data = await sbQuery(sb.from("pnd_job_products").select("*").eq("company_id", getCompanyId()));
   if(data) jobProducts = data;
 }
 function getJobProducts(jobId) {
   return jobProducts.filter(jp => jp.job_id === jobId);
 }
 async function loadLatestSprays() {
-  const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
+  const data = await sbQuery(sb.from("pnd_latest_sprays").select("*").eq("company_id", getCompanyId()));
   if(data) latestSprays = data;
 }
 async function loadLatestSpraysByAI() {
-  const data = await sbQuery(sb.from("pnd_latest_sprays_by_ai").select("*"));
+  const data = await sbQuery(sb.from("pnd_latest_sprays_by_ai").select("*").eq("company_id", getCompanyId()));
   if(data) latestSpraysByAI = data;
 }
 async function loadAIComboDefaults() {
-  const data = await sbQuery(sb.from("ai_combo_defaults").select("*"));
+  const data = await sbQuery(sb.from("ai_combo_defaults").select("*").eq("company_id", getCompanyId()));
   if(data) aiComboDefaults = data;
 }
 function getAIComboDefault(key) {
   return aiComboDefaults.find(d => d.ai_combo_key === key);
 }
 async function loadInventoryProducts() {
-  const data = await sbQuery(sb.from("products").select("id,name,category,active_ingredient,current_stock,pack_size,pack_unit,pack_type,archived").eq("archived", false));
+  const data = await sbQuery(sb.from("products").select("id,name,category,active_ingredient,current_stock,pack_size,pack_unit,pack_type,archived").eq("archived", false).eq("company_id", getCompanyId()));
   if(data) inventoryProducts = data;
 }
 async function loadInventoryTransactions() {
-  const data = await sbQuery(sb.from("transactions").select("product_id,type,quantity,unit_cost,total_cost").in("type",["in"]));
+  const data = await sbQuery(sb.from("transactions").select("product_id,type,quantity,unit_cost,total_cost").in("type",["in"]).eq("company_id", getCompanyId()));
   if(data) inventoryTransactions = data;
 }
 function getInventoryProduct(id) {
@@ -746,11 +748,22 @@ function njJobProductNames(j) {
   if(jps.length > 1) {
     return jps.map(jp => { const p=getProduct(jp.product_id); return '<div style="font-size:12px;">'+esc(p?.product_name||'?')+'</div>'; }).join('');
   }
-  const p = getProduct(j.product_id);
-  return esc(p?.product_name||'?');
+  if(j.product_id) {
+    const p = getProduct(j.product_id);
+    return esc(p?.product_name||'?');
+  }
+  // AI combo job: show combo label as product name
+  const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
+  return combo ? '<span style="font-size:12px;">'+esc(combo.label)+'</span>' : '—';
 }
 
 function njJobAIs(j) {
+  // AI combo job: use combo label directly
+  if(j.ai_combo_key) {
+    const combo = getAICombos().find(c => c.key === j.ai_combo_key);
+    if(combo) return combo.label;
+  }
+  // Legacy: look up from products
   const jps = getJobProducts(j.id);
   const prodIds = jps.length ? jps.map(jp=>jp.product_id) : [j.product_id];
   const allAIs = [];
@@ -947,7 +960,7 @@ function renderJobsTable() {
 async function viewSprayLog(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
-  const data = await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").or("logged_by.eq.auto:job:"+jobId+",logged_by.eq.intervention:job:"+jobId));
+  const data = await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("company_id", getCompanyId()).or("logged_by.eq.auto:job:"+jobId+",logged_by.eq.intervention:job:"+jobId));
   if(!data||!data.length) { notify("No auto-logged spray entry found for this job","warning"); return; }
   const log = data[0];
   const b = log.pnd_blocks?.block_name||"?";
@@ -1352,7 +1365,7 @@ async function submitNewJob() {
   const result = await sbQuery(sb.from("pnd_jobs").insert({
     block_id:blockId, product_id:null, ai_combo_key:primary.comboKey, worker_name:worker, planned_date:date,
     tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:primary.doseAmt, dose_unit:primary.doseUnit,
-    dose_per_litres:primary.dosePer, notes, logged_by:logged, job_type:jobType
+    dose_per_litres:primary.dosePer, notes, logged_by:logged, job_type:jobType, company_id:getCompanyId()
   }).select());
   if(result===null) return;
 
@@ -1371,7 +1384,7 @@ async function submitNewJob() {
       await sbQuery(sb.from("pnd_jobs").insert({
         block_id:blockId, product_id:null, ai_combo_key:extra.comboKey, worker_name:worker, planned_date:date,
         tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:extra.doseAmt, dose_unit:extra.doseUnit,
-        dose_per_litres:extra.dosePer, notes: notes ? notes + ' (tank mix)' : '(tank mix)', logged_by:logged, job_type:jobType
+        dose_per_litres:extra.dosePer, notes: notes ? notes + ' (tank mix)' : '(tank mix)', logged_by:logged, job_type:jobType, company_id:getCompanyId()
       }).select());
     }
   }
@@ -1393,20 +1406,36 @@ function openEditJobModal(jobId) {
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
   const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
 
-  // Build products display
-  const productsInMix = jps.length ? jps : [{ product_id:j.product_id, dose_amount:j.dose_amount, dose_unit:j.dose_unit, dose_per_litres:j.dose_per_litres }];
-  const productsHtml = productsInMix.map(jp => {
-    const p = getProduct(jp.product_id);
-    const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
-    const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
-    return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;">
+  // Build products display — support both AI combo jobs and legacy product jobs
+  let productsHtml = '';
+  if (jps.length) {
+    // Legacy: products in junction table
+    productsHtml = jps.map(jp => {
+      const p = getProduct(jp.product_id);
+      const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
+      const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+      return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><span style="font-weight:700;font-size:13px;">${esc(p?.product_name||'?')}</span>${ais?'<span style="font-size:11px;color:#8fcf80;margin-left:8px;">'+esc(ais)+'</span>':''}</div>
+          <span style="font-size:14px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total)+' '+esc(jp.dose_unit||'') : '—'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${jp.dose_amount||'?'} ${esc(jp.dose_unit||'')} / ${jp.dose_per_litres||'?'}L</div>
+      </div>`;
+    }).join('');
+  } else {
+    // AI combo job (or legacy single product)
+    const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
+    const p = j.product_id ? getProduct(j.product_id) : null;
+    const displayName = combo ? combo.label : (p ? p.product_name : '?');
+    const total = (j.dose_amount && j.dose_per_litres && W) ? (W / j.dose_per_litres) * j.dose_amount : 0;
+    productsHtml = `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div><span style="font-weight:700;font-size:13px;">${esc(p?.product_name||'?')}</span>${ais?'<span style="font-size:11px;color:#8fcf80;margin-left:8px;">'+esc(ais)+'</span>':''}</div>
-        <span style="font-size:14px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total)+' '+esc(jp.dose_unit||'') : '—'}</span>
+        <div><span style="font-weight:700;font-size:13px;">${esc(displayName)}</span></div>
+        <span style="font-size:14px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total)+' '+esc(j.dose_unit||'') : '—'}</span>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${jp.dose_amount||'?'} ${esc(jp.dose_unit||'')} / ${jp.dose_per_litres||'?'}L</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${j.dose_amount||'?'} ${esc(j.dose_unit||'')} / ${j.dose_per_litres||'?'}L</div>
     </div>`;
-  }).join('');
+  }
 
   document.getElementById("modal-container").innerHTML = `
     <div class="modal-overlay">
@@ -1627,7 +1656,7 @@ async function submitEditJob(jobId) {
         block_id: j.block_id, product_id: jp.product_id,
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
-        logged_by: 'auto:job:'+jobId
+        logged_by: 'auto:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     const b=getBlock(j.block_id);
@@ -1721,7 +1750,7 @@ async function renderJobLogs() {
   const toF = document.getElementById("jl-to")?.value || "";
 
   // Build server-side query
-  let query = sb.from("pnd_jobs").select("*", {count:"exact"});
+  let query = sb.from("pnd_jobs").select("*", {count:"exact"}).eq("company_id", getCompanyId());
   if(blockF) query = query.eq("block_id", blockF);
   if(workerF) query = query.eq("worker_name", workerF);
   if(statusF) query = query.eq("status", statusF);
@@ -2023,7 +2052,7 @@ async function submitEditStatus(jobId) {
         block_id: j.block_id, product_id: jp.product_id,
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
-        logged_by: 'auto:job:'+jobId
+        logged_by: 'auto:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     const b=getBlock(j.block_id);
@@ -2147,7 +2176,7 @@ async function confirmInterventionDecision() {
         block_id: j.block_id, product_id: pid,
         date_completed: compDate, next_spray_date: ls2?.next_spray_date || null,
         notes: 'Intervention spray (schedule unchanged). Job ID: '+jobId,
-        logged_by: 'intervention:job:'+jobId
+        logged_by: 'intervention:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     closeModal();
@@ -2180,7 +2209,7 @@ async function confirmInterventionDecision() {
         block_id: j.block_id, product_id: jp.product_id,
         date_completed: compDate, next_spray_date: epNext,
         notes: 'Intervention spray (schedule reset). Job ID: '+jobId,
-        logged_by: 'intervention:job:'+jobId
+        logged_by: 'intervention:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     closeModal();
@@ -2207,7 +2236,7 @@ async function confirmInterventionDecision() {
         block_id: j.block_id, product_id: jp.product_id,
         date_completed: compDate, next_spray_date: manualDate,
         notes: 'Intervention spray (manual date). Job ID: '+jobId,
-        logged_by: 'intervention:job:'+jobId
+        logged_by: 'intervention:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     closeModal();
@@ -2559,7 +2588,7 @@ async function addOverride(blockId) {
   const unit=document.getElementById("ov-unit-"+blockId).value;
   const per=parseInt(document.getElementById("ov-per-"+blockId).value);
   if(!productId||!amt||!per) { notify("Fill all override fields","warning"); return; }
-  const result = await sbQuery(sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per},{onConflict:"block_id,product_id"}).select());
+  const result = await sbQuery(sb.from("pnd_block_product_overrides").upsert({block_id:blockId,product_id:productId,dose_amount:amt,dose_unit:unit,dose_per_litres:per,company_id:getCompanyId()},{onConflict:"block_id,product_id"}).select());
   if(result===null) return;
   notify("Override saved");
   await loadOverrides(); renderOverridesSection();
@@ -2768,7 +2797,7 @@ async function migrateToInventory(pndProductId) {
     id: newId, name: p.product_name, category: category, active_ingredient: ai, formulation: formulation,
     pack_unit: p.packaging_unit || p.default_dose_unit || 'kg', pack_type: p.packaging_type || 'Bottle',
     pack_size: p.packaging_size || 0, current_stock: 0, opening_stock: 0, reorder_level: 0,
-    supplier_ids: [], archived: false
+    supplier_ids: [], archived: false, company_id: getCompanyId()
   };
   const invResult = await sbQuery(sb.from('products').insert(data).select());
   if(invResult === null) return;
@@ -2838,7 +2867,8 @@ async function enableForSpraying(invProductId) {
   const data = {
     product_name: ip.name, product_type: productType, inventory_product_id: ip.id,
     is_active: true, sort_order: products.length + 1,
-    packaging_size: ip.pack_size || null, packaging_unit: ip.pack_unit || null, packaging_type: ip.pack_type || null
+    packaging_size: ip.pack_size || null, packaging_unit: ip.pack_unit || null, packaging_type: ip.pack_type || null,
+    company_id: getCompanyId()
   };
   const result = await sbQuery(sb.from('pnd_products').insert(data).select());
   if(result === null) return;
@@ -2852,7 +2882,7 @@ async function enableForSpraying(invProductId) {
       for(const aiName of aiNames) {
         const ing = ingredients.find(i => i.name.toLowerCase() === aiName.toLowerCase());
         if(ing) {
-          const piResult = await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: newProduct.id, ingredient_id: ing.id }).select());
+          const piResult = await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: newProduct.id, ingredient_id: ing.id, company_id: getCompanyId() }).select());
           if(piResult && piResult.length) productIngredients.push({ ...piResult[0], pnd_ingredients: ing });
         }
       }
@@ -2898,7 +2928,7 @@ async function updateAIDose(comboKey, field, value) {
     await sbQuery(sb.from('ai_combo_defaults').update(upd).eq('ai_combo_key', comboKey).select());
     existing[field] = value;
   } else {
-    const data = { ai_combo_key: comboKey, dose_amount: null, dose_unit: 'g', dose_per_litres: null, interval_days: null };
+    const data = { ai_combo_key: comboKey, dose_amount: null, dose_unit: 'g', dose_per_litres: null, interval_days: null, company_id: getCompanyId() };
     data[field] = value;
     const result = await sbQuery(sb.from('ai_combo_defaults').insert(data).select());
     if(result && result.length) aiComboDefaults.push(result[0]);
@@ -2994,7 +3024,7 @@ function epAddSelectedIngredient() {
 async function epAddNewIngredient(productId) {
   const name = document.getElementById('ep-ingredient-new').value.trim();
   if(!name) { notify('Ingredient name required','warning'); return; }
-  const res = await sbQuery(sb.from("pnd_ingredients").insert({name}).select());
+  const res = await sbQuery(sb.from("pnd_ingredients").insert({name, company_id: getCompanyId()}).select());
   if(res===null) return;
   await loadIngredients();
   epSelectedIngredients.push({id:res[0].id, name:res[0].name});
@@ -3145,7 +3175,7 @@ async function generateReport() {
     const ids=[...cbs].map(c=>c.value);
     if(!ids.length){notify("Select at least one block","warning");return;}
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("block_id",ids);
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("company_id", getCompanyId()).in("block_id",ids);
     if(from) q=q.gte("date_completed",from);
     if(to) q=q.lte("date_completed",to);
     const data=await sbQuery(q.order("date_completed",{ascending:false}));
@@ -3155,7 +3185,7 @@ async function generateReport() {
   } else if(id===3) {
     const prodId=document.getElementById("rf-product").value;
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)");
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("company_id", getCompanyId());
     if(prodId!=="__all__") q=q.eq("product_id",prodId);
     if(from) q=q.gte("date_completed",from);
     if(to) q=q.lte("date_completed",to);
@@ -3175,7 +3205,7 @@ async function generateReport() {
     }).sort((a,b)=>(b[5]||0)-(a[5]||0));
   } else if(id===7) {
     const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
-    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:true}));
+    const data=await sbQuery(sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("company_id", getCompanyId()).gte("date_completed",from).lte("date_completed",to).order("date_completed",{ascending:true}));
     if(!data) return;
     cols=["Block","Product","Default Interval","Actual Interval","Status"];
     const grouped={};
@@ -3233,7 +3263,7 @@ async function generateReport() {
       matchProdIds = productIngredients.filter(pi=>pi.ingredient_id===ingId).map(pi=>pi.product_id);
     }
     if(!matchProdIds.length){notify("No products found for this ingredient","warning");return;}
-    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").in("product_id",matchProdIds);
+    let q=sb.from("pnd_spray_logs").select("*,pnd_blocks(block_name),pnd_products(product_name)").eq("company_id", getCompanyId()).in("product_id",matchProdIds);
     if(from) q=q.gte("date_completed",from);
     if(to) q=q.lte("date_completed",to);
     const data=await sbQuery(q.order("date_completed",{ascending:false}));
