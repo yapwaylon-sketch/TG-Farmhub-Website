@@ -4851,7 +4851,7 @@ function invRenderList() {
           if (invoiceBalance(inv) > 0) html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(inv.id) + '\')">Record Payment</button>';
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(inv.id) + '\')">Add Credit Note</button>';
         }
-        if (inv.status === 'issued' || inv.payment_status === 'partial' || inv.payment_status === 'paid') {
+        if (inv.status === 'draft' || inv.status === 'issued' || inv.payment_status === 'partial' || inv.payment_status === 'paid') {
           html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="gap:4px;border-color:var(--gold);color:var(--gold);">Print</button>';
         }
         if (inv.status !== 'cancelled' && inv.status !== 'paid' && inv.payment_status !== 'paid') {
