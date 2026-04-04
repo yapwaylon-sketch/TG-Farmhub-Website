@@ -5655,6 +5655,8 @@ var RPT_TYPES = [
   {id:'product', name:'Sales by Product'},
   {id:'period', name:'Sales by Period'},
   {id:'outstanding', name:'Outstanding Payments'},
+  {id:'invoice_register', name:'Invoice Register'},
+  {id:'aging', name:'Aging Report'},
   {id:'returns', name:'Return Rate'},
   {id:'driver', name:'Driver Log'},
   {id:'history', name:'Customer History'}
@@ -5722,6 +5724,12 @@ function rptRenderFilters() {
   } else if (rptType === 'driver') {
     html += dateRange;
     html += '<select id="rpt-driver"><option value="">All Drivers</option>' + driverOpts + '</select>';
+  } else if (rptType === 'invoice_register') {
+    html += dateRange;
+    html += '<select id="rpt-customer"><option value="">All Customers</option>' + custOpts + '</select>';
+    html += '<select id="rpt-inv-status"><option value="">All</option><option value="draft">Draft</option><option value="issued">Issued</option><option value="overdue">Overdue</option><option value="partial">Partial</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select>';
+  } else if (rptType === 'aging') {
+    html += '<select id="rpt-customer"><option value="">All Customers</option>' + custOpts + '</select>';
   } else if (rptType === 'history') {
     html += '<select id="rpt-customer" required><option value="">— Select Customer —</option>' + custOpts + '</select>';
   }
@@ -6007,6 +6015,80 @@ function rptGenerate() {
       sumRow._summary = true;
       rows.push(sumRow);
     }
+
+  } else if (type === 'invoice_register') {
+    title = 'Invoice Register';
+    var custFilter = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
+    var statusFilter = document.getElementById('rpt-inv-status') ? document.getElementById('rpt-inv-status').value : '';
+
+    var filtered = invoices.filter(function(inv) {
+      if (from && inv.invoice_date < from) return false;
+      if (to && inv.invoice_date > to) return false;
+      if (custFilter && inv.customer_id !== custFilter) return false;
+      if (statusFilter === 'overdue') return isInvoiceOverdue(inv);
+      if (statusFilter === 'partial') return inv.payment_status === 'partial';
+      if (statusFilter === 'paid') return inv.payment_status === 'paid';
+      if (statusFilter && statusFilter !== 'overdue' && statusFilter !== 'partial' && statusFilter !== 'paid') return inv.status === statusFilter;
+      return true;
+    });
+    filtered.sort(function(a, b) { return (a.invoice_date || '').localeCompare(b.invoice_date || ''); });
+
+    cols = ['Invoice No', 'Date', 'Due Date', 'Customer', 'Grand Total', 'Paid', 'Credits', 'Balance', 'Status'];
+    var tGrand = 0, tPaid = 0, tCredits = 0, tBal = 0;
+    rows = filtered.map(function(inv) {
+      var gt = parseFloat(inv.grand_total) || 0;
+      var pd = parseFloat(inv.amount_paid) || 0;
+      var cr = parseFloat(inv.credit_total) || 0;
+      var bal = invoiceBalance(inv);
+      tGrand += gt; tPaid += pd; tCredits += cr; tBal += bal;
+      var statusLabel = inv.status === 'cancelled' ? 'Cancelled' : (isInvoiceOverdue(inv) ? 'Overdue' : (inv.payment_status === 'paid' ? 'Paid' : inv.payment_status === 'partial' ? 'Partial' : inv.status === 'draft' ? 'Draft' : 'Issued'));
+      var row = [inv.id, fmtDate(inv.invoice_date), fmtDate(inv.due_date), getCustomerName(inv.customer_id), formatRM(gt), formatRM(pd), formatRM(cr), formatRM(bal), statusLabel];
+      row._statusClass = statusLabel === 'Overdue' ? 'rpt-outstanding-red' : (statusLabel === 'Partial' ? 'rpt-outstanding-gold' : (statusLabel === 'Paid' ? 'rpt-outstanding-green' : ''));
+      return row;
+    });
+    if (rows.length > 0) {
+      var sumRow = ['TOTAL', '', '', '', formatRM(tGrand), formatRM(tPaid), formatRM(tCredits), formatRM(tBal), ''];
+      sumRow._summary = true;
+      rows.push(sumRow);
+    }
+
+  } else if (type === 'aging') {
+    title = 'Aging Report';
+    var custFilter = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
+
+    var custAging = {};
+    invoices.forEach(function(inv) {
+      if (inv.status !== 'issued') return;
+      if (inv.payment_status === 'paid') return;
+      if (custFilter && inv.customer_id !== custFilter) return;
+      var bal = invoiceBalance(inv);
+      if (bal <= 0) return;
+      var cid = inv.customer_id || '_unknown';
+      if (!custAging[cid]) custAging[cid] = { current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0, total: 0 };
+      var days = invoiceAgeDays(inv);
+      if (days <= 0) custAging[cid].current += bal;
+      else if (days <= 30) custAging[cid].d30 += bal;
+      else if (days <= 60) custAging[cid].d60 += bal;
+      else if (days <= 90) custAging[cid].d90 += bal;
+      else custAging[cid].d90plus += bal;
+      custAging[cid].total += bal;
+    });
+
+    cols = ['Customer', 'Current', '1-30 Days', '31-60 Days', '61-90 Days', '90+ Days', 'Total Outstanding'];
+    rows = Object.keys(custAging).map(function(cid) {
+      var a = custAging[cid];
+      var row = [getCustomerName(cid), formatRM(a.current), formatRM(a.d30), formatRM(a.d60), formatRM(a.d90), formatRM(a.d90plus), formatRM(a.total)];
+      row._agingClasses = ['', 'aging-30', 'aging-60', 'aging-90', 'aging-90plus'];
+      return row;
+    }).sort(function(a, b) { return parseFloat(String(b[6]).replace(/[^0-9.-]/g, '')) - parseFloat(String(a[6]).replace(/[^0-9.-]/g, '')); });
+
+    if (rows.length > 0) {
+      var gCurrent = 0, g30 = 0, g60 = 0, g90 = 0, g90p = 0, gTotal = 0;
+      Object.keys(custAging).forEach(function(cid) { var a = custAging[cid]; gCurrent += a.current; g30 += a.d30; g60 += a.d60; g90 += a.d90; g90p += a.d90plus; gTotal += a.total; });
+      var sumRow = ['GRAND TOTAL', formatRM(gCurrent), formatRM(g30), formatRM(g60), formatRM(g90), formatRM(g90p), formatRM(gTotal)];
+      sumRow._summary = true;
+      rows.push(sumRow);
+    }
   }
 
   // Store report data
@@ -6030,6 +6112,15 @@ function rptGenerate() {
         // Return rate coloring
         if (type === 'returns' && i === 5 && r._rateClass) {
           attrs = ' class="' + r._rateClass + '"';
+        }
+        // Aging report cell colors
+        if (type === 'aging' && i >= 1 && i <= 5 && r._agingClasses && !r._summary) {
+          var ac = r._agingClasses[i - 1];
+          if (ac) attrs = ' class="' + ac + '"';
+        }
+        // Invoice register status colors
+        if (type === 'invoice_register' && i === 8 && r._statusClass && !r._summary) {
+          attrs = ' class="' + r._statusClass + '"';
         }
         // Right-align numeric/currency columns
         if (typeof c === 'string' && (c.indexOf('RM ') === 0 || c.match(/^\d+\.\d+%$/))) {

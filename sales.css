@@ -1236,6 +1236,10 @@
 .rpt-outstanding-green { color:var(--good); }
 .rpt-outstanding-gold { color:var(--gold-light); }
 .rpt-outstanding-red { color:var(--red); font-weight:700; }
+.aging-30 { color:#b8860b; }
+.aging-60 { color:#e67e22; }
+.aging-90 { color:#c0392b; }
+.aging-90plus { color:#c0392b; font-weight:700; }
 
 /* Calendar Picker */
 .cal-input {
