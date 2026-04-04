@@ -843,8 +843,8 @@ async function loadAllData() {
     sbQuery(sb.from("suppliers").select("*").eq("company_id", getCompanyId())),
     sbQuery(sb.from("workers").select("*")),
     sbQuery(sb.from("transactions").select("*").eq("company_id", getCompanyId()).order("date", { ascending: false })),
-    sbQuery(sb.from("pnd_ingredients").select("*").order("name")),
-    sbQuery(sb.from("pnd_formulations").select("*").order("name")),
+    sbQuery(sb.from("pnd_ingredients").select("*").eq("company_id", getCompanyId()).order("name")),
+    sbQuery(sb.from("pnd_formulations").select("*").eq("company_id", getCompanyId()).order("name")),
   ]);
 
   if (!uData || !pData || !sData || !wData || !tData) return;
@@ -2404,7 +2404,7 @@ async function prodAddNewIngredient() {
     }
     notify('"' + existing.name + '" added', 'success');
   } else {
-    const res = await sbQuery(sb.from("pnd_ingredients").insert({ name: ingName }).select());
+    const res = await sbQuery(sb.from("pnd_ingredients").insert({ name: ingName, company_id: getCompanyId() }).select());
     if (res === null) { notify('Failed to create ingredient', 'error'); return; }
     pndIngredients.push(res[0]);
     prodSelectedIngredients.push({ id: res[0].id, name: res[0].name });
@@ -2663,7 +2663,7 @@ async function addNewFormulation() {
   // Save to pnd_formulations
   const exists = pndFormulations.find(f => f.name.toLowerCase() === name.toLowerCase());
   if(!exists) {
-    const result = await sbQuery(sb.from('pnd_formulations').insert({ name }).select());
+    const result = await sbQuery(sb.from('pnd_formulations').insert({ name, company_id: getCompanyId() }).select());
     if(result && result.length) pndFormulations.push(result[0]);
   }
   // Add to dropdown and select it
@@ -2738,11 +2738,11 @@ async function saveProduct() {
             for (const aiName of aiNames) {
               let ing = pndIngredients.find(i => i.name.toLowerCase() === aiName.toLowerCase());
               if (!ing) {
-                const ingResult = await sbQuery(sb.from('pnd_ingredients').insert({ name: aiName }).select());
+                const ingResult = await sbQuery(sb.from('pnd_ingredients').insert({ name: aiName, company_id: getCompanyId() }).select());
                 if (ingResult && ingResult.length) { ing = ingResult[0]; pndIngredients.push(ing); }
               }
               if (ing) {
-                await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: sp.id, ingredient_id: ing.id }).select());
+                await sbQuery(sb.from('pnd_product_ingredients').insert({ product_id: sp.id, ingredient_id: ing.id, company_id: getCompanyId() }).select());
               }
             }
           }
@@ -2801,7 +2801,8 @@ async function saveProduct() {
           default_dose_amount: null,
           default_dose_unit: null,
           default_dose_per_litres: null,
-          default_interval_days: null
+          default_interval_days: null,
+          company_id: getCompanyId()
         }).select());
 
         // Link active ingredients to pnd_product_ingredients
@@ -2809,7 +2810,8 @@ async function saveProduct() {
           const sprayProductId = sprayResult[0].id;
           const rows = prodSelectedIngredients.map(i => ({
             product_id: sprayProductId,
-            ingredient_id: i.id
+            ingredient_id: i.id,
+            company_id: getCompanyId()
           }));
           await sbQuery(sb.from('pnd_product_ingredients').insert(rows).select());
         }
