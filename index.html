@@ -678,14 +678,14 @@ async function loadCompanyOverview() {
   if (!container) return;
 
   var [ordersAF, workersAB, jobsAB] = await Promise.all([
-    sbQuery(sb.from('sales_orders').select('id,total_amount,payment_status').eq('company_id', 'tg_agro_fruits')),
+    sbQuery(sb.from('sales_orders').select('id,grand_total,payment_status').eq('company_id', 'tg_agro_fruits')),
     sbQuery(sb.from('workers').select('id').eq('company_id', 'tg_agribusiness').eq('active', true)),
     sbQuery(sb.from('pnd_jobs').select('id').eq('company_id', 'tg_agribusiness').eq('status', 'active'))
   ]);
 
   var afOrders = ordersAF || [];
-  var afRevenue = afOrders.reduce(function(sum, o) { return sum + (parseFloat(o.total_amount) || 0); }, 0);
-  var afOutstanding = afOrders.filter(function(o) { return o.payment_status !== 'paid'; }).reduce(function(sum, o) { return sum + (parseFloat(o.total_amount) || 0); }, 0);
+  var afRevenue = afOrders.reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
+  var afOutstanding = afOrders.filter(function(o) { return o.payment_status !== 'paid'; }).reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
 
   container.innerHTML =
     '<div style="background:var(--card-bg);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
