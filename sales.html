@@ -961,6 +961,7 @@ var varieties = [];
 var allWorkers = [];
 var salesDrivers = [];
 var systemUsers = [];
+var invoices = [], invoiceItems = [], invoiceOrders = [], invoicePayments = [], creditNotes = [];
 var currentTab = 'dashboard';
 var soDetailOrderId = null;
 var soEditOrderId = null;
@@ -1040,7 +1041,12 @@ async function loadAllData() {
     sbQuery(sb.from('crop_varieties').select('*').eq('archived', false)),
     sbQuery(sb.from('workers').select('id,name').eq('active', true)),
     sbQuery(sb.from('sales_drivers').select('*').eq('is_active', true)),
-    sbQuery(sb.from('users').select('id,display_name,role'))
+    sbQuery(sb.from('users').select('id,display_name,role')),
+    sbQuery(sb.from('sales_invoices').select('*').order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_invoice_items').select('*')),
+    sbQuery(sb.from('sales_invoice_orders').select('*')),
+    sbQuery(sb.from('sales_invoice_payments').select('*').order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_credit_notes').select('*').order('created_at', {ascending: false}))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
@@ -1052,6 +1058,11 @@ async function loadAllData() {
   allWorkers = results[7] || [];
   salesDrivers = results[8] || [];
   systemUsers = results[9] || [];
+  invoices = results[10] || [];
+  invoiceItems = results[11] || [];
+  invoiceOrders = results[12] || [];
+  invoicePayments = results[13] || [];
+  creditNotes = results[14] || [];
 }
 
 // SYNC
@@ -1101,6 +1112,64 @@ function docTypeLabel(dt) {
 
 function docTypeBadgeClass(dt) {
   return dt === 'delivery_order' ? 'badge-do' : 'badge-cs';
+}
+
+// INVOICE HELPERS
+function invoiceBalance(inv) {
+  return (inv.grand_total || 0) - (inv.credit_total || 0) - (inv.amount_paid || 0);
+}
+
+async function recalcInvoicePaymentStatus(invoiceId) {
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv) return;
+  var totalPaid = invoicePayments
+    .filter(function(p) { return p.invoice_id === invoiceId; })
+    .reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
+  var creditTotal = parseFloat(inv.credit_total) || 0;
+  var grandTotal = parseFloat(inv.grand_total) || 0;
+  var status = 'unpaid';
+  if (totalPaid + creditTotal >= grandTotal && grandTotal > 0) status = 'paid';
+  else if (totalPaid + creditTotal > 0) status = 'partial';
+  inv.amount_paid = totalPaid;
+  inv.payment_status = status;
+  await sbQuery(sb.from('sales_invoices').update({ amount_paid: totalPaid, payment_status: status }).eq('id', invoiceId).select());
+}
+
+function isOrderInvoiced(orderId) {
+  var order = orders.find(function(o) { return o.id === orderId; });
+  if (order && order.invoice_id) return true;
+  return invoiceOrders.some(function(io) { return io.order_id === orderId; });
+}
+
+function getInvoiceDOs(invoiceId) {
+  var orderIds = invoiceOrders
+    .filter(function(io) { return io.invoice_id === invoiceId; })
+    .map(function(io) { return io.order_id; });
+  return orders.filter(function(o) { return orderIds.indexOf(o.id) !== -1; });
+}
+
+function getCustomerUninvoicedDOs(customerId) {
+  return orders.filter(function(o) {
+    return o.customer_id === customerId
+      && o.doc_type === 'delivery_order'
+      && o.status === 'completed'
+      && !o.invoice_id;
+  });
+}
+
+function calcDueDate(invoiceDate, paymentTerms) {
+  var daysMap = { cod: 0, '7days': 7, '14days': 14, '30days': 30, '60days': 60 };
+  var days = daysMap[paymentTerms] || 30;
+  var d = new Date(invoiceDate + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function isInvoiceOverdue(inv) {
+  if (inv.status !== 'issued') return false;
+  if (inv.payment_status !== 'unpaid' && inv.payment_status !== 'partial') return false;
+  var today = new Date().toISOString().split('T')[0];
+  return inv.due_date < today;
 }
 
 // DASHBOARD
@@ -5706,6 +5775,11 @@ function closeDocModal() {
 
 function soPrintDoc() {
   var isA4 = document.getElementById('so-doc-modal').classList.contains('a4-mode');
+  // On mobile, use RawBT thermal print for 80mm receipts
+  if (!isA4 && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    soPrintThermal();
+    return;
+  }
   if (isA4) {
     var style = document.createElement('style');
     style.id = 'a4-print-override';
@@ -5715,6 +5789,24 @@ function soPrintDoc() {
     document.head.removeChild(style);
   } else {
     window.print();
+  }
+}
+
+async function soPrintThermal() {
+  var isA4 = document.getElementById('so-doc-modal').classList.contains('a4-mode');
+  var docEl = isA4
+    ? document.getElementById('so-doc-a4-content').querySelector('.a4-page')
+    : document.getElementById('so-doc-content');
+  if (!docEl) { notify('No document to print', 'warning'); return; }
+  notify('Preparing print...', 'info', 2000);
+  try {
+    var canvas = await html2canvas(docEl, {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
+    });
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    window.location.href = 'rawbt:' + dataUrl;
+  } catch (e) {
+    notify('Print failed: ' + e.message, 'error');
   }
 }
 
