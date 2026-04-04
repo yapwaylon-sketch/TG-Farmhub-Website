@@ -36,6 +36,7 @@
       </button>
     </div>
   </div>
+  <div id="company-switcher"></div>
   <nav class="sidebar-nav" aria-label="Module navigation">
     <div class="nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -1062,6 +1063,7 @@ var soEditOrderId = null;
 
   document.getElementById("tg-loading").style.display = "none";
   injectUserBadge(currentUser);
+  injectCompanySwitcher();
   startInactivityTimer();
   startSessionCheck();
   await loadAllData();
@@ -1111,22 +1113,23 @@ function renderCurrentTab() {
 
 // DATA LOADING
 async function loadAllData() {
+  var cid = getCompanyId();
   var results = await Promise.all([
-    sbQuery(sb.from('sales_customers').select('*').order('name')),
-    sbQuery(sb.from('sales_products').select('*').order('sort_order')),
-    sbQuery(sb.from('sales_orders').select('*').order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_order_items').select('*')),
-    sbQuery(sb.from('sales_payments').select('*').order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_returns').select('*').order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_customers').select('*').eq('company_id', cid).order('name')),
+    sbQuery(sb.from('sales_products').select('*').eq('company_id', cid).order('sort_order')),
+    sbQuery(sb.from('sales_orders').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_order_items').select('*').eq('company_id', cid)),
+    sbQuery(sb.from('sales_payments').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_returns').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
     sbQuery(sb.from('crop_varieties').select('*').eq('archived', false)),
     sbQuery(sb.from('workers').select('id,name').eq('active', true)),
-    sbQuery(sb.from('sales_drivers').select('*').eq('is_active', true)),
+    sbQuery(sb.from('sales_drivers').select('*').eq('company_id', cid).eq('is_active', true)),
     sbQuery(sb.from('users').select('id,display_name,role')),
-    sbQuery(sb.from('sales_invoices').select('*').order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_invoice_items').select('*')),
-    sbQuery(sb.from('sales_invoice_orders').select('*')),
-    sbQuery(sb.from('sales_invoice_payments').select('*').order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_credit_notes').select('*').order('created_at', {ascending: false}))
+    sbQuery(sb.from('sales_invoices').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_invoice_items').select('*').eq('company_id', cid)),
+    sbQuery(sb.from('sales_invoice_orders').select('*').eq('company_id', cid)),
+    sbQuery(sb.from('sales_invoice_payments').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_credit_notes').select('*').eq('company_id', cid).order('created_at', {ascending: false}))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
@@ -1277,7 +1280,12 @@ function renderDashboard() {
   });
 
   var outstandingInvoices = 0, overdueCount = 0, overdueAmount = 0;
+  var draftInvoiceCount = 0, draftInvoiceAmount = 0;
   invoices.forEach(function(inv) {
+    if (inv.status === 'draft') {
+      draftInvoiceCount++;
+      draftInvoiceAmount += invoiceBalance(inv);
+    }
     if (inv.status === 'issued' && inv.payment_status !== 'paid') {
       outstandingInvoices += invoiceBalance(inv);
     }
@@ -1287,7 +1295,7 @@ function renderDashboard() {
     }
   });
 
-  var totalOwed = unpaidCS + outstandingInvoices + uninvoicedDOAmount;
+  var totalOwed = unpaidCS + outstandingInvoices + uninvoicedDOAmount + draftInvoiceAmount;
 
   // Product breakdowns
   var toPrepOrders = orders.filter(function(o) { return o.status === 'pending' || o.status === 'preparing'; });
@@ -1320,6 +1328,10 @@ function renderDashboard() {
   html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'payments\')">';
   html += '<div class="sc-label">Unpaid CS</div>';
   html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
+  html += '</div>';
+  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+  html += '<div class="sc-label">Draft Invoices</div>';
+  html += '<div class="sc-value" style="font-size:16px;color:' + (draftInvoiceCount > 0 ? '#999' : 'var(--text-muted)') + ';">' + draftInvoiceCount + (draftInvoiceCount > 0 ? ' (' + formatRM(draftInvoiceAmount) + ')' : '') + '</div>';
   html += '</div>';
   html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
   html += '<div class="sc-label">Outstanding Invoices</div>';
@@ -2700,7 +2712,8 @@ async function soDelPayConfirm() {
       method: method,
       reference: reference || null,
       notes: 'Collected on delivery',
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
 
     var result = await sbQuery(sb.from('sales_payments').insert(payData).select());
@@ -2776,7 +2789,8 @@ async function soWalkInConfirm() {
       method: method,
       reference: reference || null,
       notes: 'Walk-in sale — paid immediately',
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
     var payResult = await sbQuery(sb.from('sales_payments').insert(payData).select());
     if (payResult) payments.unshift(payResult[0] || payData);
@@ -3055,6 +3069,7 @@ async function scSaveCustomer() {
     var newId = await dbNextId('SC');
     data.id = newId;
     data.is_active = true;
+    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from('sales_customers').insert(data).select());
     if (result === null) { btnLoading(btn, false, 'Add Customer'); return; }
     customers.push(result[0] || data);
@@ -3573,6 +3588,7 @@ async function spSaveProduct() {
     data.id = newId;
     data.is_active = true;
     data.sort_order = salesProducts.length;
+    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from('sales_products').insert(data).select());
     if (result === null) { btnLoading(btn, false, 'Add Product'); return; }
     salesProducts.push(result[0] || data);
@@ -4173,7 +4189,8 @@ async function paySavePayment() {
         reference: reference || null,
         notes: notes || null,
         slip_url: slipUrl || null,
-        created_by: currentUser ? currentUser.id : null
+        created_by: currentUser ? currentUser.id : null,
+        company_id: getCompanyId()
       };
 
       var result = await sbQuery(sb.from('sales_payments').insert(payData).select());
@@ -4961,7 +4978,8 @@ async function invPaySave() {
       reference: reference || null,
       slip_url: slipUrl,
       notes: notes || null,
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
 
     var result = await sbQuery(sb.from('sales_invoice_payments').insert(payData).select());
@@ -5107,7 +5125,8 @@ async function cnSave() {
       credit_date: creditDate,
       amount: amount,
       reason: reason,
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
 
     var result = await sbQuery(sb.from('sales_credit_notes').insert(cnData).select());
@@ -5411,7 +5430,8 @@ async function invAddMoreDOs(invoiceId) {
 
     try {
       // Insert junction records
-      var juncArr = addIds.map(function(oid) { return { invoice_id: invoiceId, order_id: oid }; });
+      var juncCid = getCompanyId();
+      var juncArr = addIds.map(function(oid) { return { invoice_id: invoiceId, order_id: oid, company_id: juncCid }; });
       var jResult = await sbQuery(sb.from('sales_invoice_orders').insert(juncArr).select());
       if (jResult === null) return;
       (jResult || []).forEach(function(j) { invoiceOrders.push(j); });
@@ -5451,7 +5471,7 @@ async function invAddMoreDOs(invoiceId) {
         var p = pLines[j];
         subtotal += p.line_total;
         var iid = await dbNextId('II');
-        newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total });
+        newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
       }
       var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
       if (iResult) (iResult || []).forEach(function(ii) { invoiceItems.push(ii); });
@@ -5590,7 +5610,8 @@ async function invCreateDraftInvoice() {
       payment_status: 'unpaid',
       status: 'draft',
       notes: notesVal || null,
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
     var invResult = await sbQuery(sb.from('sales_invoices').insert(invData).select());
     if (invResult === null) { btnLoading(btn, false, 'Create Draft Invoice'); return; }
@@ -5607,15 +5628,17 @@ async function invCreateDraftInvoice() {
         product_name: p.product_name,
         quantity: p.quantity,
         unit_price: p.unit_price,
-        line_total: p.line_total
+        line_total: p.line_total,
+        company_id: getCompanyId()
       });
     }
     var itemsResult = await sbQuery(sb.from('sales_invoice_items').insert(itemsArray).select());
     if (itemsResult === null) { btnLoading(btn, false, 'Create Draft Invoice'); return; }
 
     // 7. Insert invoice-orders junction
+    var juncCid2 = getCompanyId();
     var junctionArray = selectedIds.map(function(orderId) {
-      return { invoice_id: invoiceId, order_id: orderId };
+      return { invoice_id: invoiceId, order_id: orderId, company_id: juncCid2 };
     });
     var juncResult = await sbQuery(sb.from('sales_invoice_orders').insert(junctionArray).select());
     if (juncResult === null) { btnLoading(btn, false, 'Create Draft Invoice'); return; }
@@ -6194,7 +6217,7 @@ async function soToggleWalkIn() {
     var walkIn = customers.find(function(c) { return c.name === 'Walk-In Customer'; });
     if (!walkIn) {
       var wId = await dbNextId('SC');
-      var wData = { id: wId, name: 'Walk-In Customer', phone: null, contact_person: null, address: null, type: 'individual', channel: 'walkin', payment_terms: 'cash', payment_terms_days: 0, notes: 'Auto-created for walk-in sales', is_active: true };
+      var wData = { id: wId, name: 'Walk-In Customer', phone: null, contact_person: null, address: null, type: 'individual', channel: 'walkin', payment_terms: 'cash', payment_terms_days: 0, notes: 'Auto-created for walk-in sales', is_active: true, company_id: getCompanyId() };
       var wResult = await sbQuery(sb.from('sales_customers').insert(wData).select());
       if (wResult) { walkIn = wResult[0] || wData; customers.push(walkIn); }
     }
@@ -6552,7 +6575,8 @@ async function soSaveOrder() {
           unit_price: parseFloat(item.unitPrice) || 0,
           line_total: item.lineTotal,
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
-          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null
+          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
+          company_id: getCompanyId()
         };
         var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
         if (itemResult === null) { btnLoading(btn, false, 'Save Changes'); return; }
@@ -6588,7 +6612,8 @@ async function soSaveOrder() {
         grand_total: subtotalVal,
         payment_status: 'unpaid',
         notes: document.getElementById('so-notes').value.trim() || null,
-        created_by: currentUser.id
+        created_by: currentUser.id,
+        company_id: getCompanyId()
       };
 
       var result = await sbQuery(sb.from('sales_orders').insert(orderData).select());
@@ -6606,7 +6631,8 @@ async function soSaveOrder() {
           unit_price: parseFloat(item.unitPrice) || 0,
           line_total: item.lineTotal,
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
-          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null
+          index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
+          company_id: getCompanyId()
         };
         var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
         if (itemResult === null) { btnLoading(btn, false, 'Create Order'); return; }
@@ -7605,6 +7631,7 @@ async function drvSave() {
     var newId = await dbNextId('SD');
     data.id = newId;
     data.is_active = true;
+    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from('sales_drivers').insert(data).select());
     if (result === null) return;
     salesDrivers.push(result[0] || data);
@@ -7756,7 +7783,8 @@ async function retSaveReturn() {
       debit_note_no: debitNoteNo,
       debit_note_used_on: null,
       photo_url: photoUrl,
-      created_by: currentUser ? currentUser.id : null
+      created_by: currentUser ? currentUser.id : null,
+      company_id: getCompanyId()
     };
 
     var result = await sbQuery(sb.from('sales_returns').insert(retData).select());
