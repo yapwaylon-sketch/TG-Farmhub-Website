@@ -1123,7 +1123,7 @@ async function loadAllData() {
     sbQuery(sb.from('sales_returns').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
     sbQuery(sb.from('crop_varieties').select('*').eq('archived', false)),
     sbQuery(sb.from('workers').select('id,name').eq('active', true)),
-    sbQuery(sb.from('sales_drivers').select('*').eq('company_id', cid).eq('is_active', true)),
+    sbQuery(sb.from('sales_drivers').select('*').eq('is_active', true)),
     sbQuery(sb.from('users').select('id,display_name,role')),
     sbQuery(sb.from('sales_invoices').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
     sbQuery(sb.from('sales_invoice_items').select('*').eq('company_id', cid)),
@@ -7631,7 +7631,6 @@ async function drvSave() {
     var newId = await dbNextId('SD');
     data.id = newId;
     data.is_active = true;
-    data.company_id = getCompanyId();
     var result = await sbQuery(sb.from('sales_drivers').insert(data).select());
     if (result === null) return;
     salesDrivers.push(result[0] || data);
