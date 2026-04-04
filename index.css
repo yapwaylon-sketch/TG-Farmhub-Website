@@ -61,6 +61,36 @@ body { height: auto; min-height: 100vh; overflow: auto; }
   display: inline-block; margin-top: 2px;
 }
 
+/* ===== COMPANY SWITCHER ===== */
+.hub-company-switcher {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px auto 0;
+  max-width: 400px;
+}
+.hub-company-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.hub-company-btn:hover {
+  border-color: var(--green);
+  color: var(--text);
+}
+.hub-company-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
 /* ===== NAV TABS ===== */
 .hub-nav {
   display: flex; gap: 0; padding: 0 32px; background: var(--bg-card);
@@ -159,6 +189,7 @@ body { height: auto; min-height: 100vh; overflow: auto; }
 @media (max-width: 768px) {
   .hub-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
   .hub-brand .hub-title { font-size: 18px; }
+  .hub-company-btn { font-size: 12px; padding: 8px 10px; }
   .hub-nav { padding: 0 12px; overflow-x: auto; }
   .hub-nav-item { padding: 10px 14px; font-size: 12px; white-space: nowrap; }
   .hub-content { padding: 20px 16px; }
