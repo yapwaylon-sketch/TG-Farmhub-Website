@@ -1951,7 +1951,6 @@ async function confirmAddWorker() {
     pay_rate: payRate, days_worked: 0, daily_wage: 0, ot_hours: 0, ot_pay: 0,
     responsibility_total: 0, deduct_advance: 0, deduct_loan: 0, deduct_shop: 0, deduct_other: 0,
     total_deductions: 0, task_total: 0, total_pay: 0, final_pay: 0,
-    company_id: getCompanyId(),
   };
   var result = await sbQuery(sb.from("payroll_entries").insert(entry).select());
   if (result === null) return;
@@ -2576,7 +2575,6 @@ async function initPayrollForAll() {
       responsibility_total: 0,
       deduct_advance: 0, deduct_loan: 0, deduct_shop: 0, deduct_other: 0,
       total_deductions: 0, task_total: 0, total_pay: 0, final_pay: 0,
-      company_id: getCompanyId(),
     });
   }
 
@@ -2811,7 +2809,6 @@ async function savePayrollEntry() {
       id: teId, payroll_entry_id: peId, period_id: currentPeriodId,
       worker_id: pe.worker_id, task_type_id: tid, task_name: t ? t.name : tid,
       quantity: d.quantity || 0, rate: d.rate || 0, total: d.total || 0,
-      company_id: getCompanyId(),
     };
     await sbQuery(sb.from("task_entries").upsert(teData, { onConflict: "period_id,worker_id,task_type_id" }).select());
     const existIdx = taskEntries.findIndex(te => te.id === teId);
