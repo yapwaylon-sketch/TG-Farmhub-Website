@@ -1714,7 +1714,7 @@ async function saveTaskType() {
   if (document.getElementById("tt-unit").value === "__custom__" && unit) {
     if (!taskUnits.some(u => u.name.toLowerCase() === unit.toLowerCase())) {
       const unitId = await dbNextId("TU");
-      const unitData = { id: unitId, name: unit, sort_order: taskUnits.length + 1, is_default: false, company_id: getCompanyId() };
+      const unitData = { id: unitId, name: unit, sort_order: taskUnits.length + 1, is_default: false };
       await sbQuery(sb.from("task_units").insert(unitData).select());
       taskUnits.push(unitData);
     }

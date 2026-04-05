@@ -402,11 +402,11 @@ function getJobProducts(jobId) {
   return jobProducts.filter(jp => jp.job_id === jobId);
 }
 async function loadLatestSprays() {
-  const data = await sbQuery(sb.from("pnd_latest_sprays").select("*").eq("company_id", getCompanyId()));
+  const data = await sbQuery(sb.from("pnd_latest_sprays").select("*"));
   if(data) latestSprays = data;
 }
 async function loadLatestSpraysByAI() {
-  const data = await sbQuery(sb.from("pnd_latest_sprays_by_ai").select("*").eq("company_id", getCompanyId()));
+  const data = await sbQuery(sb.from("pnd_latest_sprays_by_ai").select("*"));
   if(data) latestSpraysByAI = data;
 }
 async function loadAIComboDefaults() {

@@ -2438,7 +2438,7 @@ async function openIngredientManager() {
   closeIngredientManager();
 
   // Get usage counts per ingredient
-  const usageData = await sbQuery(sb.from('pnd_product_ingredients').select('ingredient_id'));
+  const usageData = await sbQuery(sb.from('pnd_product_ingredients').select('ingredient_id').eq('company_id', getCompanyId()));
   const usageCounts = {};
   if (usageData) {
     for (const row of usageData) {
@@ -2568,11 +2568,11 @@ async function ingConfirmMerge() {
   if (!source || !target) return;
 
   // 1. Get all product links for the source ingredient
-  const sourceLinks = await sbQuery(sb.from('pnd_product_ingredients').select('product_id').eq('ingredient_id', ingMergeSourceId));
+  const sourceLinks = await sbQuery(sb.from('pnd_product_ingredients').select('product_id').eq('ingredient_id', ingMergeSourceId).eq('company_id', getCompanyId()));
   if (sourceLinks && sourceLinks.length) {
     for (const link of sourceLinks) {
       // Check if target already linked to this product (avoid duplicate junction rows)
-      const existing = await sbQuery(sb.from('pnd_product_ingredients').select('id').eq('product_id', link.product_id).eq('ingredient_id', targetId));
+      const existing = await sbQuery(sb.from('pnd_product_ingredients').select('id').eq('product_id', link.product_id).eq('ingredient_id', targetId).eq('company_id', getCompanyId()));
       if (!existing || !existing.length) {
         // Point this link to the target ingredient
         await sbQuery(sb.from('pnd_product_ingredients').update({ ingredient_id: targetId }).eq('product_id', link.product_id).eq('ingredient_id', ingMergeSourceId).select());
@@ -2611,7 +2611,7 @@ async function ingDelete(id) {
 // After rename or merge, sync products.active_ingredient TEXT field from junction table
 async function ingSyncProductAIText(ingredientId) {
   // Find pnd_products using this ingredient
-  const links = await sbQuery(sb.from('pnd_product_ingredients').select('product_id').eq('ingredient_id', ingredientId));
+  const links = await sbQuery(sb.from('pnd_product_ingredients').select('product_id').eq('ingredient_id', ingredientId).eq('company_id', getCompanyId()));
   if (!links || !links.length) return;
   for (const link of links) {
     await ingSyncOneProductAI(link.product_id);
@@ -2620,7 +2620,7 @@ async function ingSyncProductAIText(ingredientId) {
 
 async function ingSyncAllProductAIText() {
   // Get all pnd_products that have an inventory link
-  const sprayProducts = await sbQuery(sb.from('pnd_products').select('id,inventory_product_id').not('inventory_product_id', 'is', null));
+  const sprayProducts = await sbQuery(sb.from('pnd_products').select('id,inventory_product_id').not('inventory_product_id', 'is', null).eq('company_id', getCompanyId()));
   if (!sprayProducts) return;
   for (const sp of sprayProducts) {
     await ingSyncOneProductAI(sp.id);
@@ -2629,7 +2629,7 @@ async function ingSyncAllProductAIText() {
 
 async function ingSyncOneProductAI(pndProductId) {
   // Get all ingredients for this spray product
-  const ings = await sbQuery(sb.from('pnd_product_ingredients').select('ingredient_id').eq('product_id', pndProductId));
+  const ings = await sbQuery(sb.from('pnd_product_ingredients').select('ingredient_id').eq('product_id', pndProductId).eq('company_id', getCompanyId()));
   const names = [];
   if (ings) {
     for (const row of ings) {
@@ -2639,7 +2639,7 @@ async function ingSyncOneProductAI(pndProductId) {
   }
   const aiText = names.join(' + ');
   // Find inventory product ID from pnd_products
-  const sp = await sbQuery(sb.from('pnd_products').select('inventory_product_id').eq('id', pndProductId));
+  const sp = await sbQuery(sb.from('pnd_products').select('inventory_product_id').eq('id', pndProductId).eq('company_id', getCompanyId()));
   if (sp && sp.length && sp[0].inventory_product_id) {
     await sbQuery(sb.from('products').update({ active_ingredient: aiText }).eq('id', sp[0].inventory_product_id).select());
     // Update local products array
@@ -2728,7 +2728,7 @@ async function saveProduct() {
       await sbQuery(sb.from('pnd_products').update(sprayUpdate).eq('inventory_product_id', editId).select());
       // Sync AI to pnd_product_ingredients if AI changed
       if (activeIngredient) {
-        const sprayProducts = await sbQuery(sb.from('pnd_products').select('id').eq('inventory_product_id', editId));
+        const sprayProducts = await sbQuery(sb.from('pnd_products').select('id').eq('inventory_product_id', editId).eq('company_id', getCompanyId()));
         if (sprayProducts && sprayProducts.length) {
           for (const sp of sprayProducts) {
             // Remove old AI links
