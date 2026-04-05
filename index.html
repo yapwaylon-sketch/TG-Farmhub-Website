@@ -1371,8 +1371,8 @@ async function fcDeleteBlock(blockId) {
   const reasons = [];
   const [bcCount, jobCount, logCount] = await Promise.all([
     sbQuery(sb.from('block_crops').select('id').eq('block_id', blockId)),
-    sbQuery(sb.from('pnd_jobs').select('id').eq('block_id', blockId)),
-    sbQuery(sb.from('pnd_spray_logs').select('id').eq('block_id', blockId))
+    sbQuery(sb.from('pnd_jobs').select('id').eq('block_id', blockId).eq('company_id', 'tg_agribusiness')),
+    sbQuery(sb.from('pnd_spray_logs').select('id').eq('block_id', blockId).eq('company_id', 'tg_agribusiness'))
   ]);
 
   if (bcCount && bcCount.length > 0) reasons.push(bcCount.length + ' crop assignment(s)');
@@ -1456,7 +1456,7 @@ async function fcSaveBlockCrop(id) {
     if(existing && existing.length > 0) {
       await sbQuery(sb.from('growth_records').update({ target_induce_date: targetInduceDate }).eq('id', existing[0].id).select());
     } else if(targetInduceDate) {
-      await sbQuery(sb.from('growth_records').insert({ block_crop_id: id, target_induce_date: targetInduceDate }).select());
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: id, target_induce_date: targetInduceDate, company_id: 'tg_agribusiness' }).select());
     }
   }
 
@@ -1526,7 +1526,7 @@ async function fcSaveToInduce(bcId) {
     const r = await sbQuery(sb.from('growth_records').update({ target_induce_date: targetDate }).eq('id', existing[0].id).select());
     if(r === null) return;
   } else {
-    const r = await sbQuery(sb.from('growth_records').insert({ block_crop_id: bcId, target_induce_date: targetDate }).select());
+    const r = await sbQuery(sb.from('growth_records').insert({ block_crop_id: bcId, target_induce_date: targetDate, company_id: 'tg_agribusiness' }).select());
     if(r === null) return;
   }
 
@@ -1621,6 +1621,7 @@ async function fcSaveInductionFromConfig(bcId) {
     if(grResult === null) return;
   } else {
     grData.block_crop_id = bcId;
+    grData.company_id = 'tg_agribusiness';
     const grResult = await sbQuery(sb.from('growth_records').insert(grData).select());
     if(grResult === null) return;
   }
@@ -1708,7 +1709,7 @@ async function fcDoAddCrop(blockId) {
       const d = new Date(datePlanted + 'T00:00:00');
       d.setDate(d.getDate() + daysToInduce);
       const targetInduceDate = d.toISOString().split('T')[0];
-      await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }).select());
+      await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate, company_id: 'tg_agribusiness' }).select());
     }
   }
 
@@ -1821,9 +1822,9 @@ async function fcDoNewCycle(oldBcId, blockId) {
     const d = new Date(datePlanted + 'T00:00:00');
     d.setDate(d.getDate() + daysToInduce);
     const targetInduceDate = d.toISOString().split('T')[0];
-    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate }).select());
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate, company_id: 'tg_agribusiness' }).select());
   } else {
-    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id }).select());
+    await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, company_id: 'tg_agribusiness' }).select());
   }
 
   notify('New cycle started — Cycle ' + nextCycle);

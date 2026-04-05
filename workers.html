@@ -2797,7 +2797,6 @@ async function savePayrollEntry() {
     const prData = {
       id: prId, payroll_entry_id: peId, period_id: currentPeriodId,
       worker_id: pe.worker_id, responsibility_name: rd.name, rate: rd.rate || 0,
-      company_id: getCompanyId(),
     };
     await sbQuery(sb.from("payroll_responsibilities").insert(prData).select());
     payrollResponsibilities.push(prData);

@@ -2498,7 +2498,7 @@ async function createInventoryProductAndLink(ingredientId) {
     id: newId, name: name, category: category, active_ingredient: ing.name,
     pack_unit: packUnit, pack_type: 'Bottle', pack_size: 0,
     current_stock: 0, opening_stock: 0, reorder_level: 0,
-    supplier_ids: [], archived: false
+    supplier_ids: [], archived: false, company_id: getCompanyId()
   };
 
   const result = await sbQuery(sb.from('products').insert(data).select());
