@@ -6,29 +6,37 @@
 <link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png?v=2">
 <title>TG Agro Fruits — Packing Station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════════════════════
    CSS Variables & Reset
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  --bg: #1A1F1A;
-  --bg-subtle: #1E241E;
-  --surface: #252B25;
-  --surface-2: #2E352E;
-  --border: rgba(70, 80, 70, 0.5);
+  /* Industrial Warehouse palette */
+  --bg:           #0E0E0E;   /* page + column body */
+  --card:         #1A1A1A;   /* order card + footer bar */
+  --divider:      #222;      /* column separators */
+  --footer-border:#333;      /* footer top border */
+  --text:         #ffffff;
+  --text-muted:   #888;      /* footer text */
+  --text-items:   #aaa;      /* card items line */
+
+  /* Status accents */
+  --c-received:   #FF5722;   /* orange */
+  --c-preparing:  #FFC107;   /* amber */
+  --c-prepared:   #4CAF50;   /* green */
+  --c-delivering: #2196F3;   /* blue */
+
+  /* Legacy tokens still used by gate/loading/auth */
+  --bg-subtle:    #1A1A1A;
+  --surface:      #1A1A1A;
+  --surface-2:    #222;
+  --border:       rgba(70, 80, 70, 0.5);
   --border-light: rgba(90, 100, 90, 0.6);
-  --text: #fafafa;
-  --text-dim: #b0b8b0;
-  --text-muted: #707870;
-  --green: #6B9E5E;
-  --gold: #E8A020;
-  --red: #E86060;
-  --blue: #6495ED;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --font: 'IBM Plex Sans', -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --text-dim:     #b0b8b0;
+  --green:        #4CAF50;
+  --red:          #E86060;
+  --font:         'Inter', -apple-system, sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
