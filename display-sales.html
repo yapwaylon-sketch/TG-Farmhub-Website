@@ -453,11 +453,11 @@ let rotateTimer = null;
 let paused = false;
 
 const STATUS_CONFIG = [
-  { key: "pending",    label: "ORDER RECEIVED",    emoji: "\u23F3",       cssClass: "sg-pending",    borderClass: "border-pending",    dimmed: false },
-  { key: "preparing",  label: "PREPARING",         emoji: "\uD83D\uDD04", cssClass: "sg-preparing",  borderClass: "border-preparing",  dimmed: false },
-  { key: "prepared",   label: "PREPARED",          emoji: "\u2705",       cssClass: "sg-prepared",   borderClass: "border-prepared",   dimmed: false },
-  { key: "delivering", label: "OUT FOR DELIVERY",  emoji: "\uD83D\uDE9A", cssClass: "sg-delivering", borderClass: "border-delivering", dimmed: true  },
-  { key: "completed",  label: "COMPLETED",         emoji: "\uD83C\uDFC1", cssClass: "sg-completed",  borderClass: "border-completed",  dimmed: true  }
+  { key: "pending",    label: "RECEIVED",   colKey: "received",   dimmed: false },
+  { key: "preparing",  label: "PREPARING",  colKey: "preparing",  dimmed: false },
+  { key: "prepared",   label: "PREPARED",   colKey: "prepared",   dimmed: false },
+  { key: "delivering", label: "DELIVERING", colKey: "delivering", dimmed: true  },
+  { key: "completed",  label: "COMPLETED",  colKey: null,         dimmed: true  }
 ];
 
 // ═══════════════════════════════════════════════════════════════
