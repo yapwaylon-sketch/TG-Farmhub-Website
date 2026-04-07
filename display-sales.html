@@ -91,6 +91,51 @@ body {
   margin-top: 8px;
   font-weight: 400;
 }
+#pwGate {
+  position: fixed; inset: 0; z-index: 10001;
+  background: var(--bg);
+  background-image: linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-family: var(--font);
+}
+#pwGate img { width: 96px; height: 96px; border-radius: 16px; margin-bottom: 24px; }
+#pwGate h1 { color: var(--text); font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; }
+#pwGate .gate-sub { color: var(--text-muted); font-size: 1rem; margin-bottom: 32px; }
+#pwGate input {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 24px;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-family: var(--font);
+  width: 320px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#pwGate input:focus { border-color: var(--green); }
+#pwGate button {
+  margin-top: 16px;
+  background: var(--green);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 48px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+#pwGate button:hover { opacity: 0.9; }
+#pwGate .gate-error {
+  color: var(--red);
+  font-size: 0.9rem;
+  margin-top: 12px;
+  min-height: 20px;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Layout
@@ -385,10 +430,14 @@ body {
 </head>
 <body>
 
-<!-- Auth Error -->
-<div id="authError">
-  <div>Access Denied</div>
-  <div class="sub">Invalid or missing token. Use ?token=pnd2026</div>
+<!-- Password Gate -->
+<div id="pwGate">
+  <img src="https://tgfarmhub.com/assets/logo.png?v=2" alt="TG">
+  <h1>PND Sales Display</h1>
+  <div class="gate-sub">Enter password to continue</div>
+  <input type="password" id="pwInput" placeholder="Password" autocomplete="off" autofocus>
+  <div class="gate-error" id="pwError"></div>
+  <button onclick="checkPassword()">Unlock</button>
 </div>
 
 <!-- Loading -->
@@ -437,16 +486,38 @@ body {
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// AUTH CHECK
+// PASSWORD GATE — session-based, re-prompts on browser restart
 // ═══════════════════════════════════════════════════════════════
-const VALID_TOKEN = "pnd2026";
-const params = new URLSearchParams(window.location.search);
-const token = params.get("token");
+const TV_PASSWORD = "tgtukau892312";
+const SESSION_KEY = "tg_tv_auth";
 
-if (token !== VALID_TOKEN) {
-  document.getElementById("authError").style.display = "flex";
+function checkPassword() {
+  const input = document.getElementById("pwInput");
+  const error = document.getElementById("pwError");
+  if (input.value === TV_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    document.getElementById("pwGate").style.display = "none";
+    document.getElementById("loadingOverlay").style.display = "flex";
+    init();
+  } else {
+    error.textContent = "Incorrect password";
+    input.value = "";
+    input.focus();
+  }
+}
+
+// Allow Enter key to submit
+document.getElementById("pwInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") checkPassword();
+});
+
+// If already authenticated this session, skip the gate
+const tvAuthed = sessionStorage.getItem(SESSION_KEY) === "1";
+if (tvAuthed) {
+  document.getElementById("pwGate").style.display = "none";
+} else {
+  // Hide loading overlay until password is entered
   document.getElementById("loadingOverlay").style.display = "none";
-  throw new Error("Invalid token");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -894,8 +965,8 @@ async function refreshData() {
   }
 }
 
-// Go
-init();
+// Go (only if already authenticated this session)
+if (tvAuthed) init();
 </script>
 </body>
 </html>
