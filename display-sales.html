@@ -666,86 +666,81 @@ function calcCardsPerColumn() {
 // ═══════════════════════════════════════════════════════════════
 function renderPages() {
   const container = document.getElementById("contentArea");
-  const dotsEl = document.getElementById("pageDots");
+  const pageInfoEl = document.getElementById("pageInfo");
+  const completedEl = document.getElementById("completedInfo");
 
-  if (pages.length === 0) {
-    container.innerHTML = '<div class="no-data">No orders for today or tomorrow</div>';
-    dotsEl.innerHTML = '';
-    document.getElementById("pageInfo").textContent = '';
+  // Empty state — all four columns empty
+  const allEmpty = columns.every(c => c.total === 0);
+  if (allEmpty) {
+    container.innerHTML = '<div class="iw-no-data">NO ORDERS FOR TODAY OR TOMORROW</div>';
+    pageInfoEl.textContent = '';
+    completedEl.textContent = (completedToday || 0) + ' COMPLETE TODAY';
     return;
   }
 
-  container.innerHTML = pages.map((pg, i) => {
-    let html = '<div class="sales-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">';
+  // Render four columns
+  container.innerHTML = columns.map(col => {
+    const pageIdx = currentPage < col.pages.length ? currentPage : -1;
+    const slice = pageIdx >= 0 ? col.pages[pageIdx] : [];
+    const dimClass = col.dimmed ? ' dimmed' : '';
+    const emptyClass = col.total === 0 ? ' empty' : '';
+    const countStr = String(col.total).padStart(2, '0');
 
-    pg.blocks.forEach(block => {
-      const dimClass = block.config.dimmed ? ' dimmed' : '';
-      if (block.type === 'header') {
-        const contLabel = block.continued ? ' (cont.)' : '';
-        html += '<div class="status-group-header ' + block.config.cssClass + dimClass + '">' +
-          '<span class="emoji">' + block.config.emoji + '</span>' +
-          '<span>' + block.config.label + contLabel + '</span>' +
-          '<span class="count">(' + block.count + ')</span>' +
-        '</div>';
-      } else if (block.type === 'cards') {
-        html += '<div class="orders-grid' + dimClass + '">';
-        block.orders.forEach(order => {
-          const custName = customers[order.customer_id] || "Unknown Customer";
-          const dateFmt = formatDeliveryDate(order.delivery_date);
-          const timeFmt = order.delivery_time ? formatTime(order.delivery_time) : "";
-          const dateTimeStr = dateFmt + (timeFmt ? " " + timeFmt : "");
+    let cardsHtml = '';
+    if (slice.length === 0 && col.total === 0) {
+      cardsHtml = ''; // empty column body, dim handled by .empty
+    } else {
+      cardsHtml = slice.map(order => renderCard(order)).join('');
+    }
 
-          html += '<div class="order-card ' + block.config.borderClass + '">';
-          html += '<div class="order-header">';
-          html += '<div class="order-customer">' + esc(custName) + '</div>';
-          html += '<div class="order-datetime">' + esc(dateTimeStr) + '</div>';
-          html += '</div>';
-
-          // Items
-          if (order.items && order.items.length > 0) {
-            html += '<ul class="order-items">';
-            order.items.forEach(item => {
-              const display = getItemDisplay(item);
-              html += '<li>' + esc(display.label) + ' — <span class="item-qty">' + display.qty + ' ' + esc(display.unit) + '</span></li>';
-            });
-            html += '</ul>';
-          }
-
-          // Footer: fulfillment badge + notes
-          html += '<div class="order-footer">';
-          html += getFulfillmentBadge(order);
-          if (order.notes) {
-            html += '<div class="order-notes" title="' + esc(order.notes) + '">' + esc(order.notes) + '</div>';
-          }
-          html += '</div>';
-          html += '</div>'; // .order-card
-        });
-        html += '</div>'; // .orders-grid
-      }
-    });
-
-    html += '</div>'; // .sales-page
-    return html;
+    return (
+      '<div class="iw-col' + dimClass + emptyClass + '" data-status="' + col.colKey + '">' +
+        '<div class="iw-col-head">' +
+          '<span class="iw-col-count">' + countStr + '</span>' +
+          '<span class="iw-col-label">' + col.label + '</span>' +
+        '</div>' +
+        '<div class="iw-col-body">' + cardsHtml + '</div>' +
+      '</div>'
+    );
   }).join('');
 
-  // Page dots
+  // Footer page indicator (only if any column actually paginates)
   if (pages.length > 1) {
-    dotsEl.innerHTML = pages.map((_, i) =>
-      '<div class="page-dot' + (i === currentPage ? ' active' : '') + '" data-page="' + i + '"></div>'
-    ).join('');
-    dotsEl.querySelectorAll('.page-dot').forEach(dot => {
-      dot.addEventListener('click', function() {
-        const idx = parseInt(this.getAttribute('data-page'));
-        if (idx === currentPage) return;
-        showPage(idx);
-        scheduleNextPage();
-      });
-    });
-    document.getElementById("pageInfo").textContent = "Page " + (currentPage + 1) + "/" + pages.length;
+    pageInfoEl.textContent = 'PAGE ' + (currentPage + 1) + ' \u00B7 ' + pages.length;
   } else {
-    dotsEl.innerHTML = '';
-    document.getElementById("pageInfo").textContent = '';
+    pageInfoEl.textContent = '';
   }
+  completedEl.textContent = (completedToday || 0) + ' COMPLETE TODAY';
+}
+
+function renderCard(order) {
+  const custName = customers[order.customer_id] || "Unknown Customer";
+
+  // Items: compact "2× Pineapple · 1× Jackfruit"
+  let itemsLine = '';
+  if (order.items && order.items.length > 0) {
+    itemsLine = order.items.map(item => {
+      const display = getItemDisplay(item);
+      const qty = display.qty;
+      return qty + '\u00D7 ' + display.label;
+    }).join(' \u00B7 ');
+  }
+
+  // Meta line: "10:30 · AF-SO012"
+  const timeStr = order.delivery_time ? formatTime(order.delivery_time) : '';
+  const docNo = order.doc_number || order.id || '';
+  let metaLine = '';
+  if (timeStr && docNo) metaLine = timeStr + ' \u00B7 ' + docNo;
+  else if (timeStr) metaLine = timeStr;
+  else if (docNo) metaLine = docNo;
+
+  return (
+    '<div class="iw-card">' +
+      '<div class="iw-card-customer">' + esc(custName) + '</div>' +
+      (itemsLine ? '<div class="iw-card-items">' + esc(itemsLine) + '</div>' : '') +
+      (metaLine ? '<div class="iw-card-meta">' + esc(metaLine) + '</div>' : '') +
+    '</div>'
+  );
 }
 
 function showPage(idx) {
