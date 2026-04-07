@@ -358,40 +358,33 @@ body {
 
 <!-- App -->
 <div class="app" id="appContainer" style="display:none;">
-  <!-- Header -->
-  <div class="header-row">
-    <header class="app-header">
-      <img src="https://tgfarmhub.com/assets/logo.png?v=2" alt="TG Agro Fruits" class="header-logo">
-      <div class="header-text">
-        <div class="header-title">
-          <span>TG Agro Fruits — Packing Station</span>
-          <span class="live-dot"></span>
-          <span class="live-label">Live</span>
-        </div>
-        <div class="header-meta">
-          <span id="clockDisplay"></span>
-          <span id="lastUpdate"></span>
-        </div>
-      </div>
-      <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">
+
+  <!-- Orange header bar -->
+  <header class="iw-header">
+    <div class="iw-header-title">TG AGRO FRUITS · PACKING STATION · LIVE</div>
+    <div style="display:flex;align-items:center;">
+      <div class="iw-header-clock" id="clockDisplay"></div>
+      <button class="iw-fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">
         <svg id="fsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path id="fsExpand" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
           <path id="fsShrink" d="M4 14h3a2 2 0 012 2v3m6-9h3a2 2 0 002-2V5m-9 0v3a2 2 0 01-2 2H4m16 4v3a2 2 0 01-2 2h-3" style="display:none"/>
         </svg>
       </button>
-    </header>
+    </div>
+  </header>
+
+  <!-- 4-column grid (rendered by JS) -->
+  <div class="iw-grid" id="contentArea"></div>
+
+  <!-- Footer bar -->
+  <div class="iw-footer">
+    <span id="refreshInfo">UPDATED 0S AGO · AUTO-REFRESH 60S</span>
+    <div class="iw-footer-right">
+      <span id="pageInfo"></span>
+      <span id="completedInfo">0 COMPLETE TODAY</span>
+    </div>
   </div>
 
-  <!-- Content -->
-  <div class="content-area" id="contentArea"></div>
-
-  <!-- Footer -->
-  <div class="footer-bar">
-    <span id="refreshInfo">Auto-refresh: 60s</span>
-    <div class="page-dots" id="pageDots"></div>
-    <span id="pageInfo"></span>
-    <span id="dataTime"></span>
-  </div>
 </div>
 
 <script>
