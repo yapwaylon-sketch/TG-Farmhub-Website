@@ -585,21 +585,30 @@ document.addEventListener('fullscreenchange', () => {
 // ═══════════════════════════════════════════════════════════════
 // BUILD PAGES
 // ═══════════════════════════════════════════════════════════════
+// State holding the rendered grid model + completed count
+let columns = [];           // [{ colKey, label, dimmed, total, pages: [[order, ...], ...] }, ...]
+let completedToday = 0;     // count of orders with status="completed" delivered today
+
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + "T00:00:00");
+  const t = new Date();
+  return d.toDateString() === t.toDateString();
+}
+
 function buildPages() {
-  // Group orders by status
+  // 1. Group orders by status key
   const grouped = {};
   STATUS_CONFIG.forEach(s => { grouped[s.key] = []; });
 
   orders.forEach(order => {
     const status = (order.status || "pending").toLowerCase().replace(/\s+/g, '_');
     if (!grouped[status]) grouped[status] = [];
-
-    // Attach items to order
     const items = orderItems.filter(i => i.order_id === order.id);
     grouped[status].push({ ...order, items });
   });
 
-  // Sort each group FIFO (oldest first by created_at)
+  // 2. FIFO sort within each group (oldest created_at first)
   Object.keys(grouped).forEach(key => {
     grouped[key].sort((a, b) => {
       const aT = a.created_at || '';
@@ -608,76 +617,48 @@ function buildPages() {
     });
   });
 
-  // Build content blocks: array of { type: 'header'|'cards', ... }
-  const blocks = [];
-  STATUS_CONFIG.forEach(sc => {
-    const grp = grouped[sc.key];
-    if (!grp || grp.length === 0) return;
-    blocks.push({ type: 'header', config: sc, count: grp.length });
-    blocks.push({ type: 'cards', config: sc, orders: grp });
-  });
+  // 3. "Completed today" footer counter
+  completedToday = (grouped["completed"] || []).filter(o => isToday(o.delivery_date)).length;
 
-  if (blocks.length === 0) {
-    pages = [];
-    return;
-  }
-
-  // Estimate how many cards fit per page
-  const maxCards = calcMaxCards();
-
-  // Flatten into pages
-  pages = [];
-  let currentPageBlocks = [];
-  let currentCardCount = 0;
-
-  blocks.forEach(block => {
-    if (block.type === 'header') {
-      currentPageBlocks.push(block);
-    } else if (block.type === 'cards') {
-      const ordersList = block.orders;
-      let idx = 0;
-
-      while (idx < ordersList.length) {
-        const remaining = maxCards - currentCardCount;
-        if (remaining <= 0) {
-          // Start new page
-          pages.push({ blocks: currentPageBlocks });
-          currentPageBlocks = [{ type: 'header', config: block.config, count: ordersList.length, continued: true }];
-          currentCardCount = 0;
+  // 4. Build the four visible columns with per-column pagination
+  const cardsPerCol = calcCardsPerColumn();
+  columns = STATUS_CONFIG
+    .filter(sc => sc.colKey !== null)
+    .map(sc => {
+      const list = grouped[sc.key] || [];
+      const colPages = [];
+      if (list.length === 0) {
+        colPages.push([]);
+      } else {
+        for (let i = 0; i < list.length; i += cardsPerCol) {
+          colPages.push(list.slice(i, i + cardsPerCol));
         }
-
-        const take = Math.min(ordersList.length - idx, maxCards - currentCardCount);
-        if (take <= 0) {
-          pages.push({ blocks: currentPageBlocks });
-          currentPageBlocks = [{ type: 'header', config: block.config, count: ordersList.length, continued: true }];
-          currentCardCount = 0;
-          continue;
-        }
-
-        const slice = ordersList.slice(idx, idx + take);
-        currentPageBlocks.push({ type: 'cards', config: block.config, orders: slice });
-        currentCardCount += slice.length;
-        idx += take;
       }
-    }
-  });
+      return {
+        colKey: sc.colKey,
+        label: sc.label,
+        dimmed: sc.dimmed,
+        total: list.length,
+        pages: colPages
+      };
+    });
 
-  if (currentPageBlocks.length > 0) {
-    pages.push({ blocks: currentPageBlocks });
-  }
+  // 5. Global pages = max page count across columns (each column rotates in lock-step)
+  const maxPages = Math.max(1, ...columns.map(c => c.pages.length));
+  pages = new Array(maxPages).fill(null).map((_, i) => ({ index: i }));
 }
 
-function calcMaxCards() {
-  // Estimate based on viewport height
-  const headerH = 90;
-  const footerH = 40;
-  const available = window.innerHeight - headerH - footerH - 40;
-  // Each card ~110px, header ~45px, assume ~2 status groups visible
-  const cardH = 110;
-  const statusHeaderH = 45;
-  const estimatedHeaders = 2;
-  const usable = available - (estimatedHeaders * statusHeaderH);
-  return Math.max(3, Math.floor(usable / cardH));
+function calcCardsPerColumn() {
+  // Each column has: header (~80px) + body
+  // Card height ~70px (12+14 padding + 3 lines of text + 6px gap to next)
+  const headerH = 50;     // orange header bar
+  const footerH = 36;     // footer bar
+  const colHeaderH = 80;  // count + label + 3px border + 14px margin
+  const colPadding = 32;  // 16px top + 16px bottom
+  const cardH = 78;       // card outer height including the 10px gap
+
+  const available = window.innerHeight - headerH - footerH - colHeaderH - colPadding;
+  return Math.max(2, Math.floor(available / cardH));
 }
 
 // ═══════════════════════════════════════════════════════════════
