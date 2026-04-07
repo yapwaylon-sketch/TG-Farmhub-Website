@@ -744,23 +744,9 @@ function renderCard(order) {
 }
 
 function showPage(idx) {
-  const cur = document.getElementById("page-" + currentPage);
-  if (cur) cur.classList.remove("active");
-
-  currentPage = idx % pages.length;
-
-  setTimeout(() => {
-    const next = document.getElementById("page-" + currentPage);
-    if (next) next.classList.add("active");
-
-    document.querySelectorAll(".page-dot").forEach((d, i) => {
-      d.classList.toggle("active", i === currentPage);
-    });
-
-    if (pages.length > 1) {
-      document.getElementById("pageInfo").textContent = "Page " + (currentPage + 1) + "/" + pages.length;
-    }
-  }, 50);
+  if (pages.length === 0) return;
+  currentPage = ((idx % pages.length) + pages.length) % pages.length;
+  renderPages();
 }
 
 function nextPage() {
@@ -784,14 +770,34 @@ function scheduleNextPage() {
 // ═══════════════════════════════════════════════════════════════
 function updateClock() {
   const now = new Date();
-  const opts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-  document.getElementById("clockDisplay").textContent = now.toLocaleDateString('en-GB', opts);
+  // "10:42 AM · TUE 7 APR"
+  let h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const dow = days[now.getDay()];
+  const day = now.getDate();
+  const mon = months[now.getMonth()];
+  const text = h + ':' + m + ' ' + ampm + ' \u00B7 ' + dow + ' ' + day + ' ' + mon;
+  const el = document.getElementById("clockDisplay");
+  if (el) el.textContent = text;
 }
 
+let lastRefreshAt = Date.now();
+
 function updateLastRefresh() {
-  const now = new Date();
-  const hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  document.getElementById("dataTime").textContent = "Data: " + hm;
+  lastRefreshAt = Date.now();
+  tickRefreshLabel();
+}
+
+function tickRefreshLabel() {
+  const el = document.getElementById("refreshInfo");
+  if (!el) return;
+  const secs = Math.max(0, Math.floor((Date.now() - lastRefreshAt) / 1000));
+  el.textContent = 'UPDATED ' + secs + 'S AGO · AUTO-REFRESH 60S';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -813,6 +819,7 @@ async function init() {
     // Start clock
     updateClock();
     setInterval(updateClock, 1000);
+    setInterval(tickRefreshLabel, 1000);
 
     // Start page rotation
     scheduleNextPage();
