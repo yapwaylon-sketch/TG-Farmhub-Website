@@ -257,7 +257,14 @@ body {
 .sg-preparing .count { color: #1a1a1a; }
 .sg-prepared { background: var(--green); }
 .sg-out-delivery { background: var(--blue); }
+.sg-delivering { background: var(--blue); }
+.sg-completed { background: #555; }
 .sg-awaiting-collection { background: var(--blue); }
+
+/* Dimmed status groups for done work (delivering, completed) */
+.status-group-header.dimmed { opacity: 0.55; }
+.orders-grid.dimmed { opacity: 0.55; }
+.orders-grid.dimmed .order-card { background: var(--bg-subtle); }
 
 /* ═══════════════════════════════════════════════════════════════
    Order Cards
@@ -280,6 +287,8 @@ body {
 .order-card.border-preparing { border-left-color: var(--gold); }
 .order-card.border-prepared { border-left-color: var(--green); }
 .order-card.border-out-delivery { border-left-color: var(--blue); }
+.order-card.border-delivering { border-left-color: var(--blue); }
+.order-card.border-completed { border-left-color: #555; }
 .order-card.border-awaiting-collection { border-left-color: var(--blue); }
 
 .order-header {
@@ -550,11 +559,11 @@ let rotateTimer = null;
 let paused = false;
 
 const STATUS_CONFIG = [
-  { key: "pending",              label: "ORDER RECEIVED",       emoji: "\u23F3", cssClass: "sg-pending",              borderClass: "border-pending" },
-  { key: "preparing",           label: "PREPARING",            emoji: "\uD83D\uDD04", cssClass: "sg-preparing",            borderClass: "border-preparing" },
-  { key: "prepared",            label: "PREPARED",             emoji: "\u2705", cssClass: "sg-prepared",             borderClass: "border-prepared" },
-  { key: "out_for_delivery",    label: "READY FOR DELIVERY",   emoji: "\uD83D\uDE9A", cssClass: "sg-out-delivery",         borderClass: "border-out-delivery" },
-  { key: "awaiting_collection", label: "AWAITING COLLECTION",  emoji: "\uD83C\uDFEA", cssClass: "sg-awaiting-collection",  borderClass: "border-awaiting-collection" }
+  { key: "pending",    label: "ORDER RECEIVED",    emoji: "\u23F3",       cssClass: "sg-pending",    borderClass: "border-pending",    dimmed: false },
+  { key: "preparing",  label: "PREPARING",         emoji: "\uD83D\uDD04", cssClass: "sg-preparing",  borderClass: "border-preparing",  dimmed: false },
+  { key: "prepared",   label: "PREPARED",          emoji: "\u2705",       cssClass: "sg-prepared",   borderClass: "border-prepared",   dimmed: false },
+  { key: "delivering", label: "OUT FOR DELIVERY",  emoji: "\uD83D\uDE9A", cssClass: "sg-delivering", borderClass: "border-delivering", dimmed: true  },
+  { key: "completed",  label: "COMPLETED",         emoji: "\uD83C\uDFC1", cssClass: "sg-completed",  borderClass: "border-completed",  dimmed: true  }
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -696,6 +705,15 @@ function buildPages() {
     grouped[status].push({ ...order, items });
   });
 
+  // Sort each group FIFO (oldest first by created_at)
+  Object.keys(grouped).forEach(key => {
+    grouped[key].sort((a, b) => {
+      const aT = a.created_at || '';
+      const bT = b.created_at || '';
+      return aT.localeCompare(bT);
+    });
+  });
+
   // Build content blocks: array of { type: 'header'|'cards', ... }
   const blocks = [];
   STATUS_CONFIG.forEach(sc => {
@@ -786,15 +804,16 @@ function renderPages() {
     let html = '<div class="sales-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">';
 
     pg.blocks.forEach(block => {
+      const dimClass = block.config.dimmed ? ' dimmed' : '';
       if (block.type === 'header') {
         const contLabel = block.continued ? ' (cont.)' : '';
-        html += '<div class="status-group-header ' + block.config.cssClass + '">' +
+        html += '<div class="status-group-header ' + block.config.cssClass + dimClass + '">' +
           '<span class="emoji">' + block.config.emoji + '</span>' +
           '<span>' + block.config.label + contLabel + '</span>' +
           '<span class="count">(' + block.count + ')</span>' +
         '</div>';
       } else if (block.type === 'cards') {
-        html += '<div class="orders-grid">';
+        html += '<div class="orders-grid' + dimClass + '">';
         block.orders.forEach(order => {
           const custName = customers[order.customer_id] || "Unknown Customer";
           const dateFmt = formatDeliveryDate(order.delivery_date);
