@@ -241,7 +241,7 @@
     <div class="form-row">
       <div class="form-field">
         <label>UNIT</label>
-        <select id="sp-unit" style="width:100%;">
+        <select id="sp-unit" style="width:100%;" onchange="spUnitChange()">
           <option value="kg">kg</option>
           <option value="pcs">pcs</option>
           <option value="box">box</option>
@@ -251,6 +251,9 @@
         <label>DEFAULT PRICE (RM)</label>
         <input type="number" id="sp-price" step="0.01" min="0" placeholder="0.00" style="width:100%;">
       </div>
+    </div>
+    <div id="sp-dual-unit-note" style="display:none;font-size:11px;color:var(--gold-light);background:rgba(232,160,32,0.08);border:1px solid rgba(232,160,32,0.25);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.4;">
+      <strong style="color:var(--gold);">Dual-unit:</strong> This product can also be ordered in <strong>pcs</strong> at order time. Pricing is always per kg — pcs orders are weighed at "Mark Prepared" and billed by weight.
     </div>
     <div class="form-row">
       <div class="form-field">
@@ -1663,6 +1666,14 @@ function soRenderCard(o, status, color, label) {
   if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + '</span>';
   h += '</div><div class="sales-card-total">' + formatRM(total) + '</div></div>';
 
+  // Order notes (if any)
+  if (o.notes && o.notes.trim()) {
+    h += '<div style="padding:6px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--gold-light);background:rgba(232,160,32,0.08);">';
+    h += '<span style="font-weight:700;text-transform:uppercase;font-size:10px;color:var(--gold);">Note: </span>';
+    h += esc(o.notes);
+    h += '</div>';
+  }
+
   // Item list
   var oItems = orderItems.filter(function(i) { return i.order_id === o.id; });
   if (oItems.length) {
@@ -2015,10 +2026,24 @@ function soRenderDetail() {
     } else {
       html += '<button class="btn btn-primary" id="btn-mark-collected" onclick="soMarkCollected(\'' + esc(o.id) + '\')">Mark Collected</button>';
     }
+    var docLabel = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
+    html += '<button class="btn btn-outline" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+    html += 'Print ' + docLabel + '</button>';
+    html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
+    html += 'Print A4 ' + docLabel + '</button>';
     html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
     html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'delivering') {
     html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
+    var docLabel = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
+    html += '<button class="btn btn-outline" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+    html += 'Print ' + docLabel + '</button>';
+    html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
+    html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
+    html += 'Print A4 ' + docLabel + '</button>';
     html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
   }
 
@@ -2219,6 +2244,7 @@ function buildPrepMessage(orderId) {
     var nameBM = getProductNameBM(prod);
     var qty = item.quantity || 0;
     var unit = prod ? (prod.unit || '') : '';
+    var isPcs = item.order_pcs != null;
 
     var line = '\u2022 ';
     if (varName && varName !== '\u2014') line += varName + ' ';
@@ -2228,7 +2254,11 @@ function buildPrepMessage(orderId) {
     } else if (item.index_min != null) {
       line += ' (Index ' + item.index_min + ')';
     }
-    line += ' \u2014 ' + qty + (unit ? ' ' + unit : '');
+    if (isPcs) {
+      line += ' \u2014 ' + item.order_pcs + ' pcs (timbang ikut kg)';
+    } else {
+      line += ' \u2014 ' + qty + (unit ? ' ' + unit : '');
+    }
     msg += line + '\n';
   });
 
@@ -2318,22 +2348,34 @@ async function soMarkPrepared(orderId) {
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
 
   var html = '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-  html += '<thead><tr><th>Product</th><th style="text-align:right;">Ordered</th><th style="text-align:right;width:100px;">Actual</th><th>Unit</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
+  html += '<thead><tr><th>Product</th><th style="text-align:right;">Ordered</th><th style="text-align:right;width:100px;">Prepared</th><th style="text-align:right;width:100px;">Weight (kg)</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
 
   items.forEach(function(item, idx) {
     var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
     var name = soGetProductName(item.product_id);
     var unit = prod ? (prod.unit || '') : '';
     var price = parseFloat(item.unit_price) || 0;
-    var qty = item.quantity || 0;
+    var isPcs = item.order_pcs != null;
+    var orderedDisplay = isPcs ? (item.order_pcs + ' pcs') : ((item.quantity || 0) + ' ' + unit);
+    var preparedQty = isPcs ? item.order_pcs : (item.quantity || 0);
+    var weightVal = item.actual_weight_kg != null ? item.actual_weight_kg : (isPcs ? '' : (item.quantity || 0));
+    var weightLabel = isPcs ? 'kg' : unit;
 
     html += '<tr>';
-    html += '<td style="font-weight:600;">' + esc(name) + '</td>';
-    html += '<td style="text-align:right;color:var(--text-muted);">' + qty + '</td>';
-    html += '<td style="text-align:right;"><input type="number" class="prepqty-input" data-item-id="' + esc(item.id) + '" data-price="' + price + '" value="' + qty + '" min="0" step="any" oninput="soPrepQtyRecalc()" style="width:80px;text-align:right;padding:4px 6px;font-size:13px;"></td>';
-    html += '<td>' + esc(unit) + '</td>';
+    html += '<td style="font-weight:600;">' + esc(name) + (isPcs ? ' <span style="font-size:10px;color:var(--text-muted);">[ordered in pcs]</span>' : '') + '</td>';
+    html += '<td style="text-align:right;color:var(--text-muted);">' + esc(orderedDisplay) + '</td>';
+    html += '<td style="text-align:right;">';
+    if (isPcs) {
+      html += '<input type="number" class="prepqty-pcs-input" data-item-id="' + esc(item.id) + '" value="' + preparedQty + '" min="0" step="1" style="width:70px;text-align:right;padding:4px 6px;font-size:13px;"> pcs';
+    } else {
+      html += '<span style="color:var(--text-muted);font-size:11px;">— same —</span>';
+    }
+    html += '</td>';
+    html += '<td style="text-align:right;">';
+    html += '<input type="number" class="prepqty-input" data-item-id="' + esc(item.id) + '" data-price="' + price + '" data-is-pcs="' + (isPcs ? '1' : '0') + '" value="' + weightVal + '" min="0" step="any" oninput="soPrepQtyRecalc()" placeholder="' + (isPcs ? 'required' : '') + '" style="width:80px;text-align:right;padding:4px 6px;font-size:13px;' + (isPcs && weightVal === '' ? 'border-color:#E8A020;' : '') + '"> ' + weightLabel;
+    html += '</td>';
     html += '<td style="text-align:right;">' + price.toFixed(2) + '</td>';
-    html += '<td style="text-align:right;font-weight:600;" id="prepqty-line-' + idx + '">' + (qty * price).toFixed(2) + '</td>';
+    html += '<td style="text-align:right;font-weight:600;" id="prepqty-line-' + idx + '">' + ((parseFloat(weightVal) || 0) * price).toFixed(2) + '</td>';
     html += '</tr>';
   });
 
@@ -2360,28 +2402,57 @@ function soPrepQtyRecalc() {
 async function soPrepQtyConfirm() {
   var orderId = soPrepQtyOrderId;
   var btn = document.getElementById('so-prepqty-confirm');
+
+  // Pre-validate: every pcs-ordered line must have a weight > 0
+  var weightInputs = document.querySelectorAll('.prepqty-input');
+  for (var v = 0; v < weightInputs.length; v++) {
+    var w = weightInputs[v];
+    if (w.dataset.isPcs === '1' && !(parseFloat(w.value) > 0)) {
+      notify('Please enter actual weight for all pcs-ordered items', 'warning');
+      w.focus();
+      return;
+    }
+  }
+
   btnLoading(btn, true);
 
-  // Update each item's quantity + line_total
+  // Build a map of itemId -> prepared pcs (for pcs-ordered lines)
+  var pcsMap = {};
+  document.querySelectorAll('.prepqty-pcs-input').forEach(function(inp) {
+    pcsMap[inp.dataset.itemId] = parseInt(inp.value, 10) || 0;
+  });
+
+  // Update each item's quantity + line_total + (for pcs lines) order_pcs + actual_weight_kg
   var inputs = document.querySelectorAll('.prepqty-input');
   var grandTotal = 0;
   for (var i = 0; i < inputs.length; i++) {
     var inp = inputs[i];
     var itemId = inp.dataset.itemId;
+    var isPcsLine = inp.dataset.isPcs === '1';
     var newQty = parseFloat(inp.value) || 0;
     var price = parseFloat(inp.dataset.price) || 0;
     var lineTotal = newQty * price;
     grandTotal += lineTotal;
+
+    var updatePayload = { quantity: newQty, line_total: lineTotal };
+    if (isPcsLine) {
+      updatePayload.actual_weight_kg = newQty;
+      updatePayload.order_pcs = pcsMap[itemId] || 0;
+    }
 
     // Update local array
     var localItem = orderItems.find(function(x) { return x.id === itemId; });
     if (localItem) {
       localItem.quantity = newQty;
       localItem.line_total = lineTotal;
+      if (isPcsLine) {
+        localItem.actual_weight_kg = newQty;
+        localItem.order_pcs = pcsMap[itemId] || 0;
+      }
     }
 
     // Update DB
-    await sbQuery(sb.from('sales_order_items').update({ quantity: newQty, line_total: lineTotal }).eq('id', itemId).select());
+    await sbQuery(sb.from('sales_order_items').update(updatePayload).eq('id', itemId).select());
   }
 
   // Update order grand_total
@@ -3487,7 +3558,11 @@ function renderProducts() {
       html += '<tr' + dimStyle + '>';
       html += '<td><strong>' + esc(p.name) + '</strong>' + (boxInfo ? '<span style="color:var(--text-muted);font-size:11px;">' + esc(boxInfo) + '</span>' : '') + '</td>';
       html += '<td><span class="badge badge-outline">' + esc(spCategoryLabel(p.category)) + '</span></td>';
-      html += '<td>' + esc(p.unit || '-') + '</td>';
+      var unitCell = esc(p.unit || '-');
+      if (p.unit === 'kg') {
+        unitCell += ' <span style="display:inline-block;font-size:9px;font-weight:700;color:var(--gold);background:rgba(232,160,32,0.12);border:1px solid rgba(232,160,32,0.35);border-radius:4px;padding:1px 5px;margin-left:4px;letter-spacing:0.3px;" title="Can also be ordered in pcs (billed by kg after weighing)">+ PCS</span>';
+      }
+      html += '<td>' + unitCell + '</td>';
       html += '<td>' + formatRM(p.default_price || 0) + '</td>';
       html += '<td>' + statusBadge + '</td>';
       html += '<td><div style="display:flex;gap:4px;">';
@@ -3513,6 +3588,12 @@ function spCategoryLabel(cat) {
 
 function spCategoryChange() {
   // No-op — packing info always visible now
+}
+
+function spUnitChange() {
+  var unit = document.getElementById('sp-unit').value;
+  var note = document.getElementById('sp-dual-unit-note');
+  if (note) note.style.display = (unit === 'kg') ? 'block' : 'none';
 }
 
 function spOpenModal(editId) {
@@ -3552,6 +3633,7 @@ function spOpenModal(editId) {
   }
 
   spCategoryChange();
+  spUnitChange();
   modal.style.display = 'flex';
   trapFocus(modal.querySelector('.modal-box'));
 }
@@ -5546,6 +5628,23 @@ async function invCreateDraftInvoice() {
   var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
   if (!selectedIds.length) { notify('Select at least one DO', 'warning'); return; }
 
+  // Guard: every selected DO must have all pcs-ordered lines weighed
+  var pendingByOrder = {};
+  selectedIds.forEach(function(orderId) {
+    var pending = orderItems.filter(function(i) {
+      return i.order_id === orderId && i.order_pcs != null && (i.actual_weight_kg == null || !(parseFloat(i.actual_weight_kg) > 0));
+    }).length;
+    if (pending > 0) pendingByOrder[orderId] = pending;
+  });
+  var pendingOrderIds = Object.keys(pendingByOrder);
+  if (pendingOrderIds.length) {
+    var firstOrderId = pendingOrderIds[0];
+    var firstOrder = orders.find(function(o) { return o.id === firstOrderId; });
+    var label = firstOrder ? (firstOrder.doc_number || firstOrder.id) : firstOrderId;
+    notify('Cannot invoice — order ' + label + ' has ' + pendingByOrder[firstOrderId] + ' item(s) pending weight. Mark Prepared first.', 'warning');
+    return;
+  }
+
   var invoiceDateVal = (document.getElementById('inv-date') || {}).value || todayStr();
   var paymentTermsDays = parseInt((document.getElementById('inv-terms') || {}).value, 10) || 0;
   var notesVal = ((document.getElementById('inv-notes') || {}).value || '').trim();
@@ -6256,8 +6355,8 @@ function openNewOrderModal(editOrderId) {
   wBtn.style.background = ''; wBtn.style.color = ''; wBtn.style.borderColor = '';
   document.getElementById('so-order-date').value = todayStr();
   calUpdateDisplay('so-order-date', todayStr());
-  document.getElementById('so-delivery-date').value = '';
-  calUpdateDisplay('so-delivery-date', '');
+  document.getElementById('so-delivery-date').value = todayStr();
+  calUpdateDisplay('so-delivery-date', todayStr());
   document.getElementById('so-delivery-time').value = '';
   document.getElementById('so-fulfillment').value = 'delivery';
   document.getElementById('so-doc-type').value = 'cash_sales';
@@ -6296,16 +6395,19 @@ function openNewOrderModal(editOrderId) {
     var existingItems = orderItems.filter(function(i) { return i.order_id === soEditOrderId; });
     existingItems.forEach(function(item) {
       var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+      var isPcsOrdered = item.order_pcs != null;
       soItems.push({
         id: Date.now() + Math.random(),
         productId: item.product_id || '',
-        quantity: item.quantity || '',
+        quantity: isPcsOrdered ? '' : (item.quantity || ''),
         unitPrice: item.unit_price || '',
         unit: prod ? (prod.unit || '') : '',
         indexMin: item.index_min != null ? String(item.index_min) : '',
         indexMax: item.index_max != null ? String(item.index_max) : '',
         lineTotal: parseFloat(item.line_total) || 0,
-        existingItemId: item.id // track for update
+        existingItemId: item.id, // track for update
+        orderInPcs: isPcsOrdered,
+        orderPcs: isPcsOrdered ? String(item.order_pcs) : ''
       });
     });
     if (!soItems.length) soAddItem();
@@ -6405,7 +6507,7 @@ function soAddCustomerInline() {
 var soInlineCustomerAdd = false;
 
 function soAddItem() {
-  soItems.push({ id: Date.now(), productId: '', quantity: '', unitPrice: '', unit: '', indexMin: '', indexMax: '', lineTotal: 0 });
+  soItems.push({ id: Date.now(), productId: '', quantity: '', unitPrice: '', unit: '', indexMin: '', indexMax: '', lineTotal: 0, orderInPcs: false, orderPcs: '' });
 }
 
 function soRemoveItem(id) {
@@ -6462,10 +6564,25 @@ function soRenderItems() {
     html += '</div>';
 
     // Qty + Unit + Price row
+    var canTogglePcs = unitLabel === 'kg' && !soIsWalkIn;
+    var pcsMode = !!item.orderInPcs;
+    var qtyDisplayValue = pcsMode ? (item.orderPcs || '') : (item.quantity || '');
+    var qtyPlaceholder = pcsMode ? 'Pcs' : 'Qty';
+    var qtyHandlerField = pcsMode ? 'orderPcs' : 'quantity';
+    var qtyStepRender = pcsMode ? '1' : qtyStep;
+    var unitDisplay = pcsMode ? 'pcs' : unitLabel;
+
     html += '<div class="oir-nums-row">';
-    html += '<div class="oir-qty"><input type="number" step="' + qtyStep + '" min="0" placeholder="Qty" value="' + (item.quantity || '') + '" oninput="soItemFieldChange(' + item.id + ',\'quantity\',this.value);soCalcTotals()"></div>';
-    html += '<div class="oir-unit">' + esc(unitLabel) + '</div>';
-    html += '<div class="oir-price"><input type="number" step="0.01" min="0" placeholder="Price" value="' + (item.unitPrice || '') + '" oninput="soItemFieldChange(' + item.id + ',\'unitPrice\',this.value);soCalcTotals()"></div>';
+    html += '<div class="oir-qty"><input type="number" step="' + qtyStepRender + '" min="0" placeholder="' + qtyPlaceholder + '" value="' + qtyDisplayValue + '" oninput="soItemFieldChange(' + item.id + ',\'' + qtyHandlerField + '\',this.value);soCalcTotals()"></div>';
+    if (canTogglePcs) {
+      html += '<div class="oir-unit"><select onchange="soTogglePcsMode(' + item.id + ',this.value===\'pcs\')" style="padding:6px 4px;font-size:13px;" title="Order by kg or pcs (pcs lines are billed in kg after weighing)">';
+      html += '<option value="kg"' + (pcsMode ? '' : ' selected') + '>kg</option>';
+      html += '<option value="pcs"' + (pcsMode ? ' selected' : '') + '>pcs</option>';
+      html += '</select></div>';
+    } else {
+      html += '<div class="oir-unit">' + esc(unitDisplay) + '</div>';
+    }
+    html += '<div class="oir-price" style="display:flex;align-items:center;gap:4px;"><span style="font-size:11px;color:var(--text-muted);font-weight:600;">RM</span><input type="number" step="0.01" min="0" placeholder="0.00" value="' + (item.unitPrice || '') + '" oninput="soItemFieldChange(' + item.id + ',\'unitPrice\',this.value);soCalcTotals()" style="flex:1;min-width:0;"><span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap;">/ kg</span></div>';
     html += '</div>';
 
     // Index row
@@ -6478,7 +6595,8 @@ function soRenderItems() {
 
     // Line total + remove
     html += '<div class="oir-bottom">';
-    html += '<span class="oir-line-total">' + formatRM(item.lineTotal) + '</span>';
+    var lineTotalDisplay = pcsMode ? '<span style="color:var(--text-muted);font-style:italic;">— pending weight</span>' : formatRM(item.lineTotal);
+    html += '<span class="oir-line-total">' + lineTotalDisplay + '</span>';
     html += '<button class="btn btn-outline btn-sm oir-remove" onclick="soRemoveItem(' + item.id + ')" title="Remove">&times;</button>';
     html += '</div>';
 
@@ -6492,6 +6610,22 @@ function soRenderItems() {
 function soItemFieldChange(itemId, field, value) {
   var item = soItems.find(function(i) { return i.id === itemId; });
   if (item) item[field] = value;
+}
+
+function soTogglePcsMode(itemId, on) {
+  var item = soItems.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  item.orderInPcs = !!on;
+  if (on) {
+    // Switching to pcs mode: clear kg quantity, keep pcs (if any)
+    item.quantity = '';
+    item.lineTotal = 0;
+  } else {
+    // Switching back to kg mode: clear pcs
+    item.orderPcs = '';
+  }
+  soRenderItems();
+  soCalcTotals();
 }
 
 function soProductChange(itemId) {
@@ -6510,23 +6644,53 @@ function soProductChange(itemId) {
 }
 
 function soCalcTotals() {
+  var pendingPcs = 0;
   soItems.forEach(function(item) {
-    item.lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
+    if (item.orderInPcs) {
+      item.lineTotal = 0;
+      if (parseInt(item.orderPcs, 10) > 0) pendingPcs++;
+    } else {
+      item.lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
+    }
   });
   var subtotal = soItems.reduce(function(sum, i) { return sum + i.lineTotal; }, 0);
   document.getElementById('so-subtotal').textContent = formatRM(subtotal);
 
+  // Pending-weight hint
+  var hintEl = document.getElementById('so-pending-pcs-hint');
+  if (!hintEl) {
+    var subtotalEl = document.getElementById('so-subtotal');
+    if (subtotalEl && subtotalEl.parentElement) {
+      hintEl = document.createElement('div');
+      hintEl.id = 'so-pending-pcs-hint';
+      hintEl.style.cssText = 'font-size:11px;color:var(--text-muted);font-style:italic;text-align:right;margin-top:2px;';
+      subtotalEl.parentElement.appendChild(hintEl);
+    }
+  }
+  if (hintEl) {
+    hintEl.textContent = pendingPcs > 0 ? '+ ' + pendingPcs + ' item' + (pendingPcs > 1 ? 's' : '') + ' pending weight' : '';
+  }
+
   // Update line totals in DOM
   var rows = document.querySelectorAll('.oir-line-total');
   soItems.forEach(function(item, idx) {
-    if (rows[idx]) rows[idx].textContent = formatRM(item.lineTotal);
+    if (!rows[idx]) return;
+    if (item.orderInPcs) {
+      rows[idx].innerHTML = '<span style="color:var(--text-muted);font-style:italic;">— pending weight</span>';
+    } else {
+      rows[idx].textContent = formatRM(item.lineTotal);
+    }
   });
 }
 
 async function soSaveOrder() {
   // Validate
   if (!soIsWalkIn && !soSelectedCustomer) { notify('Please select a customer', 'warning'); return; }
-  var validItems = soItems.filter(function(i) { return i.productId && parseFloat(i.quantity) > 0; });
+  var validItems = soItems.filter(function(i) {
+    if (!i.productId) return false;
+    if (i.orderInPcs) return parseInt(i.orderPcs, 10) > 0;
+    return parseFloat(i.quantity) > 0;
+  });
   if (!validItems.length) { notify('Please add at least one item with a product and quantity', 'warning'); return; }
 
   var deliveryDate = document.getElementById('so-delivery-date').value;
@@ -6567,15 +6731,18 @@ async function soSaveOrder() {
       for (var vi = 0; vi < validItems.length; vi++) {
         var item = validItems[vi];
         var itemId = await dbNextId('SI');
+        var isPcs = !!item.orderInPcs;
         var itemData = {
           id: itemId,
           order_id: soEditOrderId,
           product_id: item.productId,
-          quantity: parseFloat(item.quantity),
+          quantity: isPcs ? 0 : parseFloat(item.quantity),
           unit_price: parseFloat(item.unitPrice) || 0,
-          line_total: item.lineTotal,
+          line_total: isPcs ? 0 : item.lineTotal,
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
           index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
+          order_pcs: isPcs ? parseInt(item.orderPcs, 10) : null,
+          actual_weight_kg: null,
           company_id: getCompanyId()
         };
         var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
@@ -6623,15 +6790,18 @@ async function soSaveOrder() {
       for (var vi = 0; vi < validItems.length; vi++) {
         var item = validItems[vi];
         var itemId = await dbNextId('SI');
+        var isPcs = !!item.orderInPcs;
         var itemData = {
           id: itemId,
           order_id: orderId,
           product_id: item.productId,
-          quantity: parseFloat(item.quantity),
+          quantity: isPcs ? 0 : parseFloat(item.quantity),
           unit_price: parseFloat(item.unitPrice) || 0,
-          line_total: item.lineTotal,
+          line_total: isPcs ? 0 : item.lineTotal,
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
           index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
+          order_pcs: isPcs ? parseInt(item.orderPcs, 10) : null,
+          actual_weight_kg: null,
           company_id: getCompanyId()
         };
         var itemResult = await sbQuery(sb.from('sales_order_items').insert(itemData).select());
@@ -6754,9 +6924,13 @@ function soGenerateDoc(orderId) {
     subtotal += lineTotal;
     var qtyStr = (item.quantity || 0) + prodUnit;
     var price = (parseFloat(item.unit_price) || 0).toFixed(2);
+    var isPcs = item.order_pcs != null;
 
     html += '<div style="margin-bottom:6px;">';
     html += '<div style="font-weight:700;font-size:11px;">' + (idx + 1) + '. ' + esc(fullName) + '</div>';
+    if (isPcs) {
+      html += '<div style="font-size:9px;color:#555;padding-left:12px;font-style:italic;">(' + item.order_pcs + ' pcs)</div>';
+    }
     html += '<div style="display:flex;justify-content:space-between;font-size:10px;padding-left:12px;">';
     html += '<span>' + esc(qtyStr) + ' x ' + price + '</span>';
     html += '<span style="font-weight:700;">' + lineTotal.toFixed(2) + '</span>';
@@ -6884,17 +7058,22 @@ function soGenerateDocA4(orderId) {
       if (prodVariety && prodVariety !== '—') fullName += prodVariety + ' ';
       fullName += prodName;
       var packInfo = [];
-    if (prod && prod.box_quantity) packInfo.push(prod.box_quantity + 'pcs');
-    if (prod && prod.weight_range) packInfo.push(prod.weight_range);
-    if (packInfo.length) fullName += ' (' + packInfo.join(', ') + ')';
+      if (prod && prod.box_quantity) packInfo.push(prod.box_quantity + 'pcs');
+      if (prod && prod.weight_range) packInfo.push(prod.weight_range);
+      if (packInfo.length) fullName += ' (' + packInfo.join(', ') + ')';
       var lineTotal = parseFloat(item.line_total) || 0;
       subtotal += lineTotal;
       var qty = item.quantity || 0;
       var unitPrice = (parseFloat(item.unit_price) || 0).toFixed(2);
+      var isPcs = item.order_pcs != null;
+      var descCell = esc(fullName);
+      if (isPcs) {
+        descCell += '<div style="font-size:10px;color:#666;font-style:italic;">(' + item.order_pcs + ' pcs)</div>';
+      }
 
       html += '<tr>';
       html += '<td>' + (idx + 1) + '</td>';
-      html += '<td>' + esc(fullName) + '</td>';
+      html += '<td>' + descCell + '</td>';
       html += '<td>' + qty + '</td>';
       html += '<td>' + esc(prodUnit) + '</td>';
       html += '<td>' + unitPrice + '</td>';

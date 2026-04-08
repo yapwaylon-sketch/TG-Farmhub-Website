@@ -760,10 +760,13 @@ function renderCard(order) {
 
   const docNo = order.doc_number || order.id || '';
 
+  const notesText = (order.notes || '').trim();
+
   return (
     '<div class="iw-card">' +
       '<div class="iw-card-customer">' + esc(custName) + '</div>' +
       (itemsHtml ? '<div class="iw-card-row"><span class="iw-card-lbl">Items:</span>' + itemsHtml + '</div>' : '') +
+      (notesText ? '<div class="iw-card-row" style="color:#E8A020;font-style:italic;"><span class="iw-card-lbl" style="color:#E8A020;">Note:</span>' + esc(notesText) + '</div>' : '') +
       (dateStr ? '<div class="iw-card-date"><span class="iw-card-lbl">Delivery:</span>' + esc(dateStr) + '</div>' : '') +
       (docNo ? '<div class="iw-card-no"><span class="iw-card-lbl">Order No:</span>' + esc(docNo) + '</div>' : '') +
     '</div>'
