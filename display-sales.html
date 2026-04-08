@@ -726,12 +726,14 @@ function renderCard(order) {
     }).join(' \u00B7 ');
   }
 
-  // Meta line: "10:30 · AF-SO012"
+  // Meta line: "Today 10:30 · AF-SO012"
+  const dateStr = order.delivery_date ? formatDeliveryDate(order.delivery_date) : '';
   const timeStr = order.delivery_time ? formatTime(order.delivery_time) : '';
   const docNo = order.doc_number || order.id || '';
+  const dateTime = [dateStr, timeStr].filter(Boolean).join(' ');
   let metaLine = '';
-  if (timeStr && docNo) metaLine = timeStr + ' \u00B7 ' + docNo;
-  else if (timeStr) metaLine = timeStr;
+  if (dateTime && docNo) metaLine = dateTime + ' \u00B7 ' + docNo;
+  else if (dateTime) metaLine = dateTime;
   else if (docNo) metaLine = docNo;
 
   return (
