@@ -463,24 +463,24 @@ const STATUS_CONFIG = [
 // ═══════════════════════════════════════════════════════════════
 // DATA LOADING
 // ═══════════════════════════════════════════════════════════════
-function getTodayAndTomorrow() {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  return { today: fmt(today), tomorrow: fmt(tomorrow) };
-}
-
 async function loadData() {
-  const { today, tomorrow } = getTodayAndTomorrow();
+  // Show every active order regardless of delivery_date — packing team needs
+  // visibility on all work-in-progress, including overdue orders.
+  // Also load today's completed orders for the footer counter.
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const activeStatuses = "(pending,preparing,prepared,delivering)";
 
-  const [ordersData, itemsData, customersData, productsData, varietiesData] = await Promise.all([
-    sbGet("sales_orders", "*", "company_id=eq.tg_agro_fruits&delivery_date=gte." + today + "&delivery_date=lte." + tomorrow + "&order=delivery_date,delivery_time"),
+  const [activeOrdersData, completedOrdersData, itemsData, customersData, productsData, varietiesData] = await Promise.all([
+    sbGet("sales_orders", "*", "company_id=eq.tg_agro_fruits&status=in." + activeStatuses + "&order=delivery_date,delivery_time"),
+    sbGet("sales_orders", "*", "company_id=eq.tg_agro_fruits&status=eq.completed&delivery_date=eq." + todayStr),
     sbGet("sales_order_items", "*", "company_id=eq.tg_agro_fruits"),
     sbGet("sales_customers", "id,name", "company_id=eq.tg_agro_fruits"),
     sbGet("sales_products", "id,name,variety_id", "company_id=eq.tg_agro_fruits"),
     sbGet("crop_varieties", "id,name")
   ]);
+
+  const ordersData = [...(activeOrdersData || []), ...(completedOrdersData || [])];
 
   orders = ordersData || [];
   orderItems = itemsData || [];
@@ -672,7 +672,7 @@ function renderPages() {
   // Empty state — all four columns empty
   const allEmpty = columns.every(c => c.total === 0);
   if (allEmpty) {
-    container.innerHTML = '<div class="iw-no-data">NO ORDERS FOR TODAY OR TOMORROW</div>';
+    container.innerHTML = '<div class="iw-no-data">NO ACTIVE ORDERS</div>';
     pageInfoEl.textContent = '';
     completedEl.textContent = (completedToday || 0) + ' COMPLETE TODAY';
     return;
