@@ -265,25 +265,47 @@ body {
 .iw-col[data-status="delivering"] .iw-card { color: var(--c-delivering); }
 
 .iw-card-customer {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.3px;
   text-transform: uppercase;
   color: #fff;
-  margin-bottom: 3px;
+  margin-bottom: 8px;
 }
-.iw-card-items {
-  font-size: 10px;
+.iw-card-row {
+  font-size: 11px;
   color: var(--text-items);
   line-height: 1.5;
+  margin-top: 2px;
 }
-.iw-card-meta {
-  font-size: 9px;
+.iw-card-lbl {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+.iw-card-date {
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.8px;
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
-  /* color is inherited from .iw-col[data-status=...] */
+  /* value color inherited from .iw-col[data-status=...] */
+}
+.iw-card-date .iw-card-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.iw-card-no {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.iw-card-no .iw-card-lbl {
+  color: var(--text-muted);
 }
 
 /* ── Footer bar ───────────────────────────────────────────────── */
@@ -717,31 +739,33 @@ function renderPages() {
 function renderCard(order) {
   const custName = customers[order.customer_id] || "Unknown Customer";
 
-  // Items: compact "2× Pineapple · 1× Jackfruit"
-  let itemsLine = '';
+  // Items: "1000KG - MD2 Whole Fruit (1KG+)" one line per item
+  let itemsHtml = '';
   if (order.items && order.items.length > 0) {
-    itemsLine = order.items.map(item => {
+    itemsHtml = order.items.map(item => {
       const display = getItemDisplay(item);
-      const qty = display.qty;
-      return qty + '\u00D7 ' + display.label;
-    }).join(' \u00B7 ');
+      const unit = (display.unit || '').toString().toUpperCase();
+      return esc(display.qty + unit + ' - ' + display.label);
+    }).join('<br>');
   }
 
-  // Meta line: "Today 10:30 · AF-SO012"
-  const dateStr = order.delivery_date ? formatDeliveryDate(order.delivery_date) : '';
-  const timeStr = order.delivery_time ? formatTime(order.delivery_time) : '';
+  // Delivery date: "10/4/2026"
+  let dateStr = '';
+  if (order.delivery_date) {
+    const d = new Date(order.delivery_date + 'T00:00:00');
+    if (!isNaN(d.getTime())) {
+      dateStr = d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+    }
+  }
+
   const docNo = order.doc_number || order.id || '';
-  const dateTime = [dateStr, timeStr].filter(Boolean).join(' ');
-  let metaLine = '';
-  if (dateTime && docNo) metaLine = dateTime + ' \u00B7 ' + docNo;
-  else if (dateTime) metaLine = dateTime;
-  else if (docNo) metaLine = docNo;
 
   return (
     '<div class="iw-card">' +
       '<div class="iw-card-customer">' + esc(custName) + '</div>' +
-      (itemsLine ? '<div class="iw-card-items">' + esc(itemsLine) + '</div>' : '') +
-      (metaLine ? '<div class="iw-card-meta">' + esc(metaLine) + '</div>' : '') +
+      (itemsHtml ? '<div class="iw-card-row"><span class="iw-card-lbl">Items:</span>' + itemsHtml + '</div>' : '') +
+      (dateStr ? '<div class="iw-card-date"><span class="iw-card-lbl">Delivery:</span>' + esc(dateStr) + '</div>' : '') +
+      (docNo ? '<div class="iw-card-no"><span class="iw-card-lbl">Order No:</span>' + esc(docNo) + '</div>' : '') +
     '</div>'
   );
 }
