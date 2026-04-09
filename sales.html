@@ -1021,6 +1021,79 @@
   </div>
 </div>
 
+<!-- EDIT DRAFT INVOICE MODAL -->
+<div id="inv-editdraft-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:540px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Edit Draft Invoice</div>
+      <button class="modal-close" onclick="closeModal('inv-editdraft-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <div id="inv-ed-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
+      <input type="hidden" id="inv-ed-invoice-id" value="">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-field">
+          <label>INVOICE DATE</label>
+          <input type="date" id="inv-ed-date" onchange="invEdUpdateDueDate()" style="width:100%;">
+        </div>
+        <div class="form-field">
+          <label>PAYMENT TERMS</label>
+          <select id="inv-ed-terms" style="width:100%;" onchange="invEdUpdateDueDate()">
+            <option value="0">COD</option>
+            <option value="7">Net 7</option>
+            <option value="14">Net 14</option>
+            <option value="30">Net 30</option>
+            <option value="60">Net 60</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin:4px 0 12px;">Due date: <strong id="inv-ed-due-date" style="color:var(--text);"></strong></div>
+      <div class="form-field">
+        <label>NOTES <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <textarea id="inv-ed-notes" rows="2" placeholder="Invoice notes" style="width:100%;"></textarea>
+      </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;font-weight:700;margin-bottom:8px;">Linked Delivery Orders</div>
+        <div id="inv-ed-dos-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px 12px;"></div>
+        <div id="inv-ed-dos-warning" style="display:none;font-size:12px;color:var(--danger);margin-top:6px;">Cannot remove — invoice must have at least 1 DO.</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('inv-editdraft-modal')">Cancel</button>
+      <button class="btn btn-primary" id="inv-ed-save-btn" onclick="invEditDraftSave()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- VOID INVOICE MODAL -->
+<div id="inv-void-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Void Invoice</div>
+      <button class="modal-close" onclick="closeModal('inv-void-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <div id="inv-void-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
+      <input type="hidden" id="inv-void-invoice-id" value="">
+      <div style="padding:10px 12px;background:rgba(220,53,69,0.08);border:1px solid var(--danger);border-radius:8px;margin-bottom:14px;font-size:12px;color:var(--danger);">
+        <strong>This action cannot be undone.</strong> The invoice will be marked as voided. All items and history are preserved for audit. A credit note will be auto-generated to zero the balance. Linked DOs will be freed for re-invoicing.
+      </div>
+      <div class="form-field">
+        <label>REASON FOR VOIDING <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="inv-void-reason" placeholder="e.g. Customer requested redo, wrong DO included" style="width:100%;">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('inv-void-modal')">Cancel</button>
+      <button class="btn btn-primary" id="inv-void-confirm-btn" onclick="invVoidConfirm()" style="background:var(--danger);border-color:var(--danger);">Void Invoice</button>
+    </div>
+  </div>
+</div>
+
 <!-- RETURN MODAL -->
 <div id="ret-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
@@ -1256,7 +1329,12 @@ async function recalcInvoicePaymentStatus(invoiceId) {
 function isOrderInvoiced(orderId) {
   var order = orders.find(function(o) { return o.id === orderId; });
   if (order && order.invoice_id) return true;
-  return invoiceOrders.some(function(io) { return io.order_id === orderId; });
+  // Check junction but exclude voided/cancelled invoices (their DOs are freed)
+  return invoiceOrders.some(function(io) {
+    if (io.order_id !== orderId) return false;
+    var inv = invoices.find(function(i) { return i.id === io.invoice_id; });
+    return inv && inv.status !== 'cancelled' && inv.status !== 'voided';
+  });
 }
 
 function getInvoiceDOs(invoiceId) {
@@ -1273,6 +1351,63 @@ function getCustomerUninvoicedDOs(customerId) {
       && o.status === 'completed'
       && !o.invoice_id;
   });
+}
+
+// Shared helper: re-aggregate invoice items from linked DOs and update totals.
+// Deletes existing invoice_items, rebuilds from order_items of all linked DOs,
+// then updates the invoice's subtotal/grand_total. Returns the new subtotal.
+async function invRecomputeInvoice(invoiceId) {
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv) return 0;
+
+  // Delete existing invoice items
+  await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
+  invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
+
+  // Get all linked DOs
+  var allOrderIds = invoiceOrders
+    .filter(function(io) { return io.invoice_id === invoiceId; })
+    .map(function(io) { return io.order_id; });
+
+  // Aggregate items by product+price
+  var productAgg = {};
+  allOrderIds.forEach(function(oid) {
+    orderItems.filter(function(it) { return it.order_id === oid; }).forEach(function(item) {
+      var up = parseFloat(item.unit_price) || 0;
+      var key = item.product_id + '_' + up.toFixed(2);
+      if (!productAgg[key]) {
+        var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+        var variety = soGetProductVariety(item.product_id);
+        var snapshot = (variety && variety !== '\u2014' ? variety + ' ' : '') + (prod ? prod.name : 'Unknown');
+        productAgg[key] = { product_id: item.product_id, product_name: snapshot, quantity: 0, unit_price: up, line_total: 0 };
+      }
+      productAgg[key].quantity += (item.quantity || 0);
+      productAgg[key].line_total += parseFloat(item.line_total) || 0;
+    });
+  });
+
+  // Insert new invoice items
+  var newItems = [];
+  var subtotal = 0;
+  var pLines = Object.values(productAgg);
+  for (var j = 0; j < pLines.length; j++) {
+    var p = pLines[j];
+    subtotal += p.line_total;
+    var iid = await dbNextId('II');
+    newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
+  }
+  if (newItems.length) {
+    var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
+    if (iResult) iResult.forEach(function(ii) { invoiceItems.push(ii); });
+  }
+
+  // Update invoice totals
+  var grandTotal = subtotal - (parseFloat(inv.credit_total) || 0);
+  await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
+  inv.subtotal = subtotal;
+  inv.grand_total = subtotal;
+
+  return subtotal;
 }
 
 function calcDueDate(invoiceDate, paymentTerms) {
@@ -4874,6 +5009,7 @@ var invExpandedId = null;
 
 function invGetDisplayStatus(inv) {
   if (inv.status === 'cancelled') return 'cancelled';
+  if (inv.status === 'voided') return 'voided';
   if (inv.status === 'draft') return 'draft';
   if (isInvoiceOverdue(inv)) return 'overdue';
   if (inv.payment_status === 'paid') return 'paid';
@@ -4888,9 +5024,10 @@ function invStatusBadge(status) {
     overdue: 'background:var(--danger);color:#fff;',
     partial: 'background:var(--gold);color:#000;',
     paid: 'background:var(--green);color:#fff;',
+    voided: 'background:#8B0000;color:#fff;',
     cancelled: 'background:var(--border);color:var(--text-muted);'
   };
-  var labels = { draft:'Draft', issued:'Issued', overdue:'Overdue', partial:'Partial', paid:'Paid', cancelled:'Cancelled' };
+  var labels = { draft:'Draft', issued:'Issued', overdue:'Overdue', partial:'Partial', paid:'Paid', voided:'Voided', cancelled:'Cancelled' };
   return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;' + (styles[status] || '') + '">' + (labels[status] || status) + '</span>';
 }
 
@@ -4904,7 +5041,7 @@ function invRenderList() {
   // Filter bar
   html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
   html += '<select onchange="invFilterStatus=this.value;invRenderList()" style="min-width:120px;">';
-  ['', 'draft', 'issued', 'overdue', 'partial', 'paid', 'cancelled'].forEach(function(s) {
+  ['', 'draft', 'issued', 'overdue', 'partial', 'paid', 'voided', 'cancelled'].forEach(function(s) {
     var label = s ? (s.charAt(0).toUpperCase() + s.slice(1)) : 'All Status';
     html += '<option value="' + s + '"' + (invFilterStatus === s ? ' selected' : '') + '>' + label + '</option>';
   });
@@ -4939,7 +5076,7 @@ function invRenderList() {
   });
 
   // Summary cards (exclude cancelled from summaries)
-  var activeInvs = invoices.filter(function(inv) { return inv.status !== 'cancelled'; });
+  var activeInvs = invoices.filter(function(inv) { return inv.status !== 'cancelled' && inv.status !== 'voided'; });
   var totalOutstanding = 0, overdueCount = 0, overdueTotal = 0, monthCount = 0, monthTotal = 0;
   var thisMonth = todayStr().substring(0, 7);
   activeInvs.forEach(function(inv) {
@@ -4972,7 +5109,7 @@ function invRenderList() {
       var custName = c ? c.name : '\u2014';
       var ds = invGetDisplayStatus(inv);
       var balance = invoiceBalance(inv);
-      var dimStyle = inv.status === 'cancelled' ? 'opacity:0.5;' : '';
+      var dimStyle = (inv.status === 'cancelled' || inv.status === 'voided') ? 'opacity:0.5;' : '';
       var isExpanded = invExpandedId === inv.id;
 
       html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;' + dimStyle + '">';
@@ -5016,13 +5153,28 @@ function invRenderList() {
         var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === inv.id; });
         if (linkedOrders.length) {
           html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Linked DOs</div>';
-          html += '<div style="font-size:12px;color:var(--text-muted);">';
-          var doList = linkedOrders.map(function(io) {
-            var o = orders.find(function(x) { return x.id === io.order_id; });
-            return o ? (o.doc_number || o.id) + ' (' + fmtDateNice(o.order_date) + ')' : io.order_id;
-          });
-          html += doList.join(', ');
-          html += '</div>';
+          if (inv.status === 'issued' && linkedOrders.length > 1) {
+            // Issued invoices: show each DO with an unlink x button
+            linkedOrders.forEach(function(io) {
+              var o = orders.find(function(x) { return x.id === io.order_id; });
+              var doLabel = o ? (o.doc_number || o.id) : io.order_id;
+              var doDate = o ? fmtDateNice(o.order_date) : '';
+              var doTotal = o ? formatRM(parseFloat(o.grand_total) || 0) : '';
+              html += '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);padding:2px 0;">';
+              html += '<span style="flex:1;">' + esc(doLabel) + (doDate ? ' (' + doDate + ')' : '') + (doTotal ? ' &middot; ' + doTotal : '') + '</span>';
+              html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invUnlinkDO(\'' + esc(inv.id) + '\',\'' + esc(io.order_id) + '\')" style="padding:1px 6px;border-color:var(--danger);color:var(--danger);min-width:auto;font-size:13px;line-height:1;" title="Remove this DO from invoice">&times;</button>';
+              html += '</div>';
+            });
+          } else {
+            // Draft, voided, cancelled, or single-DO issued: plain list
+            html += '<div style="font-size:12px;color:var(--text-muted);">';
+            var doList = linkedOrders.map(function(io) {
+              var o = orders.find(function(x) { return x.id === io.order_id; });
+              return o ? (o.doc_number || o.id) + ' (' + fmtDateNice(o.order_date) + ')' : io.order_id;
+            });
+            html += doList.join(', ');
+            html += '</div>';
+          }
         }
 
         // Payment history
@@ -5054,21 +5206,24 @@ function invRenderList() {
           html += '<div style="font-size:12px;color:var(--text-muted);">No credit notes</div>';
         }
 
-        // Action buttons
+        // Action buttons — per status
         html += '<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">';
         if (inv.status === 'draft') {
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invEditDraft(\'' + esc(inv.id) + '\')">Edit Draft</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invAddMoreDOs(\'' + esc(inv.id) + '\')">Add DOs</button>';
           if (currentUser && currentUser.role === 'admin') html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invApproveInvoice(\'' + esc(inv.id) + '\')">Approve</button>';
-          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invAddMoreDOs(\'' + esc(inv.id) + '\')">Add More DOs</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invCancelInvoice(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Cancel Draft</button>';
         }
         if (inv.status === 'issued') {
           if (invoiceBalance(inv) > 0) html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(inv.id) + '\')">Record Payment</button>';
-          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(inv.id) + '\')">Add Credit Note</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(inv.id) + '\')">Credit Note</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
+          if (inv.payment_status !== 'paid') html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenVoidModal(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Void Invoice</button>';
         }
-        if (inv.status === 'draft' || inv.status === 'issued' || inv.payment_status === 'partial' || inv.payment_status === 'paid') {
-          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="gap:4px;border-color:var(--gold);color:var(--gold);">Print</button>';
-        }
-        if (inv.status !== 'cancelled' && inv.status !== 'paid' && inv.payment_status !== 'paid') {
-          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invCancelInvoice(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Cancel</button>';
+        if (inv.status === 'voided') {
+          html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
+          if (inv.void_reason) html += '<span style="font-size:11px;color:var(--text-muted);align-self:center;">Voided: ' + esc(inv.void_reason) + '</span>';
         }
         html += '</div>';
 
@@ -5705,43 +5860,8 @@ async function invAddDosConfirm() {
       if (idx >= 0) orders[idx].invoice_id = invoiceId;
     }
 
-    // Re-aggregate items: delete old, re-insert
-    await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
-    invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
-
-    var allOrderIds = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; }).map(function(io) { return io.order_id; });
-    var productAgg = {};
-    allOrderIds.forEach(function(oid) {
-      orderItems.filter(function(it) { return it.order_id === oid; }).forEach(function(item) {
-        var up = parseFloat(item.unit_price) || 0;
-        var key = item.product_id + '_' + up.toFixed(2);
-        if (!productAgg[key]) {
-          var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
-          var variety = soGetProductVariety(item.product_id);
-          var snapshot = (variety && variety !== '\u2014' ? variety + ' ' : '') + (prod ? prod.name : 'Unknown');
-          productAgg[key] = { product_id: item.product_id, product_name: snapshot, quantity: 0, unit_price: up, line_total: 0 };
-        }
-        productAgg[key].quantity += (item.quantity || 0);
-        productAgg[key].line_total += parseFloat(item.line_total) || 0;
-      });
-    });
-
-    var newItems = [];
-    var subtotal = 0;
-    var pLines = Object.values(productAgg);
-    for (var j = 0; j < pLines.length; j++) {
-      var p = pLines[j];
-      subtotal += p.line_total;
-      var iid = await dbNextId('II');
-      newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
-    }
-    var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
-    if (iResult) (iResult || []).forEach(function(ii) { invoiceItems.push(ii); });
-
-    // Update invoice totals
-    await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
-    inv.subtotal = subtotal;
-    inv.grand_total = subtotal;
+    // Re-aggregate items and update totals
+    await invRecomputeInvoice(invoiceId);
 
     btnLoading(btn, false, 'Add DOs');
     closeModal('inv-adddos-modal');
@@ -5758,11 +5878,13 @@ async function invCancelInvoice(invoiceId) {
   var inv = invoices.find(function(i) { return i.id === invoiceId; });
   if (!inv) return;
 
-  // Block if payments exist
-  var hasPayments = invoicePayments.some(function(p) { return p.invoice_id === invoiceId; });
-  if (hasPayments) { notify('Cannot cancel invoice with recorded payments. Remove payments first.', 'error'); return; }
+  // Only drafts can be cancelled — issued invoices must use Void
+  if (inv.status !== 'draft') {
+    notify('Only draft invoices can be cancelled. Use "Void Invoice" for issued invoices.', 'warning');
+    return;
+  }
 
-  confirmAction('Cancel Invoice', 'This will unlink all DOs and cancel invoice ' + invoiceId + '. Continue?', async function() {
+  confirmAction('Cancel Draft', 'This will permanently delete draft invoice ' + invoiceId + ' and free all linked DOs. Continue?', async function() {
     try {
       // Unlink DOs
       var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
@@ -5787,13 +5909,328 @@ async function invCancelInvoice(invoiceId) {
       inv.status = 'cancelled';
       if (lockResult[0] && lockResult[0].updated_at) inv.updated_at = lockResult[0].updated_at;
 
+      // Attempt to rewind the ID counter (only works if this was the latest ID)
+      try {
+        await sb.rpc('rewind_id', { p_id: invoiceId });
+      } catch(e) { /* non-critical — gap is acceptable */ }
+
       invExpandedId = null;
-      notify('Invoice ' + invoiceId + ' cancelled', 'success');
+      notify('Draft ' + invoiceId + ' cancelled', 'success');
       renderInvoicing();
     } catch(e) {
       notify('Failed to cancel: ' + e.message, 'error');
     }
   }, true);
+}
+
+// ── Edit Draft Invoice ──
+var invEdRemovedDOs = []; // track DOs removed during edit session
+
+function invEditDraft(invoiceId) {
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv || inv.status !== 'draft') { notify('Can only edit draft invoices', 'warning'); return; }
+
+  var cust = customers.find(function(c) { return c.id === inv.customer_id; });
+  document.getElementById('inv-ed-invoice-id').value = invoiceId;
+  document.getElementById('inv-ed-info').innerHTML =
+    '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;">' + esc(invoiceId) + '</div>' +
+    '<div>' + esc(cust ? cust.name : '\u2014') + ' &middot; ' + formatRM(parseFloat(inv.grand_total) || 0) + '</div>';
+
+  // Populate fields
+  document.getElementById('inv-ed-date').value = inv.invoice_date || todayStr();
+  var termsDays = 30;
+  if (inv.payment_terms === 'cod') termsDays = 0;
+  else if (inv.payment_terms) {
+    var m = inv.payment_terms.match(/(\d+)/);
+    if (m) termsDays = parseInt(m[1], 10);
+  }
+  var termsSelect = document.getElementById('inv-ed-terms');
+  termsSelect.value = String(termsDays);
+  // If customer has a non-standard terms value not in dropdown, keep closest match
+  document.getElementById('inv-ed-notes').value = inv.notes || '';
+  invEdRemovedDOs = [];
+  invEdRenderDOs(invoiceId);
+  invEdUpdateDueDate();
+  document.getElementById('inv-ed-dos-warning').style.display = 'none';
+  document.getElementById('inv-editdraft-modal').style.display = 'flex';
+}
+
+function invEdRenderDOs(invoiceId) {
+  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
+  // Exclude any that were removed this session
+  linkedOrders = linkedOrders.filter(function(io) { return invEdRemovedDOs.indexOf(io.order_id) === -1; });
+
+  var listEl = document.getElementById('inv-ed-dos-list');
+  var html = '';
+  linkedOrders.forEach(function(io) {
+    var o = orders.find(function(x) { return x.id === io.order_id; });
+    if (!o) return;
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">';
+    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
+    html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+    html += '<button class="btn btn-outline btn-sm" onclick="invEdRemoveDO(\'' + esc(invoiceId) + '\',\'' + esc(io.order_id) + '\')" style="padding:2px 8px;border-color:var(--danger);color:var(--danger);min-width:auto;font-size:14px;line-height:1;">&times;</button>';
+    html += '</div>';
+  });
+  listEl.innerHTML = html;
+
+  // Update total display in info header
+  var newTotal = 0;
+  linkedOrders.forEach(function(io) {
+    var o = orders.find(function(x) { return x.id === io.order_id; });
+    if (o) newTotal += parseFloat(o.grand_total) || 0;
+  });
+  var cust = null;
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (inv) cust = customers.find(function(c) { return c.id === inv.customer_id; });
+  document.getElementById('inv-ed-info').innerHTML =
+    '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;">' + esc(invoiceId) + '</div>' +
+    '<div>' + esc(cust ? cust.name : '\u2014') + ' &middot; ' + formatRM(newTotal) +
+    (invEdRemovedDOs.length ? ' <span style="color:var(--danger);">(' + invEdRemovedDOs.length + ' DO removed)</span>' : '') + '</div>';
+}
+
+function invEdRemoveDO(invoiceId, orderId) {
+  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
+  var remaining = linkedOrders.filter(function(io) { return invEdRemovedDOs.indexOf(io.order_id) === -1 && io.order_id !== orderId; });
+  if (remaining.length < 1) {
+    document.getElementById('inv-ed-dos-warning').style.display = 'block';
+    return;
+  }
+  document.getElementById('inv-ed-dos-warning').style.display = 'none';
+  invEdRemovedDOs.push(orderId);
+  invEdRenderDOs(invoiceId);
+}
+
+function invEdUpdateDueDate() {
+  var dateVal = document.getElementById('inv-ed-date').value || todayStr();
+  var termsDays = parseInt(document.getElementById('inv-ed-terms').value, 10) || 0;
+  var termsCode = termsDays === 0 ? 'cod' : termsDays + 'days';
+  var due = calcDueDate(dateVal, termsCode);
+  document.getElementById('inv-ed-due-date').textContent = fmtDateNice(due);
+}
+
+async function invEditDraftSave() {
+  var invoiceId = document.getElementById('inv-ed-invoice-id').value;
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv || inv.status !== 'draft') { notify('Invoice is no longer a draft', 'warning'); closeModal('inv-editdraft-modal'); return; }
+
+  var dateVal = document.getElementById('inv-ed-date').value;
+  var termsDays = parseInt(document.getElementById('inv-ed-terms').value, 10) || 0;
+  var termsCode = termsDays === 0 ? 'cod' : termsDays + 'days';
+  var dueDate = calcDueDate(dateVal, termsCode);
+  var notesVal = document.getElementById('inv-ed-notes').value.trim();
+  var btn = document.getElementById('inv-ed-save-btn');
+
+  if (!dateVal) { notify('Invoice date is required', 'warning'); return; }
+
+  btnLoading(btn, true);
+  try {
+    // 1. Process removed DOs
+    for (var i = 0; i < invEdRemovedDOs.length; i++) {
+      var oid = invEdRemovedDOs[i];
+      // Delete junction row
+      await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', oid));
+      invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === oid); });
+      // Null the invoice_id on the order
+      await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', oid).select());
+      var idx = orders.findIndex(function(x) { return x.id === oid; });
+      if (idx >= 0) orders[idx].invoice_id = null;
+    }
+
+    // 2. Re-aggregate items if DOs were removed
+    if (invEdRemovedDOs.length > 0) {
+      await invRecomputeInvoice(invoiceId);
+    }
+
+    // 3. Update invoice fields
+    var updates = {
+      invoice_date: dateVal,
+      due_date: dueDate,
+      payment_terms: termsCode,
+      notes: notesVal || null
+    };
+    var result = await sbUpdateWithLock('sales_invoices', invoiceId, updates, inv.updated_at);
+    if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
+    inv.invoice_date = dateVal;
+    inv.due_date = dueDate;
+    inv.payment_terms = termsCode;
+    inv.notes = notesVal || null;
+    if (result[0] && result[0].updated_at) inv.updated_at = result[0].updated_at;
+
+    btnLoading(btn, false, 'Save Changes');
+    closeModal('inv-editdraft-modal');
+    invEdRemovedDOs = [];
+    notify('Invoice ' + invoiceId + ' updated', 'success');
+    renderInvoicing();
+  } catch(e) {
+    btnLoading(btn, false, 'Save Changes');
+    notify('Failed to save: ' + e.message, 'error');
+  }
+}
+
+// ── Void Invoice ──
+function invOpenVoidModal(invoiceId) {
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv || inv.status !== 'issued') { notify('Only issued invoices can be voided', 'warning'); return; }
+
+  var hasPayments = invoicePayments.some(function(p) { return p.invoice_id === invoiceId; });
+  if (hasPayments) { notify('Cannot void invoice with recorded payments. Remove or refund payments first.', 'error'); return; }
+
+  var cust = customers.find(function(c) { return c.id === inv.customer_id; });
+  var balance = invoiceBalance(inv);
+
+  document.getElementById('inv-void-invoice-id').value = invoiceId;
+  document.getElementById('inv-void-info').innerHTML =
+    '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;">' + esc(invoiceId) + '</div>' +
+    '<div>' + esc(cust ? cust.name : '\u2014') + ' &middot; Total: ' + formatRM(parseFloat(inv.grand_total) || 0) +
+    (balance > 0 ? ' &middot; Outstanding: ' + formatRM(balance) : '') + '</div>';
+  document.getElementById('inv-void-reason').value = '';
+  document.getElementById('inv-void-modal').style.display = 'flex';
+}
+
+async function invVoidConfirm() {
+  var invoiceId = document.getElementById('inv-void-invoice-id').value;
+  var reason = document.getElementById('inv-void-reason').value.trim();
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv) { notify('Invoice not found', 'warning'); return; }
+  if (!reason) { notify('Reason is required', 'warning'); return; }
+
+  var btn = document.getElementById('inv-void-confirm-btn');
+  btnLoading(btn, true);
+
+  try {
+    var now = new Date().toISOString();
+    var grandTotal = parseFloat(inv.grand_total) || 0;
+
+    // 1. Auto-generate a zeroing Credit Note for the full invoice amount
+    if (grandTotal > 0) {
+      var cnId = await dbNextId('CN');
+      var cnData = {
+        id: cnId,
+        invoice_id: invoiceId,
+        return_id: null,
+        credit_date: todayStr(),
+        amount: grandTotal,
+        reason: 'Invoice voided: ' + reason,
+        created_by: currentUser ? currentUser.id : null,
+        company_id: getCompanyId()
+      };
+      var cnResult = await sbQuery(sb.from('sales_credit_notes').insert(cnData).select());
+      if (cnResult === null) { btnLoading(btn, false, 'Void Invoice'); return; }
+      creditNotes.unshift(cnResult[0] || cnData);
+
+      // Update credit_total on invoice
+      var totalCredits = creditNotes
+        .filter(function(cn) { return cn.invoice_id === invoiceId; })
+        .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
+      await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+      inv.credit_total = totalCredits;
+    }
+
+    // 2. Null out invoice_id on all linked DOs (frees them for re-invoicing)
+    //    Keep sales_invoice_orders junction rows intact for audit trail
+    var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
+    for (var i = 0; i < linkedOrders.length; i++) {
+      var oid = linkedOrders[i].order_id;
+      await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', oid).select());
+      var idx = orders.findIndex(function(x) { return x.id === oid; });
+      if (idx >= 0) orders[idx].invoice_id = null;
+    }
+
+    // 3. Set status to voided (items + junction stay intact for audit)
+    var voidUpdates = {
+      status: 'voided',
+      voided_at: now,
+      voided_by: currentUser ? currentUser.id : null,
+      void_reason: reason,
+      payment_status: 'paid' // effectively zeroed out by CN
+    };
+    var lockResult = await sbUpdateWithLock('sales_invoices', invoiceId, voidUpdates, inv.updated_at);
+    if (lockResult === null) { btnLoading(btn, false, 'Void Invoice'); notify('Invoice was modified by another user. Please refresh.', 'warning'); return; }
+    inv.status = 'voided';
+    inv.voided_at = now;
+    inv.voided_by = currentUser ? currentUser.id : null;
+    inv.void_reason = reason;
+    inv.payment_status = 'paid';
+    if (lockResult[0] && lockResult[0].updated_at) inv.updated_at = lockResult[0].updated_at;
+
+    btnLoading(btn, false, 'Void Invoice');
+    closeModal('inv-void-modal');
+    invExpandedId = null;
+    notify('Invoice ' + invoiceId + ' voided. DOs freed for re-invoicing.', 'success');
+    renderInvoicing();
+  } catch(e) {
+    btnLoading(btn, false, 'Void Invoice');
+    notify('Failed to void: ' + e.message, 'error');
+  }
+}
+
+// ── Unlink Single DO from Issued Invoice ──
+async function invUnlinkDO(invoiceId, orderId) {
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv || inv.status !== 'issued') { notify('Can only unlink DOs from issued invoices', 'warning'); return; }
+
+  // Must keep at least 1 DO
+  var linkedCount = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; }).length;
+  if (linkedCount <= 1) { notify('Cannot remove the last DO — use Void Invoice instead', 'warning'); return; }
+
+  var o = orders.find(function(x) { return x.id === orderId; });
+  var doLabel = o ? (o.doc_number || o.id) : orderId;
+  var doAmount = o ? formatRM(parseFloat(o.grand_total) || 0) : '';
+
+  confirmAction('Unlink DO from Invoice',
+    'Remove <strong>' + esc(doLabel) + '</strong> (' + doAmount + ') from ' + esc(invoiceId) + '?<br><br>' +
+    '<span style="font-size:12px;color:var(--text-muted);">A credit note will be auto-generated for the difference. The DO will be freed for re-invoicing.</span>',
+    async function() {
+      try {
+        var oldTotal = parseFloat(inv.grand_total) || 0;
+
+        // 1. Remove junction row
+        await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId));
+        invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === orderId); });
+
+        // 2. Null the invoice_id on the order
+        await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', orderId).select());
+        var idx = orders.findIndex(function(x) { return x.id === orderId; });
+        if (idx >= 0) orders[idx].invoice_id = null;
+
+        // 3. Re-aggregate remaining items and update totals
+        var newSubtotal = await invRecomputeInvoice(invoiceId);
+
+        // 4. Auto-generate CN for the difference
+        var diff = oldTotal - newSubtotal;
+        if (diff > 0) {
+          var cnId = await dbNextId('CN');
+          var cnData = {
+            id: cnId,
+            invoice_id: invoiceId,
+            return_id: null,
+            credit_date: todayStr(),
+            amount: diff,
+            reason: 'DO ' + doLabel + ' unlinked from invoice',
+            created_by: currentUser ? currentUser.id : null,
+            company_id: getCompanyId()
+          };
+          var cnResult = await sbQuery(sb.from('sales_credit_notes').insert(cnData).select());
+          if (cnResult) creditNotes.unshift(cnResult[0] || cnData);
+
+          // Update credit_total on invoice
+          var totalCredits = creditNotes
+            .filter(function(cn) { return cn.invoice_id === invoiceId; })
+            .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
+          await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+          inv.credit_total = totalCredits;
+        }
+
+        // 5. Recalc payment status
+        await recalcInvoicePaymentStatus(invoiceId);
+
+        notify('DO ' + doLabel + ' removed from ' + invoiceId + (diff > 0 ? '. CN ' + cnId + ' created for ' + formatRM(diff) : ''), 'success');
+        invRenderList();
+      } catch(e) {
+        notify('Failed to unlink DO: ' + e.message, 'error');
+      }
+    }
+  );
 }
 
 function invUpdateDueDate() {
