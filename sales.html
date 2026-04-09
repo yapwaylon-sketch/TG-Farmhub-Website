@@ -8065,7 +8065,11 @@ async function soShareDoc() {
     var urls = [];
     var elements = (pages && pages.length > 0) ? pages : [docEl];
     for (var i = 0; i < elements.length; i++) {
-      var canvas = await html2canvas(elements[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      // Scroll element into view so html2canvas can see it (otherwise captures wrong viewport area)
+      elements[i].scrollIntoView({ block: 'start' });
+      // Small delay to let the browser repaint after scroll
+      await new Promise(function(r) { setTimeout(r, 100); });
+      var canvas = await html2canvas(elements[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, scrollY: -window.scrollY });
       var blob = await new Promise(function(resolve) { canvas.toBlob(function(b) { resolve(b); }, 'image/png'); });
       blobs.push(blob);
       urls.push(URL.createObjectURL(blob));
