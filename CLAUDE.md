@@ -54,6 +54,8 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `sales.css` | Sales module styles (cards, badges, timeline, aging) |
 | `delivery.html` | Mobile driver delivery page (phone-only, PIN login, mark delivered, print DO/CS) |
 | `display-sales.html` | TV display for packing station (token auth, auto-refresh, status-grouped orders) |
+| `seedlings.html` | Oil Palm Seedlings module (batches, bookings, collections, L3.1 tracking, reports) |
+| `seedlings.css` | Seedlings module styles |
 | `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
 | `shared.js` | Shared JS (session guard, Supabase init, sidebar logic, sbMutate, sbUpdateWithLock) |
 | `{module}.css` | Per-module styles (index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css) |
@@ -107,7 +109,10 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 9. **TV Display (Sales)** — `display-sales.html`, read-only packing station display, password gate (session-based), auto-refresh 60s, auto-rotate pages
 
 ### Coming Soon (Not Built)
-10. **Oil Palm Seedlings** — Booking management, sales tracking, seedling stock
+*(None currently)*
+
+### Recently Built
+10. **Oil Palm Seedlings** (`seedlings.html` + `seedlings.css`) — Batch lifecycle management, booking with deposit/payment tracking, collection with L3.1 certificate tracking, walk-in cash sales, printable booking slips, MPOB monthly reports, batch summary, cash flow projection. Under TG Agribusiness. 7 DB tables (`seedling_suppliers`, `seedling_batches`, `seedling_batch_events`, `seedling_customers`, `seedling_bookings`, `seedling_payments`, `seedling_collections`). Supabase storage bucket: `seedling-photos`. Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`, Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
 
 ## Architecture — Growth Data Flow
 
@@ -154,10 +159,11 @@ All migrations have been applied to Supabase. Migration `.sql` files were remove
 
 ## Shared Assets
 - **Folder**: `assets/` in project root — deployed to `https://tgfarmhub.com/assets/`
-- **Files**: `logo.png` (56KB), `logo.jpg` (460KB)
+- **Files**: `logo.png` (TG Agro Fruits pineapple, 56KB), `logo.jpg` (460KB), `logo-agribusiness.png` (TG Agribusiness leaf, transparent bg), `logo-agribusiness.jpg` (cropped), `logo-agribusiness-original.jpg` (original with excess whitespace)
 - Sub-projects reference `https://tgfarmhub.com/assets/logo.png` (not local copies)
 - To update: edit file in `assets/`, redeploy main site, all sub-sites auto-update
-- Local `assets/` folder = backup + source of truth, synced via OneDrive
+- Local `assets/` folder = backup + source of truth, synced via git
+- **Per-company logo usage**: Hub page shows both logos side by side (header + login). Sidebar in modules uses company-specific logo: Sales/Delivery → `logo.png` (Agro Fruits), Inventory/Workers/Spray/Growth → `logo-agribusiness.png` (Agribusiness). Company switcher on hub is a segmented pill toggle (text only, no logos — avoids redundancy with header).
 
 ## Multi-Company Architecture (2026-04-05)
 - **Two companies**: TG Agro Fruits (code: AF, id: `tg_agro_fruits`) and TG Agribusiness (code: AB, id: `tg_agribusiness`)
@@ -325,6 +331,63 @@ DB values → Display labels: `pending` → "Order Received", `preparing` → "P
 - Phase 1 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase1.md`
 - Phase 2 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase2.md`
 
+## Seedlings Module — Architecture
+
+### Tables (7)
+| Table | Purpose |
+|-------|---------|
+| `seedling_suppliers` | Seed producers (IOI, FELDA, Sawit Kinabalu, etc.) |
+| `seedling_batches` | Seed batches — lifecycle from planting to sold out, allocation tracking |
+| `seedling_batch_events` | Inventory events: transplant, cull, doubleton gain, adjustment |
+| `seedling_customers` | Seedling buyers — estates, smallholders, agents. Cross-company link to `sales_customers` |
+| `seedling_bookings` | Customer reservations with deposit/payment/collection tracking |
+| `seedling_payments` | Payment records for deposits, top-ups, collection payments |
+| `seedling_collections` | Collection events — each = one L3.1 certificate issued |
+
+### Batch Lifecycle
+`pre_nursery` → `main_nursery` (transplant at ~4 months) → `selling` (manual, 10+ months) → `sold_out` (auto when available = 0) → `closed` (manual)
+
+### Key Business Rules
+- **Allocation**: default 50% of seeds = bookable cap (configurable per batch)
+- **Payment-controlled collection**: customer can only collect `floor(total_paid / price) - total_collected`
+- **L3.1**: one per collection, pre-printed serial from MPOB booklet, system tracks usage
+- **Doubletons/tripletons**: split and kept, increase count above seeds planted
+- **MN only**: no pre-nursery sales, minimum 10 months
+- **Pricing**: default per batch, overridable per booking
+
+### Company Addresses
+- **Office** (booking slips): Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak
+- **Farm/License** (L3.1): Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak
+- MPOB License: 522231011000
+
+### ID Prefixes (company code AB-)
+| Entity | Prefix | Example |
+|--------|--------|---------|
+| Supplier | SS | AB-SS001 |
+| Batch | SB | AB-SB001 |
+| Batch Event | SE | AB-SE001 |
+| Customer | SC | AB-SC001 |
+| Booking | BK | AB-BK001 |
+| Payment | SP | AB-SP001 |
+| Collection | CL | AB-CL001 |
+
+Batch display number is separate: `1-2026`, `2-2026` (sequential within year).
+
+### Sidebar Tabs (6)
+Batches, Bookings, Collections, Customers, Suppliers, Reports
+
+### Reports (3)
+1. **MPOB Monthly**: seeds planted, transplanted, culled, doubletons, sold (with L3.1), balance
+2. **Batch Summary**: all batches with full qty breakdown + totals
+3. **Cash Flow Projection**: monthly booking payments + cash sales + projected due
+
+### Booking Slip
+Printable/shareable document — office address header, items table, deposit/balance, customer contact, batch/variety, expected ready date, T&C (3 terms), signature lines. Print + WhatsApp share.
+
+### Design Docs
+- Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`
+- Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
+
 ## Sub-Projects (same folder, separate deploys)
 These live inside this folder but are gitignored. They share the same Supabase database and read from the same tables.
 
@@ -352,7 +415,7 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Mobile responsiveness** audit across all modules — **DONE** (2026-03-21)
 - [ ] **Farm Map Module** (`farmmap.html`) — Google Maps integration, draw block polygons, satellite imagery, area calculation (see details below)
 - [ ] **`display-spray.html`** — TV display for Spray Tracker (KIV, needs spec)
-- [ ] **Seedlings Module** (`seedlings.html`) — Booking, sales, stock, pricing
+- [x] **Seedlings Module** (`seedlings.html`) — Batch lifecycle, booking/collection, L3.1 tracking, MPOB monthly reports, cash flow projection, booking slips (2026-04-10)
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
 
@@ -420,6 +483,9 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Cross-PC skills/agents sync** (2026-04-09): Committed project-scoped copies of 24 skills + 4 agents to `.claude/skills/` and `.claude/agents/` (commit `22b4d7e`) so both PCs share them via git. `.gitignore` whitelists those two dirs (`!.claude/skills/`, `!.claude/agents/`) but keeps everything else under `.claude/` per-PC (settings, sessions, cache). **Skills copied (24):** 14 superpowers (brainstorming, writing-plans, executing-plans, subagent-driven-development, dispatching-parallel-agents, test-driven-development, systematic-debugging, verification-before-completion, requesting-code-review, receiving-code-review, finishing-a-development-branch, using-git-worktrees, using-superpowers, writing-skills) + deep-plan + deep-implement + deep-project + frontend-design + logo-designer + 5 claude-mem (do, make-plan, mem-search, smart-explore, timeline-report). **Agents copied (4):** superpowers `code-reviewer.md`, deep-plan `opus-plan-reviewer.md` + `section-writer.md`, deep-implement code-reviewer (renamed to `deep-implement-code-reviewer.md` to avoid collision with superpowers one). **NOT copied:** code-review plugin (slash-command-only, no skill), security-guidance (hooks-only — must be plugin-installed). **Secondary PC plugin install verified same day:** 8 plugins at user scope matching main PC — superpowers 5.0.7, frontend-design/code-review/security-guidance (version "unknown"), claude-mem **12.1.0** (ahead of main PC's 10.6.1), deep-project 0.2.1, deep-plan 0.3.2, deep-implement 0.2.1. Marketplaces added: `thedotmack` (from `thedotmack/claude-mem` repo) and `piercelamb-plugins` (from `piercelamb/deep-implement` repo) — marketplace names derive from each repo's `.claude-plugin/marketplace.json`, NOT from the repo name. Both PCs now have two independent paths to the same skills: plugin path (slash commands like `/deep-plan`, auto-updates, plugin-prefixed names like `superpowers:brainstorming`) and project-scoped path (bare names like `brainstorming`, frozen at today's versions, survives fresh clones with zero setup). **Follow-up:** bump main PC's `claude-mem` to 12.1.0 via `/plugin update claude-mem@thedotmack` for parity (low-risk, deferred).
 - [x] **Sales invoicing overhaul + sales UX fixes** (2026-04-09): 25 commits across invoicing, orders, documents, and export. **Invoicing UX:** select-all checkbox enlarged with "Select all N DOs" label + "N selected" badge in customer headers, auto-expand on selection; cross-customer selection blocked with red warning banner + disabled Create button; Add More DOs replaced confirmAction with dedicated modal (#inv-adddos-modal) with running count/total; Edit Draft modal for date/terms/notes/remove DOs; single-draft rule (block creation while draft exists). **Invoice lifecycle:** voided status (keeps items/junction for audit, auto-CN, frees DOs); unlink single DO from issued invoice (auto-CN for difference); draft cancel rewinds counter via `rewind_id()` RPC; cancel restricted to drafts only, issued uses Void. **A4 documents:** two-column Bill To + Invoice Details layout (Invoice + CN); amount in words ("Ringgit Malaysia ... Only"); notes box with contenteditable + `INV_DEFAULT_NOTES` variable; DO Summary attachment (page 2+, per-DO items tables, page-break-inside:avoid); e-Invoice placeholder removed; Invoice/CN signature → Prepared By + "computer-generated, no signature required"; DO signature → Issued By + Received By (Name/IC/Signature/Stamp); footer with enquiry number. **Document export:** Print → browser print window with CSS page breaks (`soOpenA4Window` + `soA4PrintStyles` shared helpers); Download → same print window (Save as PDF); Share → multi-image capture (scrollIntoView per page, modal constraint removal, multi-file Web Share API); html2pdf.js attempted then removed (html2canvas can't render clipped/hidden elements). Descriptive filenames: `AF-INV001_20260409_Customer_Name.png`. **Order sorting:** active orders sorted by delivery_date + delivery_time (most urgent first, no date sinks to bottom); completed/cancelled grouped by `completed_at` (new column) instead of order_date. **Order cancel:** requires reason text input (stored in `cancel_reason` column); shown on card (red banner) + detail view (red bordered box). **Delivery time:** input changed from `type="text"` to `type="time"` (native picker); `fmtTime12()` helper for 12h display ("2:00 PM"); existing DB values normalized to HH:MM; sorting includes delivery_time as secondary sort. **Pcs orders display:** order cards, detail view, dashboard "To Prepare"/"Ready" cards, and active orders all now show `order_pcs` for pcs-ordered items instead of `quantity` (which is 0 until weighed). Shows "30 pcs" before weighing, "30 pcs (15.5kg)" after. Total shows "Pending weight" when unweighed. **Mandatory photos:** Mark Prepared and Mark Delivered now require a photo (Skip button hidden); walk-in quick complete remains optional. **Fixes:** double variety name on A4 (snapshot already contains variety), customer detail completed-only stats, invRecomputeInvoice captures updated_at (prevents stale lock), confirmAction renders HTML body (was escaping it). **Invoice list perf:** headers-only render, detail built on click via invInsertDetail(), no full re-render on toggle. **DB changes:** `voided_at`, `voided_by`, `void_reason` on `sales_invoices`; `completed_at` on `sales_orders`; `cancel_reason` on `sales_orders`; `rewind_id(p_id)` RPC. **Infra:** Netlify token rotated (`nfp_otZ4...7832`, no expiration); old cancelled invoices (INV001/INV002) deleted, INV counter reset. **Deferred:** e-Invoice LHDN (future project), "invoice sent" tracking (revisit later), SST/tax lines (no registration yet).
 - [x] **OneDrive → git/GitHub migration** (2026-04-09): Project relocated off OneDrive onto pure git+GitHub sync between the two Windows PCs. **Why:** OneDrive was corrupting the `.git` folder via partial sync — under-syncing loose objects, racing on `FETCH_HEAD` writes, surfacing git internals as sync errors. Symptoms had been silent until they weren't. **Audit (Step 1):** repo had 66 tracked files but ~30 untracked-yet-important files (specs, plans, guides, audit report, package.json, icons/modules/, .superpowers/brainstorm/) plus 2 unpushed commits and ~10 modified files sitting in the working tree from prior un-committed work. **Step 3 commits (7 new):** `8a57d24` gitignore expansion (node_modules, supabase/.temp/, .superpowers/, icons/test/), `426967e` legacy migration .sql files removed, `35d2950` spray+growth (summary watchlist, TV display, harvesting status), `62c552a` hub+inventory (TV display tab, module icons, multi-company wiring, supplier perm fix), `a0ff41b` sales guides + trial theme + audit report + package.json, `e3c3ce7` superpowers specs and plans, `6004d3c` CLAUDE.md changelog sync. Tracked file count 66 → 97. **Sub-project decision:** Nanas split out into its own dedicated public repo `yapwaylon-sketch/TG-Nanas-Growth-TV` (Option B in plan — three Netlify deploys = three repos). Weather deferred (Option C4) — has unresolved unknowns (MET token rotation, pre-existing nested private `tg-weather-netlify` repo, Netlify build source unclear, possible second Supabase ref). Weather moved to OneDrive sibling location `TG Projects Deffered\TG Weather Monitoring Website\` to survive the project folder delete. **Cloudflare token in old `.claude/settings.local.json`:** verified DEAD via `/user/tokens/verify` API call (returned `Invalid API Token`); was a 40-char Bearer token, already deleted/rolled at some point in the past — nothing to revoke. `.claude/` is gitignored on the new Nanas repo from first commit. **Migration execution:** Phase 0 verified secondary PC clean → Phase A1+A4 closed editors and paused OneDrive on both PCs → Phase B `git clone` into `C:\dev\` on secondary PC (resulted in packed .git: 11.43 MiB pack with 0 loose objects, vs the 692 loose objects on the OneDrive copy — proof of OneDrive thrash) → Phase C verified clones (logo.png ~810 KB confirms new TG Agro Fruits logo) → Phase D3 manually moved Weather out of project folder on both PCs while OneDrive paused (avoided having OneDrive sync a folder containing a nested .git) → Phase D zip backup skipped (724 of 1143 files were cloud-only placeholders making backup impractical, and four other safety nets existed: fresh clones verified, GitHub, Recycle Bin 30d, main PC's OneDrive copy until sync propagates delete) → Phase D1 OneDrive resumed on both PCs → Phase D1.5 sanity recheck clean → Phase D4 manual Explorer delete → Phase E `git clone` on main PC → Phase F deferred (last hygiene step: remove `TG Nanas Growth TV/` from main repo `.gitignore` once both PCs migrated and OneDrive folder gone). **Daily workflow going forward** documented in the User Preferences section above. **Lessons:** (1) OneDrive + `.git` is fundamentally incompatible — git's internal database needs atomic writes that OneDrive can't guarantee. (2) The `~/.claude/projects/.../memory/` folder is keyed by working directory path and is per-PC — it does NOT carry across PCs or across path changes; CLAUDE.md is the only durable memory mechanism for this project. (3) Cut+paste a folder while OneDrive is paused is local-only; resuming sync afterward verifies state matches rather than performs the move (avoids OneDrive race conditions on nested .git folders). (4) Bash subprocess holding cwd inside a folder prevents Explorer from deleting that folder on Windows — Claude Code session must be closed before D4. (5) Recycle Bin is the silent safety net for the whole migration (30 days).
+
+- [x] **Company logos on hub + sidebars** (2026-04-10): Hub page shows both company logos side by side (header + login). Sidebar in modules uses company-specific logo: Sales/Delivery → `logo.png` (Agro Fruits), Inventory/Workers/Spray/Growth → `logo-agribusiness.png` (Agribusiness, cropped + transparent bg). Company switcher redesigned as segmented pill toggle (text only). Assets: `logo-agribusiness.png` (transparent), `logo-agribusiness.jpg` (cropped), `logo-agribusiness-original.jpg` (original with excess whitespace).
+- [x] **Oil Palm Seedlings module** (2026-04-10): Full 8-phase build. 7 DB tables + RLS + triggers. 6 sidebar tabs (Batches, Bookings, Collections, Customers, Suppliers, Reports). Batch lifecycle (pre_nursery→main_nursery→selling→sold_out→closed), transplant with doubleton tracking, culling logs. Booking with deposit/payment tracking + payment-controlled collections (can't collect more than paid for). L3.1 certificate tracking per collection. Walk-in cash sales. Cross-company customer detection (links to Agro Fruits customers by phone). Printable booking slip with T&C. 3 reports: MPOB Monthly, Batch Summary, Cash Flow Projection (all with print + CSV export). Photo upload for collections (seedlings + L3.1 page). Allocation % per batch (default 50%). Two company addresses: office (Lot 1609) for slips, farm (Lot 174) for L3.1. Migration: `supabase/seedlings_migration.sql`. Supabase storage: `seedling-photos` bucket.
 
 ## Audit Results (2026-03-22 — all issues fixed 2026-03-23)
 Full report: `AUDIT-2026-03-22.md` — 12 issues found, 0 critical, all resolved.

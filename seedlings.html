@@ -1,0 +1,2746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="assets/logo-agribusiness.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oil Palm Seedlings — TG FarmHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="seedlings.css">
+<script src="shared.js"></script>
+</head>
+<body>
+<div id="tg-loading" style="position:fixed;inset:0;background:#FAF6EF;z-index:99999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;"><span style="color:#6B4C8A;font-size:28px;font-weight:800;font-family:sans-serif;letter-spacing:1px;">Loading Module</span><span style="color:#D4AF37;font-size:13px;font-family:sans-serif;">TG Agribusiness</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="app">
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+      <div class="sidebar-logo"><img src="assets/logo-agribusiness.png" alt="TG"></div>
+      <div>
+        <div class="sidebar-brand-text">Seedlings</div>
+        <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+          TG FarmHub
+        </div>
+      </div>
+    </a>
+    <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+      <button onclick="doLogout()" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
+    </div>
+  </div>
+  <div id="company-switcher"></div>
+  <nav class="sidebar-nav" aria-label="Module navigation">
+    <div class="nav-item active" data-page="batches" onclick="navigateTo('batches')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      <span class="nav-label">Batches</span>
+    </div>
+    <div class="nav-item" data-page="bookings" onclick="navigateTo('bookings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="16" y1="12" x2="8" y2="12"/><line x1="16" y1="16" x2="8" y2="16"/></svg>
+      <span class="nav-label">Bookings</span>
+    </div>
+    <div class="nav-item" data-page="collections" onclick="navigateTo('collections')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      <span class="nav-label">Collections</span>
+    </div>
+    <div class="nav-item" data-page="customers" onclick="navigateTo('customers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-label">Customers</span>
+    </div>
+    <div class="nav-item" data-page="suppliers" onclick="navigateTo('suppliers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      <span class="nav-label">Suppliers</span>
+    </div>
+    <div class="nav-item" data-page="reports" onclick="navigateTo('reports')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="nav-label">Reports</span>
+    </div>
+  </nav>
+  <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+    <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
+    <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Change PIN
+    </button>
+    <button onclick="doLogout()" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-label">Logout</span>
+    </button>
+  </div>
+  <div class="sidebar-sync" onclick="syncAll()">
+    <svg id="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    <span id="sync-text">Synced just now</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content" role="main" id="main-content">
+
+<!-- ===== BATCHES PAGE ===== -->
+<div id="page-batches" class="page active">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Batches</div>
+      <div class="page-subtitle">Manage seed batches and nursery inventory</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-add-batch" onclick="openBatchModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Batch
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <select id="batch-filter-status" onchange="renderBatches()">
+      <option value="all">All Statuses</option>
+      <option value="pre_nursery">Pre-Nursery</option>
+      <option value="main_nursery">Main Nursery</option>
+      <option value="selling">Selling</option>
+      <option value="sold_out">Sold Out</option>
+      <option value="closed">Closed</option>
+    </select>
+  </div>
+  <div id="batches-list"></div>
+  <div id="batches-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:14px;">No batches yet. Create your first batch to get started.</div>
+</div>
+
+<!-- ===== BOOKINGS PAGE ===== -->
+<div id="page-bookings" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Bookings</div>
+      <div class="page-subtitle">Customer reservations and payment tracking</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-add-booking" onclick="openBookingModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Booking
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <select id="booking-filter-status" onchange="renderBookings()">
+      <option value="active">Active</option>
+      <option value="completed">Completed</option>
+      <option value="cancelled">Cancelled</option>
+      <option value="all">All</option>
+    </select>
+    <select id="booking-filter-batch" onchange="renderBookings()">
+      <option value="">All Batches</option>
+    </select>
+  </div>
+  <div id="bookings-list"></div>
+  <div id="bookings-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:14px;">No bookings found.</div>
+</div>
+
+<!-- ===== COLLECTIONS PAGE ===== -->
+<div id="page-collections" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Collections</div>
+      <div class="page-subtitle">L3.1 issuance log and walk-in sales</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-add-collection" onclick="openCollectionModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Record Collection
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <input type="text" id="collection-search" placeholder="Search L3.1 number..." oninput="renderCollections()" style="width:200px;">
+    <select id="collection-filter-batch" onchange="renderCollections()">
+      <option value="">All Batches</option>
+    </select>
+  </div>
+  <div id="collections-list"></div>
+  <div id="collections-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:14px;">No collections recorded yet.</div>
+</div>
+
+<!-- ===== CUSTOMERS PAGE ===== -->
+<div id="page-customers" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Customers</div>
+      <div class="page-subtitle">Seedling buyers and estate contacts</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-add-customer" onclick="openCustomerModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Customer
+      </button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <input type="text" id="customer-search" placeholder="Search name or phone..." oninput="renderCustomers()">
+  </div>
+  <div class="data-table">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Name</th><th>Phone</th><th>IC / Company</th><th>Type</th><th>Planting Location</th><th style="width:80px;"></th>
+        </tr></thead>
+        <tbody id="customers-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="customers-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:14px;">No customers yet.</div>
+</div>
+
+<!-- ===== SUPPLIERS PAGE ===== -->
+<div id="page-suppliers" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Suppliers</div>
+      <div class="page-subtitle">Seed producers and nursery suppliers</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-add-supplier" onclick="openSupplierModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Supplier
+      </button>
+    </div>
+  </div>
+  <div class="data-table">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Name</th><th>Phone</th><th>MPOB License</th><th>Notes</th><th style="width:80px;"></th>
+        </tr></thead>
+        <tbody id="suppliers-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="suppliers-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted);font-size:14px;">No suppliers yet.</div>
+</div>
+
+<!-- ===== REPORTS PAGE ===== -->
+<div id="page-reports" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Reports</div>
+      <div class="page-subtitle">MPOB monthly reports, batch summary, and cash flow</div>
+    </div>
+  </div>
+  <div class="report-btns" id="report-btns"></div>
+  <div id="report-filters"></div>
+  <div id="report-content"></div>
+</div>
+
+</div><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- ===== BATCH MODAL ===== -->
+<div id="batch-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="batch-modal-title">New Batch</div>
+      <button class="modal-close" onclick="closeModal('batch-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="bat-edit-id" value="">
+    <div class="form-row">
+      <div class="form-field">
+        <label>Supplier *</label>
+        <select id="bat-supplier"><option value="">Select supplier</option></select>
+      </div>
+      <div class="form-field">
+        <label>Variety / Cross *</label>
+        <input type="text" id="bat-variety" placeholder="e.g. DxP, Deli Dura x Avros">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Seeds Received *</label>
+        <input type="number" id="bat-qty" placeholder="0" min="1">
+      </div>
+      <div class="form-field">
+        <label>Price Per Seedling (RM)</label>
+        <input type="number" id="bat-price" placeholder="0.00" step="0.01" min="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Date Received</label>
+        <input type="date" id="bat-date-received">
+      </div>
+      <div class="form-field">
+        <label>Date Planted *</label>
+        <input type="date" id="bat-date-planted">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Supplier L3.1 No</label>
+        <input type="text" id="bat-sup-l31" placeholder="Serial from supplier's form">
+      </div>
+      <div class="form-field">
+        <label>Supplier DO / Invoice No</label>
+        <input type="text" id="bat-sup-do" placeholder="Delivery order number">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Seed Source Description</label>
+        <input type="text" id="bat-seed-source" placeholder="As written on L3.1 (e.g. Dr IOI)">
+      </div>
+      <div class="form-field">
+        <label>Field / Block Location</label>
+        <input type="text" id="bat-field" placeholder="Physical nursery location">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Allocation % (bookable)</label>
+        <input type="number" id="bat-alloc" value="50" min="1" max="100">
+      </div>
+      <div class="form-field">
+        <label>Sellable Date (auto)</label>
+        <input type="date" id="bat-date-sellable" disabled style="opacity:0.6;">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="bat-notes" rows="2" placeholder="Additional notes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('batch-modal')">Cancel</button>
+      <button class="btn btn-primary" id="bat-save-btn" onclick="saveBatch()">Save Batch</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TRANSPLANT MODAL ===== -->
+<div id="transplant-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">Record Transplant</div>
+      <button class="modal-close" onclick="closeModal('transplant-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="tp-batch-id" value="">
+    <div id="tp-info" style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"></div>
+    <div class="form-field">
+      <label>Transplant Date *</label>
+      <input type="date" id="tp-date">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Qty Transplanted *</label>
+        <input type="number" id="tp-qty" placeholder="0" min="0">
+      </div>
+      <div class="form-field">
+        <label>Qty Culled at Transplant</label>
+        <input type="number" id="tp-culled" placeholder="0" min="0" value="0">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Doubletons / Tripletons Gained</label>
+      <input type="number" id="tp-doubletons" placeholder="0" min="0" value="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('transplant-modal')">Cancel</button>
+      <button class="btn btn-primary" id="tp-save-btn" onclick="saveTransplant()">Save Transplant</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CULL MODAL ===== -->
+<div id="cull-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title">Log Culling</div>
+      <button class="modal-close" onclick="closeModal('cull-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="cull-batch-id" value="">
+    <div id="cull-info" style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"></div>
+    <div class="form-field">
+      <label>Date *</label>
+      <input type="date" id="cull-date">
+    </div>
+    <div class="form-field">
+      <label>Qty Culled *</label>
+      <input type="number" id="cull-qty" placeholder="0" min="1">
+    </div>
+    <div class="form-field">
+      <label>Reason</label>
+      <select id="cull-reason">
+        <option value="">Select reason</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="cull-notes" rows="2" placeholder="Additional details"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('cull-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cull-save-btn" onclick="saveCulling()">Log Culling</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COLLECTION MODAL ===== -->
+<div id="collection-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="collection-modal-title">Record Collection</div>
+      <button class="modal-close" onclick="closeModal('collection-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <!-- Type toggle -->
+    <div style="display:flex;gap:4px;margin-bottom:14px;">
+      <button class="btn btn-sm" id="col-type-booking" onclick="setCollectionType('booking')" style="flex:1;">From Booking</button>
+      <button class="btn btn-sm" id="col-type-walkin" onclick="setCollectionType('walkin')" style="flex:1;">Walk-in Sale</button>
+    </div>
+
+    <!-- Booking selection (shown for booking type) -->
+    <div id="col-booking-section">
+      <div class="form-field">
+        <label>Select Booking *</label>
+        <select id="col-booking" onchange="onColBookingChange()"><option value="">Select active booking</option></select>
+      </div>
+      <div id="col-booking-info" style="display:none;padding:10px 12px;background:var(--bg);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+    </div>
+
+    <!-- Walk-in section (shown for walkin type) -->
+    <div id="col-walkin-section" style="display:none;">
+      <div class="form-field">
+        <label>Customer *</label>
+        <select id="col-customer"><option value="">Select customer</option></select>
+      </div>
+      <div class="form-field">
+        <label>Batch *</label>
+        <select id="col-batch" onchange="onColBatchChange()"><option value="">Select batch</option></select>
+      </div>
+      <div id="col-batch-info" style="display:none;padding:10px 12px;background:var(--bg);border-radius:6px;margin-bottom:12px;font-size:12px;"></div>
+      <div class="form-field">
+        <label>Price Per Seedling (RM) *</label>
+        <input type="number" id="col-price" placeholder="0.00" step="0.01" min="0">
+      </div>
+    </div>
+
+    <!-- Common fields -->
+    <div id="col-limit-warning" class="allocation-warning" style="display:none;"></div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Qty to Collect *</label>
+        <input type="number" id="col-qty" placeholder="0" min="1" oninput="onColQtyChange()">
+      </div>
+      <div class="form-field">
+        <label>Collection Date *</label>
+        <input type="date" id="col-date">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>L3.1 Serial Number *</label>
+      <input type="text" id="col-l31" placeholder="Pre-printed serial from MPOB booklet">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Payment Received (RM)</label>
+        <input type="number" id="col-payment" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="form-field">
+        <label>Payment Method</label>
+        <select id="col-pay-method">
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="cheque">Cheque</option>
+        </select>
+      </div>
+    </div>
+    <div id="col-subtotal" style="font-size:14px;font-weight:700;margin-bottom:12px;">Subtotal: RM 0.00</div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Collected By</label>
+        <input type="text" id="col-collected-by" placeholder="Person collecting">
+      </div>
+      <div class="form-field">
+        <label>Transport Fee (RM)</label>
+        <input type="number" id="col-transport" placeholder="0.00" step="0.01" min="0" value="0">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Invoice No (optional)</label>
+      <input type="text" id="col-invoice" placeholder="External invoice reference">
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="col-notes" rows="2" placeholder="Additional notes"></textarea>
+    </div>
+    <!-- Photos -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <div style="flex:1;">
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px;">Seedlings Photo</label>
+        <div id="col-photo-preview" style="width:100%;height:80px;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--text-muted);overflow:hidden;" onclick="document.getElementById('sl-photo-input-album').setAttribute('data-target','seedlings');document.getElementById('sl-photo-input-album').click();">Click to add</div>
+        <input type="hidden" id="col-photo-url" value="">
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;display:block;margin-bottom:4px;">L3.1 Photo</label>
+        <div id="col-l31-preview" style="width:100%;height:80px;border:1px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--text-muted);overflow:hidden;" onclick="document.getElementById('sl-photo-input-album').setAttribute('data-target','l31');document.getElementById('sl-photo-input-album').click();">Click to add</div>
+        <input type="hidden" id="col-l31-url" value="">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('collection-modal')">Cancel</button>
+      <button class="btn btn-primary" id="col-save-btn" onclick="saveCollection()">Save Collection</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BOOKING MODAL ===== -->
+<div id="booking-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title" id="booking-modal-title">New Booking</div>
+      <button class="modal-close" onclick="closeModal('booking-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="bk-edit-id" value="">
+    <div id="bk-alloc-warning" class="allocation-warning" style="display:none;"></div>
+    <div class="form-field">
+      <label>Customer *</label>
+      <select id="bk-customer"><option value="">Select customer</option></select>
+    </div>
+    <div class="form-field">
+      <label>Batch *</label>
+      <select id="bk-batch" onchange="onBkBatchChange()"><option value="">Select batch</option></select>
+    </div>
+    <div id="bk-batch-info" style="display:none;font-size:12px;color:var(--text-muted);margin:-8px 0 12px;padding:8px 12px;background:var(--bg);border-radius:6px;"></div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Qty to Book *</label>
+        <input type="number" id="bk-qty" placeholder="0" min="1" oninput="onBkQtyChange()">
+      </div>
+      <div class="form-field">
+        <label>Price Per Seedling (RM) *</label>
+        <input type="number" id="bk-price" placeholder="0.00" step="0.01" min="0" oninput="onBkQtyChange()">
+      </div>
+    </div>
+    <div id="bk-total" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;">Total: RM 0.00</div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Booking Date *</label>
+        <input type="date" id="bk-date">
+      </div>
+      <div class="form-field">
+        <label>Expected Ready Date</label>
+        <input type="date" id="bk-ready-date">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Invoice No (optional)</label>
+      <input type="text" id="bk-invoice" placeholder="External invoice reference">
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="bk-notes" rows="2" placeholder="Additional notes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('booking-modal')">Cancel</button>
+      <button class="btn btn-primary" id="bk-save-btn" onclick="saveBooking()">Save Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAYMENT MODAL ===== -->
+<div id="payment-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">Record Payment</div>
+      <button class="modal-close" onclick="closeModal('payment-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="pay-booking-id" value="">
+    <input type="hidden" id="pay-customer-id" value="">
+    <input type="hidden" id="pay-collection-id" value="">
+    <div id="pay-info" style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"></div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Amount (RM) *</label>
+        <input type="number" id="pay-amount" placeholder="0.00" step="0.01" min="0.01">
+      </div>
+      <div class="form-field">
+        <label>Payment Date *</label>
+        <input type="date" id="pay-date">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Payment Method *</label>
+      <select id="pay-method">
+        <option value="cash">Cash</option>
+        <option value="bank_transfer">Bank Transfer</option>
+        <option value="cheque">Cheque</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Reference</label>
+      <input type="text" id="pay-ref" placeholder="Bank ref / cheque number">
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="pay-notes" rows="2" placeholder="Payment notes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('payment-modal')">Cancel</button>
+      <button class="btn btn-primary" id="pay-save-btn" onclick="savePayment()">Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BOOKING SLIP MODAL ===== -->
+<div id="slip-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:520px;padding:0;overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:700;font-size:14px;">Booking Slip</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-outline btn-sm" onclick="printBookingSlip()">Print</button>
+        <button class="btn btn-primary btn-sm" onclick="shareBookingSlip()">Share</button>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('slip-modal')" style="padding:4px 8px;">✕</button>
+      </div>
+    </div>
+    <div id="slip-content" style="padding:20px;background:#fff;"></div>
+  </div>
+</div>
+
+<!-- ===== SUPPLIER MODAL ===== -->
+<div id="supplier-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <div class="modal-title" id="supplier-modal-title">Add Supplier</div>
+      <button class="modal-close" onclick="closeModal('supplier-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="sup-edit-id" value="">
+    <div class="form-field">
+      <label>Company / Supplier Name *</label>
+      <input type="text" id="sup-name" placeholder="e.g. IOI, Sime Darby Seeds">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Phone</label>
+        <input type="text" id="sup-phone" placeholder="e.g. 085-123456">
+      </div>
+      <div class="form-field">
+        <label>MPOB License No</label>
+        <input type="text" id="sup-license" placeholder="License number">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Address</label>
+      <textarea id="sup-address" rows="2" placeholder="Address"></textarea>
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="sup-notes" rows="2" placeholder="Additional notes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('supplier-modal')">Cancel</button>
+      <button class="btn btn-primary" id="sup-save-btn" onclick="saveSupplier()">Save Supplier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CUSTOMER MODAL ===== -->
+<div id="customer-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-header">
+      <div class="modal-title" id="customer-modal-title">Add Customer</div>
+      <button class="modal-close" onclick="closeModal('customer-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <input type="hidden" id="cust-edit-id" value="">
+    <input type="hidden" id="cust-linked-id" value="">
+    <div id="cust-dup-warning" style="display:none;padding:10px 14px;background:rgba(58,138,58,0.1);border:1px solid rgba(58,138,58,0.3);border-radius:8px;margin-bottom:12px;font-size:12px;color:#2A6A2A;"></div>
+    <div class="form-field">
+      <label>Customer Name *</label>
+      <input type="text" id="cust-name" placeholder="Full name">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Phone</label>
+        <input type="text" id="cust-phone" placeholder="e.g. 013-1234567" oninput="checkCrossCompanyCustomer()">
+      </div>
+      <div class="form-field">
+        <label>I/C Number</label>
+        <input type="text" id="cust-ic" placeholder="e.g. 880101-13-5123">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Company Registration</label>
+        <input type="text" id="cust-company-reg" placeholder="SSM / Business Reg">
+      </div>
+      <div class="form-field">
+        <label>MPOB License</label>
+        <input type="text" id="cust-license" placeholder="For estate buyers">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Address</label>
+      <textarea id="cust-address" rows="2" placeholder="Full address"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Planting Location</label>
+        <input type="text" id="cust-planting-loc" placeholder="Estate / farm name + location">
+      </div>
+      <div class="form-field">
+        <label>Area (hectares)</label>
+        <input type="number" id="cust-area" placeholder="0" step="0.1" min="0">
+      </div>
+    </div>
+    <div class="form-field">
+      <label>Customer Type</label>
+      <select id="cust-type">
+        <option value="smallholder">Smallholder</option>
+        <option value="estate">Estate</option>
+        <option value="agent">Agent / Trader</option>
+        <option value="government">Government Scheme</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Notes</label>
+      <textarea id="cust-notes" rows="2" placeholder="Additional notes"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('customer-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cust-save-btn" onclick="saveCustomer()">Save Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HIDDEN FILE INPUTS ===== -->
+<input type="file" id="sl-photo-input" accept="image/*" capture="environment" style="display:none;">
+<input type="file" id="sl-photo-input-album" accept="image/*" style="display:none;">
+<input type="file" id="sl-slip-input" accept="image/*" style="display:none;">
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+var OFFICE_ADDRESS = {
+  name: 'TG AGRIBUSINESS',
+  line1: 'Lot 1609, Kpg. Riam Jaya',
+  line2: '98000 Miri, Sarawak',
+  tel: '085-615253',
+  fax: '085-616966'
+};
+var FARM_ADDRESS = {
+  name: 'TG AGRIBUSINESS',
+  line1: 'Lot 174, Block 9, Lambir Land District',
+  line2: '98000 Miri, Sarawak',
+  tel: '085-615253',
+  fax: '085-616966',
+  mpob_no: '522231011000'
+};
+
+var BOOKING_TERMS = [
+  'Full payments to be made upon collection/delivery of plants.',
+  'If plants are not collected 1 month after the confirmed date the delivery of the plants will be based on availability basis or postponed to a future date as the company sees fit.',
+  'Any cancellation of bookings refund shall be made after 14 working days from the date of bookings.'
+];
+
+var CULL_REASONS = ['Stunted growth', 'Abnormal', 'Pest damage', 'Disease', 'Mechanical damage', 'Overaged', 'Other'];
+
+var STATUS_LABELS = {
+  pre_nursery: 'Pre-Nursery',
+  main_nursery: 'Main Nursery',
+  selling: 'Selling',
+  sold_out: 'Sold Out',
+  closed: 'Closed'
+};
+
+// ============================================================
+// STATE
+// ============================================================
+var currentUser = null;
+var currentTab = 'batches';
+var suppliers = [];
+var batches = [];
+var batchEvents = [];
+var customers = [];
+var bookings = [];
+var payments = [];
+var collections = [];
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigateTo(page) {
+  currentTab = page;
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n) {
+    if (n.getAttribute('data-page') === page) n.classList.add('active');
+  });
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadAllData() {
+  var cid = getCompanyId();
+  var results = await Promise.all([
+    sbQuery(sb.from('seedling_suppliers').select('*').eq('company_id', cid).order('name')),
+    sbQuery(sb.from('seedling_batches').select('*').eq('company_id', cid).order('created_at', { ascending: false })),
+    sbQuery(sb.from('seedling_batch_events').select('*').order('event_date', { ascending: false })),
+    sbQuery(sb.from('seedling_customers').select('*').eq('company_id', cid).order('name')),
+    sbQuery(sb.from('seedling_bookings').select('*').eq('company_id', cid).order('created_at', { ascending: false })),
+    sbQuery(sb.from('seedling_payments').select('*').order('created_at', { ascending: false })),
+    sbQuery(sb.from('seedling_collections').select('*').eq('company_id', cid).order('collection_date', { ascending: false }))
+  ]);
+
+  suppliers = results[0] || [];
+  batches = results[1] || [];
+  batchEvents = results[2] || [];
+  customers = results[3] || [];
+  bookings = results[4] || [];
+  payments = results[5] || [];
+  collections = results[6] || [];
+}
+
+async function syncAll() {
+  document.getElementById('sync-text').textContent = 'Syncing...';
+  await loadAllData();
+  renderAll();
+  document.getElementById('sync-text').textContent = 'Synced just now';
+  notify('Data synced', 'success', 1500);
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderBatches();
+  renderBookings();
+  renderCollections();
+  renderCustomers();
+  renderSuppliers();
+  renderReports();
+  populateFilterDropdowns();
+}
+
+function populateFilterDropdowns() {
+  var batchOpts = '<option value="">All Batches</option>' + batches.map(function(b) {
+    return '<option value="' + esc(b.id) + '">' + esc(b.batch_number) + ' — ' + esc(b.variety) + '</option>';
+  }).join('');
+  var el1 = document.getElementById('booking-filter-batch');
+  var el2 = document.getElementById('collection-filter-batch');
+  if (el1) el1.innerHTML = batchOpts;
+  if (el2) el2.innerHTML = batchOpts;
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function getBatchAvailable(b) {
+  return (b.qty_seeds_received || 0) + (b.qty_doubletons_gained || 0) - (b.qty_culled_total || 0) - (b.qty_sold_total || 0);
+}
+
+function getBatchAllocation(b) {
+  return Math.floor((b.qty_seeds_received || 0) * (b.allocation_pct || 50) / 100);
+}
+
+function getQtyCollectible(bk) {
+  if (!bk.price_per_seedling || bk.price_per_seedling <= 0) return 0;
+  return Math.floor((bk.total_paid || 0) / bk.price_per_seedling) - (bk.total_collected || 0);
+}
+
+function statusBadge(status) {
+  return '<span class="badge badge-' + esc(status) + '">' + esc(STATUS_LABELS[status] || status) + '</span>';
+}
+
+function bookingStatusBadge(status) {
+  return '<span class="badge badge-' + esc(status) + '">' + esc(status.charAt(0).toUpperCase() + status.slice(1)) + '</span>';
+}
+
+// ============================================================
+// PLACEHOLDER RENDER FUNCTIONS (to be built in Phases 3-7)
+// ============================================================
+function renderBatches() {
+  var list = document.getElementById('batches-list');
+  var empty = document.getElementById('batches-empty');
+  var filter = document.getElementById('batch-filter-status').value;
+  var filtered = batches;
+  if (filter !== 'all') filtered = batches.filter(function(b) { return b.status === filter; });
+  if (filtered.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = filtered.map(function(b) {
+    var avail = getBatchAvailable(b);
+    var alloc = getBatchAllocation(b);
+    var supName = (suppliers.find(function(s){return s.id===b.supplier_id;})||{}).name || '—';
+    var total = (b.qty_seeds_received||0) + (b.qty_doubletons_gained||0);
+    var pctSold = total > 0 ? Math.round((b.qty_sold_total||0)/total*100) : 0;
+    var pctBooked = total > 0 ? Math.round((b.qty_booked||0)/total*100) : 0;
+    var pctCulled = total > 0 ? Math.round((b.qty_culled_total||0)/total*100) : 0;
+    var pctAvail = Math.max(0, 100 - pctSold - pctBooked - pctCulled);
+
+    // Events for this batch
+    var events = batchEvents.filter(function(e) { return e.batch_id === b.id; });
+    // Bookings for this batch
+    var batchBookings = bookings.filter(function(bk) { return bk.batch_id === b.id; });
+    // Collections for this batch
+    var batchCollections = collections.filter(function(cl) { return cl.batch_id === b.id; });
+
+    // Action buttons
+    var actions = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">';
+    actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openBatchModal(\'' + esc(b.id) + '\')">Edit Batch</button>';
+    if (b.status === 'pre_nursery') {
+      actions += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openTransplantModal(\'' + esc(b.id) + '\')">Record Transplant</button>';
+    }
+    if (b.status !== 'closed' && b.status !== 'sold_out') {
+      actions += '<button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red);" onclick="event.stopPropagation();openCullModal(\'' + esc(b.id) + '\')">Log Culling</button>';
+    }
+    if (b.status === 'main_nursery') {
+      actions += '<button class="btn btn-outline btn-sm" style="color:var(--gold);" onclick="event.stopPropagation();markSelling(\'' + esc(b.id) + '\')">Mark as Selling</button>';
+    }
+    if (b.status !== 'closed') {
+      actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();closeBatch(\'' + esc(b.id) + '\')">Close Batch</button>';
+    }
+    actions += '</div>';
+
+    // Event timeline
+    var timeline = '';
+    if (events.length > 0) {
+      timeline = '<div style="margin-top:12px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Event History</div><div class="event-timeline">';
+      events.forEach(function(e) {
+        var iconClass = e.event_type === 'cull' ? 'cull' : e.event_type === 'transplant' ? 'transplant' : e.event_type === 'doubleton_gain' ? 'doubleton' : 'adjustment';
+        var icon = e.event_type === 'cull' ? '✕' : e.event_type === 'transplant' ? '↑' : e.event_type === 'doubleton_gain' ? '+' : '⟳';
+        var label = e.event_type === 'cull' ? 'Culled' : e.event_type === 'transplant' ? 'Transplanted' : e.event_type === 'doubleton_gain' ? 'Doubletons Gained' : 'Adjustment';
+        timeline += '<div class="event-item">' +
+          '<div class="event-icon ' + iconClass + '">' + icon + '</div>' +
+          '<div class="event-detail">' +
+            '<div><b>' + label + '</b> — ' + (e.qty > 0 ? '+' : '') + e.qty + ' seedlings</div>' +
+            (e.reason ? '<div style="font-size:12px;color:var(--text-muted);">' + esc(e.reason) + '</div>' : '') +
+            (e.notes ? '<div style="font-size:12px;color:var(--text-muted);">' + esc(e.notes) + '</div>' : '') +
+          '</div>' +
+          '<div class="event-date">' + (e.event_date ? fmtDate(e.event_date) : '—') + '</div>' +
+        '</div>';
+      });
+      timeline += '</div></div>';
+    }
+
+    // Bookings mini-table
+    var bookingsHtml = '';
+    if (batchBookings.length > 0) {
+      bookingsHtml = '<div style="margin-top:12px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Bookings (' + batchBookings.length + ')</div>' +
+        '<div class="data-table" style="margin-bottom:0;"><div class="table-wrap"><table><thead><tr><th>Customer</th><th>Qty</th><th>Price</th><th>Paid</th><th>Collected</th><th>Status</th></tr></thead><tbody>';
+      batchBookings.forEach(function(bk) {
+        var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+        bookingsHtml += '<tr>' +
+          '<td>' + esc(cust ? cust.name : '—') + '</td>' +
+          '<td>' + (bk.qty_booked||0) + '</td>' +
+          '<td>' + formatRM(bk.price_per_seedling||0) + '</td>' +
+          '<td>' + formatRM(bk.total_paid||0) + '</td>' +
+          '<td>' + (bk.total_collected||0) + '</td>' +
+          '<td>' + bookingStatusBadge(bk.status) + '</td>' +
+        '</tr>';
+      });
+      bookingsHtml += '</tbody></table></div></div></div>';
+    }
+
+    // Collections mini-table
+    var collectionsHtml = '';
+    if (batchCollections.length > 0) {
+      collectionsHtml = '<div style="margin-top:12px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Collections (' + batchCollections.length + ')</div>' +
+        '<div class="data-table" style="margin-bottom:0;"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Qty</th><th>L3.1</th><th>Paid</th></tr></thead><tbody>';
+      batchCollections.forEach(function(cl) {
+        var cust = customers.find(function(c) { return c.id === cl.customer_id; });
+        collectionsHtml += '<tr>' +
+          '<td>' + (cl.collection_date ? fmtDate(cl.collection_date) : '—') + '</td>' +
+          '<td>' + esc(cust ? cust.name : '—') + '</td>' +
+          '<td>' + cl.qty_collected + '</td>' +
+          '<td><span class="l31-badge">' + esc(cl.l31_serial_no || '—') + '</span></td>' +
+          '<td>' + formatRM(cl.payment_received||0) + '</td>' +
+        '</tr>';
+      });
+      collectionsHtml += '</tbody></table></div></div></div>';
+    }
+
+    return '<div class="batch-card" onclick="this.classList.toggle(\'expanded\')">' +
+      '<div class="batch-header">' +
+        '<div>' +
+          '<div class="batch-title">Batch ' + esc(b.batch_number) + ' — ' + esc(b.variety) + '</div>' +
+          '<div class="batch-subtitle">' + esc(supName) + ' · Field: ' + esc(b.field_block || '—') + ' · Planted: ' + (b.date_planted ? fmtDate(b.date_planted) : '—') +
+            (b.date_sellable ? ' · Sellable: ' + fmtDate(b.date_sellable) : '') +
+            ' · RM' + (parseFloat(b.price_per_seedling)||0).toFixed(2) + '/pc</div>' +
+        '</div>' +
+        '<div>' + statusBadge(b.status) + '</div>' +
+      '</div>' +
+      '<div class="progress-bar">' +
+        '<div class="progress-segment progress-sold" style="width:' + pctSold + '%" title="Sold: ' + (b.qty_sold_total||0) + '"></div>' +
+        '<div class="progress-segment progress-booked" style="width:' + pctBooked + '%" title="Booked: ' + (b.qty_booked||0) + '"></div>' +
+        '<div class="progress-segment progress-culled" style="width:' + pctCulled + '%" title="Culled: ' + (b.qty_culled_total||0) + '"></div>' +
+        '<div class="progress-segment progress-available" style="width:' + pctAvail + '%" title="Available: ' + avail + '"></div>' +
+      '</div>' +
+      '<div class="qty-grid">' +
+        '<div class="qty-item"><div class="qty-val">' + (b.qty_seeds_received||0) + '</div><div class="qty-label">Seeds</div></div>' +
+        '<div class="qty-item"><div class="qty-val">' + (b.qty_transplanted||0) + '</div><div class="qty-label">Transplanted</div></div>' +
+        '<div class="qty-item"><div class="qty-val">' + (b.qty_doubletons_gained||0) + '</div><div class="qty-label">Doubletons</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--red);">' + (b.qty_culled_total||0) + '</div><div class="qty-label">Culled</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:#6B4C8A;">' + (b.qty_sold_total||0) + '</div><div class="qty-label">Sold</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--green);">' + avail + '</div><div class="qty-label">Available</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--gold);">' + (b.qty_booked||0) + '/' + alloc + '</div><div class="qty-label">Booked/Alloc</div></div>' +
+      '</div>' +
+      '<div class="batch-detail">' + actions + timeline + bookingsHtml + collectionsHtml + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderBookings() {
+  var list = document.getElementById('bookings-list');
+  var empty = document.getElementById('bookings-empty');
+  var filterStatus = document.getElementById('booking-filter-status').value;
+  var filterBatch = document.getElementById('booking-filter-batch').value;
+  var filtered = bookings;
+  if (filterStatus !== 'all') filtered = filtered.filter(function(bk) { return bk.status === filterStatus; });
+  if (filterBatch) filtered = filtered.filter(function(bk) { return bk.batch_id === filterBatch; });
+  if (filtered.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = filtered.map(function(bk) {
+    var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+    var batch = batches.find(function(b) { return b.id === bk.batch_id; });
+    var collectible = getQtyCollectible(bk);
+    var pctPaid = bk.total_amount > 0 ? Math.min(100, Math.round((bk.total_paid||0) / bk.total_amount * 100)) : 0;
+    var pctCollected = bk.qty_booked > 0 ? Math.min(100, Math.round((bk.total_collected||0) / bk.qty_booked * 100)) : 0;
+    var bkPayments = payments.filter(function(p) { return p.booking_id === bk.id; });
+    var bkCollections = collections.filter(function(cl) { return cl.booking_id === bk.id; });
+
+    var detail = '<div class="batch-detail">' +
+      '<div class="booking-summary">' +
+        '<div class="qty-item"><div class="qty-val">' + bk.qty_booked + '</div><div class="qty-label">Booked</div></div>' +
+        '<div class="qty-item"><div class="qty-val">' + formatRM(bk.total_amount||0) + '</div><div class="qty-label">Total</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--green);">' + formatRM(bk.total_paid||0) + '</div><div class="qty-label">Paid</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--red);">' + formatRM((bk.total_amount||0) - (bk.total_paid||0)) + '</div><div class="qty-label">Balance</div></div>' +
+        '<div class="qty-item"><div class="qty-val">' + (bk.total_collected||0) + '</div><div class="qty-label">Collected</div></div>' +
+        '<div class="qty-item"><div class="qty-val" style="color:var(--gold);">' + collectible + '</div><div class="qty-label">Collectible</div></div>' +
+      '</div>';
+
+    // Actions
+    if (bk.status === 'active') {
+      detail += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' +
+        '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openPaymentModal(\'' + esc(bk.id) + '\')">Record Payment</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openBookingModal(\'' + esc(bk.id) + '\')">Edit</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showBookingSlip(\'' + esc(bk.id) + '\')">Print Slip</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();reassignBatch(\'' + esc(bk.id) + '\')">Reassign Batch</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();cancelBooking(\'' + esc(bk.id) + '\')">Cancel</button>' +
+      '</div>';
+    } else {
+      detail += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showBookingSlip(\'' + esc(bk.id) + '\')">Print Slip</button>' +
+      '</div>';
+    }
+
+    // Payment history
+    if (bkPayments.length > 0) {
+      detail += '<div style="margin-top:8px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Payment History</div>' +
+        '<div class="data-table" style="margin-bottom:0;"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th></tr></thead><tbody>';
+      bkPayments.forEach(function(p) {
+        detail += '<tr><td>' + (p.payment_date ? fmtDate(p.payment_date) : '—') + '</td><td>' + formatRM(p.amount) + '</td><td>' + esc(p.payment_method||'') + '</td><td>' + esc(p.reference||'—') + '</td></tr>';
+      });
+      detail += '</tbody></table></div></div></div>';
+    }
+
+    // Collection history
+    if (bkCollections.length > 0) {
+      detail += '<div style="margin-top:8px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Collections</div>' +
+        '<div class="data-table" style="margin-bottom:0;"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Qty</th><th>L3.1</th><th>Paid</th></tr></thead><tbody>';
+      bkCollections.forEach(function(cl) {
+        detail += '<tr><td>' + (cl.collection_date ? fmtDate(cl.collection_date) : '—') + '</td><td>' + cl.qty_collected + '</td><td><span class="l31-badge">' + esc(cl.l31_serial_no||'—') + '</span></td><td>' + formatRM(cl.payment_received||0) + '</td></tr>';
+      });
+      detail += '</tbody></table></div></div></div>';
+    }
+
+    detail += '</div>';
+
+    return '<div class="batch-card" onclick="this.classList.toggle(\'expanded\')">' +
+      '<div class="batch-header">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="batch-title">' + esc(cust ? cust.name : '—') + '</div>' +
+          '<div class="batch-subtitle">' + esc(bk.id) + ' · Batch ' + esc(batch ? batch.batch_number : '—') + ' · ' + esc(batch ? batch.variety : '') + ' · ' + formatRM(bk.price_per_seedling||0) + '/pc · Booked: ' + (bk.booking_date ? fmtDate(bk.booking_date) : '—') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<div style="text-align:right;"><div style="font-size:16px;font-weight:800;">' + bk.qty_booked + '</div><div style="font-size:10px;color:var(--text-muted);">seedlings</div></div>' +
+          bookingStatusBadge(bk.status) +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;">' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Payment ' + pctPaid + '%</div>' +
+          '<div class="progress-bar"><div class="progress-segment progress-available" style="width:' + pctPaid + '%"></div></div>' +
+        '</div>' +
+        '<div style="flex:1;">' +
+          '<div style="font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:2px;">Collected ' + pctCollected + '%</div>' +
+          '<div class="progress-bar"><div class="progress-segment progress-sold" style="width:' + pctCollected + '%"></div></div>' +
+        '</div>' +
+      '</div>' +
+      detail +
+    '</div>';
+  }).join('');
+}
+
+function renderCollections() {
+  var list = document.getElementById('collections-list');
+  var empty = document.getElementById('collections-empty');
+  var search = (document.getElementById('collection-search').value || '').trim().toLowerCase();
+  var filterBatch = document.getElementById('collection-filter-batch').value;
+  var filtered = collections;
+  if (search) filtered = filtered.filter(function(cl) { return (cl.l31_serial_no||'').toLowerCase().includes(search); });
+  if (filterBatch) filtered = filtered.filter(function(cl) { return cl.batch_id === filterBatch; });
+  if (filtered.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = '<div class="data-table"><div class="table-wrap"><table>' +
+    '<thead><tr><th>Date</th><th>Customer</th><th>Batch</th><th>Qty</th><th>L3.1 No</th><th>Price</th><th>Subtotal</th><th>Paid</th><th>Type</th><th>Photos</th></tr></thead><tbody>' +
+    filtered.map(function(cl) {
+      var cust = customers.find(function(c) { return c.id === cl.customer_id; });
+      var batch = batches.find(function(b) { return b.id === cl.batch_id; });
+      var isBooking = !!cl.booking_id;
+      var photos = '';
+      if (cl.photo_url) photos += '<img src="' + esc(cl.photo_url) + '" class="photo-thumb" onclick="event.stopPropagation();window.open(this.src,\'_blank\')" alt="Seedlings">';
+      if (cl.l31_photo_url) photos += '<img src="' + esc(cl.l31_photo_url) + '" class="photo-thumb" onclick="event.stopPropagation();window.open(this.src,\'_blank\')" alt="L3.1">';
+      return '<tr>' +
+        '<td>' + (cl.collection_date ? fmtDate(cl.collection_date) : '—') + '</td>' +
+        '<td class="td-bold">' + esc(cust ? cust.name : '—') + '</td>' +
+        '<td>' + esc(batch ? batch.batch_number : '—') + '</td>' +
+        '<td>' + cl.qty_collected + '</td>' +
+        '<td><span class="l31-badge">' + esc(cl.l31_serial_no || '—') + '</span></td>' +
+        '<td>' + formatRM(cl.price_per_seedling||0) + '</td>' +
+        '<td>' + formatRM(cl.subtotal||0) + '</td>' +
+        '<td>' + formatRM(cl.payment_received||0) + '</td>' +
+        '<td>' + (isBooking ? '<span class="badge badge-active">Booking</span>' : '<span class="badge badge-selling">Walk-in</span>') + '</td>' +
+        '<td style="display:flex;gap:4px;">' + (photos || '<span style="color:var(--text-muted);font-size:11px;">—</span>') + '</td>' +
+      '</tr>';
+    }).join('') +
+  '</tbody></table></div></div>';
+}
+
+function renderCustomers() {
+  var tbody = document.getElementById('customers-tbody');
+  var empty = document.getElementById('customers-empty');
+  var search = (document.getElementById('customer-search').value || '').toLowerCase();
+  var filtered = customers;
+  if (search) filtered = customers.filter(function(c) {
+    return (c.name||'').toLowerCase().includes(search) || (c.phone||'').includes(search);
+  });
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.map(function(c, i) {
+    return '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td class="td-bold">' + esc(c.name) + '</td>' +
+      '<td>' + esc(c.phone || '—') + '</td>' +
+      '<td>' + esc(c.ic_number || c.company_reg || '—') + '</td>' +
+      '<td>' + esc(c.customer_type || '—') + '</td>' +
+      '<td class="td-truncate">' + esc(c.planting_location || '—') + '</td>' +
+      '<td style="display:flex;gap:4px;">' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openCustomerModal(\'' + esc(c.id) + '\')">Edit</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteCustomer(\'' + esc(c.id) + '\')" style="padding:4px 8px;">✕</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderSuppliers() {
+  var tbody = document.getElementById('suppliers-tbody');
+  var empty = document.getElementById('suppliers-empty');
+  if (suppliers.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = suppliers.map(function(s, i) {
+    return '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td class="td-bold">' + esc(s.name) + '</td>' +
+      '<td>' + esc(s.phone || '—') + '</td>' +
+      '<td>' + esc(s.license_no || '—') + '</td>' +
+      '<td class="td-truncate">' + esc(s.notes || '—') + '</td>' +
+      '<td style="display:flex;gap:4px;">' +
+        '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openSupplierModal(\'' + esc(s.id) + '\')">Edit</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteSupplier(\'' + esc(s.id) + '\')" style="padding:4px 8px;">✕</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ============================================================
+// REPORTS
+// ============================================================
+var _rptType = 'mpob';
+var _rptMonth = new Date().getMonth();
+var _rptYear = new Date().getFullYear();
+
+function renderReports() {
+  var btns = document.getElementById('report-btns');
+  var types = [
+    { id: 'mpob', label: 'MPOB Monthly Report' },
+    { id: 'batch', label: 'Batch Summary' },
+    { id: 'cashflow', label: 'Cash Flow Projection' }
+  ];
+  btns.innerHTML = types.map(function(t) {
+    return '<button class="report-btn' + (_rptType === t.id ? ' active' : '') + '" onclick="selectReport(\'' + t.id + '\')">' + esc(t.label) + '</button>';
+  }).join('');
+  renderReportFilters();
+  renderReportContent();
+}
+
+function selectReport(type) {
+  _rptType = type;
+  renderReports();
+}
+
+function renderReportFilters() {
+  var el = document.getElementById('report-filters');
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  if (_rptType === 'mpob') {
+    el.innerHTML = '<div class="filter-bar">' +
+      '<select id="rpt-month" onchange="_rptMonth=parseInt(this.value);renderReportContent()">' +
+      months.map(function(m, i) { return '<option value="' + i + '"' + (i === _rptMonth ? ' selected' : '') + '>' + m + '</option>'; }).join('') +
+      '</select>' +
+      '<select id="rpt-year" onchange="_rptYear=parseInt(this.value);renderReportContent()">' +
+      [_rptYear-1, _rptYear, _rptYear+1].map(function(y) { return '<option value="' + y + '"' + (y === _rptYear ? ' selected' : '') + '>' + y + '</option>'; }).join('') +
+      '</select>' +
+      '<button class="btn btn-outline btn-sm" onclick="printReport()">Print</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="exportReportCSV()">Export CSV</button>' +
+    '</div>';
+  } else if (_rptType === 'batch') {
+    el.innerHTML = '<div class="filter-bar">' +
+      '<select id="rpt-batch-status" onchange="renderReportContent()">' +
+        '<option value="all">All Statuses</option>' +
+        '<option value="active">Active (Pre-Nursery/Main/Selling)</option>' +
+        '<option value="sold_out">Sold Out</option>' +
+        '<option value="closed">Closed</option>' +
+      '</select>' +
+      '<button class="btn btn-outline btn-sm" onclick="printReport()">Print</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="exportReportCSV()">Export CSV</button>' +
+    '</div>';
+  } else if (_rptType === 'cashflow') {
+    el.innerHTML = '<div class="filter-bar">' +
+      '<select id="rpt-cf-year" onchange="_rptYear=parseInt(this.value);renderReportContent()">' +
+      [_rptYear-1, _rptYear, _rptYear+1].map(function(y) { return '<option value="' + y + '"' + (y === _rptYear ? ' selected' : '') + '>' + y + '</option>'; }).join('') +
+      '</select>' +
+      '<button class="btn btn-outline btn-sm" onclick="printReport()">Print</button>' +
+      '<button class="btn btn-outline btn-sm" onclick="exportReportCSV()">Export CSV</button>' +
+    '</div>';
+  }
+}
+
+function renderReportContent() {
+  var el = document.getElementById('report-content');
+  if (_rptType === 'mpob') renderMPOBReport(el);
+  else if (_rptType === 'batch') renderBatchSummaryReport(el);
+  else if (_rptType === 'cashflow') renderCashFlowReport(el);
+}
+
+function renderMPOBReport(el) {
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = months[_rptMonth] + ' ' + _rptYear;
+
+  // Seeds planted this month
+  var planted = batches.filter(function(b) {
+    if (!b.date_planted) return false;
+    var d = new Date(b.date_planted);
+    return d.getMonth() === _rptMonth && d.getFullYear() === _rptYear;
+  });
+
+  // Events this month
+  var monthEvents = batchEvents.filter(function(e) {
+    if (!e.event_date) return false;
+    var d = new Date(e.event_date);
+    return d.getMonth() === _rptMonth && d.getFullYear() === _rptYear;
+  });
+  var transplanted = monthEvents.filter(function(e) { return e.event_type === 'transplant'; });
+  var culled = monthEvents.filter(function(e) { return e.event_type === 'cull'; });
+  var gained = monthEvents.filter(function(e) { return e.event_type === 'doubleton_gain'; });
+
+  // Collections this month
+  var monthCollections = collections.filter(function(cl) {
+    if (!cl.collection_date) return false;
+    var d = new Date(cl.collection_date);
+    return d.getMonth() === _rptMonth && d.getFullYear() === _rptYear;
+  });
+
+  // Summary totals
+  var totalPlanted = planted.reduce(function(s, b) { return s + (b.qty_seeds_received||0); }, 0);
+  var totalTransplanted = transplanted.reduce(function(s, e) { return s + (e.qty||0); }, 0);
+  var totalCulled = culled.reduce(function(s, e) { return s + Math.abs(e.qty||0); }, 0);
+  var totalGained = gained.reduce(function(s, e) { return s + (e.qty||0); }, 0);
+  var totalSold = monthCollections.reduce(function(s, cl) { return s + (cl.qty_collected||0); }, 0);
+  var totalBalance = batches.filter(function(b) { return b.status !== 'closed'; }).reduce(function(s, b) { return s + getBatchAvailable(b); }, 0);
+
+  var html = '<div id="report-printable">';
+  html += '<h3 style="font-family:\'Playfair Display\',serif;margin-bottom:4px;">MPOB Monthly Report — ' + esc(monthLabel) + '</h3>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">TG Agribusiness · MPOB License: 522231011000</div>';
+
+  // Summary cards
+  html += '<div class="cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:20px;">' +
+    '<div class="summary-card"><div class="sc-label">Seeds Planted</div><div class="sc-value">' + totalPlanted + '</div></div>' +
+    '<div class="summary-card"><div class="sc-label">Transplanted</div><div class="sc-value">' + totalTransplanted + '</div></div>' +
+    '<div class="summary-card"><div class="sc-label">Culled</div><div class="sc-value" style="color:var(--red);">' + totalCulled + '</div></div>' +
+    '<div class="summary-card"><div class="sc-label">Doubletons</div><div class="sc-value" style="color:var(--gold);">' + totalGained + '</div></div>' +
+    '<div class="summary-card"><div class="sc-label">Sold</div><div class="sc-value" style="color:#6B4C8A;">' + totalSold + '</div></div>' +
+    '<div class="summary-card"><div class="sc-label">Balance (All)</div><div class="sc-value" style="color:var(--green);">' + totalBalance + '</div></div>' +
+  '</div>';
+
+  // Seeds Planted section
+  if (planted.length > 0) {
+    html += '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">Seeds Planted / Purchased</div>';
+    html += '<div class="data-table"><div class="table-wrap"><table><thead><tr><th>Batch</th><th>Supplier</th><th>Variety</th><th>Qty</th><th>Date Planted</th></tr></thead><tbody>';
+    planted.forEach(function(b) {
+      var sup = suppliers.find(function(s) { return s.id === b.supplier_id; });
+      html += '<tr><td>' + esc(b.batch_number) + '</td><td>' + esc(sup ? sup.name : '—') + '</td><td>' + esc(b.variety) + '</td><td>' + b.qty_seeds_received + '</td><td>' + fmtDate(b.date_planted) + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Culled section
+  if (culled.length > 0) {
+    html += '<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">Culled / Destroyed</div>';
+    html += '<div class="data-table"><div class="table-wrap"><table><thead><tr><th>Batch</th><th>Qty</th><th>Reason</th><th>Date</th></tr></thead><tbody>';
+    culled.forEach(function(e) {
+      var b = batches.find(function(x) { return x.id === e.batch_id; });
+      html += '<tr><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + Math.abs(e.qty) + '</td><td>' + esc(e.reason || '—') + '</td><td>' + fmtDate(e.event_date) + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Sold section
+  if (monthCollections.length > 0) {
+    html += '<div style="font-size:13px;font-weight:700;margin:12px 0 6px;">Sold / Collected</div>';
+    html += '<div class="data-table"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer</th><th>Batch</th><th>Qty</th><th>L3.1</th><th>Amount</th></tr></thead><tbody>';
+    monthCollections.forEach(function(cl) {
+      var cust = customers.find(function(c) { return c.id === cl.customer_id; });
+      var b = batches.find(function(x) { return x.id === cl.batch_id; });
+      html += '<tr><td>' + fmtDate(cl.collection_date) + '</td><td>' + esc(cust ? cust.name : '—') + '</td><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + cl.qty_collected + '</td><td>' + esc(cl.l31_serial_no || '—') + '</td><td>' + formatRM(cl.subtotal||0) + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  if (totalPlanted === 0 && culled.length === 0 && monthCollections.length === 0 && transplanted.length === 0) {
+    html += '<div style="text-align:center;padding:30px;color:var(--text-muted);">No activity recorded for ' + esc(monthLabel) + '</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function renderBatchSummaryReport(el) {
+  var filterStatus = (document.getElementById('rpt-batch-status') || {}).value || 'all';
+  var filtered = batches;
+  if (filterStatus === 'active') filtered = batches.filter(function(b) { return ['pre_nursery','main_nursery','selling'].includes(b.status); });
+  else if (filterStatus !== 'all') filtered = batches.filter(function(b) { return b.status === filterStatus; });
+
+  var totals = { seeds: 0, transplanted: 0, doubletons: 0, culled: 0, sold: 0, available: 0, booked: 0, uncommitted: 0 };
+
+  var html = '<div id="report-printable">';
+  html += '<h3 style="font-family:\'Playfair Display\',serif;margin-bottom:12px;">Batch Summary Report</h3>';
+  html += '<div class="data-table"><div class="table-wrap"><table><thead><tr>' +
+    '<th>Batch</th><th>Variety</th><th>Supplier</th><th>Seeds</th><th>Trans.</th><th>Dbl.</th><th>Culled</th><th>Sold</th><th>Avail.</th><th>Booked</th><th>Uncommit.</th><th>Status</th><th>Planted</th><th>Sellable</th>' +
+  '</tr></thead><tbody>';
+
+  filtered.forEach(function(b) {
+    var sup = suppliers.find(function(s) { return s.id === b.supplier_id; });
+    var avail = getBatchAvailable(b);
+    var uncommitted = avail - (b.qty_booked||0);
+    totals.seeds += (b.qty_seeds_received||0);
+    totals.transplanted += (b.qty_transplanted||0);
+    totals.doubletons += (b.qty_doubletons_gained||0);
+    totals.culled += (b.qty_culled_total||0);
+    totals.sold += (b.qty_sold_total||0);
+    totals.available += avail;
+    totals.booked += (b.qty_booked||0);
+    totals.uncommitted += uncommitted;
+    html += '<tr>' +
+      '<td class="td-bold">' + esc(b.batch_number) + '</td>' +
+      '<td>' + esc(b.variety) + '</td>' +
+      '<td>' + esc(sup ? sup.name : '—') + '</td>' +
+      '<td>' + (b.qty_seeds_received||0) + '</td>' +
+      '<td>' + (b.qty_transplanted||0) + '</td>' +
+      '<td>' + (b.qty_doubletons_gained||0) + '</td>' +
+      '<td style="color:var(--red);">' + (b.qty_culled_total||0) + '</td>' +
+      '<td style="color:#6B4C8A;">' + (b.qty_sold_total||0) + '</td>' +
+      '<td style="color:var(--green);font-weight:700;">' + avail + '</td>' +
+      '<td style="color:var(--gold);">' + (b.qty_booked||0) + '</td>' +
+      '<td>' + uncommitted + '</td>' +
+      '<td>' + statusBadge(b.status) + '</td>' +
+      '<td>' + (b.date_planted ? fmtDate(b.date_planted) : '—') + '</td>' +
+      '<td>' + (b.date_sellable ? fmtDate(b.date_sellable) : '—') + '</td>' +
+    '</tr>';
+  });
+
+  html += '<tr style="font-weight:700;border-top:2px solid var(--text);">' +
+    '<td colspan="3">TOTAL</td>' +
+    '<td>' + totals.seeds + '</td><td>' + totals.transplanted + '</td><td>' + totals.doubletons + '</td>' +
+    '<td style="color:var(--red);">' + totals.culled + '</td><td style="color:#6B4C8A;">' + totals.sold + '</td>' +
+    '<td style="color:var(--green);">' + totals.available + '</td><td style="color:var(--gold);">' + totals.booked + '</td>' +
+    '<td>' + totals.uncommitted + '</td><td colspan="3"></td>' +
+  '</tr>';
+  html += '</tbody></table></div></div></div>';
+  el.innerHTML = html;
+}
+
+function renderCashFlowReport(el) {
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var year = _rptYear;
+
+  var html = '<div id="report-printable">';
+  html += '<h3 style="font-family:\'Playfair Display\',serif;margin-bottom:12px;">Cash Flow Projection — ' + year + '</h3>';
+  html += '<div class="data-table"><div class="table-wrap"><table><thead><tr>' +
+    '<th>Month</th><th>Booking Payments</th><th>Cash Sales</th><th>Total Received</th><th>Projected Due</th>' +
+  '</tr></thead><tbody>';
+
+  var grandBooking = 0, grandCash = 0, grandTotal = 0, grandProjected = 0;
+
+  for (var m = 0; m < 12; m++) {
+    // Actual payments received this month
+    var monthPayments = payments.filter(function(p) {
+      if (!p.payment_date) return false;
+      var d = new Date(p.payment_date);
+      return d.getMonth() === m && d.getFullYear() === year;
+    });
+
+    var bookingPay = 0, cashPay = 0;
+    monthPayments.forEach(function(p) {
+      if (p.booking_id) bookingPay += (p.amount||0);
+      else cashPay += (p.amount||0);
+    });
+
+    // Also count walk-in collection payments not in payments table
+    var monthCols = collections.filter(function(cl) {
+      if (!cl.collection_date) return false;
+      var d = new Date(cl.collection_date);
+      return d.getMonth() === m && d.getFullYear() === year && !cl.booking_id;
+    });
+    monthCols.forEach(function(cl) {
+      // Only add if not already captured via payments table
+      var alreadyCounted = monthPayments.some(function(p) { return p.collection_id === cl.id; });
+      if (!alreadyCounted) cashPay += (cl.payment_received||0);
+    });
+
+    var total = bookingPay + cashPay;
+
+    // Projected: outstanding balance from active bookings expected this month
+    var projected = 0;
+    bookings.filter(function(bk) { return bk.status === 'active'; }).forEach(function(bk) {
+      if (!bk.expected_ready_date) return;
+      var rd = new Date(bk.expected_ready_date);
+      if (rd.getMonth() === m && rd.getFullYear() === year) {
+        var balance = (bk.total_amount||0) - (bk.total_paid||0);
+        if (balance > 0) projected += balance;
+      }
+    });
+
+    grandBooking += bookingPay;
+    grandCash += cashPay;
+    grandTotal += total;
+    grandProjected += projected;
+
+    var isPast = (year < new Date().getFullYear()) || (year === new Date().getFullYear() && m < new Date().getMonth());
+    var isCurrent = (year === new Date().getFullYear() && m === new Date().getMonth());
+
+    html += '<tr style="' + (isCurrent ? 'background:rgba(212,175,55,0.08);' : '') + '">' +
+      '<td class="td-bold">' + months[m] + ' ' + year + '</td>' +
+      '<td>' + (bookingPay > 0 ? formatRM(bookingPay) : '—') + '</td>' +
+      '<td>' + (cashPay > 0 ? formatRM(cashPay) : '—') + '</td>' +
+      '<td style="font-weight:700;">' + (total > 0 ? formatRM(total) : '—') + '</td>' +
+      '<td style="color:var(--gold);">' + (projected > 0 ? formatRM(projected) : '—') + '</td>' +
+    '</tr>';
+  }
+
+  html += '<tr style="font-weight:700;border-top:2px solid var(--text);">' +
+    '<td>TOTAL</td>' +
+    '<td>' + formatRM(grandBooking) + '</td>' +
+    '<td>' + formatRM(grandCash) + '</td>' +
+    '<td>' + formatRM(grandTotal) + '</td>' +
+    '<td style="color:var(--gold);">' + formatRM(grandProjected) + '</td>' +
+  '</tr>';
+  html += '</tbody></table></div></div></div>';
+  el.innerHTML = html;
+}
+
+// ============================================================
+// REPORT EXPORT
+// ============================================================
+function printReport() {
+  var content = document.getElementById('report-printable');
+  if (!content) return;
+  var win = window.open('', '_blank');
+  win.document.write('<html><head><title>Report</title><style>body{font-family:"Plus Jakarta Sans",sans-serif;margin:20px;font-size:12px;}table{border-collapse:collapse;width:100%;}th,td{padding:6px 10px;border:1px solid #ddd;text-align:left;font-size:11px;}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px;}.badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}.summary-card{border:1px solid #ddd;padding:12px;border-radius:8px;text-align:center;}.sc-label{font-size:10px;text-transform:uppercase;color:#888;}.sc-value{font-size:20px;font-weight:800;}.cards-grid{display:flex;gap:10px;flex-wrap:wrap;}@media print{body{margin:0;}}</style></head><body>');
+  win.document.write(content.innerHTML);
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
+}
+
+function exportReportCSV() {
+  var table = document.querySelector('#report-printable table');
+  if (!table) { notify('No table to export', 'warning'); return; }
+  var rows = table.querySelectorAll('tr');
+  var csv = [];
+  rows.forEach(function(row) {
+    var cells = [];
+    row.querySelectorAll('th, td').forEach(function(cell) {
+      var text = cell.textContent.replace(/"/g, '""').trim();
+      cells.push('"' + text + '"');
+    });
+    csv.push(cells.join(','));
+  });
+  var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'seedlings_report_' + _rptType + '_' + _rptYear + '.csv';
+  a.click();
+}
+
+// ============================================================
+// COLLECTION CRUD
+// ============================================================
+var _collectionType = 'booking';
+
+function setCollectionType(type) {
+  _collectionType = type;
+  document.getElementById('col-type-booking').className = 'btn btn-sm' + (type === 'booking' ? ' btn-primary' : ' btn-outline');
+  document.getElementById('col-type-walkin').className = 'btn btn-sm' + (type === 'walkin' ? ' btn-primary' : ' btn-outline');
+  document.getElementById('col-booking-section').style.display = type === 'booking' ? 'block' : 'none';
+  document.getElementById('col-walkin-section').style.display = type === 'walkin' ? 'block' : 'none';
+  document.getElementById('col-limit-warning').style.display = 'none';
+  document.getElementById('col-subtotal').textContent = 'Subtotal: RM 0.00';
+}
+
+function openCollectionModal(preselectedBookingId) {
+  document.getElementById('collection-modal-title').textContent = 'Record Collection';
+  document.getElementById('col-limit-warning').style.display = 'none';
+  document.getElementById('col-qty').value = '';
+  document.getElementById('col-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('col-l31').value = '';
+  document.getElementById('col-payment').value = '';
+  document.getElementById('col-pay-method').value = 'cash';
+  document.getElementById('col-collected-by').value = '';
+  document.getElementById('col-transport').value = '0';
+  document.getElementById('col-invoice').value = '';
+  document.getElementById('col-notes').value = '';
+  document.getElementById('col-photo-url').value = '';
+  document.getElementById('col-l31-url').value = '';
+  document.getElementById('col-photo-preview').innerHTML = 'Click to add';
+  document.getElementById('col-l31-preview').innerHTML = 'Click to add';
+  document.getElementById('col-subtotal').textContent = 'Subtotal: RM 0.00';
+
+  // Populate booking dropdown (active bookings with collectible > 0)
+  var bkSel = document.getElementById('col-booking');
+  bkSel.innerHTML = '<option value="">Select active booking</option>' + bookings.filter(function(bk) {
+    return bk.status === 'active' && getQtyCollectible(bk) > 0;
+  }).map(function(bk) {
+    var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+    var collectible = getQtyCollectible(bk);
+    return '<option value="' + esc(bk.id) + '"' + (preselectedBookingId === bk.id ? ' selected' : '') + '>' +
+      esc(bk.id) + ' — ' + esc(cust ? cust.name : '—') + ' (collectible: ' + collectible + ')</option>';
+  }).join('');
+
+  // Populate walk-in customer + batch dropdowns
+  var custSel = document.getElementById('col-customer');
+  custSel.innerHTML = '<option value="">Select customer</option>' + customers.map(function(c) {
+    return '<option value="' + esc(c.id) + '">' + esc(c.name) + (c.phone ? ' (' + esc(c.phone) + ')' : '') + '</option>';
+  }).join('');
+
+  var batchSel = document.getElementById('col-batch');
+  batchSel.innerHTML = '<option value="">Select batch</option>' + batches.filter(function(b) {
+    return b.status === 'selling' && getBatchAvailable(b) - (b.qty_booked||0) > 0;
+  }).map(function(b) {
+    var uncommitted = getBatchAvailable(b) - (b.qty_booked||0);
+    return '<option value="' + esc(b.id) + '">' + esc(b.batch_number) + ' — ' + esc(b.variety) + ' (uncommitted: ' + uncommitted + ')</option>';
+  }).join('');
+
+  setCollectionType(preselectedBookingId ? 'booking' : 'booking');
+  if (preselectedBookingId) {
+    bkSel.value = preselectedBookingId;
+    onColBookingChange();
+  }
+
+  document.getElementById('collection-modal').style.display = 'flex';
+  trapFocus(document.getElementById('collection-modal'));
+}
+
+function onColBookingChange() {
+  var bkId = document.getElementById('col-booking').value;
+  var info = document.getElementById('col-booking-info');
+  var warning = document.getElementById('col-limit-warning');
+  if (!bkId) { info.style.display = 'none'; warning.style.display = 'none'; return; }
+  var bk = bookings.find(function(x) { return x.id === bkId; });
+  if (!bk) return;
+  var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+  var batch = batches.find(function(b) { return b.id === bk.batch_id; });
+  var collectible = getQtyCollectible(bk);
+  var balance = (bk.total_amount||0) - (bk.total_paid||0);
+  info.style.display = 'block';
+  info.innerHTML = '<b>' + esc(cust ? cust.name : '—') + '</b> · Batch ' + esc(batch ? batch.batch_number : '—') + ' · ' + formatRM(bk.price_per_seedling||0) + '/pc<br>' +
+    'Booked: ' + bk.qty_booked + ' · Paid: ' + formatRM(bk.total_paid||0) + ' · Collected: ' + (bk.total_collected||0) + ' · <b style="color:var(--gold);">Collectible: ' + collectible + '</b>' +
+    (balance > 0 ? '<br><span style="color:var(--red);">Balance due: ' + formatRM(balance) + '</span> — <a href="#" onclick="event.preventDefault();event.stopPropagation();closeModal(\'collection-modal\');openPaymentModal(\'' + esc(bk.id) + '\');" style="color:var(--green);">Record payment first</a>' : '');
+  onColQtyChange();
+}
+
+function onColBatchChange() {
+  var batchId = document.getElementById('col-batch').value;
+  var info = document.getElementById('col-batch-info');
+  if (!batchId) { info.style.display = 'none'; return; }
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  var uncommitted = getBatchAvailable(b) - (b.qty_booked||0);
+  info.style.display = 'block';
+  info.innerHTML = 'Batch ' + esc(b.batch_number) + ' — ' + esc(b.variety) + '<br>Available: ' + getBatchAvailable(b) + ' · Booked: ' + (b.qty_booked||0) + ' · <b>Uncommitted: ' + uncommitted + '</b>';
+  document.getElementById('col-price').value = b.price_per_seedling || '';
+  onColQtyChange();
+}
+
+function onColQtyChange() {
+  var qty = parseInt(document.getElementById('col-qty').value) || 0;
+  var warning = document.getElementById('col-limit-warning');
+
+  if (_collectionType === 'booking') {
+    var bkId = document.getElementById('col-booking').value;
+    var bk = bkId ? bookings.find(function(x) { return x.id === bkId; }) : null;
+    if (bk) {
+      var collectible = getQtyCollectible(bk);
+      var subtotal = qty * (bk.price_per_seedling||0);
+      document.getElementById('col-subtotal').textContent = 'Subtotal: ' + formatRM(subtotal);
+      if (qty > collectible) {
+        warning.style.display = 'block';
+        warning.textContent = 'Customer can only collect ' + collectible + ' seedlings based on payments. They must pay more before collecting ' + qty + '.';
+      } else {
+        warning.style.display = 'none';
+      }
+      // Pre-fill payment with difference if they need to pay
+      var amountNeeded = qty * (bk.price_per_seedling||0) - ((bk.total_paid||0) - (bk.total_collected||0) * (bk.price_per_seedling||0));
+      if (amountNeeded > 0 && qty > collectible) {
+        document.getElementById('col-payment').value = amountNeeded.toFixed(2);
+      }
+    }
+  } else {
+    var price = parseFloat(document.getElementById('col-price').value) || 0;
+    var subtotal = qty * price;
+    document.getElementById('col-subtotal').textContent = 'Subtotal: ' + formatRM(subtotal);
+    document.getElementById('col-payment').value = subtotal > 0 ? subtotal.toFixed(2) : '';
+    warning.style.display = 'none';
+  }
+}
+
+async function processCollectionPhoto(file, collectionId, type) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = async function() {
+      var canvas = document.createElement('canvas');
+      var maxW = 1200;
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(async function(blob) {
+        var path = 'collections/' + collectionId + '/' + type + '-' + Date.now() + '.jpg';
+        notify('Uploading photo...', 'info', 2000);
+        var result = await sb.storage.from('seedling-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (result.error) { notify('Upload failed', 'error'); resolve(null); return; }
+        var urlResult = sb.storage.from('seedling-photos').getPublicUrl(path);
+        resolve(urlResult.data.publicUrl);
+      }, 'image/jpeg', 0.8);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function saveCollection() {
+  var isBooking = _collectionType === 'booking';
+  var qty = parseInt(document.getElementById('col-qty').value);
+  var colDate = document.getElementById('col-date').value;
+  var l31 = document.getElementById('col-l31').value.trim();
+
+  if (!qty || qty < 1 || !colDate || !l31) {
+    notify('Please fill in quantity, date, and L3.1 serial number', 'warning');
+    return;
+  }
+
+  var bookingId = null, customerId = null, batchId = null, price = 0;
+
+  if (isBooking) {
+    bookingId = document.getElementById('col-booking').value;
+    if (!bookingId) { notify('Please select a booking', 'warning'); return; }
+    var bk = bookings.find(function(x) { return x.id === bookingId; });
+    if (!bk) return;
+    customerId = bk.customer_id;
+    batchId = bk.batch_id;
+    price = bk.price_per_seedling || 0;
+
+    // Check payment + top-up
+    var paymentReceived = parseFloat(document.getElementById('col-payment').value) || 0;
+    var newPaid = (bk.total_paid||0) + paymentReceived;
+    var collectibleAfterPay = Math.floor(newPaid / price) - (bk.total_collected||0);
+    if (qty > collectibleAfterPay) {
+      notify('Customer can only collect ' + collectibleAfterPay + ' seedlings (including the payment entered). Increase payment or reduce qty.', 'warning');
+      return;
+    }
+  } else {
+    customerId = document.getElementById('col-customer').value;
+    batchId = document.getElementById('col-batch').value;
+    price = parseFloat(document.getElementById('col-price').value) || 0;
+    if (!customerId || !batchId || !price) { notify('Please select customer, batch, and enter price', 'warning'); return; }
+
+    // Check uncommitted stock
+    var b = batches.find(function(x) { return x.id === batchId; });
+    if (b) {
+      var uncommitted = getBatchAvailable(b) - (b.qty_booked||0);
+      if (qty > uncommitted) { notify('Only ' + uncommitted + ' uncommitted seedlings available in this batch', 'warning'); return; }
+    }
+  }
+
+  var btn = document.getElementById('col-save-btn');
+  btnLoading(btn, true);
+
+  var subtotal = qty * price;
+  var paymentReceived = parseFloat(document.getElementById('col-payment').value) || 0;
+  var transportFee = parseFloat(document.getElementById('col-transport').value) || 0;
+
+  var newId = await dbNextId('CL');
+
+  // Upload photos if selected
+  var photoUrl = document.getElementById('col-photo-url').value || null;
+  var l31PhotoUrl = document.getElementById('col-l31-url').value || null;
+
+  var record = {
+    id: newId,
+    company_id: getCompanyId(),
+    customer_id: customerId,
+    booking_id: bookingId,
+    batch_id: batchId,
+    l31_serial_no: l31,
+    qty_collected: qty,
+    price_per_seedling: price,
+    subtotal: subtotal,
+    payment_received: paymentReceived,
+    collection_date: colDate,
+    collected_by: document.getElementById('col-collected-by').value.trim() || null,
+    photo_url: photoUrl,
+    l31_photo_url: l31PhotoUrl,
+    invoice_no: document.getElementById('col-invoice').value.trim() || null,
+    transport_fee: transportFee,
+    notes: document.getElementById('col-notes').value.trim() || null,
+    logged_by: currentUser.display_name
+  };
+
+  var result = await sbMutate(function() {
+    return sb.from('seedling_collections').insert(record).select();
+  }, 'Saving...');
+
+  if (!result) { btnLoading(btn, false, 'Save Collection'); return; }
+
+  // Record payment if any
+  if (paymentReceived > 0) {
+    var payId = await dbNextId('SP');
+    await sbMutate(function() {
+      return sb.from('seedling_payments').insert({
+        id: payId, booking_id: bookingId, collection_id: newId,
+        customer_id: customerId, amount: paymentReceived,
+        payment_method: document.getElementById('col-pay-method').value,
+        payment_date: colDate, reference: null, notes: 'Payment at collection'
+      }).select();
+    });
+    payments.unshift({ id: payId, booking_id: bookingId, collection_id: newId, customer_id: customerId, amount: paymentReceived, payment_method: document.getElementById('col-pay-method').value, payment_date: colDate });
+  }
+
+  // Update booking if applicable
+  if (bookingId) {
+    var bk = bookings.find(function(x) { return x.id === bookingId; });
+    if (bk) {
+      var newCollected = (bk.total_collected||0) + qty;
+      var newPaid = (bk.total_paid||0) + paymentReceived;
+      var newStatus = newCollected >= bk.qty_booked ? 'completed' : 'active';
+      var bkResult = await sbMutate(function() {
+        return sb.from('seedling_bookings').update({ total_collected: newCollected, total_paid: newPaid, status: newStatus }).eq('id', bookingId).select();
+      });
+      if (bkResult) {
+        var idx = bookings.findIndex(function(x) { return x.id === bookingId; });
+        if (idx >= 0) bookings[idx] = bkResult[0];
+      }
+    }
+  }
+
+  // Update batch qty_sold_total
+  var batch = batches.find(function(x) { return x.id === batchId; });
+  if (batch) {
+    var newSold = (batch.qty_sold_total||0) + qty;
+    var newAvail = (batch.qty_seeds_received||0) + (batch.qty_doubletons_gained||0) - (batch.qty_culled_total||0) - newSold;
+    var newBatchStatus = batch.status;
+    if (newAvail <= 0) newBatchStatus = 'sold_out';
+    var batchResult = await sbMutate(function() {
+      return sb.from('seedling_batches').update({ qty_sold_total: newSold, status: newBatchStatus }).eq('id', batchId).select();
+    });
+    if (batchResult) {
+      var idx = batches.findIndex(function(x) { return x.id === batchId; });
+      if (idx >= 0) batches[idx] = batchResult[0];
+    }
+    if (bookingId) await recalcBatchBooked(batchId);
+  }
+
+  collections.unshift(result[0]);
+
+  btnLoading(btn, false, 'Save Collection');
+  closeModal('collection-modal');
+  releaseFocus(document.getElementById('collection-modal'));
+  renderCollections();
+  renderBookings();
+  renderBatches();
+  notify('Collection recorded — L3.1 #' + l31, 'success');
+}
+
+// ============================================================
+// BOOKING CRUD
+// ============================================================
+function onBkBatchChange() {
+  var batchId = document.getElementById('bk-batch').value;
+  var info = document.getElementById('bk-batch-info');
+  var warning = document.getElementById('bk-alloc-warning');
+  if (!batchId) { info.style.display = 'none'; warning.style.display = 'none'; return; }
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  var avail = getBatchAvailable(b);
+  var alloc = getBatchAllocation(b);
+  var uncommitted = avail - (b.qty_booked || 0);
+  info.style.display = 'block';
+  info.innerHTML = 'Available: <b>' + avail + '</b> · Booked: <b>' + (b.qty_booked||0) + '</b> · Allocation: <b>' + alloc + '</b> · Uncommitted: <b>' + uncommitted + '</b>';
+  document.getElementById('bk-price').value = b.price_per_seedling || '';
+  document.getElementById('bk-ready-date').value = b.date_sellable || '';
+  onBkQtyChange();
+}
+
+function onBkQtyChange() {
+  var qty = parseInt(document.getElementById('bk-qty').value) || 0;
+  var price = parseFloat(document.getElementById('bk-price').value) || 0;
+  document.getElementById('bk-total').textContent = 'Total: ' + formatRM(qty * price);
+
+  var batchId = document.getElementById('bk-batch').value;
+  var editId = document.getElementById('bk-edit-id').value;
+  var warning = document.getElementById('bk-alloc-warning');
+  if (!batchId || !qty) { warning.style.display = 'none'; return; }
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  var alloc = getBatchAllocation(b);
+  var currentBooked = b.qty_booked || 0;
+  // If editing, subtract old qty from booked
+  if (editId) {
+    var oldBk = bookings.find(function(x) { return x.id === editId; });
+    if (oldBk && oldBk.batch_id === batchId) currentBooked -= oldBk.qty_booked;
+  }
+  if (currentBooked + qty > alloc) {
+    warning.style.display = 'block';
+    warning.textContent = 'This booking would exceed the allocation (' + alloc + ' seedlings = ' + (b.allocation_pct||50) + '% of ' + b.qty_seeds_received + '). Currently booked: ' + currentBooked + '. You can still proceed.';
+  } else {
+    warning.style.display = 'none';
+  }
+}
+
+function openBookingModal(id) {
+  var bk = id ? bookings.find(function(x) { return x.id === id; }) : null;
+  document.getElementById('booking-modal-title').textContent = bk ? 'Edit Booking' : 'New Booking';
+  document.getElementById('bk-edit-id').value = bk ? bk.id : '';
+  document.getElementById('bk-alloc-warning').style.display = 'none';
+
+  // Customer dropdown
+  var custSel = document.getElementById('bk-customer');
+  custSel.innerHTML = '<option value="">Select customer</option>' + customers.map(function(c) {
+    return '<option value="' + esc(c.id) + '"' + (bk && bk.customer_id === c.id ? ' selected' : '') + '>' + esc(c.name) + (c.phone ? ' (' + esc(c.phone) + ')' : '') + '</option>';
+  }).join('');
+
+  // Batch dropdown — only sellable/main_nursery batches with stock, or current batch if editing
+  var batchSel = document.getElementById('bk-batch');
+  batchSel.innerHTML = '<option value="">Select batch</option>' + batches.filter(function(b) {
+    if (bk && bk.batch_id === b.id) return true;
+    return (b.status === 'pre_nursery' || b.status === 'main_nursery' || b.status === 'selling') && getBatchAvailable(b) > 0;
+  }).map(function(b) {
+    var avail = getBatchAvailable(b);
+    return '<option value="' + esc(b.id) + '"' + (bk && bk.batch_id === b.id ? ' selected' : '') + '>' + esc(b.batch_number) + ' — ' + esc(b.variety) + ' (avail: ' + avail + ')</option>';
+  }).join('');
+
+  document.getElementById('bk-qty').value = bk ? bk.qty_booked : '';
+  document.getElementById('bk-price').value = bk ? bk.price_per_seedling : '';
+  document.getElementById('bk-date').value = bk ? (bk.booking_date || '') : new Date().toISOString().split('T')[0];
+  document.getElementById('bk-ready-date').value = bk ? (bk.expected_ready_date || '') : '';
+  document.getElementById('bk-invoice').value = bk ? (bk.invoice_no || '') : '';
+  document.getElementById('bk-notes').value = bk ? (bk.notes || '') : '';
+
+  if (bk) onBkBatchChange();
+  onBkQtyChange();
+
+  document.getElementById('booking-modal').style.display = 'flex';
+  trapFocus(document.getElementById('booking-modal'));
+}
+
+async function saveBooking() {
+  var customerId = document.getElementById('bk-customer').value;
+  var batchId = document.getElementById('bk-batch').value;
+  var qty = parseInt(document.getElementById('bk-qty').value);
+  var price = parseFloat(document.getElementById('bk-price').value);
+  var bookingDate = document.getElementById('bk-date').value;
+
+  if (!customerId || !batchId || !qty || qty < 1 || !price || price <= 0 || !bookingDate) {
+    notify('Please fill in customer, batch, quantity, price, and date', 'warning');
+    return;
+  }
+
+  var editId = document.getElementById('bk-edit-id').value;
+  var totalAmount = qty * price;
+  var record = {
+    customer_id: customerId,
+    batch_id: batchId,
+    qty_booked: qty,
+    price_per_seedling: price,
+    total_amount: totalAmount,
+    booking_date: bookingDate,
+    expected_ready_date: document.getElementById('bk-ready-date').value || null,
+    invoice_no: document.getElementById('bk-invoice').value.trim() || null,
+    notes: document.getElementById('bk-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+
+  var btn = document.getElementById('bk-save-btn');
+  btnLoading(btn, true);
+
+  var result;
+  if (editId) {
+    result = await sbMutate(function() {
+      return sb.from('seedling_bookings').update(record).eq('id', editId).select();
+    }, 'Saving...');
+  } else {
+    var newId = await dbNextId('BK');
+    record.id = newId;
+    record.status = 'active';
+    record.total_paid = 0;
+    record.total_collected = 0;
+    result = await sbMutate(function() {
+      return sb.from('seedling_bookings').insert(record).select();
+    }, 'Saving...');
+  }
+
+  btnLoading(btn, false, 'Save Booking');
+  if (!result) return;
+
+  // Update batch qty_booked
+  await recalcBatchBooked(batchId);
+  if (editId) {
+    var oldBk = bookings.find(function(x) { return x.id === editId; });
+    if (oldBk && oldBk.batch_id !== batchId) await recalcBatchBooked(oldBk.batch_id);
+  }
+
+  if (editId) {
+    var idx = bookings.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) bookings[idx] = result[0];
+  } else {
+    bookings.unshift(result[0]);
+  }
+
+  closeModal('booking-modal');
+  releaseFocus(document.getElementById('booking-modal'));
+  renderBookings();
+  renderBatches();
+  notify(editId ? 'Booking updated' : 'Booking ' + result[0].id + ' created', 'success');
+
+  // If new booking, prompt for deposit
+  if (!editId) {
+    setTimeout(function() {
+      openPaymentModal(result[0].id);
+    }, 500);
+  }
+}
+
+async function recalcBatchBooked(batchId) {
+  var totalBooked = 0;
+  bookings.forEach(function(bk) {
+    if (bk.batch_id === batchId && bk.status === 'active') totalBooked += (bk.qty_booked || 0);
+  });
+  var res = await sbMutate(function() {
+    return sb.from('seedling_batches').update({ qty_booked: totalBooked }).eq('id', batchId).select();
+  });
+  if (res) {
+    var idx = batches.findIndex(function(x) { return x.id === batchId; });
+    if (idx >= 0) batches[idx] = res[0];
+  }
+}
+
+function cancelBooking(id) {
+  var bk = bookings.find(function(x) { return x.id === id; });
+  if (!bk) return;
+  var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+  confirmAction('Cancel Booking', 'Cancel booking ' + bk.id + ' for ' + esc(cust ? cust.name : '—') + '?<br>Qty: ' + bk.qty_booked + ', Paid: ' + formatRM(bk.total_paid||0), async function() {
+    var result = await sbMutate(function() {
+      return sb.from('seedling_bookings').update({ status: 'cancelled' }).eq('id', id).select();
+    });
+    if (!result) return;
+    var idx = bookings.findIndex(function(x) { return x.id === id; });
+    if (idx >= 0) bookings[idx] = result[0];
+    await recalcBatchBooked(bk.batch_id);
+    renderBookings();
+    renderBatches();
+    notify('Booking cancelled', 'success');
+  }, true);
+}
+
+function reassignBatch(bookingId) {
+  var bk = bookings.find(function(x) { return x.id === bookingId; });
+  if (!bk) return;
+  // Open edit modal to change batch
+  openBookingModal(bookingId);
+  notify('Change the batch selection to reassign', 'info');
+}
+
+// ============================================================
+// PAYMENT RECORDING
+// ============================================================
+function openPaymentModal(bookingId, collectionId) {
+  var bk = bookingId ? bookings.find(function(x) { return x.id === bookingId; }) : null;
+  var cust = bk ? customers.find(function(c) { return c.id === bk.customer_id; }) : null;
+  document.getElementById('pay-booking-id').value = bookingId || '';
+  document.getElementById('pay-customer-id').value = bk ? bk.customer_id : '';
+  document.getElementById('pay-collection-id').value = collectionId || '';
+  var balance = bk ? (bk.total_amount||0) - (bk.total_paid||0) : 0;
+  document.getElementById('pay-info').innerHTML = bk ?
+    '<b>' + esc(cust ? cust.name : '—') + '</b> — ' + esc(bk.id) + '<br>Total: ' + formatRM(bk.total_amount||0) + ' · Paid: ' + formatRM(bk.total_paid||0) + ' · <b>Balance: ' + formatRM(balance) + '</b>' : '';
+  document.getElementById('pay-amount').value = balance > 0 ? balance.toFixed(2) : '';
+  document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pay-method').value = 'cash';
+  document.getElementById('pay-ref').value = '';
+  document.getElementById('pay-notes').value = '';
+  document.getElementById('payment-modal').style.display = 'flex';
+  trapFocus(document.getElementById('payment-modal'));
+}
+
+async function savePayment() {
+  var amount = parseFloat(document.getElementById('pay-amount').value);
+  var payDate = document.getElementById('pay-date').value;
+  var method = document.getElementById('pay-method').value;
+  var bookingId = document.getElementById('pay-booking-id').value || null;
+  var customerId = document.getElementById('pay-customer-id').value;
+  var collectionId = document.getElementById('pay-collection-id').value || null;
+
+  if (!amount || amount <= 0 || !payDate) { notify('Please fill in amount and date', 'warning'); return; }
+
+  var btn = document.getElementById('pay-save-btn');
+  btnLoading(btn, true);
+
+  var newId = await dbNextId('SP');
+  var record = {
+    id: newId,
+    booking_id: bookingId,
+    collection_id: collectionId,
+    customer_id: customerId,
+    amount: amount,
+    payment_method: method,
+    payment_date: payDate,
+    reference: document.getElementById('pay-ref').value.trim() || null,
+    notes: document.getElementById('pay-notes').value.trim() || null
+  };
+
+  var result = await sbMutate(function() {
+    return sb.from('seedling_payments').insert(record).select();
+  }, 'Saving...');
+
+  if (!result) { btnLoading(btn, false, 'Record Payment'); return; }
+
+  // Update booking total_paid
+  if (bookingId) {
+    var bk = bookings.find(function(x) { return x.id === bookingId; });
+    if (bk) {
+      var newPaid = (bk.total_paid || 0) + amount;
+      var bkResult = await sbMutate(function() {
+        return sb.from('seedling_bookings').update({ total_paid: newPaid }).eq('id', bookingId).select();
+      });
+      if (bkResult) {
+        var idx = bookings.findIndex(function(x) { return x.id === bookingId; });
+        if (idx >= 0) bookings[idx] = bkResult[0];
+      }
+    }
+  }
+
+  payments.unshift(result[0]);
+
+  btnLoading(btn, false, 'Record Payment');
+  closeModal('payment-modal');
+  releaseFocus(document.getElementById('payment-modal'));
+  renderBookings();
+  renderBatches();
+  notify('Payment of ' + formatRM(amount) + ' recorded', 'success');
+}
+
+// ============================================================
+// BOOKING SLIP
+// ============================================================
+function showBookingSlip(bookingId) {
+  var bk = bookings.find(function(x) { return x.id === bookingId; });
+  if (!bk) return;
+  var cust = customers.find(function(c) { return c.id === bk.customer_id; });
+  var batch = batches.find(function(b) { return b.id === bk.batch_id; });
+  var balance = (bk.total_amount||0) - (bk.total_paid||0);
+
+  var html = '<div id="slip-page" style="font-family:\'Courier New\',monospace;font-size:13px;color:#000;max-width:480px;margin:0 auto;">' +
+    '<div style="text-align:center;margin-bottom:16px;">' +
+      '<div style="font-weight:700;font-size:16px;">' + esc(OFFICE_ADDRESS.name) + '</div>' +
+      '<div style="font-size:11px;">' + esc(OFFICE_ADDRESS.line1) + '</div>' +
+      '<div style="font-size:11px;">' + esc(OFFICE_ADDRESS.line2) + '</div>' +
+      '<div style="font-size:11px;">Tel: ' + esc(OFFICE_ADDRESS.tel) + '  Fax: ' + esc(OFFICE_ADDRESS.fax) + '</div>' +
+      '<div style="font-weight:700;font-size:14px;margin-top:10px;text-decoration:underline;">Oil Palm Seedlings Booking</div>' +
+      '<div style="text-align:right;font-size:12px;margin-top:4px;">No. <b>' + esc(bk.id) + '</b></div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">' +
+      '<div>Mr/Ms: <b>' + esc(cust ? cust.name : '—') + '</b></div>' +
+      '<div>Date: <b>' + (bk.booking_date ? fmtDate(bk.booking_date) : '—') + '</b></div>' +
+    '</div>' +
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
+      '<tr style="border-bottom:1px solid #000;"><th style="text-align:left;padding:4px;">Quantity</th><th style="text-align:left;padding:4px;">Description</th><th style="text-align:right;padding:4px;">Unit Price</th><th style="text-align:right;padding:4px;">Amount (RM)</th></tr>' +
+      '<tr><td style="padding:4px;">' + bk.qty_booked + '</td><td style="padding:4px;">Oil Palm Seedlings</td><td style="text-align:right;padding:4px;">' + (bk.price_per_seedling||0).toFixed(2) + '</td><td style="text-align:right;padding:4px;">' + (bk.total_amount||0).toFixed(2) + '</td></tr>' +
+    '</table>' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
+      '<div style="font-size:12px;">Batch: ' + esc(batch ? batch.batch_number + ' — ' + batch.variety : '—') + '</div>' +
+      '<div><b>Total RM: ' + (bk.total_amount||0).toFixed(2) + '</b></div>' +
+    '</div>' +
+    '<div style="text-align:right;margin-bottom:2px;">Deposit Paid: ' + (bk.total_paid||0).toFixed(2) + '</div>' +
+    '<div style="text-align:right;margin-bottom:10px;"><b>Balance RM: ' + balance.toFixed(2) + '</b></div>' +
+    (bk.expected_ready_date ? '<div style="margin-bottom:8px;">Expected Ready: <b>' + fmtDate(bk.expected_ready_date) + '</b></div>' : '') +
+    '<div style="border-top:1px solid #000;padding-top:8px;margin-bottom:12px;">' +
+      '<div style="font-size:12px;font-weight:700;margin-bottom:4px;">Contact Information:</div>' +
+      '<div style="display:flex;gap:20px;font-size:12px;">' +
+        '<div>Name: ' + esc(cust ? cust.name : '') + '<br>Address: ' + esc(cust ? (cust.address || '—') : '') + '</div>' +
+        '<div>I/C No: ' + esc(cust ? (cust.ic_number || '—') : '') + '<br>Phone: ' + esc(cust ? (cust.phone || '—') : '') + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;margin:30px 0 20px;">' +
+      '<div style="text-align:center;width:45%;"><div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Issued by</div></div>' +
+      '<div style="text-align:center;width:45%;"><div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Received by</div></div>' +
+    '</div>' +
+    '<div style="font-size:10px;border-top:1px solid #ccc;padding-top:8px;">' +
+      '<div style="font-weight:700;margin-bottom:2px;">Terms and Conditions:</div>' +
+      BOOKING_TERMS.map(function(t, i) { return '<div>' + (i+1) + '. ' + esc(t) + '</div>'; }).join('') +
+    '</div>' +
+  '</div>';
+
+  document.getElementById('slip-content').innerHTML = html;
+  document.getElementById('slip-modal').style.display = 'flex';
+  window._currentSlipBookingId = bookingId;
+}
+
+function printBookingSlip() {
+  var content = document.getElementById('slip-page');
+  if (!content) return;
+  var win = window.open('', '_blank');
+  win.document.write('<html><head><title>Booking Slip</title><style>body{font-family:"Courier New",monospace;margin:20px;}table{border-collapse:collapse;width:100%;}th,td{padding:4px;}@media print{body{margin:0;}}</style></head><body>');
+  win.document.write(content.innerHTML);
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
+}
+
+function shareBookingSlip() {
+  var el = document.getElementById('slip-page');
+  if (!el || typeof html2canvas === 'undefined') {
+    notify('Share requires html2canvas — use Print instead', 'info');
+    return;
+  }
+  html2canvas(el).then(function(canvas) {
+    canvas.toBlob(function(blob) {
+      var bk = bookings.find(function(x) { return x.id === window._currentSlipBookingId; });
+      var cust = bk ? customers.find(function(c) { return c.id === bk.customer_id; }) : null;
+      var fname = (bk ? bk.id : 'slip') + '_' + (cust ? cust.name.replace(/\s+/g, '_') : '') + '.png';
+      if (navigator.share && navigator.canShare) {
+        var file = new File([blob], fname, { type: 'image/png' });
+        navigator.share({ files: [file] }).catch(function() {});
+      } else {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        a.click();
+      }
+    }, 'image/png');
+  });
+}
+
+// ============================================================
+// BATCH CRUD
+// ============================================================
+function openBatchModal(id) {
+  var b = id ? batches.find(function(x) { return x.id === id; }) : null;
+  document.getElementById('batch-modal-title').textContent = b ? 'Edit Batch' : 'New Batch';
+  document.getElementById('bat-edit-id').value = b ? b.id : '';
+
+  // Populate supplier dropdown
+  var supSel = document.getElementById('bat-supplier');
+  supSel.innerHTML = '<option value="">Select supplier</option>' + suppliers.map(function(s) {
+    return '<option value="' + esc(s.id) + '"' + (b && b.supplier_id === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>';
+  }).join('');
+
+  document.getElementById('bat-variety').value = b ? b.variety : '';
+  document.getElementById('bat-qty').value = b ? b.qty_seeds_received : '';
+  document.getElementById('bat-price').value = b ? (b.price_per_seedling || '') : '';
+  document.getElementById('bat-date-received').value = b ? (b.date_received || '') : '';
+  document.getElementById('bat-date-planted').value = b ? (b.date_planted || '') : '';
+  document.getElementById('bat-sup-l31').value = b ? (b.supplier_l31_no || '') : '';
+  document.getElementById('bat-sup-do').value = b ? (b.supplier_do_no || '') : '';
+  document.getElementById('bat-seed-source').value = b ? (b.seed_source_desc || '') : '';
+  document.getElementById('bat-field').value = b ? (b.field_block || '') : '';
+  document.getElementById('bat-alloc').value = b ? (b.allocation_pct || 50) : 50;
+  document.getElementById('bat-date-sellable').value = b ? (b.date_sellable || '') : '';
+  document.getElementById('bat-notes').value = b ? (b.notes || '') : '';
+
+  // Disable qty if batch has events
+  var hasEvents = b && batchEvents.some(function(e) { return e.batch_id === b.id; });
+  document.getElementById('bat-qty').disabled = !!hasEvents;
+
+  // Auto-calc sellable date on date change
+  document.getElementById('bat-date-planted').onchange = function() {
+    var dp = this.value;
+    if (dp) {
+      var d = new Date(dp);
+      d.setMonth(d.getMonth() + 10);
+      document.getElementById('bat-date-sellable').value = d.toISOString().split('T')[0];
+    }
+  };
+  // Trigger once
+  if (!b) document.getElementById('bat-date-planted').onchange();
+
+  document.getElementById('batch-modal').style.display = 'flex';
+  trapFocus(document.getElementById('batch-modal'));
+}
+
+async function generateBatchNumber() {
+  var year = new Date().getFullYear();
+  var maxSeq = 0;
+  batches.forEach(function(b) {
+    var parts = (b.batch_number || '').split('-');
+    if (parts.length === 2 && parseInt(parts[1]) === year) {
+      var seq = parseInt(parts[0]);
+      if (seq > maxSeq) maxSeq = seq;
+    }
+  });
+  return (maxSeq + 1) + '-' + year;
+}
+
+async function saveBatch() {
+  var variety = document.getElementById('bat-variety').value.trim();
+  var qty = parseInt(document.getElementById('bat-qty').value);
+  var datePlanted = document.getElementById('bat-date-planted').value;
+  var supplierId = document.getElementById('bat-supplier').value;
+
+  if (!variety || !qty || qty < 1 || !datePlanted || !supplierId) {
+    notify('Please fill in supplier, variety, seeds received, and date planted', 'warning');
+    return;
+  }
+
+  var editId = document.getElementById('bat-edit-id').value;
+  var allocPct = parseInt(document.getElementById('bat-alloc').value) || 50;
+  var dateSellable = document.getElementById('bat-date-sellable').value || null;
+
+  var record = {
+    supplier_id: supplierId,
+    variety: variety,
+    qty_seeds_received: qty,
+    price_per_seedling: parseFloat(document.getElementById('bat-price').value) || null,
+    date_received: document.getElementById('bat-date-received').value || null,
+    date_planted: datePlanted,
+    date_sellable: dateSellable,
+    supplier_l31_no: document.getElementById('bat-sup-l31').value.trim() || null,
+    supplier_do_no: document.getElementById('bat-sup-do').value.trim() || null,
+    seed_source_desc: document.getElementById('bat-seed-source').value.trim() || null,
+    field_block: document.getElementById('bat-field').value.trim() || null,
+    allocation_pct: allocPct,
+    notes: document.getElementById('bat-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+
+  var btn = document.getElementById('bat-save-btn');
+  btnLoading(btn, true);
+
+  var result;
+  if (editId) {
+    result = await sbMutate(function() {
+      return sb.from('seedling_batches').update(record).eq('id', editId).select();
+    }, 'Saving...');
+  } else {
+    var newId = await dbNextId('SB');
+    var batchNum = await generateBatchNumber();
+    record.id = newId;
+    record.batch_number = batchNum;
+    record.status = 'pre_nursery';
+    result = await sbMutate(function() {
+      return sb.from('seedling_batches').insert(record).select();
+    }, 'Saving...');
+  }
+
+  btnLoading(btn, false, 'Save Batch');
+  if (!result) return;
+
+  if (editId) {
+    var idx = batches.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) batches[idx] = result[0];
+  } else {
+    batches.unshift(result[0]);
+  }
+
+  closeModal('batch-modal');
+  releaseFocus(document.getElementById('batch-modal'));
+  renderBatches();
+  populateFilterDropdowns();
+  notify(editId ? 'Batch updated' : 'Batch ' + result[0].batch_number + ' created', 'success');
+}
+
+// ============================================================
+// TRANSPLANT
+// ============================================================
+function openTransplantModal(batchId) {
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  document.getElementById('tp-batch-id').value = batchId;
+  document.getElementById('tp-info').innerHTML = '<b>Batch ' + esc(b.batch_number) + '</b> — ' + esc(b.variety) + ' · Seeds: ' + b.qty_seeds_received;
+  document.getElementById('tp-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tp-qty').value = '';
+  document.getElementById('tp-culled').value = '0';
+  document.getElementById('tp-doubletons').value = '0';
+  document.getElementById('transplant-modal').style.display = 'flex';
+  trapFocus(document.getElementById('transplant-modal'));
+}
+
+async function saveTransplant() {
+  var batchId = document.getElementById('tp-batch-id').value;
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+
+  var date = document.getElementById('tp-date').value;
+  var qty = parseInt(document.getElementById('tp-qty').value);
+  var culled = parseInt(document.getElementById('tp-culled').value) || 0;
+  var doubletons = parseInt(document.getElementById('tp-doubletons').value) || 0;
+
+  if (!date || !qty || qty < 1) { notify('Please fill in date and qty transplanted', 'warning'); return; }
+
+  var btn = document.getElementById('tp-save-btn');
+  btnLoading(btn, true);
+
+  // Create batch events
+  var events = [];
+  var evId1 = await dbNextId('SE');
+  events.push({ id: evId1, batch_id: batchId, event_type: 'transplant', qty: qty, reason: null, event_date: date, logged_by: currentUser.display_name });
+
+  if (culled > 0) {
+    var evId2 = await dbNextId('SE');
+    events.push({ id: evId2, batch_id: batchId, event_type: 'cull', qty: -culled, reason: 'Culled at transplant', event_date: date, logged_by: currentUser.display_name });
+  }
+
+  if (doubletons > 0) {
+    var evId3 = await dbNextId('SE');
+    events.push({ id: evId3, batch_id: batchId, event_type: 'doubleton_gain', qty: doubletons, reason: null, event_date: date, logged_by: currentUser.display_name });
+  }
+
+  var evResult = await sbMutate(function() {
+    return sb.from('seedling_batch_events').insert(events).select();
+  });
+  if (!evResult) { btnLoading(btn, false, 'Save Transplant'); return; }
+
+  // Update batch
+  var updates = {
+    qty_transplanted: qty,
+    qty_culled_total: (b.qty_culled_total || 0) + culled,
+    qty_doubletons_gained: (b.qty_doubletons_gained || 0) + doubletons,
+    date_transplanted: date,
+    status: 'main_nursery'
+  };
+
+  var batchResult = await sbMutate(function() {
+    return sb.from('seedling_batches').update(updates).eq('id', batchId).select();
+  });
+
+  btnLoading(btn, false, 'Save Transplant');
+  if (!batchResult) return;
+
+  var idx = batches.findIndex(function(x) { return x.id === batchId; });
+  if (idx >= 0) batches[idx] = batchResult[0];
+  batchEvents = batchEvents.concat(evResult);
+  batchEvents.sort(function(a, b) { return new Date(b.event_date) - new Date(a.event_date); });
+
+  closeModal('transplant-modal');
+  releaseFocus(document.getElementById('transplant-modal'));
+  renderBatches();
+  notify('Transplant recorded — batch moved to Main Nursery', 'success');
+}
+
+// ============================================================
+// CULLING
+// ============================================================
+function openCullModal(batchId) {
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  var avail = getBatchAvailable(b);
+  document.getElementById('cull-batch-id').value = batchId;
+  document.getElementById('cull-info').innerHTML = '<b>Batch ' + esc(b.batch_number) + '</b> — ' + esc(b.variety) + ' · Available: ' + avail;
+  document.getElementById('cull-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('cull-qty').value = '';
+  document.getElementById('cull-notes').value = '';
+
+  // Populate reason dropdown
+  var sel = document.getElementById('cull-reason');
+  sel.innerHTML = '<option value="">Select reason</option>' + CULL_REASONS.map(function(r) {
+    return '<option value="' + esc(r) + '">' + esc(r) + '</option>';
+  }).join('');
+
+  document.getElementById('cull-modal').style.display = 'flex';
+  trapFocus(document.getElementById('cull-modal'));
+}
+
+async function saveCulling() {
+  var batchId = document.getElementById('cull-batch-id').value;
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+
+  var date = document.getElementById('cull-date').value;
+  var qty = parseInt(document.getElementById('cull-qty').value);
+  var reason = document.getElementById('cull-reason').value;
+  var notes = document.getElementById('cull-notes').value.trim();
+
+  if (!date || !qty || qty < 1) { notify('Please fill in date and quantity', 'warning'); return; }
+
+  var avail = getBatchAvailable(b);
+  if (qty > avail) { notify('Cannot cull more than available (' + avail + ')', 'warning'); return; }
+
+  var btn = document.getElementById('cull-save-btn');
+  btnLoading(btn, true);
+
+  var evId = await dbNextId('SE');
+  var evResult = await sbMutate(function() {
+    return sb.from('seedling_batch_events').insert({
+      id: evId, batch_id: batchId, event_type: 'cull', qty: -qty,
+      reason: reason || null, event_date: date,
+      logged_by: currentUser.display_name, notes: notes || null
+    }).select();
+  });
+  if (!evResult) { btnLoading(btn, false, 'Log Culling'); return; }
+
+  var newCulled = (b.qty_culled_total || 0) + qty;
+  var newAvail = (b.qty_seeds_received||0) + (b.qty_doubletons_gained||0) - newCulled - (b.qty_sold_total||0);
+  var newStatus = b.status;
+  if (newAvail <= 0) newStatus = 'sold_out';
+
+  var batchResult = await sbMutate(function() {
+    return sb.from('seedling_batches').update({ qty_culled_total: newCulled, status: newStatus }).eq('id', batchId).select();
+  });
+
+  btnLoading(btn, false, 'Log Culling');
+  if (!batchResult) return;
+
+  var idx = batches.findIndex(function(x) { return x.id === batchId; });
+  if (idx >= 0) batches[idx] = batchResult[0];
+  batchEvents.unshift(evResult[0]);
+
+  closeModal('cull-modal');
+  releaseFocus(document.getElementById('cull-modal'));
+  renderBatches();
+  notify(qty + ' seedlings culled', 'success');
+}
+
+// ============================================================
+// BATCH STATUS TRANSITIONS
+// ============================================================
+function markSelling(batchId) {
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  confirmAction('Mark as Selling', 'Mark batch ' + b.batch_number + ' as ready for sale?', async function() {
+    var result = await sbMutate(function() {
+      return sb.from('seedling_batches').update({ status: 'selling' }).eq('id', batchId).select();
+    });
+    if (!result) return;
+    var idx = batches.findIndex(function(x) { return x.id === batchId; });
+    if (idx >= 0) batches[idx] = result[0];
+    renderBatches();
+    notify('Batch ' + b.batch_number + ' is now selling', 'success');
+  });
+}
+
+function closeBatch(batchId) {
+  var b = batches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  confirmAction('Close Batch', 'Close batch ' + b.batch_number + '? This marks the lifecycle as complete.', async function() {
+    var result = await sbMutate(function() {
+      return sb.from('seedling_batches').update({ status: 'closed' }).eq('id', batchId).select();
+    });
+    if (!result) return;
+    var idx = batches.findIndex(function(x) { return x.id === batchId; });
+    if (idx >= 0) batches[idx] = result[0];
+    renderBatches();
+    notify('Batch ' + b.batch_number + ' closed', 'success');
+  });
+}
+
+// ============================================================
+// SUPPLIER CRUD
+// ============================================================
+function openSupplierModal(id) {
+  var s = id ? suppliers.find(function(x) { return x.id === id; }) : null;
+  document.getElementById('supplier-modal-title').textContent = s ? 'Edit Supplier' : 'Add Supplier';
+  document.getElementById('sup-edit-id').value = s ? s.id : '';
+  document.getElementById('sup-name').value = s ? s.name : '';
+  document.getElementById('sup-phone').value = s ? (s.phone || '') : '';
+  document.getElementById('sup-license').value = s ? (s.license_no || '') : '';
+  document.getElementById('sup-address').value = s ? (s.address || '') : '';
+  document.getElementById('sup-notes').value = s ? (s.notes || '') : '';
+  document.getElementById('supplier-modal').style.display = 'flex';
+  trapFocus(document.getElementById('supplier-modal'));
+}
+
+async function saveSupplier() {
+  var name = document.getElementById('sup-name').value.trim();
+  if (!name) { notify('Supplier name is required', 'warning'); return; }
+
+  var editId = document.getElementById('sup-edit-id').value;
+  var record = {
+    name: name,
+    phone: document.getElementById('sup-phone').value.trim() || null,
+    license_no: document.getElementById('sup-license').value.trim() || null,
+    address: document.getElementById('sup-address').value.trim() || null,
+    notes: document.getElementById('sup-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+
+  var btn = document.getElementById('sup-save-btn');
+  btnLoading(btn, true);
+
+  var result;
+  if (editId) {
+    result = await sbMutate(function() {
+      return sb.from('seedling_suppliers').update(record).eq('id', editId).select();
+    }, 'Saving...');
+  } else {
+    var newId = await dbNextId('SS');
+    record.id = newId;
+    result = await sbMutate(function() {
+      return sb.from('seedling_suppliers').insert(record).select();
+    }, 'Saving...');
+  }
+
+  btnLoading(btn, false, 'Save Supplier');
+  if (!result) return;
+
+  if (editId) {
+    var idx = suppliers.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) suppliers[idx] = result[0];
+  } else {
+    suppliers.push(result[0]);
+    suppliers.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  closeModal('supplier-modal');
+  releaseFocus(document.getElementById('supplier-modal'));
+  renderSuppliers();
+  notify(editId ? 'Supplier updated' : 'Supplier added', 'success');
+}
+
+function deleteSupplier(id) {
+  var s = suppliers.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var hasBatches = batches.some(function(b) { return b.supplier_id === id; });
+  if (hasBatches) { notify('Cannot delete — supplier has batches', 'warning'); return; }
+  confirmAction('Delete Supplier', 'Delete "' + esc(s.name) + '"? This cannot be undone.', async function() {
+    var result = await sbMutate(function() {
+      return sb.from('seedling_suppliers').delete().eq('id', id).select();
+    });
+    if (!result) return;
+    suppliers = suppliers.filter(function(x) { return x.id !== id; });
+    renderSuppliers();
+    notify('Supplier deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// CUSTOMER CRUD
+// ============================================================
+function openCustomerModal(id) {
+  var c = id ? customers.find(function(x) { return x.id === id; }) : null;
+  document.getElementById('customer-modal-title').textContent = c ? 'Edit Customer' : 'Add Customer';
+  document.getElementById('cust-edit-id').value = c ? c.id : '';
+  document.getElementById('cust-linked-id').value = c ? (c.linked_customer_id || '') : '';
+  document.getElementById('cust-name').value = c ? c.name : '';
+  document.getElementById('cust-phone').value = c ? (c.phone || '') : '';
+  document.getElementById('cust-ic').value = c ? (c.ic_number || '') : '';
+  document.getElementById('cust-company-reg').value = c ? (c.company_reg || '') : '';
+  document.getElementById('cust-license').value = c ? (c.license_no || '') : '';
+  document.getElementById('cust-address').value = c ? (c.address || '') : '';
+  document.getElementById('cust-planting-loc').value = c ? (c.planting_location || '') : '';
+  document.getElementById('cust-area').value = c ? (c.planting_area_ha || '') : '';
+  document.getElementById('cust-type').value = c ? (c.customer_type || 'smallholder') : 'smallholder';
+  document.getElementById('cust-notes').value = c ? (c.notes || '') : '';
+  document.getElementById('cust-dup-warning').style.display = 'none';
+  document.getElementById('customer-modal').style.display = 'flex';
+  trapFocus(document.getElementById('customer-modal'));
+}
+
+var _crossCheckTimeout = null;
+function checkCrossCompanyCustomer() {
+  clearTimeout(_crossCheckTimeout);
+  _crossCheckTimeout = setTimeout(async function() {
+    var phone = document.getElementById('cust-phone').value.trim();
+    var editId = document.getElementById('cust-edit-id').value;
+    var warning = document.getElementById('cust-dup-warning');
+
+    if (!phone || phone.length < 8) { warning.style.display = 'none'; return; }
+
+    // Check within seedling customers first
+    var localDup = customers.find(function(c) { return c.phone === phone && c.id !== editId; });
+    if (localDup) {
+      warning.style.display = 'block';
+      warning.style.background = 'rgba(196,64,64,0.1)';
+      warning.style.borderColor = 'rgba(196,64,64,0.3)';
+      warning.style.color = '#8B2020';
+      warning.innerHTML = '⚠ Customer "<b>' + esc(localDup.name) + '</b>" already has this phone number.';
+      return;
+    }
+
+    // Cross-company check — search sales_customers (Agro Fruits)
+    var result = await sbQuery(sb.from('sales_customers').select('id,name,phone').eq('phone', phone));
+    if (result && result.length > 0) {
+      var match = result[0];
+      warning.style.display = 'block';
+      warning.style.background = 'rgba(58,138,58,0.1)';
+      warning.style.borderColor = 'rgba(58,138,58,0.3)';
+      warning.style.color = '#2A6A2A';
+      warning.innerHTML = '🔗 This customer exists as "<b>' + esc(match.name) + '</b>" under TG Agro Fruits. ' +
+        '<button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:rgba(58,138,58,0.15);border:1px solid rgba(58,138,58,0.3);color:#2A6A2A;margin-left:6px;" onclick="document.getElementById(\'cust-linked-id\').value=\'' + esc(match.id) + '\';this.textContent=\'Linked ✓\';this.disabled=true;">Link</button>';
+    } else {
+      warning.style.display = 'none';
+    }
+  }, 500);
+}
+
+async function saveCustomer() {
+  var name = document.getElementById('cust-name').value.trim();
+  if (!name) { notify('Customer name is required', 'warning'); return; }
+
+  var editId = document.getElementById('cust-edit-id').value;
+  var linkedId = document.getElementById('cust-linked-id').value || null;
+  var record = {
+    name: name,
+    phone: document.getElementById('cust-phone').value.trim() || null,
+    ic_number: document.getElementById('cust-ic').value.trim() || null,
+    company_reg: document.getElementById('cust-company-reg').value.trim() || null,
+    license_no: document.getElementById('cust-license').value.trim() || null,
+    address: document.getElementById('cust-address').value.trim() || null,
+    planting_location: document.getElementById('cust-planting-loc').value.trim() || null,
+    planting_area_ha: parseFloat(document.getElementById('cust-area').value) || null,
+    customer_type: document.getElementById('cust-type').value,
+    linked_customer_id: linkedId,
+    notes: document.getElementById('cust-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+
+  var btn = document.getElementById('cust-save-btn');
+  btnLoading(btn, true);
+
+  var result;
+  if (editId) {
+    result = await sbMutate(function() {
+      return sb.from('seedling_customers').update(record).eq('id', editId).select();
+    }, 'Saving...');
+  } else {
+    var newId = await dbNextId('SC');
+    record.id = newId;
+    result = await sbMutate(function() {
+      return sb.from('seedling_customers').insert(record).select();
+    }, 'Saving...');
+  }
+
+  btnLoading(btn, false, 'Save Customer');
+  if (!result) return;
+
+  if (editId) {
+    var idx = customers.findIndex(function(x) { return x.id === editId; });
+    if (idx >= 0) customers[idx] = result[0];
+  } else {
+    customers.push(result[0]);
+    customers.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  closeModal('customer-modal');
+  releaseFocus(document.getElementById('customer-modal'));
+  renderCustomers();
+  notify(editId ? 'Customer updated' : 'Customer added', 'success');
+}
+
+function deleteCustomer(id) {
+  var c = customers.find(function(x) { return x.id === id; });
+  if (!c) return;
+  var hasBookings = bookings.some(function(b) { return b.customer_id === id; });
+  var hasCollections = collections.some(function(cl) { return cl.customer_id === id; });
+  if (hasBookings || hasCollections) { notify('Cannot delete — customer has bookings or collections', 'warning'); return; }
+  confirmAction('Delete Customer', 'Delete "' + esc(c.name) + '"? This cannot be undone.', async function() {
+    var result = await sbMutate(function() {
+      return sb.from('seedling_customers').delete().eq('id', id).select();
+    });
+    if (!result) return;
+    customers = customers.filter(function(x) { return x.id !== id; });
+    renderCustomers();
+    notify('Customer deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// ============================================================
+// PHOTO UPLOAD HANDLER
+// ============================================================
+document.getElementById('sl-photo-input-album').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var target = this.getAttribute('data-target');
+  // Generate temp ID for upload path
+  var tempId = 'temp-' + Date.now();
+  var type = target === 'l31' ? 'l31' : 'seedlings';
+  var url = await processCollectionPhoto(file, tempId, type);
+  if (url) {
+    if (target === 'l31') {
+      document.getElementById('col-l31-url').value = url;
+      document.getElementById('col-l31-preview').innerHTML = '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;">';
+    } else {
+      document.getElementById('col-photo-url').value = url;
+      document.getElementById('col-photo-preview').innerHTML = '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;">';
+    }
+  }
+  this.value = '';
+});
+
+// INIT
+// ============================================================
+(async function initModule() {
+  // Session guard
+  var userData = localStorage.getItem('tgfarmhub_user');
+  if (!userData) { location.href = 'index.html'; return; }
+  try { currentUser = JSON.parse(userData); } catch(e) { location.href = 'index.html'; return; }
+
+  // Force company to Agribusiness for this module
+  setCompanyId('tg_agribusiness');
+
+  // Inject company switcher (redirect to hub if Agro Fruits selected)
+  injectCompanySwitcher();
+  document.querySelectorAll('.company-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var cid = btn.getAttribute('data-company');
+      if (cid !== 'tg_agribusiness') {
+        setCompanyId(cid);
+        location.href = 'index.html';
+      }
+    });
+  });
+
+  // Inject user badge
+  injectUserBadge(currentUser);
+
+  // Start session management
+  startInactivityTimer();
+  startSessionCheck();
+
+  // Load data
+  await loadAllData();
+  renderAll();
+
+  // Hide loading
+  var loading = document.getElementById('tg-loading');
+  if (loading) loading.style.display = 'none';
+})();
+</script>
+</body>
+</html>

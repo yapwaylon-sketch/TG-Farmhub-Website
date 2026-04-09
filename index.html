@@ -389,13 +389,17 @@ const MODULES = [
     name: "Oil Palm Seedlings",
     icon: "🌴",
     iconImg: "icons/modules/seedlings.png",
-    desc: "Booking management, sales tracking, and seedling stock",
+    desc: "Batch management, bookings, collections, L3.1 tracking, and MPOB reports",
     url: "seedlings.html",
-    active: false,
+    active: true,
     permissions: [
-      { key: "view", label: "View bookings & seedling stock" },
-      { key: "booking", label: "Create / edit bookings" },
-      { key: "admin", label: "Manage pricing & availability" },
+      { key: "view", label: "View batches, bookings & stock" },
+      { key: "manageBatches", label: "Create / edit batches, log events" },
+      { key: "manageBookings", label: "Create / edit bookings" },
+      { key: "recordCollections", label: "Process collections & L3.1" },
+      { key: "manageCustomers", label: "Add / edit customers" },
+      { key: "manageSuppliers", label: "Add / edit suppliers" },
+      { key: "viewReports", label: "Access reports" },
     ]
   }
 ];
