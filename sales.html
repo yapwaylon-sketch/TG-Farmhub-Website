@@ -4537,6 +4537,37 @@ var invSelectedDOs = {};
 // Default notes pre-filled on new invoice creation. Set your standard terms here.
 var INV_DEFAULT_NOTES = '';
 
+// Convert number to words for Malaysian invoices (e.g. 3100.50 → "Ringgit Malaysia Three Thousand One Hundred and Cents Fifty Only")
+function amountInWords(amount) {
+  var ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  var tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+  function toWords(n) {
+    if (n === 0) return '';
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + toWords(n % 100) : '');
+    if (n < 1000000) return toWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + toWords(n % 1000) : '');
+    if (n < 1000000000) return toWords(Math.floor(n / 1000000)) + ' Million' + (n % 1000000 ? ' ' + toWords(n % 1000000) : '');
+    return String(n);
+  }
+
+  var num = Math.abs(parseFloat(amount) || 0);
+  var ringgit = Math.floor(num);
+  var sen = Math.round((num - ringgit) * 100);
+
+  var result = 'Ringgit Malaysia ';
+  if (ringgit === 0 && sen === 0) return result + 'Zero Only';
+  if (ringgit > 0) result += toWords(ringgit);
+  if (sen > 0) {
+    if (ringgit > 0) result += ' and Cents ';
+    else result += 'Zero and Cents ';
+    result += toWords(sen);
+  }
+  result += ' Only';
+  return result;
+}
+
 function renderInvoicing() {
   var body = document.getElementById('page-invoicing').querySelector('.page-body');
   var html = '';
@@ -5575,7 +5606,9 @@ function generateCreditNoteA4(cnId) {
   html += '</div>';
 
   // Amount
-  html += '<div style="text-align:center;margin:20px 0;font-size:20px;font-weight:800;">Credit Amount: RM ' + (parseFloat(cn.amount) || 0).toFixed(2) + '</div>';
+  var cnAmount = parseFloat(cn.amount) || 0;
+  html += '<div style="text-align:center;margin:20px 0;font-size:20px;font-weight:800;">Credit Amount: RM ' + cnAmount.toFixed(2) + '</div>';
+  html += '<div style="text-align:center;font-size:11px;font-weight:700;color:#000;font-style:italic;margin-top:-12px;margin-bottom:16px;">' + amountInWords(cnAmount) + '</div>';
 
   // Prepared By + electronic document note
   html += '<div style="margin-top:24px;display:flex;justify-content:space-between;align-items:flex-end;">';
@@ -5744,6 +5777,9 @@ function generateInvoiceA4(invoiceId) {
   }
   html += '</div>';
   html += '</div>';
+
+  // Amount in words
+  html += '<div style="font-size:11px;font-weight:700;color:#000;margin:4px 0 12px;font-style:italic;">' + amountInWords(grandTotal) + '</div>';
 
   // Bank Details
   html += '<div class="a4-bank-details">';
