@@ -1878,9 +1878,9 @@ function renderOrderCards() {
     if (soFilterStatus && o.status !== soFilterStatus) return false;
     if (soFilterDocType && o.doc_type !== soFilterDocType) return false;
     if (soFilterPayment && o.payment_status !== soFilterPayment) return false;
-    // Date filter: use completion date for completed/cancelled, order_date for active
+    // Date filter: use completed_at for completed/cancelled, order_date for active
     var filterDate = (o.status === 'completed' || o.status === 'cancelled')
-      ? (o.updated_at || '').substring(0, 10) : o.order_date;
+      ? (o.completed_at || o.updated_at || '').substring(0, 10) : o.order_date;
     if (soFilterDateFrom && filterDate < soFilterDateFrom) return false;
     if (soFilterDateTo && filterDate > soFilterDateTo) return false;
     if (soFilterCustomer) {
@@ -1947,11 +1947,11 @@ function renderOrderCards() {
     var needsDateGroup = (status === 'completed' || status === 'cancelled');
 
     if (needsDateGroup && group.length > 0) {
-      // Group by completion date (updated_at date portion)
+      // Group by completion date (completed_at, fallback updated_at)
       var dateGroups = {};
       var dateOrder = [];
       group.forEach(function(o) {
-        var d = (o.updated_at || '').substring(0, 10) || o.order_date || 'unknown';
+        var d = (o.completed_at || o.updated_at || '').substring(0, 10) || o.order_date || 'unknown';
         if (!dateGroups[d]) { dateGroups[d] = []; dateOrder.push(d); }
         dateGroups[d].push(o);
       });
@@ -2375,6 +2375,8 @@ function soRenderDetail() {
 
 async function soUpdateStatus(orderId, newStatus, extraData) {
   var updateData = { status: newStatus };
+  // Set completed_at timestamp when marking as completed (never overwritten by later edits)
+  if (newStatus === 'completed') updateData.completed_at = new Date().toISOString();
   if (extraData) Object.assign(updateData, extraData);
   var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
   if (result === null) return false;
@@ -3031,9 +3033,10 @@ async function soWalkInConfirm() {
     }
 
     // 2. Set status directly to completed
-    await sbQuery(sb.from('sales_orders').update({ status: 'completed' }).eq('id', orderId).select());
+    var completedNow = new Date().toISOString();
+    await sbQuery(sb.from('sales_orders').update({ status: 'completed', completed_at: completedNow }).eq('id', orderId).select());
     var localOrder = orders.find(function(x) { return x.id === orderId; });
-    if (localOrder) localOrder.status = 'completed';
+    if (localOrder) { localOrder.status = 'completed'; localOrder.completed_at = completedNow; }
 
     // 3. Record full payment
     var paymentId = await dbNextId('SY');
