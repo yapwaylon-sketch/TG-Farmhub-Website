@@ -374,6 +374,45 @@
   </div>
 </div>
 
+<!-- BRANCH MODAL -->
+<div id="br-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="br-modal-title">Add Branch</div>
+      <button class="modal-close" onclick="closeModal('br-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="br-edit-id" value="">
+    <input type="hidden" id="br-customer-id" value="">
+    <div class="form-field">
+      <label>BRANCH NAME</label>
+      <input type="text" id="br-name" placeholder="e.g., MY DAILY MART 08 (Times Square)" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>ADDRESS</label>
+      <textarea id="br-address" rows="3" placeholder="Full delivery address" style="width:100%;"></textarea>
+    </div>
+    <div class="form-field">
+      <label>CONTACT PERSON</label>
+      <input type="text" id="br-contact-person" placeholder="Branch contact (optional)" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label>PHONE</label>
+      <input type="tel" id="br-phone" placeholder="Branch phone (optional)" style="width:100%;">
+    </div>
+    <div class="form-field">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="br-is-default"> Set as default branch
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('br-modal')">Cancel</button>
+      <button class="btn btn-primary" id="br-save-btn" onclick="brSaveBranch()">Add Branch</button>
+    </div>
+  </div>
+</div>
+
 <!-- HIDDEN PHOTO INPUT -->
 <input type="file" id="so-photo-input" accept="image/*" capture="environment" style="display:none;">
 <input type="file" id="so-photo-input-album" accept="image/*" style="display:none;">
@@ -3521,6 +3560,117 @@ function scBackToList() {
   renderCustomers();
 }
 
+// ── Branch Management ──
+function brOpenModal(customerId, branchId) {
+  document.getElementById('br-customer-id').value = customerId;
+  document.getElementById('br-edit-id').value = '';
+  document.getElementById('br-name').value = '';
+  document.getElementById('br-address').value = '';
+  document.getElementById('br-contact-person').value = '';
+  document.getElementById('br-phone').value = '';
+  document.getElementById('br-is-default').checked = false;
+  document.getElementById('br-modal-title').textContent = 'Add Branch';
+  document.getElementById('br-save-btn').textContent = 'Add Branch';
+
+  if (branchId) {
+    var br = getBranch(branchId);
+    if (br) {
+      document.getElementById('br-edit-id').value = branchId;
+      document.getElementById('br-name').value = br.name || '';
+      document.getElementById('br-address').value = br.address || '';
+      document.getElementById('br-contact-person').value = br.contact_person || '';
+      document.getElementById('br-phone').value = br.phone || '';
+      document.getElementById('br-is-default').checked = !!br.is_default;
+      document.getElementById('br-modal-title').textContent = 'Edit Branch';
+      document.getElementById('br-save-btn').textContent = 'Save Changes';
+    }
+  }
+  document.getElementById('br-modal').style.display = 'flex';
+}
+
+async function brSaveBranch() {
+  var customerId = document.getElementById('br-customer-id').value;
+  var editId = document.getElementById('br-edit-id').value;
+  var name = document.getElementById('br-name').value.trim();
+  var address = document.getElementById('br-address').value.trim();
+  var contactPerson = document.getElementById('br-contact-person').value.trim();
+  var phone = document.getElementById('br-phone').value.trim();
+  var isDefault = document.getElementById('br-is-default').checked;
+
+  if (!name) { notify('Branch name is required', 'warning'); return; }
+
+  var btn = document.getElementById('br-save-btn');
+  btnLoading(btn, true);
+
+  // If setting as default, clear other defaults for this customer
+  if (isDefault) {
+    var existing = getCustomerBranches(customerId);
+    for (var i = 0; i < existing.length; i++) {
+      if (existing[i].is_default && existing[i].id !== editId) {
+        await sbQuery(sb.from('sales_customer_branches').update({ is_default: false, updated_at: new Date().toISOString() }).eq('id', existing[i].id).select());
+        existing[i].is_default = false;
+      }
+    }
+  }
+
+  var data = {
+    customer_id: customerId,
+    name: name,
+    address: address || null,
+    contact_person: contactPerson || null,
+    phone: phone || null,
+    is_default: isDefault,
+    updated_at: new Date().toISOString()
+  };
+
+  if (editId) {
+    var result = await sbQuery(sb.from('sales_customer_branches').update(data).eq('id', editId).select());
+    if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
+    var idx = branches.findIndex(function(b) { return b.id === editId; });
+    if (idx >= 0) Object.assign(branches[idx], data);
+    notify('Branch updated');
+  } else {
+    var newId = await dbNextId('SB');
+    data.id = newId;
+    data.is_active = true;
+    data.company_id = getCompanyId();
+    var result = await sbQuery(sb.from('sales_customer_branches').insert(data).select());
+    if (result === null) { btnLoading(btn, false, 'Add Branch'); return; }
+    branches.push(result[0] || data);
+    notify('Branch added');
+  }
+
+  btnLoading(btn, false, editId ? 'Save Changes' : 'Add Branch');
+  closeModal('br-modal');
+  scRenderDetail();
+}
+
+async function brSetDefault(branchId, customerId) {
+  var existing = getCustomerBranches(customerId);
+  for (var i = 0; i < existing.length; i++) {
+    var newVal = existing[i].id === branchId;
+    if (existing[i].is_default !== newVal) {
+      await sbQuery(sb.from('sales_customer_branches').update({ is_default: newVal, updated_at: new Date().toISOString() }).eq('id', existing[i].id).select());
+      existing[i].is_default = newVal;
+    }
+  }
+  notify('Default branch updated');
+  scRenderDetail();
+}
+
+function brDelete(branchId) {
+  var br = getBranch(branchId);
+  if (!br) return;
+  confirmAction('Delete Branch?', 'Deactivate branch <strong>' + esc(br.name) + '</strong>? Existing orders referencing it will keep the link.', async function() {
+    var result = await sbQuery(sb.from('sales_customer_branches').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', branchId).select());
+    if (result === null) return;
+    var idx = branches.findIndex(function(b) { return b.id === branchId; });
+    if (idx >= 0) branches[idx].is_active = false;
+    notify('Branch deactivated');
+    scRenderDetail();
+  });
+}
+
 function scRenderDetail() {
   var c = customers.find(function(x) { return x.id === scDetailCustomerId; });
   if (!c) { scBackToList(); return; }
@@ -3603,6 +3753,37 @@ function scRenderDetail() {
     html += '<div class="summary-card"><div class="sc-label">Return Rate</div><div class="sc-value" style="color:' + rrColor + ';">' + rr.toFixed(1) + '%</div></div>';
   }
   html += '</div></div>';
+
+  // ── Delivery Branches ──
+  var custBranches = getCustomerBranches(c.id);
+  html += '<div class="so-detail-section">';
+  html += '<div class="so-detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">Delivery Branches';
+  html += '<button class="btn btn-primary btn-sm" onclick="brOpenModal(\'' + esc(c.id) + '\')">+ Add Branch</button>';
+  html += '</div>';
+  if (custBranches.length === 0) {
+    html += '<div style="color:var(--text-muted);font-size:13px;padding:12px 0;">No delivery branches added yet. Click "+ Add Branch" to add one.</div>';
+  } else {
+    html += '<div style="overflow-x:auto;"><table class="data-table" style="width:100%;font-size:13px;">';
+    html += '<thead><tr><th>#</th><th>Branch Name</th><th>Address</th><th>Contact</th><th>Phone</th><th></th></tr></thead><tbody>';
+    custBranches.forEach(function(br, idx) {
+      html += '<tr>';
+      html += '<td>' + (idx + 1) + '</td>';
+      html += '<td style="font-weight:600;">' + esc(br.name);
+      if (br.is_default) html += ' <span class="badge badge-gold" style="font-size:10px;padding:1px 6px;">Default</span>';
+      html += '</td>';
+      html += '<td style="white-space:pre-line;max-width:200px;">' + esc(br.address || '\u2014') + '</td>';
+      html += '<td>' + esc(br.contact_person || '\u2014') + '</td>';
+      html += '<td>' + esc(br.phone || '\u2014') + '</td>';
+      html += '<td style="text-align:right;white-space:nowrap;">';
+      if (!br.is_default) html += '<a href="javascript:void(0)" onclick="brSetDefault(\'' + esc(br.id) + '\',\'' + esc(c.id) + '\')" style="font-size:11px;color:var(--gold);margin-right:8px;">Set Default</a>';
+      html += '<a href="javascript:void(0)" onclick="brOpenModal(\'' + esc(c.id) + '\',\'' + esc(br.id) + '\')" style="font-size:11px;color:var(--green-light);margin-right:8px;">Edit</a>';
+      html += '<a href="javascript:void(0)" onclick="brDelete(\'' + esc(br.id) + '\')" style="font-size:11px;color:#c00;">Delete</a>';
+      html += '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
 
   // ── Purchases by Month ──
   // Only count completed orders — pending/preparing/delivering aren't real sales yet.
