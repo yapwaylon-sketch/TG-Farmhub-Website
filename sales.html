@@ -5941,7 +5941,7 @@ function generateCreditNoteA4(cnId) {
   // Left: Bill To
   html += '<div style="flex:1;">';
   html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Bill To</div>';
-  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? cust.name : '\u2014') + '</div>';
+  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? (cust.registration_name || cust.name) : '\u2014') + '</div>';
   if (cust && cust.ssm_brn) html += '<div style="font-size:11px;color:#333;margin-top:2px;">SSM/BRN: ' + esc(cust.ssm_brn) + '</div>';
   if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
   if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
@@ -6041,7 +6041,7 @@ function generateInvoiceA4(invoiceId) {
   // Left: Bill To
   html += '<div style="flex:1;">';
   html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Bill To</div>';
-  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? cust.name : '\u2014') + '</div>';
+  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? (cust.registration_name || cust.name) : '\u2014') + '</div>';
   if (cust && cust.ssm_brn) html += '<div style="font-size:11px;color:#333;margin-top:2px;">SSM/BRN: ' + esc(cust.ssm_brn) + '</div>';
   if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
   if (cust && cust.ic_number) html += '<div style="font-size:11px;color:#333;">IC: ' + esc(cust.ic_number) + '</div>';
