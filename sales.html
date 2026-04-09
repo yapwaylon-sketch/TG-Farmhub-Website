@@ -292,12 +292,24 @@
       <input type="text" id="sc-name" placeholder="Customer or company name" style="width:100%;">
     </div>
     <div class="form-field">
+      <label>REGISTRATION NAME</label>
+      <input type="text" id="sc-registration-name" placeholder="Legal company name (optional)" style="width:100%;">
+    </div>
+    <div class="form-field">
       <label>CONTACT PERSON</label>
       <input type="text" id="sc-contact-person" placeholder="Contact person name (optional)" style="width:100%;">
     </div>
     <div class="form-field">
+      <label>EMAIL</label>
+      <input type="email" id="sc-email" placeholder="e.g., accounts@company.com (optional)" style="width:100%;">
+    </div>
+    <div class="form-field">
       <label>ADDRESS</label>
       <textarea id="sc-address" rows="2" placeholder="Delivery address (optional)" style="width:100%;"></textarea>
+    </div>
+    <div class="form-field">
+      <label>SECONDARY PHONE</label>
+      <input type="tel" id="sc-secondary-phone" placeholder="Alternate contact number (optional)" style="width:100%;">
     </div>
     <div class="form-row">
       <div class="form-field">
@@ -326,6 +338,18 @@
         <option value="30">Net 30</option>
         <option value="60">Net 60</option>
       </select>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>CREDIT LIMIT (RM)</label>
+        <input type="number" id="sc-credit-limit" placeholder="Optional" style="width:100%;" min="0" step="0.01">
+      </div>
+      <div class="form-field">
+        <label>CURRENCY</label>
+        <select id="sc-currency" style="width:100%;">
+          <option value="MYR">MYR</option>
+        </select>
+      </div>
     </div>
     <div class="form-field">
       <label>SSM / BRN</label>
@@ -3307,6 +3331,11 @@ function scOpenModal(editId) {
       document.getElementById('sc-tin').value = c.tin || '';
       document.getElementById('sc-ic-number').value = c.ic_number || '';
       document.getElementById('sc-notes').value = c.notes || '';
+      document.getElementById('sc-registration-name').value = c.registration_name || '';
+      document.getElementById('sc-email').value = c.email || '';
+      document.getElementById('sc-secondary-phone').value = c.secondary_phone || '';
+      document.getElementById('sc-credit-limit').value = c.credit_limit || '';
+      document.getElementById('sc-currency').value = c.currency || 'MYR';
     }
   } else {
     title.textContent = 'Add Customer';
@@ -3322,6 +3351,11 @@ function scOpenModal(editId) {
     document.getElementById('sc-tin').value = '';
     document.getElementById('sc-ic-number').value = '';
     document.getElementById('sc-notes').value = '';
+    document.getElementById('sc-registration-name').value = '';
+    document.getElementById('sc-email').value = '';
+    document.getElementById('sc-secondary-phone').value = '';
+    document.getElementById('sc-credit-limit').value = '';
+    document.getElementById('sc-currency').value = 'MYR';
   }
 
   modal.style.display = 'flex';
@@ -3355,6 +3389,11 @@ async function scSaveCustomer() {
   var tin = document.getElementById('sc-tin').value.trim();
   var icNumber = document.getElementById('sc-ic-number').value.trim();
   var notes = document.getElementById('sc-notes').value.trim();
+  var registrationName = document.getElementById('sc-registration-name').value.trim();
+  var email = document.getElementById('sc-email').value.trim();
+  var secondaryPhone = document.getElementById('sc-secondary-phone').value.trim();
+  var creditLimit = document.getElementById('sc-credit-limit').value;
+  var currency = document.getElementById('sc-currency').value;
 
   if (!name) { notify('Customer name is required', 'warning'); return; }
 
@@ -3373,7 +3412,12 @@ async function scSaveCustomer() {
     payment_terms: paymentTermsDays > 0 ? 'credit' : 'cash',
     payment_terms_days: paymentTermsDays,
     ssm_brn: ssmBrn || null, tin: tin || null, ic_number: icNumber || null,
-    notes: notes || null
+    notes: notes || null,
+    registration_name: registrationName || null,
+    email: email || null,
+    secondary_phone: secondaryPhone || null,
+    credit_limit: creditLimit ? parseFloat(creditLimit) : null,
+    currency: currency || 'MYR'
   };
 
   if (editId) {
@@ -3520,6 +3564,10 @@ function scRenderDetail() {
   if (c.tin) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">TIN</div><div style="color:var(--text);">' + esc(c.tin) + '</div></div>';
   if (c.ic_number) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">IC Number</div><div style="color:var(--text);">' + esc(c.ic_number) + '</div></div>';
   if (c.notes) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Notes</div><div style="color:var(--text);">' + esc(c.notes) + '</div></div>';
+  if (c.registration_name) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Registration Name</div><div style="color:var(--text);">' + esc(c.registration_name) + '</div></div>';
+  if (c.email) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Email</div><div style="color:var(--text);">' + esc(c.email) + '</div></div>';
+  if (c.secondary_phone) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Secondary Phone</div><div style="color:var(--text);">' + esc(c.secondary_phone) + '</div></div>';
+  if (c.credit_limit) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Credit Limit</div><div style="color:var(--text);">RM ' + parseFloat(c.credit_limit).toFixed(2) + '</div></div>';
   html += '</div>';
   html += '<div style="margin-top:10px;display:flex;gap:8px;">';
   html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + esc(c.id) + '\')">Edit Customer</button>';
