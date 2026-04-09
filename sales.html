@@ -6199,6 +6199,21 @@ function generateInvoiceA4(invoiceId) {
       html += '</div>';
       html += '</div>';
 
+      // Branch / Ship To info
+      var doBranch = o.branch_id ? getBranch(o.branch_id) : null;
+      if (doBranch) {
+        html += '<div style="font-size:11px;color:#444;margin-bottom:6px;padding:3px 0;border-bottom:1px dotted #ccc;">';
+        html += '<strong>Ship To:</strong> ' + esc(doBranch.name);
+        if (doBranch.address) html += ' \u2014 ' + esc(doBranch.address.replace(/\n/g, ', '));
+        html += '</div>';
+      }
+      // Order notes
+      if (o.notes) {
+        html += '<div style="font-size:10px;color:#666;margin-bottom:6px;font-style:italic;">';
+        html += '<strong>Note:</strong> ' + esc(o.notes);
+        html += '</div>';
+      }
+
       html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;">';
       html += '<thead><tr style="background:#f5f5f5;"><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">#</th><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">Product</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Qty</th><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">Unit</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Price (RM)</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Amount (RM)</th></tr></thead><tbody>';
       doItems.forEach(function(item, idx) {
