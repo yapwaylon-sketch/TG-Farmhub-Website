@@ -4530,6 +4530,9 @@ async function payUploadSlip(paymentId) {
 // ==================== INVOICING TAB ====================
 var invSelectedDOs = {};
 
+// Default notes pre-filled on new invoice creation. Set your standard terms here.
+var INV_DEFAULT_NOTES = '';
+
 function renderInvoicing() {
   var body = document.getElementById('page-invoicing').querySelector('.page-body');
   var html = '';
@@ -4627,7 +4630,7 @@ function renderInvoicing() {
     // Due date display
     var dueDate = calcDueDate(todayStr(), defaultTermsDays === 0 ? 'cod' : defaultTermsDays + 'days');
     html += '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Due date: <strong id="inv-due-date" style="color:var(--text);">' + fmtDateNice(dueDate) + '</strong></div>';
-    html += '<div class="form-field" style="margin-top:12px;"><label>NOTES</label><textarea id="inv-notes" rows="2" placeholder="Optional invoice notes" style="width:100%;"></textarea></div>';
+    html += '<div class="form-field" style="margin-top:12px;"><label>NOTES</label><textarea id="inv-notes" rows="2" placeholder="Optional invoice notes" style="width:100%;">' + esc(INV_DEFAULT_NOTES) + '</textarea></div>';
     html += '</div>';
 
     // Multi-customer guard
@@ -5707,6 +5710,14 @@ function generateInvoiceA4(invoiceId) {
       return dn + (shortDate ? ' (' + shortDate + ')' : '');
     });
     html += '<div class="a4-do-ref">Ref: ' + esc(doRefs.join(', ')) + '</div>';
+  }
+
+  // Notes (editable inline before printing)
+  if (inv.notes) {
+    html += '<div style="margin:12px 0;padding:10px 14px;border:1px solid #ddd;border-radius:4px;background:#fafafa;">';
+    html += '<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:4px;">Notes</div>';
+    html += '<div contenteditable="true" style="font-size:11px;color:#333;outline:none;min-height:16px;cursor:text;">' + esc(inv.notes) + '</div>';
+    html += '</div>';
   }
 
   // Totals
