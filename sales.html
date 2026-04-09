@@ -1933,12 +1933,15 @@ function renderOrderCards() {
     html += '<span class="so-group-count" style="background:' + color + ';">' + group.length + '</span>';
     html += '</div>';
 
-    // Sort active statuses by delivery urgency (earliest delivery_date first, no date = bottom)
+    // Sort active statuses by delivery urgency (earliest date+time first, no date = bottom)
     if (status !== 'completed' && status !== 'cancelled') {
       group.sort(function(a, b) {
         var da = a.delivery_date || '9999-99-99';
         var db = b.delivery_date || '9999-99-99';
         if (da !== db) return da.localeCompare(db);
+        var ta = a.delivery_time || '99:99';
+        var tb = b.delivery_time || '99:99';
+        if (ta !== tb) return ta.localeCompare(tb);
         return (a.order_date || '').localeCompare(b.order_date || '');
       });
     }
