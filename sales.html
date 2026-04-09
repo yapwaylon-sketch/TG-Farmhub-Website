@@ -8045,6 +8045,10 @@ function soGenerateDoc(orderId) {
   if (cust && cust.address) {
     html += '<div class="doc-info-label">Address:</div><div class="doc-info-value">' + esc(cust.address) + '</div>';
   }
+  var receiptBranch = o.branch_id ? getBranch(o.branch_id) : null;
+  if (receiptBranch) {
+    html += '<div class="doc-info-label">Ship To:</div><div class="doc-info-value">' + esc(receiptBranch.name) + '</div>';
+  }
   html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(o.delivery_date || o.order_date) + '</div>';
   html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDate(o.order_date) + '</div>';
   if (o.fulfillment === 'delivery' && o.driver_id) {
@@ -8168,26 +8172,40 @@ function soGenerateDocA4(orderId) {
     html += '<div class="a4-doc-number">' + docNumber + '</div>';
     html += '<div class="a4-copy-label">' + copyLabel + '</div>';
 
-    // Customer Info (4-column grid)
-    html += '<div class="a4-info-grid">';
-    html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value">' + esc(cust ? cust.name : '—') + '</div>';
-    html += '<div class="a4-info-label">Date:</div><div class="a4-info-value">' + fmtDate(o.delivery_date || o.order_date) + '</div>';
-    if (cust && cust.phone) {
-      html += '<div class="a4-info-label">Phone:</div><div class="a4-info-value">' + esc(cust.phone) + '</div>';
-    } else {
-      html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
+    // Bill To + Ship To (two-column layout)
+    var orderBranch = o.branch_id ? getBranch(o.branch_id) : null;
+    html += '<div style="display:flex;gap:24px;margin:16px 0;">';
+
+    // Left: Bill To
+    html += '<div style="flex:1;">';
+    html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Bill To</div>';
+    html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? (cust.registration_name || cust.name) : '\u2014') + '</div>';
+    if (cust && cust.ssm_brn) html += '<div style="font-size:11px;color:#333;margin-top:2px;">SSM/BRN: ' + esc(cust.ssm_brn) + '</div>';
+    if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
+    if (cust && cust.ic_number) html += '<div style="font-size:11px;color:#333;">IC: ' + esc(cust.ic_number) + '</div>';
+    if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
+    if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(cust.phone) + '</div>';
+    html += '</div>';
+
+    // Right: Ship To + Order Details
+    html += '<div style="min-width:200px;">';
+    if (orderBranch) {
+      html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Ship To</div>';
+      html += '<div style="font-size:13px;font-weight:700;color:#000;">' + esc(orderBranch.name) + '</div>';
+      if (orderBranch.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(orderBranch.address) + '</div>';
+      if (orderBranch.contact_person) html += '<div style="font-size:11px;color:#333;">Attn: ' + esc(orderBranch.contact_person) + '</div>';
+      if (orderBranch.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(orderBranch.phone) + '</div>';
     }
-    html += '<div class="a4-info-label">Order Date:</div><div class="a4-info-value">' + fmtDate(o.order_date) + '</div>';
-    if (cust && cust.address) {
-      html += '<div class="a4-info-label">Address:</div><div class="a4-info-value">' + esc(cust.address) + '</div>';
-    } else {
-      html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
-    }
+    html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:4px;' + (orderBranch ? 'margin-top:12px;' : '') + '">Order Details</div>';
+    html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
+    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Date:</td><td>' + fmtDate(o.delivery_date || o.order_date) + '</td></tr>';
+    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Order Date:</td><td>' + fmtDate(o.order_date) + '</td></tr>';
     if (o.fulfillment === 'delivery' && o.driver_id) {
-      html += '<div class="a4-info-label">Driver:</div><div class="a4-info-value">' + esc(getDriverName(o.driver_id, o.driver_source)) + '</div>';
-    } else {
-      html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
+      html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Driver:</td><td>' + esc(getDriverName(o.driver_id, o.driver_source)) + '</td></tr>';
     }
+    html += '</table>';
+    html += '</div>';
+
     html += '</div>';
     if (o.notes) {
       html += '<div style="font-size:12px;margin-bottom:12px;padding:8px 12px;border:1px dashed #999;border-radius:4px;background:#faf8f0;"><strong>Note:</strong> ' + esc(o.notes) + '</div>';
