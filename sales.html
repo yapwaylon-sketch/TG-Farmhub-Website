@@ -791,7 +791,7 @@
       <div class="form-row">
         <div class="form-field">
           <label>DELIVERY TIME</label>
-          <input type="text" id="so-delivery-time" placeholder="e.g., 10:00 AM" style="width:100%;">
+          <input type="time" id="so-delivery-time" style="width:100%;">
         </div>
         <div class="form-field">
           <label>FULFILLMENT</label>
@@ -1835,7 +1835,7 @@ function soRenderCard(o, status, color, label) {
   h += '</div></div>';
   h += '<div class="sales-card-bottom"><div class="sales-card-meta">';
   h += '<span>' + esc(o.order_date || '\u2014') + '</span>';
-  if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + '</span>';
+  if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + (o.delivery_time ? ' ' + fmtTime12(o.delivery_time) : '') + '</span>';
   h += '</div><div class="sales-card-total">' + formatRM(total) + '</div></div>';
 
   // Order notes (if any)
@@ -2138,7 +2138,7 @@ function soRenderDetail() {
   }
   html += '<div class="so-detail-field"><div class="so-detail-label">Fulfillment</div><div class="so-detail-value">' + esc(o.fulfillment === 'delivery' ? 'Delivery' : 'Collection') + '</div></div>';
   html += '<div class="so-detail-field"><div class="so-detail-label">Doc Type</div><div class="so-detail-value">' + (o.doc_type === 'delivery_order' ? 'Delivery Order (DO)' : 'Cash Sales (CS)') + '</div></div>';
-  html += '<div class="so-detail-field"><div class="so-detail-label">Delivery Date</div><div class="so-detail-value">' + esc(o.delivery_date || '\u2014') + (o.delivery_time ? ' ' + esc(o.delivery_time) : '') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Delivery Date</div><div class="so-detail-value">' + esc(o.delivery_date || '\u2014') + (o.delivery_time ? ' ' + fmtTime12(o.delivery_time) : '') + '</div></div>';
   html += '<div class="so-detail-field"><div class="so-detail-label">Order Date</div><div class="so-detail-value">' + esc(o.order_date || '\u2014') + '</div></div>';
   if (o.assigned_worker_id) {
     var assignedWorker = allWorkers.find(function(w) { return w.id === o.assigned_worker_id; });
@@ -2407,7 +2407,7 @@ function buildPrepMessage(orderId) {
   var cust = customers.find(function(c) { return c.id === o.customer_id; });
   var items = orderItems.filter(function(i) { return i.order_id === o.id; });
   var deliveryStr = fmtDate(o.delivery_date);
-  if (o.delivery_time) deliveryStr += ' ' + o.delivery_time;
+  if (o.delivery_time) deliveryStr += ' ' + fmtTime12(o.delivery_time);
 
   // Get assigned worker name if available
   var workerSel = document.getElementById('so-prep-worker');
@@ -4549,6 +4549,18 @@ async function payUploadSlip(paymentId) {
 
 // ==================== INVOICING TAB ====================
 var invSelectedDOs = {};
+
+// Format 24h time string (HH:MM) to 12h (e.g. "2:00 PM")
+function fmtTime12(t) {
+  if (!t) return '';
+  var parts = t.split(':');
+  var h = parseInt(parts[0], 10);
+  var m = parts[1] || '00';
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return h + ':' + m + ' ' + ampm;
+}
 
 // Default notes pre-filled on new invoice creation. Set your standard terms here.
 var INV_DEFAULT_NOTES = '';
