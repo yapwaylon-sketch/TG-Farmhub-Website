@@ -1836,7 +1836,8 @@ function soRenderCard(o, status, color, label) {
   h += '<div class="sales-card-bottom"><div class="sales-card-meta">';
   h += '<span>' + esc(o.order_date || '\u2014') + '</span>';
   if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + (o.delivery_time ? ' ' + fmtTime12(o.delivery_time) : '') + '</span>';
-  h += '</div><div class="sales-card-total">' + formatRM(total) + '</div></div>';
+  var hasPendingPcs = orderItems.filter(function(i) { return i.order_id === o.id; }).some(function(i) { return i.order_pcs != null && !i.actual_weight_kg; });
+  h += '</div><div class="sales-card-total">' + (hasPendingPcs && total === 0 ? '<span style="font-size:10px;color:var(--text-muted);">Pending weight</span>' : formatRM(total)) + '</div></div>';
 
   // Cancel reason (if cancelled)
   if (o.status === 'cancelled' && o.cancel_reason) {
@@ -1865,9 +1866,12 @@ function soRenderCard(o, status, color, label) {
       if (variety && variety !== '—') name += variety + ' ';
       name += prod ? prod.name : '—';
       var unit = prod ? (prod.unit || '') : '';
+      var isPcs = item.order_pcs != null;
+      var qtyDisplay = isPcs ? (item.order_pcs + ' pcs') : ((item.quantity || 0) + esc(unit));
+      if (isPcs && item.actual_weight_kg) qtyDisplay += ' (' + item.actual_weight_kg + 'kg)';
       h += '<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0;">';
       h += '<span style="color:var(--text-muted);">' + esc(name) + '</span>';
-      h += '<span style="font-weight:600;">' + (item.quantity || 0) + esc(unit) + '</span>';
+      h += '<span style="font-weight:600;">' + qtyDisplay + '</span>';
       h += '</div>';
     });
     h += '</div>';
@@ -2184,14 +2188,26 @@ function soRenderDetail() {
     var lineTotal = parseFloat(item.line_total) || 0;
     subtotal += lineTotal;
 
+    var isPcsItem = item.order_pcs != null;
+    var qtyCell = '';
+    var unitCell = '';
+    if (isPcsItem) {
+      qtyCell = item.order_pcs + ' pcs';
+      if (item.actual_weight_kg) qtyCell += ' (' + item.actual_weight_kg + 'kg)';
+      unitCell = 'pcs';
+    } else {
+      qtyCell = String(item.quantity || 0);
+      unitCell = prodUnit;
+    }
+
     html += '<tr>';
     html += '<td>' + esc(prodName) + '</td>';
     html += '<td>' + esc(prodVariety) + '</td>';
     html += '<td>' + esc(idxStr || '\u2014') + '</td>';
-    html += '<td style="text-align:right;">' + (item.quantity || 0) + '</td>';
-    html += '<td>' + esc(prodUnit) + '</td>';
+    html += '<td style="text-align:right;">' + qtyCell + '</td>';
+    html += '<td>' + esc(unitCell) + '</td>';
     html += '<td style="text-align:right;">' + formatRM(item.unit_price || 0) + '</td>';
-    html += '<td style="text-align:right;">' + formatRM(lineTotal) + '</td>';
+    html += '<td style="text-align:right;">' + (isPcsItem && !item.actual_weight_kg ? 'Pending' : formatRM(lineTotal)) + '</td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
