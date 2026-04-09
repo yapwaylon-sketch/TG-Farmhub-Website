@@ -1878,8 +1878,11 @@ function renderOrderCards() {
     if (soFilterStatus && o.status !== soFilterStatus) return false;
     if (soFilterDocType && o.doc_type !== soFilterDocType) return false;
     if (soFilterPayment && o.payment_status !== soFilterPayment) return false;
-    if (soFilterDateFrom && o.order_date < soFilterDateFrom) return false;
-    if (soFilterDateTo && o.order_date > soFilterDateTo) return false;
+    // Date filter: use completion date for completed/cancelled, order_date for active
+    var filterDate = (o.status === 'completed' || o.status === 'cancelled')
+      ? (o.updated_at || '').substring(0, 10) : o.order_date;
+    if (soFilterDateFrom && filterDate < soFilterDateFrom) return false;
+    if (soFilterDateTo && filterDate > soFilterDateTo) return false;
     if (soFilterCustomer) {
       var custName = getCustomerName(o.customer_id).toLowerCase();
       if (custName.indexOf(soFilterCustomer.toLowerCase()) < 0) return false;
@@ -1930,15 +1933,25 @@ function renderOrderCards() {
     html += '<span class="so-group-count" style="background:' + color + ';">' + group.length + '</span>';
     html += '</div>';
 
-    // For completed/cancelled: sub-group by date with collapsible sections
+    // Sort active statuses by delivery urgency (earliest delivery_date first, no date = bottom)
+    if (status !== 'completed' && status !== 'cancelled') {
+      group.sort(function(a, b) {
+        var da = a.delivery_date || '9999-99-99';
+        var db = b.delivery_date || '9999-99-99';
+        if (da !== db) return da.localeCompare(db);
+        return (a.order_date || '').localeCompare(b.order_date || '');
+      });
+    }
+
+    // For completed/cancelled: sub-group by completion date (updated_at)
     var needsDateGroup = (status === 'completed' || status === 'cancelled');
 
     if (needsDateGroup && group.length > 0) {
-      // Group by order_date
+      // Group by completion date (updated_at date portion)
       var dateGroups = {};
       var dateOrder = [];
       group.forEach(function(o) {
-        var d = o.order_date || 'unknown';
+        var d = (o.updated_at || '').substring(0, 10) || o.order_date || 'unknown';
         if (!dateGroups[d]) { dateGroups[d] = []; dateOrder.push(d); }
         dateGroups[d].push(o);
       });
