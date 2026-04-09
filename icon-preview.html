@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Icon Preview — Phase 2 (Full Set)</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FAF6EF;
+  --bg-card: #FFFFFF;
+  --border: #E0D5C5;
+  --text: #2A1A3E;
+  --text-muted: #8A7A6A;
+  --gold: #D4AF37;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 36px 24px;
+  min-height: 100vh;
+}
+.wrap { max-width: 1200px; margin: 0 auto; }
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 30px; color: var(--gold); margin-bottom: 4px;
+}
+.sub { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; line-height: 1.6; }
+
+.section-title {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 36px 0 14px;
+}
+
+/* Full-size grid */
+.grid-full {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+}
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 18px 18px;
+  text-align: center;
+}
+.card img {
+  width: 180px; height: 180px;
+  border-radius: 14px;
+  display: block;
+  margin: 0 auto 14px;
+}
+.card .name {
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 3px;
+}
+.card .meta {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+
+/* Hub-size mockup */
+.hub-mock {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+}
+.hub-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+.hub-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 16px 16px;
+  text-align: center;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.hub-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  box-shadow: 0 6px 20px rgba(42,26,62,0.06);
+}
+.hub-card img {
+  width: 70px; height: 70px;
+  border-radius: 10px;
+  display: block;
+  margin: 0 auto 10px;
+}
+.hub-card .title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.hub-card .desc { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+
+.actions {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-top: 24px;
+}
+.actions .hd { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.actions ul { font-size: 12px; color: var(--text-muted); line-height: 1.8; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Icon Set — Full Preview</h1>
+  <div class="sub">All 8 module icons generated in the locked style: 3D clay render, cream background, gold + green + brown palette, pineapple motif throughout. Pick any you want tweaked, or approve and I'll ship them to the hub.</div>
+
+  <!-- FULL SIZE GRID -->
+  <div class="section-title">Full size (180px)</div>
+  <div class="grid-full">
+    <div class="card"><img src="icons/test/inventory.png" alt=""><div class="name">Inventory</div><div class="meta">Stock &amp; Suppliers</div></div>
+    <div class="card"><img src="icons/test/workers.png" alt=""><div class="name">Workers</div><div class="meta">Payroll &amp; Tasks</div></div>
+    <div class="card"><img src="icons/test/spray-tracker.png" alt=""><div class="name">PnD Spray Tracker</div><div class="meta">Spray Schedule</div></div>
+    <div class="card"><img src="icons/test/growth-tracker.png" alt=""><div class="name">Growth Tracker</div><div class="meta">Blocks &amp; Harvest</div></div>
+    <div class="card"><img src="icons/test/sales.png" alt=""><div class="name">Sales</div><div class="meta">Orders &amp; Invoicing</div></div>
+    <div class="card"><img src="icons/test/farm-config.png" alt=""><div class="name">Farm Configuration</div><div class="meta">Blocks &amp; Crops</div></div>
+    <div class="card"><img src="icons/test/tv-display.png" alt=""><div class="name">TV Display</div><div class="meta">Display Screens</div></div>
+    <div class="card"><img src="icons/test/seedlings.png" alt=""><div class="name">Oil Palm Seedlings</div><div class="meta">Coming Soon</div></div>
+  </div>
+
+  <!-- HUB MOCKUP -->
+  <div class="section-title">Real hub size (70px) — how they'll appear on the hub</div>
+  <div class="hub-mock">
+    <div class="hub-cards">
+      <div class="hub-card"><img src="icons/test/inventory.png" alt=""><div class="title">Inventory</div><div class="desc">Stock &amp; Suppliers</div></div>
+      <div class="hub-card"><img src="icons/test/workers.png" alt=""><div class="title">Workers</div><div class="desc">Payroll &amp; Tasks</div></div>
+      <div class="hub-card"><img src="icons/test/spray-tracker.png" alt=""><div class="title">PnD Spray Tracker</div><div class="desc">Spray Schedule</div></div>
+      <div class="hub-card"><img src="icons/test/growth-tracker.png" alt=""><div class="title">Growth Tracker</div><div class="desc">Blocks &amp; Harvest</div></div>
+      <div class="hub-card"><img src="icons/test/sales.png" alt=""><div class="title">Sales</div><div class="desc">Orders &amp; Invoicing</div></div>
+      <div class="hub-card"><img src="icons/test/farm-config.png" alt=""><div class="title">Farm Configuration</div><div class="desc">Blocks &amp; Crops</div></div>
+      <div class="hub-card"><img src="icons/test/tv-display.png" alt=""><div class="title">TV Display</div><div class="desc">Display Screens</div></div>
+      <div class="hub-card"><img src="icons/test/seedlings.png" alt=""><div class="title">Oil Palm Seedlings</div><div class="desc">Coming Soon</div></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="hd">What to tell me</div>
+    <ul>
+      <li><strong>Ship it</strong> — I swap these into index.html, replacing the emojis</li>
+      <li><strong>Regenerate X</strong> — name any specific icons you want redone with tweaks (e.g. "Seedlings needs pineapple motif", "Workers face too cartoon")</li>
+      <li><strong>Tweak palette</strong> — any color changes across the set</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

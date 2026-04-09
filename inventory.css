@@ -308,6 +308,15 @@ select { min-width: 140px; }
   .sidebar-nav { justify-content: space-around !important; }
 }
 
+/* DESKTOP (>=1024px) */
+@media (min-width: 1024px) {
+  .page-title { font-size: 28px; }
+  .summary-card .sc-value { font-size: 28px; }
+  td, th { font-size: 14px; padding: 10px 14px; }
+  input, select, textarea { font-size: 14px; }
+  .btn { font-size: 14px; }
+}
+
 /* PRINT */
 @media print {
   body { background: white !important; color: black !important; }

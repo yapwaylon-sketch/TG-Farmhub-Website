@@ -259,7 +259,7 @@
     <div id="page-suppliers" class="page">
       <div class="page-header">
         <h1 class="page-title">Suppliers</h1>
-        <button class="btn btn-primary" onclick="openSupplierModal()">
+        <button class="btn btn-primary supplier-manage-action" onclick="openSupplierModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           Add Supplier
         </button>
@@ -818,7 +818,7 @@ let dbReady = false;
 // SUPABASE DATA MAPPING (snake_case DB ↔ camelCase JS)
 // ============================================================
 function mapUserFromDb(row) {
-  return { id: row.id, username: row.username, pin: row.pin, displayName: row.display_name, role: row.role };
+  return { id: row.id, username: row.username, pin: row.pin, displayName: row.display_name, role: row.role, permissions: row.permissions || {} };
 }
 function mapProductFromDb(row) {
   return { id: row.id, name: row.name, category: row.category, subcategory: row.subcategory || "", activeIngredient: row.active_ingredient, formulation: row.formulation, packType: row.pack_type || "Bag", packSize: Number(row.pack_size) || 0, packUnit: row.pack_unit || "pc", reorderLevel: Number(row.reorder_level), currentStock: Number(row.current_stock), openingStock: Number(row.opening_stock) || 0, supplierIds: row.supplier_ids || [], archived: row.archived || false, imageUrl: row.image_url || "" };
@@ -1044,6 +1044,13 @@ function updateUserDisplay() {
   // Sidebar elements removed — user info now shown in page headers via injectUserBadge()
 }
 
+function hasPermission(permKey) {
+  if (!currentUser) return false;
+  if (currentUser.role === "admin") return true;
+  const mp = currentUser.permissions || {};
+  return !!(mp.inventory && mp.inventory[permKey] === true);
+}
+
 function applyPermissions() {
   if (!currentUser) return;
   const isAdmin = currentUser.role === "admin";
@@ -1053,8 +1060,8 @@ function applyPermissions() {
     el.style.display = isAdmin ? "" : "none";
   });
 
-  // Staff: hide Products page nav (can only add transactions from dashboard), hide Analytics, Suppliers
-  const staffHiddenPages = ["products", "analytics", "suppliers"];
+  // Staff: hide Products page nav (can only add transactions from dashboard), hide Analytics
+  const staffHiddenPages = ["products", "analytics"];
   if (!isAdmin) {
     staffHiddenPages.forEach(page => {
       const nav = document.querySelector('.nav-item[data-page="'+page+'"]');
@@ -1065,6 +1072,16 @@ function applyPermissions() {
       if (!nav.classList.contains("admin-only")) nav.style.display = "";
     });
   }
+
+  // Suppliers page: gated by manageSuppliers permission (admin always allowed)
+  const canManageSuppliers = hasPermission("manageSuppliers");
+  const supplierNav = document.querySelector('.nav-item[data-page="suppliers"]');
+  if (supplierNav) supplierNav.style.display = canManageSuppliers ? "" : "none";
+  document.querySelectorAll(".supplier-manage-action").forEach(el => {
+    el.style.display = canManageSuppliers ? "" : "none";
+  });
+  // Re-render suppliers table to apply row-level action visibility
+  if (typeof renderSuppliers === "function" && suppliers && suppliers.length) renderSuppliers();
 }
 
 // ============================================================
@@ -2866,24 +2883,25 @@ function renderSuppliers() {
   }
 
   empty.style.display = "none";
+  const canManage = hasPermission("manageSuppliers");
   tbody.innerHTML = suppliers.map(s => {
     const productCount = products.filter(p => (p.supplierIds||[]).includes(s.id)).length;
     const productNames = products.filter(p => (p.supplierIds||[]).includes(s.id)).map(p => p.name).slice(0, 3);
     const moreCount = productCount - productNames.length;
     const prodLabel = productNames.join(", ") + (moreCount > 0 ? ` +${moreCount} more` : "");
+    const actions = canManage ? `
+        <button class="btn btn-outline supplier-manage-action" style="padding:4px 8px;" onclick="openEditSupplier('${s.id}')" title="Edit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="btn btn-outline supplier-manage-action" style="padding:4px 8px;color:var(--critical);border-color:var(--critical);" onclick="deleteSupplier('${s.id}')" title="Delete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>` : '';
     return `<tr>
       <td class="td-bold">${s.name}</td>
       <td>${s.contact || "—"}</td>
       <td style="color:var(--gold-light);">+${s.phone}</td>
       <td style="font-size:12px;color:var(--text-dim);">${prodLabel || "No products linked"}</td>
-      <td style="text-align:right;white-space:nowrap;">
-        <button class="btn btn-outline" style="padding:4px 8px;" onclick="openEditSupplier('${s.id}')" title="Edit">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button class="btn btn-outline" style="padding:4px 8px;color:var(--critical);border-color:var(--critical);" onclick="deleteSupplier('${s.id}')" title="Delete">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        </button>
-      </td>
+      <td style="text-align:right;white-space:nowrap;">${actions}</td>
     </tr>`;
   }).join("");
 }
@@ -2915,6 +2933,7 @@ function openEditSupplier(id) {
 }
 
 async function saveSupplier() {
+  if (!hasPermission("manageSuppliers")) { notify("You don't have permission to manage suppliers", "warning"); return; }
   const editId = document.getElementById("sup-edit-id").value;
   const name = document.getElementById("sup-name").value.trim();
   const contact = document.getElementById("sup-contact").value.trim();
@@ -2949,6 +2968,7 @@ async function saveSupplier() {
 }
 
 async function deleteSupplier(id) {
+  if (!hasPermission("manageSuppliers")) { notify("You don't have permission to manage suppliers", "warning"); return; }
   const s = suppliers.find(su => su.id === id);
   if (!s) return;
   const linkedCount = products.filter(p => (p.supplierIds||[]).includes(id)).length;

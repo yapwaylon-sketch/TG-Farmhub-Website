@@ -69,6 +69,7 @@
   <div class="hub-nav">
     <div class="hub-nav-item active" data-page="modules" onclick="showHubPage('modules')">Modules</div>
     <div class="hub-nav-item farm-config-nav" data-page="farmconfig" onclick="showHubPage('farmconfig')">Farm Configuration</div>
+    <div class="hub-nav-item tv-display-nav" data-page="tvdisplay" onclick="showHubPage('tvdisplay')">TV Display</div>
     <div class="hub-nav-item admin-only" data-page="users" onclick="showHubPage('users')">User Management</div>
   </div>
 
@@ -138,6 +139,82 @@
         </div>
       </div>
     </div>
+
+    <!-- TV DISPLAY PAGE -->
+    <div class="hub-page" id="hubpage-tvdisplay">
+      <div class="section-header">
+        <h2>TV Display</h2>
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Quick access to all TV display screens. Each link opens in a new tab and will still prompt for the display password.
+      </div>
+      <div class="tv-display-grid" id="tv-display-grid">
+        <div class="tv-display-cell">
+          <a class="tv-display-card" href="https://nanasgrowth.tgfarmhub.com" target="_blank" rel="noopener">
+            <span class="tv-display-badge badge-active">Active</span>
+            <span class="tv-display-icon"><img src="icons/modules/growth-tracker.png" alt=""></span>
+            <div class="tv-display-name">Growth Tracker</div>
+            <div class="tv-display-desc">Block growth monitoring, induction & harvest countdowns</div>
+            <div class="tv-display-url">nanasgrowth.tgfarmhub.com</div>
+          </a>
+        </div>
+        <div class="tv-display-cell">
+          <a class="tv-display-card" href="https://weather.tgfarmhub.com" target="_blank" rel="noopener">
+            <span class="tv-display-badge badge-active">Active</span>
+            <span class="tv-display-icon">⛅</span>
+            <div class="tv-display-name">Weather Monitoring</div>
+            <div class="tv-display-desc">Live farm weather station readings</div>
+            <div class="tv-display-url">weather.tgfarmhub.com</div>
+          </a>
+        </div>
+        <div class="tv-display-cell">
+          <a class="tv-display-card" href="display-sales.html" target="_blank" rel="noopener">
+            <span class="tv-display-badge badge-active">Active</span>
+            <span class="tv-display-icon"><img src="icons/modules/sales.png" alt=""></span>
+            <div class="tv-display-name">Sales — Packing Station</div>
+            <div class="tv-display-desc">Live order queue for packing workers</div>
+            <div class="tv-display-url">display-sales.html</div>
+          </a>
+        </div>
+        <div class="tv-display-cell">
+          <a class="tv-display-card" href="display-spray.html" target="_blank" rel="noopener">
+            <span class="tv-display-badge badge-active">Active</span>
+            <span class="tv-display-icon"><img src="icons/modules/spray-tracker.png" alt=""></span>
+            <div class="tv-display-name">PND Spray Tracker</div>
+            <div class="tv-display-desc">Last spray date & days elapsed per AI, rotating per active ingredient</div>
+            <div class="tv-display-url">display-spray.html</div>
+          </a>
+          <div class="admin-only tv-display-config">
+            <button class="btn btn-outline btn-sm" onclick="openTvSprayConfigModal()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Configure Monitoring AIs
+            </button>
+            <div class="tv-display-config-status" id="tv-spray-config-status">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TV SPRAY CONFIG MODAL ===== -->
+<div id="tv-spray-config-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Configure PnD Spray Monitoring</h3>
+      <button class="modal-close" onclick="closeModal('tv-spray-config-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+      Tick the active ingredients to display on the PnD Spray Tracker TV. Each ticked AI gets its own rotating page on the display. Saves immediately to TG Agribusiness — TV picks up changes within 5 minutes.
+    </div>
+    <input type="text" id="tv-spray-ai-search" placeholder="Search ingredients..." oninput="renderTvSprayAiList()" style="width:100%;font-size:13px;padding:8px 12px;margin-bottom:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+    <div id="tv-spray-ai-list" style="max-height:420px;overflow-y:auto;background:var(--bg-hover);border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-outline" onclick="closeModal('tv-spray-config-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTvSprayConfig()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -201,6 +278,7 @@ const MODULES = [
     key: "sales",
     name: "Sales",
     icon: "🍍",
+    iconImg: "icons/modules/sales.png",
     desc: "Pineapple sales orders, customers, payments, delivery tracking, and reports",
     url: "sales.html",
     active: true,
@@ -217,6 +295,7 @@ const MODULES = [
     key: "inventory",
     name: "Inventory Management",
     icon: "📦",
+    iconImg: "icons/modules/inventory.png",
     desc: "Track farm inputs — stock in, stock out, suppliers, reports, and stock checks",
     url: "inventory.html",
     active: true,
@@ -226,6 +305,7 @@ const MODULES = [
       { key: "stockOut", label: "Record Stock Out (issue to workers)" },
       { key: "stockCheck", label: "Perform Stock Check (physical count)" },
       { key: "editProducts", label: "Add / edit product details" },
+      { key: "manageSuppliers", label: "Add / edit / delete suppliers" },
       { key: "editTransactions", label: "Edit past transactions" },
       { key: "deleteTransactions", label: "Delete transactions" },
       { key: "export", label: "Export reports (CSV / PDF)" },
@@ -235,6 +315,7 @@ const MODULES = [
     key: "workers",
     name: "Worker Management",
     icon: "👷",
+    iconImg: "icons/modules/workers.png",
     desc: "Worker profiles, monthly payroll, task-based pay, deductions, and reports",
     url: "workers.html",
     active: true,
@@ -249,6 +330,7 @@ const MODULES = [
     key: "spraytracker",
     name: "PND Spray Tracker",
     icon: "🌿",
+    iconImg: "icons/modules/spray-tracker.png",
     desc: "Log and manage fungicide & pesticide spray applications across all farm blocks",
     url: "spraytracker.html",
     active: true,
@@ -262,6 +344,7 @@ const MODULES = [
     key: "growthtracker",
     name: "Growth Tracker",
     icon: "🌱",
+    iconImg: "icons/modules/growth-tracker.png",
     desc: "Monitor block growth, induction schedules, and harvest planning",
     url: "growthtracker.html",
     active: true,
@@ -274,6 +357,7 @@ const MODULES = [
     key: "farmconfig",
     name: "Farm Configuration",
     icon: "🌾",
+    iconImg: "icons/modules/farm-config.png",
     desc: "Manage farm blocks, crop types, and varieties",
     url: null,
     active: true,
@@ -283,9 +367,23 @@ const MODULES = [
     ]
   },
   {
+    key: "tvdisplay",
+    name: "TV Display",
+    icon: "📺",
+    iconImg: "icons/modules/tv-display.png",
+    desc: "Quick links to all TV display screens",
+    url: null,
+    active: true,
+    hubPage: true,
+    permissions: [
+      { key: "view", label: "Access TV Display links page" },
+    ]
+  },
+  {
     key: "seedlings",
     name: "Oil Palm Seedlings",
     icon: "🌴",
+    iconImg: "icons/modules/seedlings.png",
     desc: "Booking management, sales tracking, and seedling stock",
     url: "seedlings.html",
     active: false,
@@ -598,6 +696,12 @@ function showHub() {
     el.style.display = canFarm ? "" : "none";
   });
 
+  // TV Display visibility — admin or users with tvdisplay view permission
+  const canTv = currentUser.role === "admin" || hasPermission("tvdisplay", "view");
+  document.querySelectorAll(".tv-display-nav").forEach(el => {
+    el.style.display = canTv ? "" : "none";
+  });
+
   // Initialize company switcher
   var savedCompany = getCompanyId();
   document.querySelectorAll('.hub-company-btn').forEach(btn => {
@@ -622,6 +726,76 @@ async function showHubPage(page) {
     await loadFcBlocks();
     renderCropList();
     renderBlockList();
+  }
+  if (page === "tvdisplay" && currentUser && currentUser.role === "admin") {
+    refreshTvSprayConfigStatus();
+  }
+}
+
+// ============================================================
+// TV DISPLAY — PnD SPRAY MONITORING CONFIG
+// ============================================================
+let tvSprayAllIngredients = [];
+let tvSprayWatchedIds = [];
+
+async function refreshTvSprayConfigStatus() {
+  try {
+    const rows = await sbQuery(sb.from('pnd_tv_config').select('watched_ai_ids').eq('company_id', 'tg_agribusiness'));
+    const watched = (rows && rows[0] && rows[0].watched_ai_ids) || [];
+    const el = document.getElementById('tv-spray-config-status');
+    if (el) el.textContent = watched.length ? `${watched.length} active ingredient${watched.length===1?'':'s'} configured` : 'Not configured yet';
+  } catch(e) {}
+}
+
+async function openTvSprayConfigModal() {
+  // Load all pnd_ingredients for tg_agribusiness + current watched list in parallel
+  try {
+    const [ingRows, cfgRows] = await Promise.all([
+      sbQuery(sb.from('pnd_ingredients').select('id,name').eq('company_id', 'tg_agribusiness').order('name')),
+      sbQuery(sb.from('pnd_tv_config').select('watched_ai_ids').eq('company_id', 'tg_agribusiness'))
+    ]);
+    tvSprayAllIngredients = ingRows || [];
+    tvSprayWatchedIds = (cfgRows && cfgRows[0] && cfgRows[0].watched_ai_ids) || [];
+  } catch(e) {
+    notify('Failed to load ingredients', 'error');
+    return;
+  }
+  document.getElementById('tv-spray-ai-search').value = '';
+  renderTvSprayAiList();
+  document.getElementById('tv-spray-config-modal').style.display = 'flex';
+}
+
+function renderTvSprayAiList() {
+  const search = (document.getElementById('tv-spray-ai-search').value || '').toLowerCase();
+  const filtered = tvSprayAllIngredients.filter(i => !search || (i.name||'').toLowerCase().includes(search));
+  const container = document.getElementById('tv-spray-ai-list');
+  if (!filtered.length) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);padding:14px;text-align:center;">No active ingredients found.</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(i => {
+    const isWatched = tvSprayWatchedIds.includes(i.id);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;${isWatched?'background:rgba(74,124,63,0.15);':''}">
+      <input type="checkbox" class="tv-spray-ai-cb" value="${i.id}" ${isWatched?'checked':''} style="accent-color:var(--green);cursor:pointer;width:16px;height:16px;">
+      <span style="color:var(--white);font-weight:600;">${esc(i.name)}</span>
+    </label>`;
+  }).join('');
+}
+
+async function saveTvSprayConfig() {
+  const selected = [...document.querySelectorAll('.tv-spray-ai-cb:checked')].map(cb => cb.value);
+  try {
+    const result = await sbQuery(
+      sb.from('pnd_tv_config')
+        .upsert({ company_id: 'tg_agribusiness', watched_ai_ids: selected, updated_at: new Date().toISOString() }, { onConflict: 'company_id' })
+        .select()
+    );
+    if (!result) { notify('Save failed', 'error'); return; }
+    closeModal('tv-spray-config-modal');
+    notify('TV spray monitoring updated', 'success');
+    refreshTvSprayConfigStatus();
+  } catch(e) {
+    notify('Save failed: ' + e.message, 'error');
   }
 }
 
@@ -661,7 +835,7 @@ function renderModuleCards() {
         onclick="${clickable ? "window.location.href='" + m.url + "?session=" + currentUser.id + "'" : ""}"
         title="${!m.active ? "Coming soon" : !hasAccess ? "No access — contact admin" : "Open " + m.name}">
         <span class="module-badge ${badgeClass}">${badgeText}</span>
-        <span class="module-icon">${m.icon}</span>
+        <span class="module-icon">${m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon}</span>
         <div class="module-name">${m.name}</div>
         <div class="module-desc">${m.desc}</div>
         ${!hasAccess && m.active ? '<div style="font-size:11px;color:var(--critical);margin-top:10px;">🔒 No access — contact admin</div>' : ""}
@@ -715,12 +889,12 @@ function renderUsers() {
     } else if (u.role === "supervisor") {
       const accessible = MODULES.filter(m => u.permissions[m.key] && u.permissions[m.key].view);
       accessIcons = accessible.length > 0
-        ? accessible.map(m => '<span title="' + m.name + '">' + m.icon + '</span>').join(" ")
+        ? accessible.map(m => '<span class="access-icon" title="' + m.name + '">' + (m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon) + '</span>').join(" ")
         : '<span style="font-size:11px;color:var(--text-dim);">No access</span>';
     } else {
       const accessible = MODULES.filter(m => u.permissions[m.key] && u.permissions[m.key].view);
       accessIcons = accessible.length > 0
-        ? accessible.map(m => '<span title="' + m.name + '">' + m.icon + '</span>').join(" ")
+        ? accessible.map(m => '<span class="access-icon" title="' + m.name + '">' + (m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon) + '</span>').join(" ")
         : '<span style="font-size:11px;color:var(--text-dim);">No access</span>';
     }
 
@@ -800,7 +974,7 @@ function buildPermPanels(perms) {
     return `
       <div class="perm-module" data-module="${m.key}">
         <div class="perm-module-header" onclick="togglePermPanel('${m.key}')">
-          <span class="perm-module-icon">${m.icon}</span>
+          <span class="perm-module-icon">${m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon}</span>
           <span class="perm-module-name">${m.name}${!m.active ? ' <span style="font-size:10px;color:var(--text-dim);">(coming soon)</span>' : ""}</span>
           <span class="perm-status" id="perm-status-${m.key}" style="color:${statusColor};">${statusText}</span>
           <button class="perm-toggle-btn" onclick="event.stopPropagation();toggleAllPerms('${m.key}')">${allChecked ? "Clear All" : "Select All"}</button>
