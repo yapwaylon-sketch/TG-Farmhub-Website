@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Module — Interactive Walkthrough</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Microsoft YaHei','PingFang SC','Segoe UI',sans-serif; background:#111; color:#fff; height:100vh; overflow:hidden; }
+
+.walkthrough { height:100vh; display:flex; flex-direction:column; }
+
+/* Top bar */
+.wt-header { background:#1a1a1a; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; flex-shrink:0; }
+.wt-header-left { display:flex; align-items:center; gap:10px; }
+.wt-header-left img { width:32px; height:32px; object-fit:contain; }
+.wt-title { font-size:14px; font-weight:700; }
+.wt-progress { display:flex; align-items:center; gap:8px; font-size:12px; color:#888; }
+.wt-progress-bar { width:200px; height:4px; background:#333; border-radius:2px; overflow:hidden; }
+.wt-progress-fill { height:100%; background:#2E8B3E; transition:width 0.3s; }
+
+/* Main content */
+.wt-body { flex:1; display:flex; overflow:hidden; }
+
+/* Left: mockup screen */
+.wt-screen { flex:1; background:#1A1F1A; display:flex; align-items:center; justify-content:center; padding:20px; position:relative; }
+.wt-mockup { background:#242C24; border:1px solid #2E3A2E; border-radius:12px; width:100%; max-width:700px; min-height:400px; padding:24px; position:relative; overflow:hidden; }
+.wt-mockup-title { font-size:16px; font-weight:800; color:#E8F0E0; margin-bottom:16px; }
+
+/* Right: description panel */
+.wt-panel { width:360px; background:#1a1a1a; border-left:1px solid #333; padding:24px; overflow-y:auto; display:flex; flex-direction:column; }
+.wt-step-badge { display:inline-block; background:#2E8B3E; color:#fff; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:700; margin-bottom:12px; }
+.wt-step-title { font-size:20px; font-weight:800; margin-bottom:8px; line-height:1.3; }
+.wt-step-title-cn { font-size:16px; color:#888; margin-bottom:16px; }
+.wt-step-desc { font-size:14px; color:#ccc; line-height:1.8; margin-bottom:16px; }
+.wt-step-desc .ui { background:#333; border:1px solid #555; border-radius:4px; padding:1px 6px; font-size:12px; font-family:monospace; color:#6B9E5E; }
+.wt-step-tip { background:rgba(232,160,32,0.1); border:1px solid rgba(232,160,32,0.3); border-radius:8px; padding:10px 14px; font-size:13px; color:#F5C04A; margin-bottom:16px; }
+
+/* Navigation */
+.wt-nav { margin-top:auto; display:flex; gap:8px; padding-top:16px; border-top:1px solid #333; }
+.wt-btn { flex:1; padding:12px; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.15s; }
+.wt-btn-prev { background:#333; color:#fff; }
+.wt-btn-prev:hover { background:#444; }
+.wt-btn-next { background:#2E8B3E; color:#fff; }
+.wt-btn-next:hover { background:#257A34; }
+.wt-btn:disabled { opacity:0.3; cursor:not-allowed; }
+
+/* Mockup elements */
+.mock-btn { display:inline-block; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:default; }
+.mock-btn-primary { background:#4A7C3F; color:#fff; }
+.mock-btn-outline { background:transparent; border:1px solid #2E3A2E; color:#D0DCC0; }
+.mock-input { background:#1E261E; border:1px solid #2E3A2E; border-radius:8px; padding:8px 12px; color:#D0DCC0; font-size:13px; width:100%; }
+.mock-card { background:#1A1F1A; border:1px solid #2E3A2E; border-radius:10px; padding:12px 16px; margin-bottom:8px; }
+.mock-badge { display:inline-block; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700; }
+.mock-badge-blue { background:rgba(58,122,200,0.15); color:#6AA8E8; }
+.mock-badge-gold { background:rgba(232,160,32,0.12); color:#F5C04A; }
+.mock-badge-green { background:rgba(74,124,63,0.15); color:#6B9E5E; }
+.mock-badge-purple { background:rgba(140,90,210,0.15); color:#B08AE8; }
+.mock-status-banner { padding:6px 14px; border-radius:8px 8px 0 0; font-size:12px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* Highlight pulse */
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(46,139,62,0.4); } 50% { box-shadow:0 0 0 12px rgba(46,139,62,0); } }
+.highlight { animation:pulse 1.5s infinite; border:2px solid #2E8B3E !important; position:relative; }
+.highlight::after { content:'👆 点击这里'; position:absolute; bottom:-24px; left:50%; transform:translateX(-50%); font-size:11px; color:#2E8B3E; white-space:nowrap; font-weight:700; }
+
+/* Arrow pointer */
+@keyframes bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+.arrow-pointer { position:absolute; font-size:24px; animation:bounce 1s infinite; z-index:10; }
+
+/* Slide transitions */
+.slide { display:none; }
+.slide.active { display:block; }
+
+/* Mobile */
+@media (max-width:768px) {
+  .wt-body { flex-direction:column; }
+  .wt-panel { width:100%; max-height:50vh; border-left:none; border-top:1px solid #333; }
+  .wt-screen { min-height:250px; }
+  .wt-mockup { min-height:200px; padding:16px; }
+  .wt-progress-bar { width:100px; }
+}
+</style>
+</head>
+<body>
+
+<div class="walkthrough">
+  <div class="wt-header">
+    <div class="wt-header-left">
+      <img src="assets/logo.png?v=2" alt="TG">
+      <span class="wt-title">Sales Module Walkthrough</span>
+    </div>
+    <div class="wt-progress">
+      <span id="wt-step-num">1 / 14</span>
+      <div class="wt-progress-bar"><div class="wt-progress-fill" id="wt-progress-fill" style="width:7%"></div></div>
+      <button onclick="wtAutoPlay()" id="wt-auto-btn" style="background:#333;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;">▶ Auto</button>
+    </div>
+  </div>
+
+  <div class="wt-body">
+    <div class="wt-screen" id="wt-screen"></div>
+    <div class="wt-panel">
+      <div id="wt-desc"></div>
+      <div class="wt-nav">
+        <button class="wt-btn wt-btn-prev" id="wt-prev" onclick="wtGo(-1)">← 上一步</button>
+        <button class="wt-btn wt-btn-next" id="wt-next" onclick="wtGo(1)">下一步 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var steps = [
+  {
+    title: 'Open Sales Module',
+    titleCn: '打开销售模块',
+    desc: '从 TG FarmHub 主页登录后，点击 <span class="ui">Sales</span> 模块卡片进入销售系统。',
+    tip: '确保使用正确的 PIN 码登录。主管和工人有不同的权限。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div style="text-align:center;margin-bottom:20px;"><div style="font-size:20px;font-weight:800;color:#E8A020;">TG FarmHub</div><div style="font-size:11px;color:#7A8A7A;">Select a module</div></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+        '<div class="mock-card" style="text-align:center;padding:20px;opacity:0.5;"><div style="font-size:24px;">📦</div><div style="font-size:13px;font-weight:700;margin-top:8px;">Inventory</div></div>' +
+        '<div class="mock-card" style="text-align:center;padding:20px;opacity:0.5;"><div style="font-size:24px;">👷</div><div style="font-size:13px;font-weight:700;margin-top:8px;">Workers</div></div>' +
+        '<div class="mock-card highlight" style="text-align:center;padding:20px;border-color:#4A7C3F;"><div style="font-size:24px;">💰</div><div style="font-size:13px;font-weight:700;margin-top:8px;color:#6B9E5E;">Sales</div></div>' +
+        '<div class="mock-card" style="text-align:center;padding:20px;opacity:0.5;"><div style="font-size:24px;">🌱</div><div style="font-size:13px;font-weight:700;margin-top:8px;">Growth</div></div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Dashboard Overview',
+    titleCn: '仪表盘总览',
+    desc: '登入后首先看到 Dashboard（仪表盘）。显示今日订单、准备中订单、未付款项等关键信息。<br><br>点击底部的 <span class="ui">+ New Order</span> 按钮开始创建订单。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">Dashboard</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">' +
+        '<div class="mock-card" style="text-align:center;"><div style="font-size:10px;color:#7A8A7A;">Orders Today</div><div style="font-size:22px;font-weight:800;">3</div></div>' +
+        '<div class="mock-card" style="text-align:center;"><div style="font-size:10px;color:#7A8A7A;">Pending Prep</div><div style="font-size:22px;font-weight:800;color:#E86060;">2</div></div>' +
+        '<div class="mock-card" style="text-align:center;"><div style="font-size:10px;color:#7A8A7A;">Outstanding (CS)</div><div style="font-size:22px;font-weight:800;color:#E8A020;">RM 850</div></div>' +
+        '</div>' +
+        '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">Active Orders</div>' +
+        '<div class="mock-card"><div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:700;">ABC Trading</span><span class="mock-badge mock-badge-blue">Order Received</span></div></div>' +
+        '<div class="mock-card"><div style="display:flex;justify-content:space-between;font-size:12px;"><span style="font-weight:700;">Fresh Mart</span><span class="mock-badge mock-badge-gold">Preparing</span></div></div>' +
+        '<div style="text-align:center;margin-top:16px;"><div class="mock-btn mock-btn-primary highlight" style="padding:12px 32px;">+ New Order</div></div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Select Customer',
+    titleCn: '选择客户',
+    desc: '点击客户搜索框，会显示所有客户列表。<br><br>输入名字或电话号码可快速筛选。<br><br>如果客户不存在，点击 <span class="ui">+ Add New Customer</span> 新增。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">New Order</div>' +
+        '<div style="font-size:11px;color:#7A8A7A;text-transform:uppercase;font-weight:700;margin-bottom:6px;">CUSTOMER</div>' +
+        '<div class="mock-input highlight" style="margin-bottom:4px;">Search customer name or phone...</div>' +
+        '<div style="background:#1E261E;border:1px solid #2E3A2E;border-radius:0 0 8px 8px;padding:4px 0;">' +
+        '<div style="padding:8px 12px;border-bottom:1px solid #2E3A2E;font-size:12px;display:flex;justify-content:space-between;"><span style="font-weight:700;">ABC Trading</span><span style="color:#7A8A7A;">012-345 6789</span></div>' +
+        '<div style="padding:8px 12px;border-bottom:1px solid #2E3A2E;font-size:12px;display:flex;justify-content:space-between;"><span style="font-weight:700;">Fresh Mart Sdn Bhd</span><span style="color:#7A8A7A;">011-222 3333</span></div>' +
+        '<div style="padding:8px 12px;font-size:12px;display:flex;justify-content:space-between;"><span style="font-weight:700;">Ah Kow Fruits</span><span style="color:#7A8A7A;">019-888 7777</span></div>' +
+        '</div>' +
+        '<div style="margin-top:6px;"><a style="font-size:12px;color:#6B9E5E;">+ Add New Customer</a></div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Set Dates & Details',
+    titleCn: '设置日期和详情',
+    desc: '点击日期框弹出日历选择器。<br><br>设置 <span class="ui">ORDER DATE</span>（订单日期）和 <span class="ui">DELIVERY DATE</span>（送货日期）。<br><br>选择交付方式：<br>• <span class="ui">Delivery</span> = 送货<br>• <span class="ui">Collection</span> = 自取<br><br>单据类型会根据客户自动设置。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div style="font-size:11px;color:#7A8A7A;text-transform:uppercase;font-weight:700;margin-bottom:6px;">ORDER DETAILS</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">' +
+        '<div><div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">ORDER DATE</div><div class="mock-input highlight">23 Mar 2026</div></div>' +
+        '<div><div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">DELIVERY DATE</div><div class="mock-input">24 Mar 2026</div></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div><div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">FULFILLMENT</div><div class="mock-input">Delivery ▾</div></div>' +
+        '<div><div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">DOC TYPE</div><div class="mock-input">Cash Sales ▾</div></div>' +
+        '</div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Add Products',
+    titleCn: '添加产品',
+    desc: '点击 <span class="ui">+ Add Item</span> 添加产品。<br><br>选择产品、输入数量和价格。可添加多个产品。<br><br>总额会自动计算。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div style="font-size:11px;color:#7A8A7A;text-transform:uppercase;font-weight:700;margin-bottom:6px;">ITEMS</div>' +
+        '<div class="mock-card"><div style="display:flex;gap:8px;align-items:center;font-size:12px;"><span style="color:#7A8A7A;">1.</span><span style="font-weight:700;flex:1;">MD2 Whole Fruit (Crown)</span><span>500kg</span><span>× RM 3.50</span><span style="font-weight:700;color:#F5C04A;">RM 1,750</span></div></div>' +
+        '<div class="mock-card"><div style="display:flex;gap:8px;align-items:center;font-size:12px;"><span style="color:#7A8A7A;">2.</span><span style="font-weight:700;flex:1;">SG1 Whole Fruit (No Crown)</span><span>200kg</span><span>× RM 2.80</span><span style="font-weight:700;color:#F5C04A;">RM 560</span></div></div>' +
+        '<div style="text-align:center;margin:12px 0;"><span class="mock-btn mock-btn-outline highlight" style="font-size:12px;">+ Add Item</span></div>' +
+        '<div style="text-align:right;border-top:1px solid #2E3A2E;padding-top:10px;"><span style="font-size:11px;color:#7A8A7A;">Subtotal:</span> <span style="font-size:18px;font-weight:800;color:#F5C04A;">RM 2,310.00</span></div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Create Order',
+    titleCn: '创建订单',
+    desc: '检查所有信息后，点击 <span class="ui">Create Order</span> 按钮。<br><br>订单创建后会出现在 Orders 标签页的 "Order Received"（已接单）分组下。',
+    screen: function() {
+      return '<div class="wt-mockup" style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:300px;">' +
+        '<div style="font-size:48px;margin-bottom:16px;">✅</div>' +
+        '<div style="font-size:18px;font-weight:800;margin-bottom:8px;">Order Created!</div>' +
+        '<div style="font-size:13px;color:#7A8A7A;margin-bottom:20px;">CS-260323-001 — ABC Trading</div>' +
+        '<div class="mock-btn mock-btn-primary highlight" style="padding:12px 32px;">View Order →</div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Start Preparing',
+    titleCn: '开始准备',
+    desc: '进入订单详情，点击 <span class="ui">Start Preparing</span>。<br><br>弹出窗口中：<br>1. 从下拉菜单<strong>选择工人</strong><br>2. 选择后 WhatsApp 消息会自动生成<br>3. 点击 <span class="ui">WhatsApp</span> 发送给工人<br>4. 点击 <span class="ui">Confirm & Start</span> 确认',
+    tip: 'WhatsApp 消息只有在选择工人后才会出现。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">Start Preparing</div>' +
+        '<div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">ASSIGN TO WORKER</div>' +
+        '<div class="mock-input highlight" style="margin-bottom:12px;">Ahmad ▾</div>' +
+        '<div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">WHATSAPP MESSAGE PREVIEW</div>' +
+        '<div style="background:#1E261E;border:1px solid #2E3A2E;border-radius:8px;padding:10px;font-size:11px;color:#D0DCC0;white-space:pre-line;margin-bottom:12px;">🍍 *Order Baru*\n📋 No: CS-260323-001\n👷 Tugasan: Ahmad\n👤 Pelanggan: ABC Trading\n📅 Tarikh Hantar: 24 Mar 2026\n\n📝 *Senarai:*\n• MD2 Whole Fruit — 500 kg</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<div class="mock-btn mock-btn-outline" style="font-size:11px;">Cancel</div>' +
+        '<div class="mock-btn" style="font-size:11px;background:#25D366;color:#fff;">WhatsApp</div>' +
+        '<div class="mock-btn mock-btn-primary" style="font-size:11px;">Confirm & Start</div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Mark Prepared — Adjust Qty',
+    titleCn: '标记已备好 — 调整数量',
+    desc: '准备完成后，点击 <span class="ui">Mark Prepared</span>。<br><br>弹出数量确认窗口。如果实际数量与订单不同（例如订500kg但只有480kg），在此修改。<br><br>总额自动重新计算。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">Confirm Prepared Quantities</div>' +
+        '<div style="font-size:11px;color:#7A8A7A;margin-bottom:8px;">Adjust actual quantities if different from ordered.</div>' +
+        '<table style="width:100%;font-size:12px;border-collapse:collapse;">' +
+        '<tr style="border-bottom:1px solid #2E3A2E;"><th style="text-align:left;padding:6px;color:#7A8A7A;">Product</th><th style="text-align:right;padding:6px;color:#7A8A7A;">Ordered</th><th style="text-align:right;padding:6px;color:#7A8A7A;">Actual</th><th style="text-align:right;padding:6px;color:#7A8A7A;">Total</th></tr>' +
+        '<tr style="border-bottom:1px solid #2E3A2E;"><td style="padding:6px;font-weight:700;">MD2 Whole Fruit</td><td style="text-align:right;padding:6px;color:#7A8A7A;">500</td><td style="text-align:right;padding:6px;"><span class="highlight" style="display:inline-block;padding:2px 8px;border-radius:4px;background:#1E261E;">480</span></td><td style="text-align:right;padding:6px;font-weight:700;">1,680.00</td></tr>' +
+        '<tr><td style="padding:6px;font-weight:700;">SG1 Whole Fruit</td><td style="text-align:right;padding:6px;color:#7A8A7A;">200</td><td style="text-align:right;padding:6px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#1E261E;">200</span></td><td style="text-align:right;padding:6px;font-weight:700;">560.00</td></tr>' +
+        '</table>' +
+        '<div style="text-align:right;margin-top:10px;padding-top:8px;border-top:1px solid #2E3A2E;font-size:15px;font-weight:800;color:#F5C04A;">Total: RM 2,240.00</div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Take Photo',
+    titleCn: '拍照',
+    desc: '数量确认后，可选择拍照或从相册上传。<br><br>三个选项：<br>• <span class="ui">Take Photo</span> — 打开相机拍照<br>• <span class="ui">From Album</span> — 从手机相册选择<br>• <span class="ui">Skip</span> — 跳过（稍后可补充）',
+    screen: function() {
+      return '<div class="wt-mockup" style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:250px;">' +
+        '<div style="font-size:16px;font-weight:800;margin-bottom:8px;">Preparation Photo</div>' +
+        '<div style="font-size:13px;color:#7A8A7A;margin-bottom:24px;">Take a photo of the prepared order?</div>' +
+        '<div style="display:flex;gap:8px;">' +
+        '<div class="mock-btn mock-btn-outline">Skip</div>' +
+        '<div class="mock-btn mock-btn-outline" style="gap:4px;">🖼️ From Album</div>' +
+        '<div class="mock-btn mock-btn-primary highlight" style="gap:4px;">📷 Take Photo</div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Assign Driver',
+    titleCn: '安排司机送货',
+    desc: '订单备好后，点击 <span class="ui">Assign Driver & Deliver</span>。<br><br>从下拉菜单选择司机，确认后订单状态变为 "Ready For Delivery"（待送货）。<br><br>如果是自取订单，点击 <span class="ui">Mark Collected</span> 直接完成。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">Assign Driver</div>' +
+        '<div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">SELECT DRIVER</div>' +
+        '<div class="mock-input highlight" style="margin-bottom:16px;">Razak ▾</div>' +
+        '<div style="display:flex;gap:8px;">' +
+        '<div class="mock-btn mock-btn-outline">Cancel</div>' +
+        '<div class="mock-btn mock-btn-primary">Confirm & Deliver</div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Mark Delivered',
+    titleCn: '标记已送达',
+    desc: '司机送达后，点击 <span class="ui">Mark Delivered</span>。<br><br>流程：<br>1. 拍送货照片（可选）<br>2. 收款弹窗（仅 Cash Sales）<br>3. 收据自动生成',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+        '<div><div style="font-size:18px;font-weight:800;">CS-260323-001</div><div style="font-size:13px;color:#7A8A7A;">ABC Trading</div></div>' +
+        '<span class="mock-badge mock-badge-purple" style="font-size:13px;padding:6px 14px;">Ready For Delivery</span>' +
+        '</div>' +
+        '<div style="padding:8px 0;border-top:1px solid #2E3A2E;border-bottom:1px solid #2E3A2E;margin-bottom:16px;">' +
+        '<div style="font-size:12px;color:#7A8A7A;">Driver: <span style="color:#D0DCC0;font-weight:600;">Razak</span></div>' +
+        '</div>' +
+        '<div class="mock-btn mock-btn-primary highlight" style="width:100%;text-align:center;padding:14px;">Mark Delivered ✓</div>' +
+        '</div>';
+    }
+  },
+  {
+    title: 'Collect Payment',
+    titleCn: '收款（现金销售）',
+    desc: '送货完成后，对于 Cash Sales 订单会弹出收款窗口。<br><br>金额已预填。选择付款方式：<br>• <span class="ui">Cash</span>（现金）<br>• <span class="ui">Bank Transfer</span>（银行转账）<br><br>点击 <span class="ui">Confirm Payment & Print</span> 收款并打印收据。<br>或 <span class="ui">Skip</span> 跳过（收据显示 UNPAID）。',
+    tip: '送货单 (DO) 不需要在此收款，会跳过此步骤。',
+    screen: function() {
+      return '<div class="wt-mockup">' +
+        '<div class="wt-mockup-title">Collect Payment</div>' +
+        '<div class="mock-card" style="font-size:12px;margin-bottom:12px;"><strong>CS-260323-001 — ABC Trading</strong><br>Total: <strong>RM 2,240.00</strong> — Balance: <strong style="color:#F5C04A;">RM 2,240.00</strong></div>' +
+        '<div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">AMOUNT (RM)</div>' +
+        '<div class="mock-input" style="margin-bottom:10px;font-weight:700;">2240.00</div>' +
+        '<div style="font-size:10px;color:#7A8A7A;margin-bottom:4px;">METHOD</div>' +
+        '<div class="mock-input" style="margin-bottom:14px;">Cash ▾</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<div class="mock-btn mock-btn-outline" style="font-size:11px;flex:1;text-align:center;">Skip — Print Receipt</div>' +
+        '<div class="mock-btn mock-btn-primary highlight" style="font-size:11px;flex:1;text-align:center;">Confirm Payment & Print</div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Receipt Generated',
+    titleCn: '收据生成',
+    desc: '80mm 热敏收据自动弹出，显示：<br>• 公司信息和 logo<br>• 客户和订单详情<br>• 产品清单和金额<br>• 付款状态（PAID/UNPAID）<br><br>可打印或通过 WhatsApp 分享给客户。',
+    screen: function() {
+      return '<div class="wt-mockup" style="display:flex;justify-content:center;">' +
+        '<div style="background:#fff;color:#000;font-family:Courier New,monospace;width:240px;padding:16px;font-size:10px;border-radius:4px;">' +
+        '<div style="text-align:center;margin-bottom:6px;font-size:12px;font-weight:800;font-family:Arial;">TG AGRO FRUITS SDN BHD</div>' +
+        '<div style="border-top:1px dashed #000;margin:6px 0;"></div>' +
+        '<div style="text-align:center;font-size:12px;font-weight:700;letter-spacing:1px;">CASH SALES</div>' +
+        '<div style="text-align:center;font-size:11px;font-weight:800;">CS-260323-001</div>' +
+        '<div style="border-top:1px dashed #000;margin:6px 0;"></div>' +
+        '<div>Customer: ABC Trading</div>' +
+        '<div>Date: 24 Mar 2026</div>' +
+        '<div style="border-top:1px dashed #000;margin:6px 0;"></div>' +
+        '<div style="font-weight:700;">1. MD2 Whole Fruit</div>' +
+        '<div style="padding-left:10px;">480kg x 3.50 <span style="float:right;">1,680.00</span></div>' +
+        '<div style="font-weight:700;margin-top:4px;">2. SG1 Whole Fruit</div>' +
+        '<div style="padding-left:10px;">200kg x 2.80 <span style="float:right;">560.00</span></div>' +
+        '<div style="border-top:1px solid #000;margin:6px 0;"></div>' +
+        '<div style="text-align:right;font-size:13px;font-weight:800;border-top:2px solid #000;padding-top:4px;">TOTAL: RM 2,240.00</div>' +
+        '<div style="border-top:1px dashed #000;margin:6px 0;"></div>' +
+        '<div>Payment: CASH</div>' +
+        '<div style="font-weight:800;font-size:12px;">Status: PAID ✓</div>' +
+        '</div></div>';
+    }
+  },
+  {
+    title: 'Complete! 🎉',
+    titleCn: '完成！',
+    desc: '订单流程已完成！<br><br><strong>其他功能：</strong><br>• <span class="ui">Payments</span> — 查看和记录付款<br>• <span class="ui">Invoicing</span> — DO 合并开发票<br>• <span class="ui">Manage Customers</span> — 管理客户资料<br>• <span class="ui">Reports</span> — 生成销售报告<br><br>详细说明请参考：<br><a href="guide-sales-cn.html" style="color:#6B9E5E;">中文操作指南</a> ｜ <a href="guide-sales.html" style="color:#6B9E5E;">English Guide</a>',
+    screen: function() {
+      return '<div class="wt-mockup" style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:300px;">' +
+        '<div style="font-size:64px;margin-bottom:16px;">🎉</div>' +
+        '<div style="font-size:22px;font-weight:800;margin-bottom:8px;">恭喜！流程演示完成</div>' +
+        '<div style="font-size:14px;color:#7A8A7A;margin-bottom:24px;">Walkthrough Complete</div>' +
+        '<a href="sales.html" class="mock-btn mock-btn-primary" style="padding:12px 32px;text-decoration:none;color:#fff;">进入销售系统 →</a>' +
+        '</div>';
+    }
+  }
+];
+
+var currentStep = 0;
+var autoTimer = null;
+
+function wtRender() {
+  var s = steps[currentStep];
+  document.getElementById('wt-screen').innerHTML = s.screen();
+  var desc = '<div class="wt-step-badge">步骤 ' + (currentStep + 1) + ' / ' + steps.length + '</div>';
+  desc += '<div class="wt-step-title">' + s.title + '</div>';
+  desc += '<div class="wt-step-title-cn">' + s.titleCn + '</div>';
+  desc += '<div class="wt-step-desc">' + s.desc + '</div>';
+  if (s.tip) desc += '<div class="wt-step-tip">💡 ' + s.tip + '</div>';
+  document.getElementById('wt-desc').innerHTML = desc;
+  document.getElementById('wt-step-num').textContent = (currentStep + 1) + ' / ' + steps.length;
+  document.getElementById('wt-progress-fill').style.width = ((currentStep + 1) / steps.length * 100) + '%';
+  document.getElementById('wt-prev').disabled = currentStep === 0;
+  document.getElementById('wt-next').disabled = currentStep === steps.length - 1;
+  document.getElementById('wt-next').textContent = currentStep === steps.length - 2 ? '完成 ✓' : '下一步 →';
+}
+
+function wtGo(dir) {
+  currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + dir));
+  wtRender();
+}
+
+function wtAutoPlay() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; document.getElementById('wt-auto-btn').textContent = '▶ Auto'; return; }
+  document.getElementById('wt-auto-btn').textContent = '⏸ Stop';
+  autoTimer = setInterval(function() {
+    if (currentStep >= steps.length - 1) { clearInterval(autoTimer); autoTimer = null; document.getElementById('wt-auto-btn').textContent = '▶ Auto'; return; }
+    wtGo(1);
+  }, 5000);
+}
+
+// Keyboard nav
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); wtGo(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); wtGo(-1); }
+});
+
+wtRender();
+</script>
+</body>
+</html>

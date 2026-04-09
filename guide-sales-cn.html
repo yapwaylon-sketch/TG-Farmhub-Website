@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>销售模块 — 员工操作指南</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Microsoft YaHei','PingFang SC','Segoe UI',Arial,sans-serif; background:#f8f9fa; color:#222; line-height:1.8; padding:20px; }
+  .guide { max-width:800px; margin:0 auto; }
+  .header { text-align:center; margin-bottom:32px; padding-bottom:20px; border-bottom:2px solid #2E8B3E; }
+  .header img { width:60px; height:60px; object-fit:contain; margin-bottom:8px; }
+  .header h1 { font-size:24px; color:#1a1a1a; margin-bottom:4px; }
+  .header p { font-size:13px; color:#666; }
+  h2 { font-size:18px; color:#2E8B3E; margin:28px 0 12px; padding-bottom:6px; border-bottom:1px solid #ddd; }
+  h3 { font-size:15px; color:#333; margin:16px 0 8px; }
+  .step { background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin-bottom:12px; display:flex; gap:14px; }
+  .step-num { background:#2E8B3E; color:#fff; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex-shrink:0; }
+  .step-content { flex:1; }
+  .step-title { font-weight:700; font-size:14px; margin-bottom:4px; }
+  .step-desc { font-size:13px; color:#555; }
+  .step-note { font-size:12px; color:#888; margin-top:4px; font-style:italic; }
+  .step-ui { display:inline-block; background:#eee; border:1px solid #ccc; border-radius:4px; padding:1px 6px; font-size:12px; font-family:monospace; color:#333; }
+  .role-tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; margin-bottom:6px; }
+  .role-supervisor { background:#E8F5E9; color:#2E7D32; }
+  .role-worker { background:#FFF3E0; color:#E65100; }
+  .role-driver { background:#E3F2FD; color:#1565C0; }
+  .status-flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  .status-box { padding:6px 12px; border-radius:6px; font-size:12px; font-weight:700; color:#fff; }
+  .tip { background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; padding:12px 16px; margin:12px 0; font-size:13px; }
+  .tip strong { color:#F57F17; }
+  .section { margin-bottom:32px; }
+  @media print {
+    body { padding:10px; }
+    .step { break-inside:avoid; page-break-inside:avoid; }
+    .no-print { display:none; }
+  }
+  .print-btn { position:fixed; bottom:20px; right:20px; background:#2E8B3E; color:#fff; border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.2); }
+  .print-btn:hover { background:#256d32; }
+</style>
+</head>
+<body>
+<div class="guide">
+
+<div class="header">
+  <img src="assets/logo.png?v=2" alt="TG Agro Fruits">
+  <h1>销售模块 — 员工操作指南</h1>
+  <p>TG Agro Fruits Sdn Bhd &middot; tgfarmhub.com/sales</p>
+  <p style="font-size:11px;color:#999;margin-top:4px;">界面为英文，本指南为中文说明</p>
+</div>
+
+<!-- 订单状态流程 -->
+<div class="section">
+<h2>订单状态流程</h2>
+<div class="status-flow">
+  <div class="status-box" style="background:#3A7AC8;">Order Received<br>（已接单）</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#E8A020;">Preparing<br>（准备中）</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#4A7C3F;">Prepared<br>（已备好）</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#8C5AD2;">Ready For Delivery<br>（待送货）</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#3EC850;">Completed<br>（已完成）</div>
+</div>
+</div>
+
+<!-- 1. 创建订单 -->
+<div class="section">
+<h2>1. 创建新订单</h2>
+<span class="role-tag role-supervisor">主管操作</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">点击 <span class="step-ui">+ New Order</span> 按钮</div>
+    <div class="step-desc">在屏幕底部可以找到此按钮。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">选择客户</div>
+    <div class="step-desc">点击客户搜索框，会显示所有客户列表。输入名字或电话号码可快速筛选。如果客户不存在，点击 <span class="step-ui">+ Add New Customer</span> 新增客户。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">设置订单日期和送货日期</div>
+    <div class="step-desc">点击日期框会弹出日历。选择 <span class="step-ui">ORDER DATE</span>（订单日期）和 <span class="step-ui">DELIVERY DATE</span>（送货日期）。如有需要可设置送货时间。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">选择交付方式和单据类型</div>
+    <div class="step-desc">
+      <strong>交付方式 (Fulfillment)：</strong><br>
+      &bull; <span class="step-ui">Delivery</span> = 送货（司机送）<br>
+      &bull; <span class="step-ui">Collection</span> = 自取（客户来拿）<br><br>
+      <strong>单据类型 (Doc Type)：</strong><br>
+      &bull; <span class="step-ui">Cash Sales (CS)</span> = 现金销售 — 现金客户<br>
+      &bull; <span class="step-ui">Delivery Order (DO)</span> = 送货单 — 赊账客户<br>
+      系统会根据客户付款条件自动设置。
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">
+    <div class="step-title">添加产品</div>
+    <div class="step-desc">点击 <span class="step-ui">+ Add Item</span>，选择产品、输入数量、价格和甜度指数（如适用）。可添加多个产品。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-content">
+    <div class="step-title">创建订单</div>
+    <div class="step-desc">检查总额后点击 <span class="step-ui">Create Order</span>。订单会出现在 "Order Received"（已接单）分类下。</div>
+  </div>
+</div>
+</div>
+
+<!-- 2. 开始准备 -->
+<div class="section">
+<h2>2. 开始准备订单</h2>
+<span class="role-tag role-supervisor">主管操作</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">进入订单 → 点击 <span class="step-ui">Start Preparing</span></div>
+    <div class="step-desc">在 Orders（订单）标签页，点击订单卡片进入详情，然后点击 "Start Preparing"（开始准备）。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">指派工人</div>
+    <div class="step-desc">从下拉菜单中选择负责准备的工人。选择工人后，WhatsApp 消息预览会自动出现。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">发送 WhatsApp 给工人</div>
+    <div class="step-desc">消息会以马来语（BM）格式显示订单详情。点击 <span class="step-ui">WhatsApp</span> 直接发送，或点击 <span class="step-ui">Copy</span> 复制后粘贴到群聊。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">确认开始</div>
+    <div class="step-desc">点击 <span class="step-ui">Confirm & Start</span>，订单状态变为 "Preparing"（准备中）。</div>
+  </div>
+</div>
+
+<div class="tip"><strong>提示：</strong>指派的工人名字会显示在订单卡片上和 Dashboard（仪表盘）的活跃订单表格中。</div>
+</div>
+
+<!-- 3. 标记已备好 -->
+<div class="section">
+<h2>3. 标记为已备好</h2>
+<span class="role-tag role-worker">工人</span> <span class="role-tag role-supervisor">主管</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">点击 <span class="step-ui">Mark Prepared</span></div>
+    <div class="step-desc">打开处于 "Preparing"（准备中）状态的订单，点击 "Mark Prepared"（标记已备好）。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">确认实际数量</div>
+    <div class="step-desc">弹出窗口会显示所有产品，并带有可编辑的数量栏。如果实际准备的数量与订单不同（例如订了500kg但只有480kg），请在此修改。总额会自动重新计算。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">拍照（可选）</div>
+    <div class="step-desc">选择 <span class="step-ui">Take Photo</span>（拍照）或 <span class="step-ui">From Album</span>（从相册选择）来附上准备照片。或点击 <span class="step-ui">Skip</span> 跳过。</div>
+  </div>
+</div>
+
+<div class="tip"><strong>提示：</strong>照片可以稍后在订单详情页的 "Photos"（照片）部分补充上传。</div>
+</div>
+
+<!-- 4. 送货 -->
+<div class="section">
+<h2>4. 安排送货</h2>
+<span class="role-tag role-supervisor">主管操作</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">送货订单：点击 <span class="step-ui">Assign Driver & Deliver</span></div>
+    <div class="step-desc">从下拉菜单选择司机并确认。订单状态变为 "Ready For Delivery"（待送货）。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">自取订单：点击 <span class="step-ui">Mark Collected</span></div>
+    <div class="step-desc">如果客户自取，点击 "Mark Collected"（标记已取）。订单直接变为 "Completed"（已完成）。</div>
+  </div>
+</div>
+</div>
+
+<!-- 5. 完成送货 -->
+<div class="section">
+<h2>5. 完成送货</h2>
+<span class="role-tag role-driver">司机</span> <span class="role-tag role-supervisor">主管</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">点击 <span class="step-ui">Mark Delivered</span></div>
+    <div class="step-desc">在 "Ready For Delivery"（待送货）状态的订单详情页点击。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">拍送货照片（可选）</div>
+    <div class="step-desc">拍照或从相册选择作为送货证明。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">收款（仅限现金销售 Cash Sales）</div>
+    <div class="step-desc">对于 Cash Sales 订单，会弹出收款窗口，金额已预填。输入收到的金额，选择付款方式（现金 Cash / 银行转账 Bank Transfer）。点击 <span class="step-ui">Confirm Payment & Print</span>（确认收款并打印）或 <span class="step-ui">Skip — Print Receipt</span>（跳过 — 打印收据）。</div>
+    <div class="step-note">送货单（DO）不需要在此收款 — DO 通过 QB Invoice（发票）处理付款。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">收据自动生成</div>
+    <div class="step-desc">80mm 热敏收据弹出，显示订单详情和付款状态（PAID 已付 / UNPAID 未付）。可打印或通过 WhatsApp 分享。</div>
+  </div>
+</div>
+</div>
+
+<!-- 6. 记录付款 -->
+<div class="section">
+<h2>6. 记录付款（送货后）</h2>
+<span class="role-tag role-supervisor">主管操作</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">进入 <span class="step-ui">Payments</span>（付款）标签页</div>
+    <div class="step-desc">显示所有已完成的 Cash Sales 订单，按客户分组。只有已完成的订单才会出现在这里。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">展开客户 → 单笔或批量付款</div>
+    <div class="step-desc">点击客户行展开详情。使用勾选框选择多个订单，然后点击 <span class="step-ui">Pay Selected</span>（支付所选）进行批量付款。或点击单个订单的 <span class="step-ui">Pay</span> 按钮。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">输入付款详情</div>
+    <div class="step-desc">金额（已预填）、付款方式（现金 Cash / 银行转账 Bank Transfer / 支票 Cheque）、参考编号。可选择附上银行转账凭证照片。</div>
+  </div>
+</div>
+
+<div class="tip"><strong>注意：</strong>送货单（DO）不会出现在付款页面 — DO 通过 <span class="step-ui">Invoicing</span>（发票）标签页处理。</div>
+</div>
+
+<!-- 7. 开发票 -->
+<div class="section">
+<h2>7. 送货单开发票</h2>
+<span class="role-tag role-supervisor">主管操作</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">进入 <span class="step-ui">Invoicing</span>（发票）标签页</div>
+    <div class="step-desc">显示未开发票的送货单（DO），按客户分组。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">选择要合并成一张发票的送货单</div>
+    <div class="step-desc">展开客户，勾选要包含的送货单。下方会出现"账单摘要"（Billing Summary），显示汇总的产品、数量和总额。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">复制或打印账单摘要</div>
+    <div class="step-desc">点击 <span class="step-ui">Copy</span> 复制后粘贴到 QuickBooks，或点击 <span class="step-ui">Print</span> 打印纸质版交给会计。</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">标记为已开发票</div>
+    <div class="step-desc">点击 <span class="step-ui">Mark as Invoiced</span>，输入 QB 发票号码和日期，然后保存。送货单移至发票历史记录。</div>
+  </div>
+</div>
+</div>
+
+<!-- 快速参考 -->
+<div class="section">
+<h2>快速参考</h2>
+
+<h3>Dashboard（仪表盘）</h3>
+<p style="font-size:13px;color:#555;margin-bottom:8px;">每日总览 — 活跃订单、即将到来的送货、未付款项、未开发票的送货单。</p>
+
+<h3>单据类型</h3>
+<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:8px;font-weight:700;">Cash Sales (CS)<br>现金销售</td><td style="padding:8px;">现金客户。送货时或送货后付款。在 Payments（付款）标签页记录付款。</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:8px;font-weight:700;">Delivery Order (DO)<br>送货单</td><td style="padding:8px;">赊账客户。多张送货单合并成 QB Invoice（发票）。不直接收款 — 通过 Invoicing（发票）标签页处理。</td></tr>
+</table>
+
+<h3>重要规则</h3>
+<ul style="font-size:13px;color:#555;padding-left:20px;">
+  <li>订单只能在 "Order Received"（已接单）状态下编辑</li>
+  <li>付款只能记录在<strong>已完成</strong>的订单上</li>
+  <li>标记为 "Prepared"（已备好）时可以调整实际数量（实际 vs 订购）</li>
+  <li>照片可以随时从订单详情页补充上传</li>
+  <li>WhatsApp 消息只有在指派工人后才会生成</li>
+</ul>
+
+<h3>标签页说明</h3>
+<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Dashboard</td><td style="padding:6px;">仪表盘 — 每日总览</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Orders</td><td style="padding:6px;">订单 — 按状态分组查看所有订单</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Payments</td><td style="padding:6px;">付款 — 记录现金销售的收款</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Invoicing</td><td style="padding:6px;">发票 — 送货单合并开发票</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Manage Customers</td><td style="padding:6px;">管理客户 — 查看/编辑客户资料</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Manage Products</td><td style="padding:6px;">管理产品 — 查看/编辑产品目录</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Reports</td><td style="padding:6px;">报告 — 生成和导出销售数据</td></tr>
+</table>
+</div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">打印指南</button>
+
+</body>
+</html>

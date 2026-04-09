@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 480">
+  <defs>
+    <!-- Diamond pattern: gold squares with white gaps, rotated 45° to form diamonds -->
+    <pattern id="diamonds" patternUnits="userSpaceOnUse" width="27" height="27"
+             patternTransform="rotate(45 256 295)">
+      <rect width="27" height="27" fill="white"/>
+      <rect x="2" y="2" width="23" height="23" fill="#F5A623"/>
+    </pattern>
+  </defs>
+
+  <!-- Crown / Leaves (drawn first so body covers their bases) -->
+  <g id="leaves">
+    <!-- Outer-left leaf (lightest green, widest curve) -->
+    <path d="M170 108 C188 115 210 128 232 148 Q240 155 248 152
+             C230 135 210 118 188 108 Q178 103 170 108Z" fill="#7CB342"/>
+    <!-- Outer-right leaf -->
+    <path d="M342 108 C324 115 302 128 280 148 Q272 155 264 152
+             C282 135 302 118 324 108 Q334 103 342 108Z" fill="#7CB342"/>
+
+    <!-- Mid-left leaf (dark green) -->
+    <path d="M198 62 C208 82 222 108 238 142 Q243 152 250 148
+             C236 118 222 88 210 68 Q204 58 198 62Z" fill="#5B8C2A"/>
+    <!-- Mid-right leaf -->
+    <path d="M314 62 C304 82 290 108 274 142 Q269 152 262 148
+             C276 118 290 88 302 68 Q308 58 314 62Z" fill="#5B8C2A"/>
+
+    <!-- Inner-left leaf (medium green) -->
+    <path d="M230 38 C232 62 236 92 243 132 Q246 150 254 148
+             C249 108 246 72 242 48 Q238 32 230 38Z" fill="#6DA033"/>
+    <!-- Inner-right leaf -->
+    <path d="M282 38 C280 62 276 92 269 132 Q266 150 258 148
+             C263 108 266 72 270 48 Q274 32 282 38Z" fill="#6DA033"/>
+
+    <!-- Center leaf (tallest, darkest green) -->
+    <path d="M256 18 C252 45 248 80 246 125 Q245 145 248 152
+             L264 152 Q267 145 266 125 C264 80 260 45 256 18Z" fill="#4A7A22"/>
+
+    <!-- Small accent leaves between inner and outer -->
+    <path d="M215 78 C220 92 228 112 238 140 L246 136
+             C236 110 228 90 222 78 Q218 72 215 78Z" fill="#78A83A"/>
+    <path d="M297 78 C292 92 284 112 274 140 L266 136
+             C276 110 284 90 290 78 Q294 72 297 78Z" fill="#78A83A"/>
+  </g>
+
+  <!-- Pineapple Body -->
+  <g id="body">
+    <ellipse cx="256" cy="295" rx="138" ry="160" fill="url(#diamonds)"/>
+  </g>
+
+  <!-- Text centered on pineapple body -->
+  <g id="text">
+    <text x="256" y="290" text-anchor="middle"
+          font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="54"
+          fill="white" stroke="#2D5A1E" stroke-width="2" paint-order="stroke">TG</text>
+    <text x="256" y="316" text-anchor="middle"
+          font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="17"
+          fill="white" stroke="#2D5A1E" stroke-width="0.8" paint-order="stroke">Home of Sarawak Gold</text>
+  </g>
+</svg>

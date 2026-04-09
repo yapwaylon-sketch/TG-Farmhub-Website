@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Module — Staff Guide</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Arial,sans-serif; background:#f8f9fa; color:#222; line-height:1.6; padding:20px; }
+  .guide { max-width:800px; margin:0 auto; }
+  .header { text-align:center; margin-bottom:32px; padding-bottom:20px; border-bottom:2px solid #2E8B3E; }
+  .header img { width:60px; height:60px; object-fit:contain; margin-bottom:8px; }
+  .header h1 { font-size:24px; color:#1a1a1a; margin-bottom:4px; }
+  .header p { font-size:13px; color:#666; }
+  h2 { font-size:18px; color:#2E8B3E; margin:28px 0 12px; padding-bottom:6px; border-bottom:1px solid #ddd; }
+  h3 { font-size:15px; color:#333; margin:16px 0 8px; }
+  .step { background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:16px; margin-bottom:12px; display:flex; gap:14px; }
+  .step-num { background:#2E8B3E; color:#fff; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex-shrink:0; }
+  .step-content { flex:1; }
+  .step-title { font-weight:700; font-size:14px; margin-bottom:4px; }
+  .step-desc { font-size:13px; color:#555; }
+  .step-note { font-size:12px; color:#888; margin-top:4px; font-style:italic; }
+  .role-tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; margin-bottom:6px; }
+  .role-supervisor { background:#E8F5E9; color:#2E7D32; }
+  .role-worker { background:#FFF3E0; color:#E65100; }
+  .role-driver { background:#E3F2FD; color:#1565C0; }
+  .flow-arrow { text-align:center; font-size:20px; color:#2E8B3E; margin:8px 0; }
+  .status-flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  .status-box { padding:6px 12px; border-radius:6px; font-size:12px; font-weight:700; color:#fff; }
+  .tip { background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; padding:12px 16px; margin:12px 0; font-size:13px; }
+  .tip strong { color:#F57F17; }
+  .section { margin-bottom:32px; }
+  @media print {
+    body { padding:10px; }
+    .step { break-inside:avoid; page-break-inside:avoid; }
+    .no-print { display:none; }
+  }
+  .print-btn { position:fixed; bottom:20px; right:20px; background:#2E8B3E; color:#fff; border:none; padding:12px 24px; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.2); }
+  .print-btn:hover { background:#256d32; }
+</style>
+</head>
+<body>
+<div class="guide">
+
+<div class="header">
+  <img src="assets/logo.png?v=2" alt="TG Agro Fruits">
+  <h1>Sales Module — Staff Workflow Guide</h1>
+  <p>TG Agro Fruits Sdn Bhd &middot; tgfarmhub.com/sales</p>
+</div>
+
+<!-- ORDER STATUS FLOW -->
+<div class="section">
+<h2>Order Status Flow</h2>
+<div class="status-flow">
+  <div class="status-box" style="background:#3A7AC8;">Order Received</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#E8A020;">Preparing</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#4A7C3F;">Prepared</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#8C5AD2;">Ready For Delivery</div>
+  <span>&rarr;</span>
+  <div class="status-box" style="background:#3EC850;">Completed</div>
+</div>
+</div>
+
+<!-- 1. CREATE ORDER -->
+<div class="section">
+<h2>1. Creating a New Order</h2>
+<span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Click "+ New Order" button</div>
+    <div class="step-desc">Found at the bottom of the screen on all tabs.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Select Customer</div>
+    <div class="step-desc">Click the customer box — a dropdown shows all customers. Type to filter. If customer doesn't exist, click "+ Add New Customer" to create one.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Set Order & Delivery Date</div>
+    <div class="step-desc">Click the date boxes — a calendar pops up. Select the order date and delivery date. Set delivery time if needed.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">Choose Fulfillment & Doc Type</div>
+    <div class="step-desc"><strong>Fulfillment:</strong> Delivery (driver sends) or Collection (customer picks up).<br>
+    <strong>Doc Type:</strong> Cash Sales (CS) for cash customers, Delivery Order (DO) for credit customers. Auto-set based on customer payment terms.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">
+    <div class="step-title">Add Products</div>
+    <div class="step-desc">Click "+ Add Item". Select product, enter quantity, price, and ripeness index (if applicable). Add multiple items as needed.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-content">
+    <div class="step-title">Create Order</div>
+    <div class="step-desc">Review totals and click "Create Order". The order appears in the "Order Received" section.</div>
+  </div>
+</div>
+</div>
+
+<!-- 2. START PREPARING -->
+<div class="section">
+<h2>2. Start Preparing</h2>
+<span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Click into the order → "Start Preparing"</div>
+    <div class="step-desc">From Orders tab, click the order card, then click "Start Preparing".</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Assign a Worker</div>
+    <div class="step-desc">Select a worker from the dropdown. This shows who is responsible for preparing the order.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Send WhatsApp to Worker</div>
+    <div class="step-desc">After selecting a worker, a WhatsApp message preview appears in Bahasa Malaysia with order details. Click "WhatsApp" to send directly, or "Copy" to paste into a group chat.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">Confirm & Start</div>
+    <div class="step-desc">Click "Confirm & Start" to move the order to "Preparing" status.</div>
+  </div>
+</div>
+
+<div class="tip"><strong>Tip:</strong> The assigned worker's name appears on the order card and in the Dashboard's Active Orders table.</div>
+</div>
+
+<!-- 3. MARK PREPARED -->
+<div class="section">
+<h2>3. Mark as Prepared</h2>
+<span class="role-tag role-worker">Worker / Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Click "Mark Prepared"</div>
+    <div class="step-desc">Open the order in "Preparing" status and click "Mark Prepared".</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Confirm Actual Quantities</div>
+    <div class="step-desc">A popup shows all ordered items with editable quantities. Adjust if the actual prepared amount differs from the order (e.g., ordered 500kg but only 480kg available). Totals recalculate automatically.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Take Photo (Optional)</div>
+    <div class="step-desc">Choose "Take Photo" (camera) or "From Album" (gallery) to attach a preparation photo. Or click "Skip" to proceed without a photo.</div>
+  </div>
+</div>
+
+<div class="tip"><strong>Tip:</strong> Photos can be added later from the order detail page under the "Photos" section.</div>
+</div>
+
+<!-- 4. DELIVERY -->
+<div class="section">
+<h2>4. Assign Driver & Deliver</h2>
+<span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">For Delivery orders: "Assign Driver & Deliver"</div>
+    <div class="step-desc">Select a driver from the dropdown and confirm. Order moves to "Ready For Delivery".</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">For Collection orders: "Mark Collected"</div>
+    <div class="step-desc">If the customer picks up, click "Mark Collected". Order goes straight to "Completed".</div>
+  </div>
+</div>
+</div>
+
+<!-- 5. MARK DELIVERED -->
+<div class="section">
+<h2>5. Complete Delivery</h2>
+<span class="role-tag role-driver">Driver</span> <span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Click "Mark Delivered"</div>
+    <div class="step-desc">From the order detail page when status is "Ready For Delivery".</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Take Delivery Photo (Optional)</div>
+    <div class="step-desc">Take a photo or choose from album as proof of delivery.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Collect Payment (Cash Sales only)</div>
+    <div class="step-desc">For Cash Sales orders, a payment popup appears with the balance pre-filled. Enter amount collected, select method (Cash/Bank Transfer). Click "Confirm Payment & Print" or "Skip — Print Receipt" if unpaid.</div>
+    <div class="step-note">Delivery Orders (DO) skip this step — DOs are paid via QB Invoice.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">Receipt Generated</div>
+    <div class="step-desc">An 80mm receipt pops up showing order details and payment status (PAID/UNPAID). Print it or share via WhatsApp.</div>
+  </div>
+</div>
+</div>
+
+<!-- 6. PAYMENTS -->
+<div class="section">
+<h2>6. Recording Payments (After Delivery)</h2>
+<span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Go to Payments tab</div>
+    <div class="step-desc">Shows all completed Cash Sales orders grouped by customer. Only completed orders appear here.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Expand a customer → Pay individual or batch</div>
+    <div class="step-desc">Click a customer row to expand. Use checkboxes to select multiple orders, then click "Pay Selected" for batch payment. Or click "Pay" on a single order.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Enter payment details</div>
+    <div class="step-desc">Amount (pre-filled), method (Cash/Bank Transfer/Cheque), reference number. Optionally attach a bank transfer slip photo.</div>
+  </div>
+</div>
+
+<div class="tip"><strong>Note:</strong> Delivery Orders do NOT appear in Payments — they are handled through Invoicing tab (QB Invoice).</div>
+</div>
+
+<!-- 7. INVOICING -->
+<div class="section">
+<h2>7. Invoicing Delivery Orders</h2>
+<span class="role-tag role-supervisor">Supervisor</span>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    <div class="step-title">Go to Invoicing tab</div>
+    <div class="step-desc">Shows uninvoiced DOs grouped by customer.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    <div class="step-title">Select DOs to batch into an invoice</div>
+    <div class="step-desc">Expand a customer, tick the DOs to include. A Billing Summary appears showing aggregated products, quantities, and totals.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <div class="step-title">Copy or Print the Billing Summary</div>
+    <div class="step-desc">Use "Copy" to paste into QuickBooks, or "Print" for a paper copy to hand to billing staff.</div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    <div class="step-title">Mark as Invoiced</div>
+    <div class="step-desc">Click "Mark as Invoiced", enter the QB Invoice Number and date, then save. DOs move to Invoice History.</div>
+  </div>
+</div>
+</div>
+
+<!-- 8. QUICK REFERENCE -->
+<div class="section">
+<h2>Quick Reference</h2>
+
+<h3>Dashboard</h3>
+<p style="font-size:13px;color:#555;margin-bottom:8px;">Your daily overview — active orders, upcoming deliveries, outstanding payments, uninvoiced DOs.</p>
+
+<h3>Document Types</h3>
+<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0;">
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Cash Sales (CS)</td><td style="padding:6px;">Cash customers. Pay immediately or after delivery. Payment tracked in Payments tab.</td></tr>
+  <tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;font-weight:700;">Delivery Order (DO)</td><td style="padding:6px;">Credit customers. Batched into QB invoices. No direct payment — handled through Invoicing tab.</td></tr>
+</table>
+
+<h3>Key Rules</h3>
+<ul style="font-size:13px;color:#555;padding-left:20px;">
+  <li>Orders can only be edited when in "Order Received" status</li>
+  <li>Payments can only be recorded on <strong>completed</strong> orders</li>
+  <li>Quantities can be adjusted when marking as Prepared (actual vs ordered)</li>
+  <li>Photos can be added at any time from the order detail page</li>
+  <li>WhatsApp messages are only generated when a worker is assigned</li>
+</ul>
+</div>
+
+</div>
+
+<button class="print-btn no-print" onclick="window.print()">Print Guide</button>
+
+</body>
+</html>

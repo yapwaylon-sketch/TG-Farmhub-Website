@@ -1,0 +1,473 @@
+/* ============================================================
+   TG FarmHub — Light Agricultural Theme (Trial)
+   Override on top of shared.css + sales.css
+   ============================================================ */
+
+:root {
+  /* Backgrounds */
+  --bg: #F5F7F2;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F0F3EC;
+  --bg-input: #F8FAF6;
+  --border: #DDE4D6;
+  --border-light: #E8EDE2;
+
+  /* Text */
+  --text: #2D3A2D;
+  --text-muted: #6B7A6B;
+  --text-dim: #94A394;
+  --white: #1A2A1A;
+
+  /* Brand Colors */
+  --green: #2E8B3E;
+  --green-light: #3AA04A;
+  --green-pale: rgba(46,139,62,0.08);
+  --gold: #E8870E;
+  --gold-light: #D47A0A;
+  --gold-pale: rgba(232,135,14,0.08);
+
+  /* Status Colors */
+  --red: #DC4040;
+  --red-pale: rgba(220,64,64,0.08);
+  --good: #2E8B3E;
+  --good-bg: rgba(46,139,62,0.08);
+  --low: #E8870E;
+  --low-bg: rgba(232,135,14,0.08);
+  --critical: #DC4040;
+}
+
+/* ── Base ──────────────────────────────────────────────── */
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ── Sidebar ──────────────────────────────────────────── */
+.sidebar {
+  background: #FFFFFF;
+  border-right: 1px solid var(--border);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+}
+
+.sidebar-brand-text {
+  color: var(--green);
+}
+
+.nav-item {
+  color: var(--text-muted);
+  border-left-color: transparent;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--green-pale);
+  color: var(--green);
+  border-left-color: var(--green);
+  font-weight: 700;
+}
+
+.sidebar-sync {
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* ── Cards ──────────────────────────────────────────── */
+.summary-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.summary-card .sc-label {
+  color: var(--text-muted);
+}
+
+.summary-card .sc-value {
+  color: var(--text);
+}
+
+/* ── Page Header ──────────────────────────────────────── */
+.page-title { color: var(--text); }
+.page-subtitle { color: var(--text-muted); }
+
+/* ── Buttons ──────────────────────────────────────────── */
+.btn-primary {
+  background: var(--green);
+  color: #FFFFFF;
+  border-color: var(--green);
+  box-shadow: 0 1px 3px rgba(46,139,62,0.2);
+}
+
+.btn-primary:hover {
+  background: #257A34;
+  border-color: #257A34;
+}
+
+.btn-outline {
+  background: #FFFFFF;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-outline:hover {
+  background: var(--bg-hover);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* ── Inputs ──────────────────────────────────────────── */
+input, select, textarea {
+  background: #FFFFFF;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(46,139,62,0.1);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-dim);
+}
+
+/* ── Tables ──────────────────────────────────────────── */
+.data-table, table {
+  background: #FFFFFF;
+}
+
+th {
+  background: #F5F7F2;
+  color: var(--text);
+  border-color: var(--border);
+  font-weight: 700;
+}
+
+td {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+tr:hover td {
+  background: #F8FAF6;
+}
+
+/* ── Badges ──────────────────────────────────────────── */
+.badge {
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.badge-pending {
+  background: #EBF2FF;
+  color: #2563EB;
+}
+
+.badge-preparing {
+  background: #FFF4E5;
+  color: #D47A0A;
+}
+
+.badge-prepared {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.badge-delivering {
+  background: #F3E8FF;
+  color: #7C3AED;
+}
+
+.badge-completed {
+  background: #E8F5E9;
+  color: #1B5E20;
+}
+
+.badge-cancelled {
+  background: #F5F5F5;
+  color: #9E9E9E;
+}
+
+.badge-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.badge-do {
+  background: #EBF2FF;
+  color: #2563EB;
+}
+
+.badge-cs {
+  background: #FFF4E5;
+  color: #D47A0A;
+}
+
+.badge-unpaid {
+  background: #FFF0F0;
+  color: #DC4040;
+}
+
+.badge-partial {
+  background: #FFF4E5;
+  color: #D47A0A;
+}
+
+.badge-paid {
+  background: #E8F5E9;
+  color: #1B5E20;
+}
+
+/* ── Modals ──────────────────────────────────────────── */
+.modal-overlay {
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(2px);
+}
+
+.modal-box {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+  color: var(--text);
+}
+
+.modal-close {
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  border-top: 1px solid var(--border);
+}
+
+/* ── Notifications ──────────────────────────────────── */
+.notification {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  color: var(--text);
+}
+
+/* ── Sales Cards ──────────────────────────────────────── */
+.sales-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.sales-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 2px 8px rgba(46,139,62,0.1);
+}
+
+.sales-card-customer {
+  color: var(--text);
+}
+
+.sales-card-doc {
+  color: var(--text-muted);
+}
+
+/* ── Status Groups ──────────────────────────────────── */
+.so-group-header {
+  background: rgba(0,0,0,0.02);
+}
+
+/* ── Status Banner ──────────────────────────────────── */
+.sales-card-status-banner {
+  opacity: 0.9;
+}
+
+/* ── Status Timeline ──────────────────────────────────── */
+.timeline-dot {
+  background: #FFFFFF;
+  border-color: var(--border);
+}
+
+.timeline-step.done .timeline-dot {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.timeline-step.current .timeline-dot {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.timeline-step .timeline-label {
+  color: var(--text-dim);
+}
+
+.timeline-step.done .timeline-label {
+  color: var(--green);
+}
+
+.timeline-step.current .timeline-label {
+  color: var(--gold);
+}
+
+.timeline-line {
+  background: var(--border);
+}
+
+.timeline-line.done {
+  background: var(--green);
+}
+
+/* ── Order Detail Sections ──────────────────────────── */
+.so-detail-section {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.so-detail-section-title {
+  color: var(--text);
+}
+
+.so-detail-value {
+  color: var(--text);
+}
+
+/* ── Aging Rows ──────────────────────────────────────── */
+.aging-row {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+}
+
+.aging-current { border-left: 3px solid var(--green); }
+.aging-warning { border-left: 3px solid var(--gold); }
+.aging-overdue { border-left: 3px solid #E87020; }
+.aging-critical { border-left: 3px solid var(--red); }
+
+.aging-label { color: var(--text); }
+.aging-amount { color: var(--text); }
+
+/* ── Tabs ──────────────────────────────────────────── */
+.sales-tab {
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+}
+
+.sales-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.sales-tab.active {
+  color: var(--green);
+  border-bottom-color: var(--green);
+  font-weight: 700;
+}
+
+/* ── Sidebar Logo ──────────────────────────────────── */
+.sidebar-logo {
+  background: transparent;
+}
+
+/* ── Payment Customer Rows ──────────────────────────── */
+.pay-cust-row {
+  background: #FFFFFF !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* ── Invoicing Groups ──────────────────────────────── */
+.inv-customer-group {
+  background: #FFFFFF !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Calendar ──────────────────────────────────────── */
+.cal-popup {
+  background: #FFFFFF;
+  border-color: var(--border);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}
+
+.cal-day { color: var(--text); }
+.cal-day:hover { background: rgba(46,139,62,0.1); }
+.cal-day.other-month { color: var(--text-dim); }
+.cal-day.today { border-color: var(--green); }
+.cal-day.selected { background: var(--green); color: #fff; }
+.cal-header-title { color: var(--text); }
+.cal-nav { color: var(--text-muted); }
+.cal-nav:hover { background: var(--bg-hover); color: var(--text); }
+.cal-weekday { color: var(--text-muted); }
+.cal-footer { border-top-color: var(--border); }
+.cal-footer-btn { color: var(--green); }
+
+/* ── Customer Dropdown ──────────────────────────────── */
+.so-cust-dropdown {
+  background: #FFFFFF;
+  border-color: var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.so-cust-item:hover {
+  background: var(--bg-hover);
+}
+
+/* ── Bottom Actions ──────────────────────────────────── */
+.bottom-actions {
+  background: #FFFFFF;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+}
+
+/* ── Filters ──────────────────────────────────────────── */
+.sales-filters select,
+.sales-filters input,
+.filter-bar select,
+.filter-bar input {
+  background: #FFFFFF;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ── Confirm Modal ──────────────────────────────────── */
+.confirm-overlay {
+  background: rgba(0,0,0,0.3);
+}
+
+.confirm-box {
+  background: #FFFFFF;
+  border-color: var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+  color: var(--text);
+}
+
+/* ── Empty State ──────────────────────────────────────── */
+.empty-state {
+  color: var(--text-muted);
+}
+
+/* ── Print — keep as-is ──────────────────────────────── */
+@media print {
+  body { background: white; }
+}
+
+/* ── Mobile sidebar ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+}
