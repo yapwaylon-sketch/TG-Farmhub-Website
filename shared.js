@@ -301,7 +301,7 @@ function confirmAction(title, message, onConfirm, danger) {
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
       '</div>' +
-      '<div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:20px;">' + esc(message) + '</div>' +
+      '<div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:20px;">' + message + '</div>' +
       '<div class="modal-actions">' +
         '<button class="btn btn-outline" id="tg-confirm-cancel">Cancel</button>' +
         '<button class="btn ' + btnClass + '" id="tg-confirm-btn">' + confirmLabel + '</button>' +
