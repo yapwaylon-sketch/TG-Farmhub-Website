@@ -989,6 +989,38 @@
   </div>
 </div>
 
+<!-- ADD MORE DOs TO DRAFT INVOICE MODAL -->
+<div id="inv-adddos-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:520px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title">Add DOs to Invoice</div>
+      <button class="modal-close" onclick="closeModal('inv-adddos-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:0 16px 16px;">
+      <div id="inv-adddos-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--text-muted);"></div>
+      <input type="hidden" id="inv-adddos-invoice-id" value="">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Uninvoiced DOs</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="invAddDosSelectAll(true)">Select All</button>
+          <button class="btn btn-outline btn-sm" onclick="invAddDosSelectAll(false)">Clear</button>
+        </div>
+      </div>
+      <div id="inv-adddos-list" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:4px 12px;"></div>
+      <div id="inv-adddos-footer" style="margin-top:12px;padding:10px 12px;background:var(--bg-hover);border-radius:8px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;">
+        <span id="inv-adddos-count">0 selected</span>
+        <span id="inv-adddos-total">RM 0.00</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('inv-adddos-modal')">Cancel</button>
+      <button class="btn btn-primary" id="inv-adddos-confirm-btn" onclick="invAddDosConfirm()" disabled style="opacity:0.5;cursor:not-allowed;">Add 0 DOs</button>
+    </div>
+  </div>
+</div>
+
 <!-- RETURN MODAL -->
 <div id="ret-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
@@ -3239,6 +3271,9 @@ function scRenderDetail() {
   document.getElementById('customers-header-actions').innerHTML = '';
 
   var custOrders = orders.filter(function(o) { return o.customer_id === c.id && o.status !== 'cancelled'; });
+  // Completed-only view used for all financial stats/breakdowns. Pending/preparing/delivering
+  // orders aren't real sales yet — they appear only in "All Orders" table at the bottom.
+  var custCompleted = custOrders.filter(function(o) { return o.status === 'completed'; });
   var custPayments = [];
   custOrders.forEach(function(o) {
     payments.filter(function(p) { return p.order_id === o.id; }).forEach(function(p) { custPayments.push(p); });
@@ -3281,9 +3316,10 @@ function scRenderDetail() {
   html += '</div>';
 
   // ── Summary Cards ──
+  // Financial + count stats are completed-only so pending orders don't inflate the numbers
   var totalPurchases = 0, totalPaid = 0, totalOutstanding = 0;
   var csCount = 0, doCount = 0;
-  custOrders.forEach(function(o) {
+  custCompleted.forEach(function(o) {
     totalPurchases += parseFloat(o.grand_total) || 0;
     totalPaid += parseFloat(o.amount_paid) || 0;
     totalOutstanding += orderBalance(o);
@@ -3294,7 +3330,7 @@ function scRenderDetail() {
   html += '<div class="so-detail-section">';
   html += '<div class="so-detail-section-title">Overview</div>';
   html += '<div class="cards-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">';
-  html += '<div class="summary-card"><div class="sc-label">Total Orders</div><div class="sc-value">' + custOrders.length + '</div></div>';
+  html += '<div class="summary-card"><div class="sc-label">Total Orders</div><div class="sc-value">' + custCompleted.length + '</div></div>';
   html += '<div class="summary-card"><div class="sc-label">Total Purchases</div><div class="sc-value" style="font-size:20px;">' + formatRM(totalPurchases) + '</div></div>';
   html += '<div class="summary-card"><div class="sc-label">Total Paid</div><div class="sc-value" style="font-size:20px;color:var(--green-light);">' + formatRM(totalPaid) + '</div></div>';
   html += '<div class="summary-card"><div class="sc-label">Outstanding</div><div class="sc-value" style="font-size:20px;color:' + (totalOutstanding > 0 ? 'var(--gold)' : 'var(--green-light)') + ';">' + formatRM(totalOutstanding) + '</div></div>';
@@ -3307,10 +3343,11 @@ function scRenderDetail() {
   html += '</div></div>';
 
   // ── Purchases by Month ──
+  // Only count completed orders — pending/preparing/delivering aren't real sales yet.
   html += '<div class="so-detail-section">';
   html += '<div class="so-detail-section-title">Purchases by Month</div>';
   var monthlyData = {};
-  custOrders.forEach(function(o) {
+  custCompleted.forEach(function(o) {
     var d = o.order_date || '';
     var monthKey = d.substring(0, 7); // YYYY-MM
     if (!monthKey) return;
@@ -3347,7 +3384,7 @@ function scRenderDetail() {
   html += '<div class="so-detail-section">';
   html += '<div class="so-detail-section-title">Purchases by Product</div>';
   var productBreakdown = {};
-  custOrders.forEach(function(o) {
+  custCompleted.forEach(function(o) {
     var items = orderItems.filter(function(i) { return i.order_id === o.id; });
     items.forEach(function(item) {
       var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
@@ -3390,7 +3427,8 @@ function scRenderDetail() {
   html += '</div>';
 
   // ── Outstanding Orders ──
-  var outstandingOrders = custOrders.filter(function(o) { return o.payment_status !== 'paid' && o.doc_type !== 'delivery_order'; });
+  // Completed CS only — pending/preparing orders aren't real debt yet
+  var outstandingOrders = custCompleted.filter(function(o) { return o.payment_status !== 'paid' && o.doc_type !== 'delivery_order'; });
   if (outstandingOrders.length) {
     var custOutTotal = 0;
     outstandingOrders.forEach(function(o) { custOutTotal += orderBalance(o); });
@@ -4387,22 +4425,32 @@ function renderInvoicing() {
       var custTotal = 0;
       custOrders.forEach(function(o) { custTotal += parseFloat(o.grand_total) || 0; });
 
+      // Count how many of this customer's DOs are currently selected
+      var selectedInGroup = 0;
+      custOrders.forEach(function(o) { if (invSelectedDOs[o.id]) selectedInGroup++; });
+      var allSelected = selectedInGroup > 0 && selectedInGroup === custOrders.length;
+      // Auto-expand if any DO in this group is selected (preserves selection visibility across re-renders)
+      var groupExpanded = selectedInGroup > 0;
+
       html += '<div class="inv-customer-group" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">';
 
       // Customer header (clickable to expand)
       html += '<div class="inv-cust-header" style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="invToggleCustomer(\'' + esc(custId) + '\')">';
       html += '<div>';
       html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(custName) + '</div>';
-      html += '<div style="font-size:12px;color:var(--text-muted);">' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + ' &middot; ' + formatRM(custTotal) + '</div>';
+      html += '<div style="font-size:12px;color:var(--text-muted);">' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + ' &middot; ' + formatRM(custTotal);
+      if (selectedInGroup > 0) html += ' &middot; <strong style="color:var(--gold);">' + selectedInGroup + ' selected</strong>';
       html += '</div>';
-      html += '<div style="display:flex;align-items:center;gap:8px;">';
-      html += '<label style="font-size:11px;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="event.stopPropagation()">';
-      html += '<input type="checkbox" onchange="invSelectAllCustomer(\'' + esc(custId) + '\', this.checked)" id="inv-selall-' + esc(custId) + '"> Select All</label>';
-      html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;transition:transform 0.2s;" id="inv-chevron-' + esc(custId) + '"><polyline points="6 9 12 15 18 9"/></svg>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<label style="font-size:12px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:600;" onclick="event.stopPropagation()">';
+      html += '<input type="checkbox" style="width:16px;height:16px;cursor:pointer;" onchange="invSelectAllCustomer(\'' + esc(custId) + '\', this.checked)" id="inv-selall-' + esc(custId) + '"' + (allSelected ? ' checked' : '') + '>';
+      html += ' Select all ' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + '</label>';
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;transition:transform 0.2s;' + (groupExpanded ? 'transform:rotate(180deg);' : '') + '" id="inv-chevron-' + esc(custId) + '"><polyline points="6 9 12 15 18 9"/></svg>';
       html += '</div></div>';
 
       // Customer DOs (expandable)
-      html += '<div id="inv-dos-' + esc(custId) + '" style="display:none;border-top:1px solid var(--border);padding:8px 16px;">';
+      html += '<div id="inv-dos-' + esc(custId) + '" style="display:' + (groupExpanded ? 'block' : 'none') + ';border-top:1px solid var(--border);padding:8px 16px;">';
       custOrders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
       custOrders.forEach(function(o) {
         var checked = invSelectedDOs[o.id] ? ' checked' : '';
@@ -4446,9 +4494,24 @@ function renderInvoicing() {
     html += '<div class="form-field" style="margin-top:12px;"><label>NOTES</label><textarea id="inv-notes" rows="2" placeholder="Optional invoice notes" style="width:100%;"></textarea></div>';
     html += '</div>';
 
+    // Multi-customer guard
+    var selCustIds = invSelectedCustomerIds();
+    var multiCust = selCustIds.length > 1;
+    if (multiCust) {
+      var custNames = selCustIds.map(function(cid) {
+        var c = customers.find(function(x) { return x.id === cid; });
+        return c ? c.name : cid;
+      }).join(', ');
+      html += '<div style="margin-top:12px;padding:12px 14px;background:rgba(220,53,69,0.08);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px;">';
+      html += '<strong>\u26A0 Multiple customers selected:</strong> ' + esc(custNames);
+      html += '<div style="font-size:12px;margin-top:4px;color:var(--text-muted);">Invoices must be per-customer. Please select DOs from only one customer at a time.</div>';
+      html += '</div>';
+    }
+
     // Action button
+    var createDisabled = selectedCount === 0 || multiCust;
     html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">';
-    html += '<button class="btn btn-primary" id="inv-create-btn" onclick="invCreateDraftInvoice()"' + (selectedCount === 0 ? ' disabled style="opacity:0.5;cursor:not-allowed;"' : '') + '>';
+    html += '<button class="btn btn-primary" id="inv-create-btn" onclick="invCreateDraftInvoice()"' + (createDisabled ? ' disabled style="opacity:0.5;cursor:not-allowed;"' : '') + '>';
     html += 'Create Draft Invoice (' + selectedCount + ' selected)</button>';
     html += '</div>';
   }
@@ -4462,6 +4525,17 @@ function renderInvoicing() {
 }
 
 // Invoicing helpers
+function invSelectedCustomerIds() {
+  // Returns array of distinct customer_ids among currently selected DOs
+  var seen = {};
+  Object.keys(invSelectedDOs).forEach(function(oid) {
+    if (!invSelectedDOs[oid]) return;
+    var o = orders.find(function(x) { return x.id === oid; });
+    if (o && o.customer_id) seen[o.customer_id] = true;
+  });
+  return Object.keys(seen);
+}
+
 function invToggleCustomer(custId) {
   var el = document.getElementById('inv-dos-' + custId);
   var chevron = document.getElementById('inv-chevron-' + custId);
@@ -4477,10 +4551,47 @@ function invToggleCustomer(custId) {
 
 
 function invToggleDO(orderId, custId, checked) {
+  var prevCusts = invSelectedCustomerIds();
   if (checked) invSelectedDOs[orderId] = true;
   else delete invSelectedDOs[orderId];
+  var nextCusts = invSelectedCustomerIds();
+
+  // If selection now spans multiple customers (or just dropped back to one),
+  // do a full re-render so the cross-customer warning banner + button state update.
+  var crossedBoundary = (prevCusts.length > 1) !== (nextCusts.length > 1);
+  if (crossedBoundary) {
+    renderInvoicing();
+    return;
+  }
+
   invUpdateSelectAll(custId);
   invUpdateButtons();
+  // Refresh header "N selected" badge without collapsing the group
+  invRefreshCustHeaderBadge(custId);
+}
+
+function invRefreshCustHeaderBadge(custId) {
+  // Lightweight header refresh: update the "N selected" badge in the customer header
+  // without re-rendering the whole section (which would collapse the open group).
+  var uninvoicedDOs = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed' && o.customer_id === custId;
+  });
+  var total = uninvoicedDOs.length;
+  var custTotal = 0;
+  uninvoicedDOs.forEach(function(o) { custTotal += parseFloat(o.grand_total) || 0; });
+  var selectedInGroup = 0;
+  uninvoicedDOs.forEach(function(o) { if (invSelectedDOs[o.id]) selectedInGroup++; });
+
+  var header = document.querySelector('#inv-dos-' + custId);
+  if (!header) return;
+  var group = header.parentElement;
+  if (!group) return;
+  var subline = group.querySelector('.inv-cust-header > div:first-child > div:last-child');
+  if (subline) {
+    var txt = total + ' DO' + (total !== 1 ? 's' : '') + ' \u00b7 ' + formatRM(custTotal);
+    if (selectedInGroup > 0) txt += ' \u00b7 <strong style="color:var(--gold);">' + selectedInGroup + ' selected</strong>';
+    subline.innerHTML = txt;
+  }
 }
 
 function invUpdateButtons() {
@@ -4506,14 +4617,17 @@ function invUpdateSelectAll(custId) {
 }
 
 function invSelectAllCustomer(custId, checked) {
-  var checkboxes = document.querySelectorAll('input[data-customer-id="' + custId + '"]');
-  checkboxes.forEach(function(cb) {
-    cb.checked = checked;
-    var orderId = cb.getAttribute('data-order-id');
-    if (checked) invSelectedDOs[orderId] = true;
-    else delete invSelectedDOs[orderId];
+  // Update selection state
+  var custOrders = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed' && o.customer_id === custId;
   });
-  invUpdateButtons();
+  custOrders.forEach(function(o) {
+    if (checked) invSelectedDOs[o.id] = true;
+    else delete invSelectedDOs[o.id];
+  });
+  // Re-render — this auto-expands the group (groupExpanded = selectedInGroup > 0)
+  // and refreshes the header "N selected" badge + billing summary.
+  renderInvoicing();
 }
 
 function invRenderBillingSummary() {
@@ -5485,90 +5599,159 @@ function generateInvoiceA4(invoiceId) {
   document.getElementById('so-doc-modal').style.display = 'flex';
 }
 
-async function invAddMoreDOs(invoiceId) {
+// ---- Add More DOs to draft invoice (modal) ----
+var invAddDosSelected = {};
+
+function invAddMoreDOs(invoiceId) {
   var inv = invoices.find(function(i) { return i.id === invoiceId; });
   if (!inv || inv.status !== 'draft') { notify('Can only add DOs to draft invoices', 'warning'); return; }
 
   var moreDOs = getCustomerUninvoicedDOs(inv.customer_id);
   if (!moreDOs.length) { notify('No more uninvoiced DOs for this customer', 'info'); return; }
 
-  // Build selection HTML
-  var selHtml = '<div style="max-height:300px;overflow-y:auto;">';
-  moreDOs.forEach(function(o) {
-    selHtml += '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">';
-    selHtml += '<input type="checkbox" data-oid="' + esc(o.id) + '">';
-    selHtml += '<span style="flex:1;"><span style="font-weight:600;">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
-    selHtml += '<span style="font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
-    selHtml += '</label>';
+  var cust = customers.find(function(c) { return c.id === inv.customer_id; });
+  var currentTotal = parseFloat(inv.grand_total) || 0;
+
+  document.getElementById('inv-adddos-invoice-id').value = invoiceId;
+  document.getElementById('inv-adddos-info').innerHTML =
+    '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px;">' + esc(invoiceId) + '</div>' +
+    '<div>' + esc(cust ? cust.name : '\u2014') + '</div>' +
+    '<div style="margin-top:4px;">Current total: <strong style="color:var(--text);">' + formatRM(currentTotal) + '</strong></div>';
+
+  // Reset selection state
+  invAddDosSelected = {};
+
+  // Build DO list (sorted oldest-first, same as main Uninvoiced DOs section)
+  var sorted = moreDOs.slice().sort(function(a, b) {
+    return (a.order_date || '').localeCompare(b.order_date || '');
   });
-  selHtml += '</div>';
 
-  confirmAction('Add DOs to ' + invoiceId, selHtml, async function() {
-    var modal = document.getElementById('tg-confirm-modal');
-    var checks = modal ? modal.querySelectorAll('input[type="checkbox"]:checked') : [];
-    var addIds = [];
-    checks.forEach(function(cb) { addIds.push(cb.getAttribute('data-oid')); });
-    if (!addIds.length) { notify('No DOs selected', 'warning'); return; }
+  var listEl = document.getElementById('inv-adddos-list');
+  var html = '';
+  sorted.forEach(function(o) {
+    html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">';
+    html += '<input type="checkbox" class="inv-adddos-cb" data-oid="' + esc(o.id) + '" data-amount="' + (parseFloat(o.grand_total) || 0) + '" onchange="invAddDosToggle(this)">';
+    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
+    html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+    html += '</label>';
+  });
+  listEl.innerHTML = html;
 
-    try {
-      // Insert junction records
-      var juncCid = getCompanyId();
-      var juncArr = addIds.map(function(oid) { return { invoice_id: invoiceId, order_id: oid, company_id: juncCid }; });
-      var jResult = await sbQuery(sb.from('sales_invoice_orders').insert(juncArr).select());
-      if (jResult === null) return;
-      (jResult || []).forEach(function(j) { invoiceOrders.push(j); });
+  invAddDosRefreshFooter();
+  document.getElementById('inv-adddos-modal').style.display = 'flex';
+}
 
-      // Update orders
-      for (var i = 0; i < addIds.length; i++) {
-        await sbQuery(sb.from('sales_orders').update({ invoice_id: invoiceId }).eq('id', addIds[i]).is('invoice_id', null).select());
-        var idx = orders.findIndex(function(x) { return x.id === addIds[i]; });
-        if (idx >= 0) orders[idx].invoice_id = invoiceId;
-      }
+function invAddDosToggle(cb) {
+  var oid = cb.getAttribute('data-oid');
+  if (cb.checked) invAddDosSelected[oid] = true;
+  else delete invAddDosSelected[oid];
+  invAddDosRefreshFooter();
+}
 
-      // Re-aggregate items: delete old, re-insert
-      await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
-      invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
+function invAddDosSelectAll(checked) {
+  var cbs = document.querySelectorAll('#inv-adddos-list .inv-adddos-cb');
+  cbs.forEach(function(cb) {
+    cb.checked = checked;
+    var oid = cb.getAttribute('data-oid');
+    if (checked) invAddDosSelected[oid] = true;
+    else delete invAddDosSelected[oid];
+  });
+  invAddDosRefreshFooter();
+}
 
-      var allOrderIds = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; }).map(function(io) { return io.order_id; });
-      var productAgg = {};
-      allOrderIds.forEach(function(oid) {
-        orderItems.filter(function(it) { return it.order_id === oid; }).forEach(function(item) {
-          var up = parseFloat(item.unit_price) || 0;
-          var key = item.product_id + '_' + up.toFixed(2);
-          if (!productAgg[key]) {
-            var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
-            var variety = soGetProductVariety(item.product_id);
-            var snapshot = (variety && variety !== '\u2014' ? variety + ' ' : '') + (prod ? prod.name : 'Unknown');
-            productAgg[key] = { product_id: item.product_id, product_name: snapshot, quantity: 0, unit_price: up, line_total: 0 };
-          }
-          productAgg[key].quantity += (item.quantity || 0);
-          productAgg[key].line_total += parseFloat(item.line_total) || 0;
-        });
-      });
-
-      var newItems = [];
-      var subtotal = 0;
-      var pLines = Object.values(productAgg);
-      for (var j = 0; j < pLines.length; j++) {
-        var p = pLines[j];
-        subtotal += p.line_total;
-        var iid = await dbNextId('II');
-        newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
-      }
-      var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
-      if (iResult) (iResult || []).forEach(function(ii) { invoiceItems.push(ii); });
-
-      // Update invoice totals
-      await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
-      inv.subtotal = subtotal;
-      inv.grand_total = subtotal;
-
-      notify(addIds.length + ' DO(s) added to ' + invoiceId, 'success');
-      renderInvoicing();
-    } catch(e) {
-      notify('Failed to add DOs: ' + e.message, 'error');
+function invAddDosRefreshFooter() {
+  var total = 0;
+  var count = 0;
+  var cbs = document.querySelectorAll('#inv-adddos-list .inv-adddos-cb');
+  cbs.forEach(function(cb) {
+    if (cb.checked) {
+      count++;
+      total += parseFloat(cb.getAttribute('data-amount')) || 0;
     }
   });
+  var invoiceId = document.getElementById('inv-adddos-invoice-id').value;
+  document.getElementById('inv-adddos-count').textContent = count + ' selected';
+  document.getElementById('inv-adddos-total').textContent = formatRM(total);
+  var btn = document.getElementById('inv-adddos-confirm-btn');
+  btn.textContent = 'Add ' + count + ' DO' + (count !== 1 ? 's' : '') + ' to ' + invoiceId;
+  btn.disabled = count === 0;
+  btn.style.opacity = count === 0 ? '0.5' : '';
+  btn.style.cursor = count === 0 ? 'not-allowed' : '';
+}
+
+async function invAddDosConfirm() {
+  var invoiceId = document.getElementById('inv-adddos-invoice-id').value;
+  var inv = invoices.find(function(i) { return i.id === invoiceId; });
+  if (!inv || inv.status !== 'draft') { notify('Invoice is no longer a draft', 'warning'); closeModal('inv-adddos-modal'); return; }
+
+  var addIds = Object.keys(invAddDosSelected).filter(function(k) { return invAddDosSelected[k]; });
+  if (!addIds.length) { notify('No DOs selected', 'warning'); return; }
+
+  var btn = document.getElementById('inv-adddos-confirm-btn');
+  btnLoading(btn, true);
+
+  try {
+    // Insert junction records
+    var juncCid = getCompanyId();
+    var juncArr = addIds.map(function(oid) { return { invoice_id: invoiceId, order_id: oid, company_id: juncCid }; });
+    var jResult = await sbQuery(sb.from('sales_invoice_orders').insert(juncArr).select());
+    if (jResult === null) { btnLoading(btn, false, 'Add DOs'); return; }
+    (jResult || []).forEach(function(j) { invoiceOrders.push(j); });
+
+    // Update orders
+    for (var i = 0; i < addIds.length; i++) {
+      await sbQuery(sb.from('sales_orders').update({ invoice_id: invoiceId }).eq('id', addIds[i]).is('invoice_id', null).select());
+      var idx = orders.findIndex(function(x) { return x.id === addIds[i]; });
+      if (idx >= 0) orders[idx].invoice_id = invoiceId;
+    }
+
+    // Re-aggregate items: delete old, re-insert
+    await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
+    invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
+
+    var allOrderIds = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; }).map(function(io) { return io.order_id; });
+    var productAgg = {};
+    allOrderIds.forEach(function(oid) {
+      orderItems.filter(function(it) { return it.order_id === oid; }).forEach(function(item) {
+        var up = parseFloat(item.unit_price) || 0;
+        var key = item.product_id + '_' + up.toFixed(2);
+        if (!productAgg[key]) {
+          var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+          var variety = soGetProductVariety(item.product_id);
+          var snapshot = (variety && variety !== '\u2014' ? variety + ' ' : '') + (prod ? prod.name : 'Unknown');
+          productAgg[key] = { product_id: item.product_id, product_name: snapshot, quantity: 0, unit_price: up, line_total: 0 };
+        }
+        productAgg[key].quantity += (item.quantity || 0);
+        productAgg[key].line_total += parseFloat(item.line_total) || 0;
+      });
+    });
+
+    var newItems = [];
+    var subtotal = 0;
+    var pLines = Object.values(productAgg);
+    for (var j = 0; j < pLines.length; j++) {
+      var p = pLines[j];
+      subtotal += p.line_total;
+      var iid = await dbNextId('II');
+      newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
+    }
+    var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
+    if (iResult) (iResult || []).forEach(function(ii) { invoiceItems.push(ii); });
+
+    // Update invoice totals
+    await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
+    inv.subtotal = subtotal;
+    inv.grand_total = subtotal;
+
+    btnLoading(btn, false, 'Add DOs');
+    closeModal('inv-adddos-modal');
+    invAddDosSelected = {};
+    notify(addIds.length + ' DO(s) added to ' + invoiceId, 'success');
+    renderInvoicing();
+  } catch(e) {
+    btnLoading(btn, false, 'Add DOs');
+    notify('Failed to add DOs: ' + e.message, 'error');
+  }
 }
 
 async function invCancelInvoice(invoiceId) {
@@ -5627,6 +5810,13 @@ function invUpdateDueDate() {
 async function invCreateDraftInvoice() {
   var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
   if (!selectedIds.length) { notify('Select at least one DO', 'warning'); return; }
+
+  // Guard: all selected DOs must belong to the same customer
+  var custIdSet = invSelectedCustomerIds();
+  if (custIdSet.length > 1) {
+    notify('Selected DOs belong to multiple customers. Invoices must be per-customer.', 'error');
+    return;
+  }
 
   // Guard: every selected DO must have all pcs-ordered lines weighed
   var pendingByOrder = {};
