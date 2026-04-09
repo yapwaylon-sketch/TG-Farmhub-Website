@@ -1486,10 +1486,12 @@ function renderDashboard() {
         var name = '';
         if (variety && variety !== '—') name += variety + ' ';
         name += prod ? prod.name : '—';
-        var unit = prod ? (prod.unit || '') : '';
+        var isPcs = item.order_pcs != null;
+        var unit = isPcs ? 'pcs' : (prod ? (prod.unit || '') : '');
+        var qty = isPcs ? (item.order_pcs || 0) : (parseFloat(item.quantity) || 0);
         var key = name + '|' + unit;
         if (!products[key]) products[key] = { name: name, unit: unit, qty: 0 };
-        products[key].qty += parseFloat(item.quantity) || 0;
+        products[key].qty += qty;
       });
     });
     return Object.keys(products).map(function(k) { return products[k]; }).sort(function(a, b) { return b.qty - a.qty; });
@@ -1655,7 +1657,9 @@ function renderDashboard() {
 
         html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">';
         html += '<div style="font-weight:700;font-size:13px;color:var(--text);line-height:1.2;">' + esc(getCustomerName(o.customer_id)) + '</div>';
-        html += '<div style="font-weight:800;font-size:14px;color:var(--text);white-space:nowrap;margin-left:8px;">' + formatRM(parseFloat(o.grand_total) || 0) + '</div>';
+        var oTotal = parseFloat(o.grand_total) || 0;
+        var oHasPendingPcs = orderItems.filter(function(i) { return i.order_id === o.id; }).some(function(i) { return i.order_pcs != null && !i.actual_weight_kg; });
+        html += '<div style="font-weight:800;font-size:14px;color:var(--text);white-space:nowrap;margin-left:8px;">' + (oHasPendingPcs && oTotal === 0 ? '<span style="font-size:10px;color:var(--text-muted);">Pending</span>' : formatRM(oTotal)) + '</div>';
         html += '</div>';
 
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
@@ -1673,10 +1677,11 @@ function renderDashboard() {
             var name = '';
             if (variety && variety !== '—') name += variety + ' ';
             name += prod ? prod.name : '—';
-            var unit = prod ? (prod.unit || '') : '';
+            var isPcsD = item.order_pcs != null;
+            var qtyD = isPcsD ? (item.order_pcs + ' pcs') : ((item.quantity || 0) + esc(prod ? (prod.unit || '') : ''));
             html += '<div style="display:flex;justify-content:space-between;font-size:11px;padding:1px 0;">';
             html += '<span style="color:var(--text-muted);">' + esc(name) + '</span>';
-            html += '<span style="font-weight:600;">' + (item.quantity || 0) + esc(unit) + '</span>';
+            html += '<span style="font-weight:600;">' + qtyD + '</span>';
             html += '</div>';
           });
           html += '</div>';
