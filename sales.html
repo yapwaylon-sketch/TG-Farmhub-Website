@@ -5573,23 +5573,14 @@ function generateCreditNoteA4(cnId) {
   // Amount
   html += '<div style="text-align:center;margin:20px 0;font-size:20px;font-weight:800;">Credit Amount: RM ' + (parseFloat(cn.amount) || 0).toFixed(2) + '</div>';
 
-  // Signature Block
-  html += '<div class="a4-sig-section">';
-  html += '<div class="a4-sig-block">';
-  html += '<div class="sig-label">Prepared By:</div>';
-  html += '<div class="sig-name">' + preparedBy + '</div>';
-  html += '</div>';
-  html += '<div class="a4-sig-block">';
-  html += '<div class="sig-label">Authorized By:</div>';
-  html += '<div class="sig-line"></div>';
-  html += '<div class="sig-field-label">Name:</div>';
-  html += '<div class="sig-line" style="height:20px;"></div>';
-  html += '<div class="sig-field-label">Signature</div>';
-  html += '</div>';
+  // Prepared By + electronic document note
+  html += '<div style="margin-top:24px;display:flex;justify-content:space-between;align-items:flex-end;">';
+  html += '<div><div style="font-size:10px;font-weight:600;color:#666;">Prepared By:</div><div style="font-size:12px;font-weight:700;color:#000;margin-top:2px;">' + preparedBy + '</div></div>';
+  html += '<div style="font-size:9px;color:#999;text-align:right;font-style:italic;">This is a computer-generated document.<br>No signature is required.</div>';
   html += '</div>';
 
   // Footer
-  html += '<div class="a4-footer">This credit note reduces the amount due on the referenced invoice.</div>';
+  html += '<div class="a4-footer">This credit note reduces the amount due on the referenced invoice. For enquiries: 012-3286661</div>';
   html += '</div>';
 
   // Show in modal
@@ -5759,26 +5750,79 @@ function generateInvoiceA4(invoiceId) {
   html += '</div>';
 
 
-  // Signature Block
-  html += '<div class="a4-sig-section">';
-  html += '<div class="a4-sig-block">';
-  html += '<div class="sig-label">Prepared By:</div>';
-  html += '<div class="sig-name">' + preparedBy + '</div>';
-  html += '</div>';
-  html += '<div class="a4-sig-block">';
-  html += '<div class="sig-label">Authorized By:</div>';
-  html += '<div class="sig-line"></div>';
-  html += '<div class="sig-field-label">Name:</div>';
-  html += '<div class="sig-line" style="height:20px;"></div>';
-  html += '<div class="sig-field-label">Date:</div>';
-  html += '<div class="sig-line" style="height:20px;"></div>';
-  html += '<div class="sig-field-label">Signature</div>';
-  html += '</div>';
+  // Prepared By + electronic document note
+  html += '<div style="margin-top:24px;display:flex;justify-content:space-between;align-items:flex-end;">';
+  html += '<div><div style="font-size:10px;font-weight:600;color:#666;">Prepared By:</div><div style="font-size:12px;font-weight:700;color:#000;margin-top:2px;">' + preparedBy + '</div></div>';
+  html += '<div style="font-size:9px;color:#999;text-align:right;font-style:italic;">This is a computer-generated document.<br>No signature is required.</div>';
   html += '</div>';
 
   // Footer
-  html += '<div class="a4-footer">Thank you for your business</div>';
+  html += '<div class="a4-footer">Thank you for your business. For enquiries: 012-3286661</div>';
   html += '</div>'; // close a4-page
+
+  // ── DO Summary Attachment (page 2+) ──
+  if (linkedDOs.length > 0) {
+    html += '<div class="a4-page" style="page-break-before:always;">';
+
+    // Letterhead (same as page 1)
+    html += '<div class="a4-letterhead">';
+    html += '<img src="assets/logo.png?v=2" alt="TG">';
+    html += '<div class="a4-letterhead-text">';
+    html += '<h2>TG AGRO FRUITS SDN. BHD.</h2>';
+    html += '<p>(201401034124 / 1110222-T)</p>';
+    html += '<p>Lot 189, Kampung Riam Jaya, Airport Road,</p>';
+    html += '<p>98000 Miri, Sarawak</p>';
+    html += '</div></div>';
+    html += '<hr class="a4-divider">';
+
+    html += '<div class="a4-title" style="font-size:14px;letter-spacing:1px;">DELIVERY ORDER SUMMARY</div>';
+    html += '<div style="text-align:center;font-size:11px;color:#666;margin-bottom:16px;">Attachment to Invoice ' + esc(inv.id) + ' &mdash; ' + esc(cust ? cust.name : '') + '</div>';
+
+    var doGrandTotal = 0;
+    linkedDOs.forEach(function(o) {
+      var doItems = orderItems.filter(function(i) { return i.order_id === o.id; });
+      var doTotal = 0;
+      doItems.forEach(function(i) { doTotal += parseFloat(i.line_total) || 0; });
+      doGrandTotal += doTotal;
+
+      // Each DO block — avoid page-break inside
+      html += '<div style="page-break-inside:avoid;margin-bottom:16px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:6px;">';
+      html += '<div style="font-size:12px;font-weight:700;color:#000;">' + esc(o.doc_number || o.id) + '</div>';
+      html += '<div style="font-size:11px;color:#666;">';
+      html += 'Date: ' + fmtDate(o.delivery_date || o.order_date);
+      if (o.driver_name) html += ' &nbsp;|&nbsp; Driver: ' + esc(o.driver_name);
+      html += '</div>';
+      html += '</div>';
+
+      html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;">';
+      html += '<thead><tr style="background:#f5f5f5;"><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">#</th><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">Product</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Qty</th><th style="text-align:left;padding:4px 6px;border:1px solid #ddd;">Unit</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Price (RM)</th><th style="text-align:right;padding:4px 6px;border:1px solid #ddd;">Amount (RM)</th></tr></thead><tbody>';
+      doItems.forEach(function(item, idx) {
+        var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+        var variety = soGetProductVariety(item.product_id);
+        var desc = '';
+        if (variety && variety !== '\u2014') desc += variety + ' ';
+        desc += prod ? prod.name : '\u2014';
+        html += '<tr>';
+        html += '<td style="padding:3px 6px;border:1px solid #ddd;">' + (idx + 1) + '</td>';
+        html += '<td style="padding:3px 6px;border:1px solid #ddd;">' + esc(desc) + '</td>';
+        html += '<td style="text-align:right;padding:3px 6px;border:1px solid #ddd;">' + (item.quantity || 0) + '</td>';
+        html += '<td style="padding:3px 6px;border:1px solid #ddd;">' + esc(prod ? (prod.unit || '') : '') + '</td>';
+        html += '<td style="text-align:right;padding:3px 6px;border:1px solid #ddd;">' + (parseFloat(item.unit_price) || 0).toFixed(2) + '</td>';
+        html += '<td style="text-align:right;padding:3px 6px;border:1px solid #ddd;">' + (parseFloat(item.line_total) || 0).toFixed(2) + '</td>';
+        html += '</tr>';
+      });
+      html += '<tr style="font-weight:700;background:#fafafa;"><td colspan="5" style="text-align:right;padding:4px 6px;border:1px solid #ddd;">DO Total:</td><td style="text-align:right;padding:4px 6px;border:1px solid #ddd;">' + doTotal.toFixed(2) + '</td></tr>';
+      html += '</tbody></table>';
+      html += '</div>';
+    });
+
+    // Grand total matching invoice
+    html += '<div style="text-align:right;font-size:14px;font-weight:800;border-top:2px solid #333;padding-top:8px;margin-top:8px;">Invoice Total: RM ' + doGrandTotal.toFixed(2) + '</div>';
+
+    html += '<div class="a4-footer">Thank you for your business. For enquiries: 012-3286661</div>';
+    html += '</div>'; // close attachment page
+  }
 
   // Show in modal
   document.getElementById('so-doc-content').style.display = 'none';
@@ -7772,27 +7816,30 @@ function soGenerateDocA4(orderId) {
     }
     html += '</div>';
 
-    // Signature Section
+    // Signature Section — Issued By + Received By
     html += '<div class="a4-sig-section">';
-    // Prepared By (no signature line — auto from system)
+    // Issued By
     html += '<div class="a4-sig-block">';
-    html += '<div class="sig-label">Prepared By:</div>';
+    html += '<div class="sig-label">Issued By:</div>';
     html += '<div class="sig-name">' + preparedBy + '</div>';
+    html += '<div class="sig-line" style="margin-top:20px;"></div>';
+    html += '<div class="sig-field-label">Signature</div>';
     html += '</div>';
-    // Received By (with signature line)
+    // Received By (Name, IC No, Signature, Stamp)
     html += '<div class="a4-sig-block">';
     html += '<div class="sig-label">Received By:</div>';
-    html += '<div class="sig-line"></div>';
+    html += '<div class="sig-line" style="margin-top:8px;"></div>';
     html += '<div class="sig-field-label">Name:</div>';
     html += '<div class="sig-line" style="height:20px;"></div>';
-    html += '<div class="sig-field-label">Date:</div>';
+    html += '<div class="sig-field-label">IC No:</div>';
     html += '<div class="sig-line" style="height:20px;"></div>';
-    html += '<div class="sig-field-label">Signature</div>';
+    html += '<div class="sig-field-label">Signature:</div>';
+    html += '<div style="width:120px;height:60px;border:1px dashed #ccc;border-radius:4px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#ccc;">Company Stamp</div>';
     html += '</div>';
     html += '</div>';
 
     // Footer
-    html += '<div class="a4-footer">Thank you for your business</div>';
+    html += '<div class="a4-footer">Thank you for your business. For enquiries: 012-3286661</div>';
     html += '</div>'; // close a4-page
     return html;
   }
