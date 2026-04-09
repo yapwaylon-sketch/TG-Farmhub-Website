@@ -2695,18 +2695,19 @@ async function soPrepQtyConfirm() {
 }
 
 function soShowPrepPhoto(orderId) {
-  soShowPhotoModal('Preparation Photo', 'Take a photo of the prepared order?', orderId, 'prep', async function(photoUrl) {
+  soShowPhotoModal('Preparation Photo', 'Photo is required before marking as prepared.', orderId, 'prep', async function(photoUrl) {
     var btn = document.getElementById('btn-mark-prepared');
     if (btn) btnLoading(btn, true);
     var extra = photoUrl ? { prep_photo_url: photoUrl } : {};
     var ok = await soUpdateStatus(orderId, 'prepared', extra);
     if (btn) btnLoading(btn, false, 'Mark Prepared');
     if (ok) { notify('Order marked as prepared' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); }
-  });
+  }, true);
 }
 
 // Generic photo modal — supports camera + album
-function soShowPhotoModal(title, msg, orderId, type, onComplete) {
+// Set required=true to hide the Skip button (photo is mandatory)
+function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
   var modal = document.getElementById('so-photo-modal');
   document.getElementById('so-photo-modal-title').textContent = title;
   document.getElementById('so-photo-modal-msg').textContent = msg;
@@ -2718,6 +2719,10 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete) {
     var clone = btn.cloneNode(true);
     btn.parentNode.replaceChild(clone, btn);
   });
+
+  // Hide/show Skip button based on required flag
+  var skipBtn = document.getElementById('so-photo-skip-btn');
+  if (skipBtn) skipBtn.style.display = required ? 'none' : '';
 
   modal.style.display = 'flex';
 
@@ -2948,11 +2953,11 @@ async function soDelQtyConfirm() {
   document.getElementById('so-prepqty-confirm').onclick = soPrepQtyConfirm;
 
   // Now proceed with delivery photo + complete
-  soShowPhotoModal('Delivery Photo', 'Take a photo of the delivery?', orderId, 'delivery', async function(photoUrl) {
+  soShowPhotoModal('Delivery Photo', 'Photo is required before marking as delivered.', orderId, 'delivery', async function(photoUrl) {
     var extra = photoUrl ? { delivery_photo_url: photoUrl } : {};
     var ok = await soUpdateStatus(orderId, 'completed', extra);
     if (ok) { notify('Order delivered', 'success'); soRenderDetail(); soShowDelPayModal(orderId); }
-  });
+  }, true);
 }
 
 // ── Delivery Payment Flow ───────────────────────────────
