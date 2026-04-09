@@ -5677,12 +5677,17 @@ function generateInvoiceA4(invoiceId) {
   html += '<tbody>';
   items.forEach(function(item, idx) {
     var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
-    var prodName = item.product_name || (prod ? prod.name : '—');
-    var prodVariety = soGetProductVariety(item.product_id);
     var prodUnit = prod ? (prod.unit || '') : '';
     var fullName = '';
-    if (prodVariety && prodVariety !== '—') fullName += prodVariety + ' ';
-    fullName += prodName;
+    if (item.product_name) {
+      // Snapshot already includes variety prefix (e.g. "SG1 Whole Fruits") — use as-is
+      fullName = item.product_name;
+    } else {
+      // Fallback to live product data
+      var prodVariety = soGetProductVariety(item.product_id);
+      if (prodVariety && prodVariety !== '\u2014') fullName += prodVariety + ' ';
+      fullName += prod ? prod.name : '\u2014';
+    }
     var packInfo = [];
     if (prod && prod.box_quantity) packInfo.push(prod.box_quantity + 'pcs');
     if (prod && prod.weight_range) packInfo.push(prod.weight_range);
