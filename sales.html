@@ -693,6 +693,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print
         </button>
+        <button style="padding:8px 16px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;background:#fff;color:#333;" onclick="soDownloadDoc()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </button>
         <button class="doc-btn-wa" onclick="soShareDoc()">
           <svg viewBox="0 0 24 24" fill="white" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
           Share
@@ -8051,24 +8055,52 @@ async function soShareDocPDF() {
   notify('Generating PDF...', 'info');
 
   try {
-    // Temporarily disable contenteditable (causes blue outlines in renderers)
-    var editables = a4Container.querySelectorAll('[contenteditable]');
-    editables.forEach(function(el) { el.setAttribute('contenteditable', 'false'); });
+    // Build a standalone element outside the modal (modal's max-height + overflow
+    // clips content, causing html2canvas to capture only the visible portion).
+    // We create a full-height wrapper with embedded A4 styles at document root.
+    var wrapper = document.createElement('div');
+    wrapper.id = 'so-doc-a4-content';
+    wrapper.style.cssText = 'position:fixed;left:0;top:0;z-index:-1;opacity:0;pointer-events:none;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;width:210mm;padding:15mm;font-size:12px;line-height:1.5;box-sizing:border-box;';
+    wrapper.innerHTML = a4Container.innerHTML;
+    // Remove contenteditable
+    wrapper.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
+    // Apply inline styles that normally come from the stylesheet
+    wrapper.querySelectorAll('.a4-page').forEach(function(page, idx) {
+      page.style.minHeight = '267mm';
+      page.style.position = 'relative';
+      page.style.boxSizing = 'border-box';
+      if (idx > 0) { page.style.pageBreakBefore = 'always'; page.style.marginTop = '20px'; }
+    });
+    wrapper.querySelectorAll('.a4-letterhead').forEach(function(el) { el.style.cssText = 'display:flex;align-items:flex-start;gap:16px;margin-bottom:12px;'; });
+    wrapper.querySelectorAll('.a4-letterhead img').forEach(function(el) { el.style.cssText = 'width:80px;height:80px;object-fit:contain;'; });
+    wrapper.querySelectorAll('.a4-letterhead-text').forEach(function(el) { el.style.cssText = 'font-size:11px;line-height:1.4;'; });
+    wrapper.querySelectorAll('.a4-letterhead-text h2').forEach(function(el) { el.style.cssText = 'font-size:16px;margin:0 0 2px;font-weight:800;letter-spacing:0.5px;'; });
+    wrapper.querySelectorAll('.a4-letterhead-text p').forEach(function(el) { el.style.cssText = 'margin:0;color:#333;'; });
+    wrapper.querySelectorAll('.a4-divider').forEach(function(el) { el.style.cssText = 'border:none;border-top:2px solid #333;margin:8px 0;'; });
+    wrapper.querySelectorAll('.a4-title').forEach(function(el) { var fs = el.style.fontSize || '18px'; el.style.cssText = 'text-align:center;font-size:' + fs + ';font-weight:800;letter-spacing:2px;margin:10px 0 4px;'; });
+    wrapper.querySelectorAll('.a4-doc-number').forEach(function(el) { el.style.cssText = 'text-align:center;font-size:13px;color:#444;margin-bottom:16px;'; });
+    wrapper.querySelectorAll('.a4-items-table').forEach(function(el) { el.style.cssText = 'width:100%;border-collapse:collapse;margin:16px 0;font-size:11px;'; });
+    wrapper.querySelectorAll('.a4-items-table th').forEach(function(el) { el.style.cssText += ';background:#f5f5f5;border:1px solid #ddd;padding:6px 8px;text-align:left;font-weight:700;'; });
+    wrapper.querySelectorAll('.a4-items-table td').forEach(function(el) { el.style.cssText += ';border:1px solid #ddd;padding:5px 8px;'; });
+    wrapper.querySelectorAll('.a4-do-ref').forEach(function(el) { el.style.cssText = 'font-size:10px;color:#555;margin:8px 0;font-style:italic;'; });
+    wrapper.querySelectorAll('.a4-totals').forEach(function(el) { el.style.cssText = 'text-align:right;margin:16px 0;font-size:12px;line-height:1.8;'; });
+    wrapper.querySelectorAll('.a4-grand-total').forEach(function(el) { el.style.cssText = 'font-size:16px;font-weight:800;border-top:2px solid #333;padding-top:4px;margin-top:4px;'; });
+    wrapper.querySelectorAll('.a4-bank-details').forEach(function(el) { el.style.cssText = 'background:#f9f9f9;border:1px solid #ddd;border-radius:4px;padding:10px 14px;font-size:11px;line-height:1.6;margin:12px 0;'; });
+    wrapper.querySelectorAll('.a4-footer').forEach(function(el) { el.style.cssText = 'text-align:center;font-size:10px;color:#888;margin-top:24px;padding-top:12px;border-top:1px solid #eee;'; });
+
+    document.body.appendChild(wrapper);
 
     var opt = {
       margin: [8, 5, 8, 5],
       filename: soDocFileName('pdf'),
       image: { type: 'jpeg', quality: 0.92 },
-      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+      html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', scrollY: 0 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css'], avoid: ['tr'] }
     };
 
-    // Render directly from the visible modal content
-    var pdfBlob = await html2pdf().set(opt).from(a4Container).outputPdf('blob');
-
-    // Restore contenteditable
-    editables.forEach(function(el) { el.setAttribute('contenteditable', 'true'); });
+    var pdfBlob = await html2pdf().set(opt).from(wrapper).outputPdf('blob');
+    document.body.removeChild(wrapper);
 
     // Try Web Share API (mobile — WhatsApp accepts PDF)
     if (navigator.share && navigator.canShare) {
@@ -8132,6 +8164,45 @@ function soDocFileName(ext) {
     }
   }
   return parts.join('_') + '.' + ext;
+}
+
+async function soDownloadDoc() {
+  var isA4 = document.getElementById('so-doc-modal').classList.contains('a4-mode');
+  var a4Pages = isA4 ? document.getElementById('so-doc-a4-content').querySelectorAll('.a4-page') : null;
+  var isMultiPage = a4Pages && a4Pages.length > 1;
+
+  if (isA4 && isMultiPage) {
+    // Multi-page: generate + download PDF
+    await soShareDocPDF();
+    // If Web Share didn't trigger (desktop), download directly
+    if (soDocPdfBlob) soDownloadDocPDF();
+  } else if (isA4) {
+    // Single-page A4: generate image + download
+    var docEl = document.getElementById('so-doc-a4-content').querySelector('.a4-page');
+    if (!docEl) return;
+    notify('Generating image...', 'info');
+    try {
+      var canvas = await html2canvas(docEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      var blob = await new Promise(function(resolve) { canvas.toBlob(function(b) { resolve(b); }, 'image/png'); });
+      soDocImageBlob = blob;
+      if (soDocImageUrl) URL.revokeObjectURL(soDocImageUrl);
+      soDocImageUrl = URL.createObjectURL(blob);
+      soDownloadDocImage();
+    } catch(e) { notify('Download failed: ' + e.message, 'error'); }
+  } else {
+    // Receipt: generate image + download
+    var docEl2 = document.getElementById('so-doc-content');
+    if (!docEl2) return;
+    notify('Generating image...', 'info');
+    try {
+      var canvas2 = await html2canvas(docEl2, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      var blob2 = await new Promise(function(resolve) { canvas2.toBlob(function(b) { resolve(b); }, 'image/png'); });
+      soDocImageBlob = blob2;
+      if (soDocImageUrl) URL.revokeObjectURL(soDocImageUrl);
+      soDocImageUrl = URL.createObjectURL(blob2);
+      soDownloadDocImage();
+    } catch(e) { notify('Download failed: ' + e.message, 'error'); }
+  }
 }
 
 function soDownloadDocPDF() {
