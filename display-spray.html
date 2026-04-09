@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<title>Ladang Pest and Disease Spray Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09090b;
+  --bg-subtle: #0c0a1a;
+  --surface: #18181b;
+  --surface-2: #27272a;
+  --border: rgba(63, 63, 70, 0.4);
+  --border-light: rgba(82, 82, 91, 0.6);
+  --text: #fafafa;
+  --text-dim: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #818cf8;
+  --green: #4ade80;
+  --gold: #fbbf24;
+  --red: #f87171;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font: 'IBM Plex Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  background-image: linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.5;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Password gate */
+#pwGate {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.gate-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 36px 44px;
+  text-align: center; max-width: 380px;
+}
+.gate-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+.gate-sub { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 22px; }
+.gate-box input {
+  width: 100%; padding: 12px 14px; background: var(--surface-2);
+  border: 1px solid var(--border-light); border-radius: 10px;
+  color: var(--text); font-size: 1rem; font-family: var(--font);
+  margin-bottom: 12px;
+}
+.gate-box input:focus { outline: none; border-color: var(--accent); }
+.gate-box button {
+  width: 100%; padding: 12px; background: var(--accent);
+  color: #0a0a0f; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+.gate-error { color: var(--red); font-size: 0.85rem; margin-top: 8px; min-height: 1em; }
+
+/* Loading */
+#loadingOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.6s ease;
+}
+#loadingOverlay.done { opacity: 0; pointer-events: none; }
+.loader-ring {
+  width: 44px; height: 44px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { margin-top: 20px; font-size: 0.85rem; color: var(--text-dim); font-family: var(--mono); }
+
+/* Layout */
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* Header */
+.header-row { padding: 12px 16px 0; flex-shrink: 0; }
+.app-header {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.header-logo { height: 60px; }
+.header-text { flex: 1; }
+.header-title {
+  font-size: 1.5rem; font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.header-sub {
+  font-size: 0.78rem; color: var(--text-dim);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+.header-stats {
+  display: flex; gap: 18px;
+  align-items: center;
+}
+.stat-box {
+  text-align: center;
+  padding: 6px 14px;
+  border-left: 1px solid var(--border);
+}
+.stat-box:first-child { border-left: none; }
+.stat-value {
+  font-size: 1.6rem; font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1;
+}
+.stat-value.red { color: var(--red); }
+.stat-value.gold { color: var(--gold); }
+.stat-value.green { color: var(--green); }
+.stat-label {
+  font-size: 0.62rem; color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+.header-clock {
+  text-align: right;
+  font-family: var(--mono);
+  border-left: 1px solid var(--border);
+  padding-left: 18px;
+}
+.clock-time { font-size: 1.5rem; font-weight: 600; line-height: 1; }
+.clock-date { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+
+/* Content area */
+.content-area {
+  flex: 1;
+  padding: 12px 16px 0;
+  overflow: hidden;
+  position: relative;
+}
+.ai-page {
+  position: absolute;
+  top: 12px; left: 16px; right: 16px; bottom: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+.ai-page.active { opacity: 1; pointer-events: auto; }
+
+/* AI page header */
+.ai-subheader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 18px;
+  margin-bottom: 10px;
+}
+.ai-name-pill {
+  background: rgba(74,124,63,0.2);
+  color: #8fcf80;
+  border: 1px solid rgba(74,124,63,0.4);
+  border-radius: 20px;
+  padding: 6px 18px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ai-products {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.ai-counts {
+  margin-left: auto;
+  display: flex;
+  gap: 14px;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+}
+.ai-counts span { display: flex; align-items: center; gap: 6px; }
+.ai-counts .dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.red { background: var(--red); }
+.dot.gold { background: var(--gold); }
+.dot.green { background: var(--green); }
+.dot.gray { background: var(--text-muted); }
+.ai-page-num {
+  font-size: 0.7rem; color: var(--text-muted); font-family: var(--mono);
+  background: var(--surface-2); padding: 4px 10px; border-radius: 10px;
+}
+
+/* Table */
+.spray-table-wrap {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.spray-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.spray-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.spray-table td {
+  padding: 9px 16px;
+  font-size: 0.92rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.spray-table tr:last-child td { border-bottom: none; }
+.td-block { font-weight: 700; font-family: var(--mono); }
+.td-status { font-size: 0.78rem; }
+.td-variety { font-size: 0.85rem; color: var(--text-dim); }
+.td-date { font-family: var(--mono); }
+.td-days { font-family: var(--mono); font-weight: 600; }
+.td-days.red { color: var(--red); }
+.td-days.gold { color: var(--gold); }
+.td-days.green { color: var(--green); }
+.td-product { font-size: 0.85rem; color: var(--text-dim); }
+.row-no-data { opacity: 0.45; }
+
+/* Status group separator row */
+.status-sep td {
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  background: rgba(255,255,255,0.02);
+  color: var(--text-muted);
+}
+.status-sep.s-growing    td { background: rgba(74,124,63,0.18);   color: #6ECB63; border-left-color: #6ECB63; }
+.status-sep.s-to-induce  td { background: rgba(232,160,32,0.18);  color: #E8A020; border-left-color: #E8A020; }
+.status-sep.s-induced    td { background: rgba(100,149,237,0.18); color: #6495ED; border-left-color: #6495ED; }
+.status-sep.s-harvesting td { background: rgba(255,140,40,0.18);  color: #FF8C28; border-left-color: #FF8C28; }
+.status-sep.s-suckers    td { background: rgba(186,135,89,0.18);  color: #C4956A; border-left-color: #C4956A; }
+.status-sep.s-to-replant td { background: rgba(232,96,96,0.18);   color: #E86060; border-left-color: #E86060; }
+
+/* Empty state */
+.empty-msg {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  padding: 60px 30px;
+}
+.empty-msg .em-title { font-size: 1.4rem; font-weight: 600; color: var(--text); }
+.empty-msg .em-sub { font-size: 0.95rem; color: var(--text-dim); max-width: 600px; line-height: 1.5; }
+
+/* Footer dots + ticker */
+.footer-row {
+  padding: 8px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.page-dots { display: flex; gap: 7px; flex: 1; align-items: center; }
+.page-dots .dot {
+  width: 28px; height: 6px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  transition: background 0.3s ease, transform 0.15s ease;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+.page-dots .dot:hover { background: var(--border-light); transform: scaleY(1.5); }
+.page-dots .dot.active { background: var(--accent); }
+.updated-ticker {
+  font-size: 0.7rem; font-family: var(--mono);
+  color: var(--text-muted);
+}
+.ctrl-btn {
+  width: 36px; height: 36px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.ctrl-btn:hover { background: var(--surface); color: var(--text); }
+.ctrl-btn svg { width: 18px; height: 18px; }
+.ctrl-btn.paused { background: var(--accent); color: #0a0a0f; }
+.app-header > .ctrl-btn { margin-left: 4px; }
+
+/* Large screen scaling */
+@media (min-width: 1920px) {
+  html { font-size: 19px; }
+  .header-logo { height: 76px; }
+  .stat-box { padding: 8px 18px; }
+  .ai-name-pill { font-size: 1.3rem; }
+  .spray-table th { padding: 14px 18px; font-size: 0.78rem; }
+  .spray-table td { padding: 11px 18px; font-size: 1rem; }
+}
+@media (min-width: 2560px) {
+  html { font-size: 22px; }
+  .header-logo { height: 92px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Password gate -->
+<div id="pwGate">
+  <div class="gate-box">
+    <div class="gate-title">Spray Monitoring TV</div>
+    <div class="gate-sub">Enter password to continue</div>
+    <input type="password" id="pwInput" placeholder="Password" autocomplete="off" autofocus>
+    <button onclick="checkPassword()">Unlock</button>
+    <div class="gate-error" id="pwError"></div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text">Loading spray data...</div>
+</div>
+
+<!-- App -->
+<div class="app" id="app">
+  <div class="header-row">
+    <div class="app-header">
+      <img class="header-logo" src="https://tgfarmhub.com/assets/logo.png" alt="logo">
+      <div class="header-text">
+        <div class="header-title">Ladang Pest and Disease Spray Monitoring</div>
+        <div class="header-sub" id="hdrSub">TG Agribusiness · Last spray date and days elapsed per active ingredient</div>
+      </div>
+      <div class="header-stats">
+        <div class="stat-box">
+          <div class="stat-value" id="statBlocks">—</div>
+          <div class="stat-label">Active Blocks</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statAis">—</div>
+          <div class="stat-label">Watched AIs</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value red" id="statOverdue">—</div>
+          <div class="stat-label">Overdue (>21d)</div>
+        </div>
+      </div>
+      <div class="header-clock">
+        <div class="clock-time" id="clockTime">—</div>
+        <div class="clock-date" id="clockDate">—</div>
+      </div>
+      <button class="ctrl-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">
+        <svg id="fsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path id="fsExpand" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+          <path id="fsShrink" d="M4 14h3a2 2 0 012 2v3m6-9h3a2 2 0 002-2V5m-9 0v3a2 2 0 01-2 2H4m16 4v3a2 2 0 01-2 2h-3" style="display:none"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="content-area" id="contentArea">
+    <!-- Pages injected here -->
+  </div>
+
+  <div class="footer-row">
+    <div class="page-dots" id="pageDots"></div>
+    <button class="ctrl-btn" id="pauseBtn" onclick="togglePause()" title="Pause/Resume rotation">
+      <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><polygon points="6,4 20,12 6,20"/></svg>
+    </button>
+    <div class="updated-ticker" id="updTicker">Updated just now</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// PASSWORD GATE
+// ═══════════════════════════════════════════════════════════════
+const TV_PASSWORD = "tgtukau892312";
+const SESSION_KEY = "tg_tv_auth";
+function checkPassword() {
+  const input = document.getElementById("pwInput");
+  const error = document.getElementById("pwError");
+  if (input.value === TV_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    document.getElementById("pwGate").style.display = "none";
+    document.getElementById("loadingOverlay").style.display = "flex";
+    init();
+  } else {
+    error.textContent = "Incorrect password";
+    input.value = "";
+    input.focus();
+  }
+}
+document.getElementById("pwInput").addEventListener("keydown", function(e) { if (e.key === "Enter") checkPassword(); });
+const tvAuthed = sessionStorage.getItem(SESSION_KEY) === "1";
+if (tvAuthed) {
+  document.getElementById("pwGate").style.display = "none";
+} else {
+  document.getElementById("loadingOverlay").style.display = "none";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
+const HEADERS = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+async function sbGet(table, select, params) {
+  let url = SUPABASE_URL + "/rest/v1/" + table + "?select=" + encodeURIComponent(select);
+  if (params) url += "&" + params;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error("Failed: " + table);
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const COMPANY = 'tg_agribusiness';
+let watchedAiIds = [];
+let allIngredients = []; // [{id, name}]
+let allProducts = []; // [{id, product_name, is_active}]
+let productIngredients = []; // [{product_id, ingredient_id}]
+let blocks = []; // active pnd_blocks
+let blockCrops = []; // [{block_id, status_id, variety_id, date_planted, ...}]
+let cropStatuses = []; // [{id, name, sort_order}]
+let cropVarieties = []; // [{id, name}]
+let latestSpraysByAI = []; // [{block_id, ai_combo_key, product_id, date_completed}]
+let pages = []; // built per render
+let currentPage = 0;
+let lastUpdated = null;
+let rotationTimer = null;
+let refreshTimer = null;
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function esc(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function todayStr() { const d = new Date(); return d.toISOString().split('T')[0]; }
+function daysDiff(from, to) {
+  if (!from || !to) return null;
+  const a = new Date(from), b = new Date(to);
+  return Math.round((b - a) / 86400000);
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  const dd = String(dt.getDate()).padStart(2,'0');
+  const mm = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+  return dd + ' ' + mm + ' ' + dt.getFullYear();
+}
+function getStatusName(id) { const s = cropStatuses.find(x => x.id === id); return s ? s.name : '—'; }
+function getStatusOrder(name) {
+  const order = ['growing','to induce','induced','harvesting','suckers','to replant'];
+  const idx = order.indexOf((name||'').toLowerCase());
+  return idx >= 0 ? idx : 999;
+}
+function getVarietyName(id) { const v = cropVarieties.find(x => x.id === id); return v ? v.name : '—'; }
+function getBlockCrop(blockId) {
+  // Pick the current cycle block_crop for this block
+  return blockCrops.find(bc => bc.block_id === blockId && bc.is_current);
+}
+function colorForDays(d) {
+  if (d == null) return 'gray';
+  if (d > 21) return 'red';
+  if (d >= 14) return 'gold';
+  return 'green';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════
+function updateClock() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  document.getElementById('clockTime').textContent = hh + ':' + mm;
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('clockDate').textContent = days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+function updateTicker() {
+  if (!lastUpdated) { document.getElementById('updTicker').textContent = 'Loading...'; return; }
+  const elapsed = Math.round((Date.now() - lastUpdated) / 1000);
+  let txt;
+  if (elapsed < 60) txt = 'Updated ' + elapsed + 's ago';
+  else txt = 'Updated ' + Math.floor(elapsed/60) + 'm ago';
+  document.getElementById('updTicker').textContent = txt;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════
+async function loadData() {
+  const [tvCfg, ings, prods, prodIngs, blks, bcs, cs, cv, lsAI] = await Promise.all([
+    sbGet("pnd_tv_config", "watched_ai_ids", "company_id=eq." + COMPANY),
+    sbGet("pnd_ingredients", "id,name", "company_id=eq." + COMPANY + "&order=name"),
+    sbGet("pnd_products", "id,product_name,is_active", "company_id=eq." + COMPANY),
+    sbGet("pnd_product_ingredients", "product_id,ingredient_id", "company_id=eq." + COMPANY),
+    sbGet("pnd_blocks", "id,block_name,is_active", "is_active=eq.true"),
+    sbGet("block_crops", "id,block_id,status_id,variety_id,date_planted,is_current", "is_current=eq.true"),
+    sbGet("crop_statuses", "id,name,sort_order", "order=sort_order"),
+    sbGet("crop_varieties", "id,name", ""),
+    sbGet("pnd_latest_sprays_by_ai", "block_id,ai_combo_key,product_id,date_completed", "")
+  ]);
+  watchedAiIds = (tvCfg && tvCfg[0] && tvCfg[0].watched_ai_ids) || [];
+  allIngredients = ings || [];
+  allProducts = prods || [];
+  productIngredients = prodIngs || [];
+  blocks = blks || [];
+  blockCrops = bcs || [];
+  cropStatuses = cs || [];
+  cropVarieties = cv || [];
+  latestSpraysByAI = lsAI || [];
+  lastUpdated = Date.now();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD PAGES
+// ═══════════════════════════════════════════════════════════════
+function buildPages() {
+  pages = [];
+  const today = todayStr();
+
+  // Update header stats
+  document.getElementById('statBlocks').textContent = blocks.length;
+  document.getElementById('statAis').textContent = watchedAiIds.length;
+
+  // No watched AIs → empty page
+  if (!watchedAiIds.length) {
+    pages.push({ type: 'empty', message: 'No active ingredients configured.', sub: 'Open Hub → TV Display → Configure PnD Spray Monitoring AIs to set up.' });
+    document.getElementById('statOverdue').textContent = '0';
+    return;
+  }
+
+  // For each watched AI, find products containing it
+  const productIdsByAi = {};
+  watchedAiIds.forEach(aiId => {
+    productIdsByAi[aiId] = new Set(
+      productIngredients.filter(pi => pi.ingredient_id === aiId).map(pi => pi.product_id)
+    );
+  });
+
+  // Compute total overdue across all watched AIs
+  let totalOverdue = 0;
+
+  // Build one page per watched AI (in the order they appear in allIngredients alphabetically, filtered to watched)
+  const watchedIngredients = allIngredients.filter(i => watchedAiIds.includes(i.id));
+
+  watchedIngredients.forEach(ing => {
+    const productSet = productIdsByAi[ing.id] || new Set();
+    const productNames = [...productSet]
+      .map(pid => (allProducts.find(p => p.id === pid) || {}).product_name)
+      .filter(Boolean)
+      .sort();
+
+    // For each block, find latest spray containing this AI
+    const latestByBlock = {};
+    latestSpraysByAI.forEach(ls => {
+      if (!productSet.has(ls.product_id)) return;
+      const existing = latestByBlock[ls.block_id];
+      if (!existing || (ls.date_completed || '') > (existing.date_completed || '')) {
+        latestByBlock[ls.block_id] = ls;
+      }
+    });
+
+    // Build rows for every active block
+    const rows = blocks.map(b => {
+      const bc = getBlockCrop(b.id);
+      const statusName = bc ? getStatusName(bc.status_id) : '—';
+      const varietyName = bc ? getVarietyName(bc.variety_id) : '—';
+      const ls = latestByBlock[b.id] || null;
+      const product = ls && ls.product_id ? allProducts.find(p => p.id === ls.product_id) : null;
+      const daysAgo = ls && ls.date_completed ? daysDiff(ls.date_completed, today) : null;
+      return {
+        blockName: b.block_name,
+        statusName,
+        varietyName,
+        lastSprayed: ls ? ls.date_completed : null,
+        productName: product ? product.product_name : null,
+        daysAgo,
+        statusSort: getStatusOrder(statusName),
+      };
+    });
+
+    // Count overdue
+    let overdueCount = 0, dueSoonCount = 0, okCount = 0, noDataCount = 0;
+    rows.forEach(r => {
+      if (r.daysAgo == null) noDataCount++;
+      else if (r.daysAgo > 21) overdueCount++;
+      else if (r.daysAgo >= 14) dueSoonCount++;
+      else okCount++;
+    });
+    totalOverdue += overdueCount;
+
+    // Sort: by status order, then within group by daysAgo desc (most neglected first), then nulls at bottom
+    rows.sort((a,b) => {
+      if (a.statusSort !== b.statusSort) return a.statusSort - b.statusSort;
+      const aNull = a.daysAgo == null, bNull = b.daysAgo == null;
+      if (aNull && bNull) return (a.blockName||'').localeCompare(b.blockName||'', undefined, {numeric:true});
+      if (aNull) return 1;
+      if (bNull) return -1;
+      return b.daysAgo - a.daysAgo;
+    });
+
+    // Split into sub-pages by max rows per page
+    const maxRows = calcMaxRows();
+    const totalPages = Math.max(1, Math.ceil(rows.length / maxRows));
+    for (let p = 0; p < totalPages; p++) {
+      const slice = rows.slice(p * maxRows, (p + 1) * maxRows);
+      pages.push({
+        type: 'ai',
+        aiName: ing.name,
+        productNames: productNames,
+        rows: slice,
+        overdueCount, dueSoonCount, okCount, noDataCount,
+        totalCount: rows.length,
+        pageNum: p + 1,
+        totalPages,
+      });
+    }
+  });
+
+  document.getElementById('statOverdue').textContent = totalOverdue;
+  if (currentPage >= pages.length) currentPage = 0;
+}
+
+let maxRowsCache = 20;
+function calcMaxRows() {
+  // Probe row height
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;left:-9999px;top:0;width:100%;';
+  probe.innerHTML =
+    '<div class="ai-page active" style="position:static;"><div class="ai-subheader"><span class="ai-name-pill">PROBE</span></div>' +
+    '<div class="spray-table-wrap"><table class="spray-table"><thead><tr><th>B</th><th>S</th><th>V</th><th>L</th><th>D</th><th>P</th></tr></thead>' +
+    '<tbody><tr><td class="td-block">X</td><td class="td-status">X</td><td class="td-variety">X</td><td class="td-date">01 Jan 2026</td><td class="td-days">10d</td><td class="td-product">X</td></tr>' +
+    '<tr><td class="td-block">X</td><td class="td-status">X</td><td class="td-variety">X</td><td class="td-date">01 Jan 2026</td><td class="td-days">10d</td><td class="td-product">X</td></tr></tbody></table></div></div>';
+  document.body.appendChild(probe);
+
+  const headerH = document.querySelector('.header-row').offsetHeight;
+  const footerH = document.querySelector('.footer-row').offsetHeight;
+  const contentPad = 12;
+  const subheaderH = probe.querySelector('.ai-subheader').offsetHeight + 10;
+  const table = probe.querySelector('.spray-table');
+  const theadH = table.querySelector('thead').offsetHeight;
+  const trows = table.querySelectorAll('tbody tr');
+  const rowH = (trows[1].offsetTop - trows[0].offsetTop) || 36;
+
+  document.body.removeChild(probe);
+
+  const available = window.innerHeight - headerH - footerH - contentPad - subheaderH - theadH - 20;
+  maxRowsCache = Math.max(5, Math.floor(available / rowH));
+  return maxRowsCache;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderPages() {
+  const container = document.getElementById('contentArea');
+  const dotsEl = document.getElementById('pageDots');
+  if (!pages.length) { container.innerHTML = ''; dotsEl.innerHTML = ''; return; }
+
+  container.innerHTML = pages.map((pg, i) => {
+    if (pg.type === 'empty') {
+      return '<div class="ai-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">' +
+        '<div class="empty-msg">' +
+          '<div class="em-title">' + esc(pg.message) + '</div>' +
+          '<div class="em-sub">' + esc(pg.sub) + '</div>' +
+        '</div>' +
+      '</div>';
+    }
+    // AI page
+    const productLabel = pg.productNames.length ? 'Products: ' + pg.productNames.join(' · ') : 'No products linked to this AI';
+    const pageNumLabel = pg.totalPages > 1 ? 'Page ' + pg.pageNum + ' of ' + pg.totalPages : '';
+
+    let html = '<div class="ai-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">';
+    html += '<div class="ai-subheader">';
+    html += '<span class="ai-name-pill">' + esc(pg.aiName) + '</span>';
+    html += '<span class="ai-products">' + esc(productLabel) + '</span>';
+    html += '<div class="ai-counts">';
+    html += '<span><span class="dot red"></span>' + pg.overdueCount + ' overdue</span>';
+    html += '<span><span class="dot gold"></span>' + pg.dueSoonCount + ' due soon</span>';
+    html += '<span><span class="dot green"></span>' + pg.okCount + ' ok</span>';
+    html += '<span><span class="dot gray"></span>' + pg.noDataCount + ' no data</span>';
+    html += '</div>';
+    if (pageNumLabel) html += '<span class="ai-page-num">' + pageNumLabel + '</span>';
+    html += '</div>';
+
+    html += '<div class="spray-table-wrap"><table class="spray-table"><thead><tr>' +
+      '<th>Block</th><th>Status</th><th>Variety</th><th>Last Sprayed</th><th>Days Elapsed</th><th>Product Used</th>' +
+    '</tr></thead><tbody>';
+    let prevStatus = null;
+    pg.rows.forEach(r => {
+      if (r.statusName !== prevStatus) {
+        const sCls = 's-' + (r.statusName || '').toLowerCase().replace(/\s+/g, '-');
+        html += '<tr class="status-sep ' + sCls + '"><td colspan="6">' + esc(r.statusName) + '</td></tr>';
+        prevStatus = r.statusName;
+      }
+      const cls = r.daysAgo == null ? ' class="row-no-data"' : '';
+      const dayCls = colorForDays(r.daysAgo);
+      const dayTxt = r.daysAgo == null ? '—' : (r.daysAgo + 'd');
+      html += '<tr' + cls + '>';
+      html += '<td class="td-block">' + esc(r.blockName) + '</td>';
+      html += '<td class="td-status">' + esc(r.statusName) + '</td>';
+      html += '<td class="td-variety">' + esc(r.varietyName) + '</td>';
+      html += '<td class="td-date">' + (r.lastSprayed ? fmtDate(r.lastSprayed) : '—') + '</td>';
+      html += '<td class="td-days ' + dayCls + '">' + dayTxt + '</td>';
+      html += '<td class="td-product">' + esc(r.productName || '—') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '</div>';
+    return html;
+  }).join('');
+
+  dotsEl.innerHTML = pages.map((_, i) =>
+    '<button class="dot' + (i === currentPage ? ' active' : '') + '" onclick="jumpToPage(' + i + ')" title="Page ' + (i+1) + '"></button>'
+  ).join('');
+}
+
+function showPage(idx) {
+  if (!pages.length) return;
+  currentPage = (idx + pages.length) % pages.length;
+  document.querySelectorAll('.ai-page').forEach((el, i) => el.classList.toggle('active', i === currentPage));
+  document.querySelectorAll('.page-dots .dot').forEach((el, i) => el.classList.toggle('active', i === currentPage));
+}
+
+// Manual jump — restart rotation timer so the new page gets a full 30s
+function jumpToPage(idx) {
+  showPage(idx);
+  if (!paused) startRotation();
+}
+
+let paused = false;
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('pauseBtn');
+  const pauseIcon = document.getElementById('pauseIcon');
+  const playIcon = document.getElementById('playIcon');
+  if (paused) {
+    if (rotationTimer) { clearInterval(rotationTimer); rotationTimer = null; }
+    btn.classList.add('paused');
+    pauseIcon.style.display = 'none';
+    playIcon.style.display = 'block';
+    btn.title = 'Resume rotation';
+  } else {
+    btn.classList.remove('paused');
+    pauseIcon.style.display = 'block';
+    playIcon.style.display = 'none';
+    btn.title = 'Pause rotation';
+    startRotation();
+  }
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  const isFs = !!document.fullscreenElement;
+  const exp = document.getElementById('fsExpand');
+  const shr = document.getElementById('fsShrink');
+  if (exp) exp.style.display = isFs ? 'none' : '';
+  if (shr) shr.style.display = isFs ? '' : 'none';
+});
+
+function startRotation() {
+  if (rotationTimer) clearInterval(rotationTimer);
+  if (paused) return;
+  rotationTimer = setInterval(() => {
+    showPage(currentPage + 1);
+  }, 30000); // 30s per page (Growth TV cadence)
+}
+
+function startRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    try {
+      await loadData();
+      buildPages();
+      renderPages();
+    } catch(e) { console.error('Refresh failed:', e); }
+  }, 5 * 60 * 1000); // 5 min
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    await loadData();
+    buildPages();
+    renderPages();
+    document.getElementById('loadingOverlay').classList.add('done');
+    setTimeout(() => { document.getElementById('loadingOverlay').style.display = 'none'; }, 600);
+    startRotation();
+    startRefresh();
+    updateClock();
+    setInterval(updateClock, 1000);
+    setInterval(updateTicker, 1000);
+    // Re-build on resize (row count per page may change)
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { buildPages(); renderPages(); }, 300);
+    });
+  } catch(e) {
+    console.error('Init failed:', e);
+    document.getElementById('loadingOverlay').innerHTML = '<div style="color:#f87171;font-size:1.1rem;text-align:center;padding:30px;">Failed to load spray data.<br><span style="font-size:0.85rem;color:#a1a1aa;">' + esc(e.message) + '</span></div>';
+  }
+}
+
+if (tvAuthed) init();
+</script>
+</body>
+</html>

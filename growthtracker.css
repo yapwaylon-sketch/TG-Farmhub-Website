@@ -27,12 +27,16 @@ th.sortable:hover { color:var(--green-light); }
 .badge-status { background:var(--bg-hover); color:var(--text-muted); }
 .badge-growing { background:rgba(74,124,63,0.2); color:#6ECB63; }
 .badge-induced { background:rgba(100,149,237,0.2); color:#6495ED; }
+.badge-harvesting { background:rgba(255,140,40,0.2); color:#FF8C28; }
 .badge-suckers { background:rgba(186,135,89,0.2); color:#C4956A; }
 .badge-to-replant { background:rgba(232,96,96,0.15); color:#E86060; }
 .badge-to-induce { background:rgba(232,160,32,0.2); color:#E8A020; }
 
 /* Table scroll for many columns */
 .table-wrap { overflow-x:auto; }
+.table-wrap table { min-width:1200px; }
+.table-wrap th { white-space:nowrap; font-size:12px; }
+.table-wrap td { white-space:nowrap; }
 
 /* Summary cards — 3 columns for overview */
 .cards-3 { grid-template-columns: repeat(3,1fr); }
@@ -66,4 +70,14 @@ tr:last-child td { border-bottom:none; }
   .data-table table td:nth-child(15) {
     display: none;
   }
+}
+
+/* DESKTOP (>=1024px) */
+@media (min-width: 1024px) {
+  .page-title { font-size: 28px; }
+  .summary-card .sc-value { font-size: 28px; }
+  td, th { font-size: 14px; padding: 10px 14px; }
+  input, select, textarea { font-size: 14px; }
+  .btn { font-size: 14px; }
+  .filter-btn { font-size: 13px; }
 }

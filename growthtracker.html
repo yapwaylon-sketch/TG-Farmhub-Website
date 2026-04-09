@@ -255,6 +255,7 @@ function statusBadgeClass(name) {
   const map = {
     'growing': 'badge-growing',
     'induced': 'badge-induced',
+    'harvesting': 'badge-harvesting',
     'suckers': 'badge-suckers',
     'to replant': 'badge-to-replant',
     'to induce': 'badge-to-induce',
@@ -425,9 +426,11 @@ function renderOverview() {
   updateSortIndicators();
 
   // Summary cards — always based on all rows (unfiltered)
+  // Exclude Harvesting blocks from Approaching/Overdue — once supervisor marks Harvesting, warnings silence
   const totalBlocks = allRows.length;
-  const approaching = allRows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30).length;
-  const overdue = allRows.filter(r => r.days_to_harvest != null && r.days_to_harvest < 0).length;
+  const harvestCountableRows = allRows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting');
+  const approaching = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30).length;
+  const overdue = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest < 0).length;
 
   document.getElementById("card-total").textContent = totalBlocks;
   document.getElementById("card-approaching").textContent = approaching;
@@ -472,19 +475,23 @@ function renderOverview() {
   }
 
   tbody.innerHTML = rows.map(r => {
-    // Row colour coding
+    const isHarvesting = (r.status_name || '').toLowerCase() === 'harvesting';
+
+    // Row colour coding — skip overdue/approaching tint for harvesting (supervisor has it)
     let rowClass = '';
-    if(r.days_to_harvest != null && r.days_to_harvest < 0) rowClass = 'row-overdue';
-    else if(r.days_to_harvest != null && r.days_to_harvest <= 30) rowClass = 'row-approaching';
+    if(!isHarvesting && r.days_to_harvest != null && r.days_to_harvest < 0) rowClass = 'row-overdue';
+    else if(!isHarvesting && r.days_to_harvest != null && r.days_to_harvest <= 30) rowClass = 'row-approaching';
     else if(!r.date_induced_start) rowClass = 'row-no-induction';
 
-    const dthClass = r.days_to_harvest != null && r.days_to_harvest < 0
+    const dthClass = isHarvesting ? '' : (r.days_to_harvest != null && r.days_to_harvest < 0
       ? 'td-overdue'
-      : (r.days_to_harvest != null && r.days_to_harvest <= 30 ? 'td-approaching' : '');
+      : (r.days_to_harvest != null && r.days_to_harvest <= 30 ? 'td-approaching' : ''));
 
     const varietyDisplay = esc(r.crop_name + ' - ' + r.variety_name);
     const quantityDisplay = r.quantity != null ? Number(r.quantity).toLocaleString() : '—';
-    const dthDisplay = r.days_to_harvest != null ? r.days_to_harvest : '—';
+    // Blank the countdown columns when harvesting — active harvest, countdowns no longer meaningful
+    const dthDisplay = isHarvesting ? '—' : (r.days_to_harvest != null ? r.days_to_harvest : '—');
+    const daiDisplay = isHarvesting ? '—' : (r.days_after_induce != null ? r.days_after_induce : '—');
 
     const dtiClass = r.days_to_induce != null && r.days_to_induce < 0
       ? 'td-overdue'
@@ -504,7 +511,7 @@ function renderOverview() {
       '<td class="' + dtiClass + '">' + dtiDisplay + '</td>' +
       '<td>' + fmtDate(r.date_induced_start) + '</td>' +
       '<td>' + fmtDate(r.date_induced_end) + '</td>' +
-      '<td>' + (r.days_after_induce != null ? r.days_after_induce : '—') + '</td>' +
+      '<td>' + daiDisplay + '</td>' +
       '<td>' + (r.harvest_days != null ? r.harvest_days : '—') + '</td>' +
       '<td>' + esc(r.harvest_window) + '</td>' +
       '<td class="' + dthClass + '">' + dthDisplay + '</td>' +

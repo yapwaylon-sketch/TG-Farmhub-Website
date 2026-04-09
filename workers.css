@@ -22,6 +22,9 @@
 .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; color: var(--text); }
 .data-table tr:hover { background: var(--bg-hover); }
 
+/* Hidden columns toggle (Excel-style show/hide) */
+.col-hidden { display: none; }
+
 /* BADGES — workers-specific variants */
 .badge-m { background: rgba(74,124,200,0.15); color: #7AA0D0; }
 .badge-f { background: rgba(200,100,150,0.15); color: #D080A0; }
@@ -43,11 +46,13 @@
 @media (max-width: 768px) {
   .sidebar { width: 60px; }
   .sidebar-brand-text, .sidebar-brand-sub, .nav-label, .sidebar-sync, #sidebar-user { display: none; }
-  .sidebar-brand { padding: 12px 10px; justify-content: center; }
-  .nav-item { justify-content: center; padding: 12px 0; }
-  .page { padding: 16px; }
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .form-row { flex-direction: column; gap: 0; }
-  .modal-box { padding: 20px; max-width: 95vw; }
-  #page-summary [style*="grid-template-columns: 2fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+
+/* DESKTOP (>=1024px) */
+@media (min-width: 1024px) {
+  .page-title { font-size: 28px; }
+  .stat-grid .stat-value { font-size: 28px; }
+  td, th { font-size: 14px; padding: 10px 14px; }
+  input, select, textarea { font-size: 14px; }
+  .btn { font-size: 14px; }
 }

@@ -82,20 +82,58 @@
 <div id="page-summary" class="page active">
   <div class="print-header"><h2>TG Agro Fruits Sdn Bhd</h2><p>Spray Summary Report — Generated <span class="print-date"></span></p></div>
   <div class="page-header">
-    <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Overview of all block spray statuses</div></div>
+    <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Monitored products and spray status</div></div>
   </div>
   <div id="summary-cards" class="cards-grid"></div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0 0;align-items:center;">
-    <div id="summary-tabs" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+  <!-- Type filter pills -->
+  <div id="summary-type-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 8px;"></div>
+
+  <!-- Product sub-pills (shown when a specific type is selected) -->
+  <div id="summary-product-pills" style="display:none;gap:6px;flex-wrap:wrap;margin:0 0 10px 0;padding:8px 10px;background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:8px;"></div>
+
+  <!-- Watchlist bar -->
+  <div id="summary-watchlist-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;">
+    <div id="summary-watchlist-count" style="font-size:12px;color:var(--text-muted);font-weight:600;">Monitoring 0 products</div>
+    <div id="summary-watchlist-chips" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
+    <div style="display:flex;gap:6px;margin-left:auto;">
+      <button class="btn btn-primary btn-sm" onclick="openAddToMonitoringModal()" style="font-size:11px;padding:5px 10px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add to Monitoring
+      </button>
+      <button class="btn btn-outline btn-sm" id="summary-clear-watchlist-btn" onclick="clearWatchlist()" style="font-size:11px;padding:5px 10px;display:none;">Clear All</button>
+    </div>
+  </div>
+
+  <!-- Status filter (moved below watchlist) -->
+  <div id="summary-filter-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
     <div style="margin-left:auto;">
       <select id="summary-status-filter" onchange="summaryStatusFilter=this.value;renderSummary();" style="font-size:11px;min-width:130px;">
         <option value="">All Statuses</option>
       </select>
     </div>
   </div>
-  <div class="data-table">
-    <div class="table-header">Spray Status by Block</div>
-    <div class="table-wrap"><div id="summary-table-wrap"></div></div>
+
+  <!-- Sections container (one per watched AI combo) -->
+  <div id="summary-sections"></div>
+</div>
+
+<!-- ===== ADD TO MONITORING MODAL ===== -->
+<div id="addMonitoringModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">Add Products to Monitoring</div>
+      <button class="modal-close" onclick="closeAddMonitoringModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="addMonitoringSearch" placeholder="Search products..." oninput="renderAddMonitoringList()" style="width:100%;font-size:13px;padding:8px 12px;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Tick products to add to your monitoring watchlist. Already-monitored products are pre-ticked.</div>
+      <div id="addMonitoringList" style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeAddMonitoringModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMonitoringSelection()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -290,6 +328,48 @@ let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
 let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
 let inventoryProducts=[], inventoryTransactions=[];
 let summaryStatusFilter = '';
+let summaryWatchlist = []; // array of pnd_products.id
+let summaryTypeFilter = 'all'; // 'all' | 'fungicide' | 'pesticide' | ...
+let summaryProductFilter = 'all'; // 'all' or a pnd_products.id (Level 2 drill-in)
+let summarySortDir = 'asc'; // 'asc' (oldest first, default) | 'desc'
+const PRODUCT_TYPES = [
+  { key: 'all',       label: 'All' },
+  { key: 'fungicide', label: 'Fungicide' },
+  { key: 'pesticide', label: 'Pesticide' },
+  { key: 'herbicide', label: 'Herbicide' },
+  { key: 'pgr',       label: 'PGR' },
+  { key: 'adjuvant',  label: 'Adjuvant' },
+  { key: 'carbide',   label: 'Carbide' },
+];
+function summaryStorageKey() { return 'tg_spray_watchlist_' + (typeof getCompanyId === 'function' ? getCompanyId() : 'default'); }
+function summaryTypeFilterKey() { return 'tg_spray_type_filter_' + (typeof getCompanyId === 'function' ? getCompanyId() : 'default'); }
+function loadWatchlist() {
+  try {
+    const s = localStorage.getItem(summaryStorageKey());
+    summaryWatchlist = s ? JSON.parse(s) : [];
+    if (!Array.isArray(summaryWatchlist)) summaryWatchlist = [];
+  } catch(e) { summaryWatchlist = []; }
+  try {
+    const t = localStorage.getItem(summaryTypeFilterKey());
+    if (t) summaryTypeFilter = t;
+  } catch(e) {}
+}
+function saveWatchlist() {
+  try { localStorage.setItem(summaryStorageKey(), JSON.stringify(summaryWatchlist)); } catch(e) {}
+}
+function saveTypeFilter() {
+  try { localStorage.setItem(summaryTypeFilterKey(), summaryTypeFilter); } catch(e) {}
+}
+function pruneWatchlist() {
+  // Remove watched products that are no longer active/present
+  const validIds = new Set(products.filter(p => p.is_active).map(p => p.id));
+  const before = summaryWatchlist.length;
+  summaryWatchlist = summaryWatchlist.filter(id => validIds.has(id));
+  if (summaryWatchlist.length !== before) {
+    saveWatchlist();
+    if (typeof notify === 'function') notify('Some monitored products were removed (archived or deleted)', 'info');
+  }
+}
 let currentPage = 'summary';
 let currentReport = null;
 let reportData = [];
@@ -304,6 +384,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ui = document.getElementById("sidebar-user-info");
   if(ui && currentUser.displayName) ui.textContent = currentUser.displayName;
   await loadAll();
+  loadWatchlist();
   renderCurrentPage();
   document.getElementById("tg-loading").style.display = "none";
   injectCompanySwitcher();
@@ -552,14 +633,15 @@ function allowedTransitions(current) {
 // ============================================================
 // SUMMARY PAGE
 // ============================================================
-let summaryTab = 0;
-
-// Build AI combo groups from active products
-// Each combo is { key: sorted ingredient IDs, names: ["AI1", "AI2"], label: "AI1 + AI2", productIds: [...] }
+// Build AI combos from all active products (used by jobs, reports, joblogs, etc.)
 function getAICombos() {
-  const activeProductIds = products.filter(p => p.is_active).map(p => p.id);
-  const comboMap = {}; // key -> { key, names, productIds }
-  activeProductIds.forEach(pid => {
+  return getAICombosForProducts(products.filter(p => p.is_active).map(p => p.id));
+}
+
+// Build AI combos from a given product ID list (not all products)
+function getAICombosForProducts(productIds) {
+  const comboMap = {};
+  productIds.forEach(pid => {
     const pIngs = productIngredients.filter(pi => pi.product_id === pid && pi.pnd_ingredients);
     if(!pIngs.length) return;
     const sortedIds = pIngs.map(pi => pi.pnd_ingredients.id).sort();
@@ -574,16 +656,58 @@ function getAICombos() {
 }
 
 function renderSummary() {
-  const activeBlocks = blocks.filter(b=>b.is_active);
-  const combos = getAICombos();
-  const today = todayStr();
-  const map = {};
-  latestSpraysByAI.forEach(ls => { map[ls.block_id+"_"+ls.ai_combo_key] = ls; });
+  pruneWatchlist();
 
+  // Type pills — resets product filter when changed
+  document.getElementById('summary-type-pills').innerHTML = PRODUCT_TYPES.map(t =>
+    `<button class="sum-tab${summaryTypeFilter===t.key?' active':''}" onclick="onSummaryTypeClick('${t.key}')">${esc(t.label)}</button>`
+  ).join('');
+
+  // Watchlist bar
+  const watchedProducts = summaryWatchlist.map(id => products.find(p => p.id === id)).filter(Boolean);
+  document.getElementById('summary-watchlist-count').textContent = 'Monitoring ' + watchedProducts.length + ' product' + (watchedProducts.length===1?'':'s');
+  document.getElementById('summary-clear-watchlist-btn').style.display = watchedProducts.length ? '' : 'none';
+  document.getElementById('summary-watchlist-chips').innerHTML = watchedProducts.map(p =>
+    `<span style="background:rgba(74,124,63,0.2);color:#8fcf80;border:1px solid rgba(74,124,63,0.35);border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+      ${esc(p.product_name)}
+      <button onclick="removeFromWatchlist('${p.id}')" title="Remove from monitoring" style="background:none;border:none;color:#8fcf80;cursor:pointer;font-size:14px;line-height:1;padding:0;">&times;</button>
+    </span>`
+  ).join('');
+
+  // Watched products passing the type filter
+  const visibleWatchedProducts = watchedProducts.filter(p =>
+    summaryTypeFilter === 'all' || (p.product_type||'').toLowerCase() === summaryTypeFilter
+  );
+  const visibleWatchedProductIds = visibleWatchedProducts.map(p => p.id);
+
+  // Sub-pill row (only when a specific type is picked — not "All")
+  const subPillEl = document.getElementById('summary-product-pills');
+  if (summaryTypeFilter !== 'all' && visibleWatchedProducts.length) {
+    subPillEl.style.display = 'flex';
+    const typeLabel = (PRODUCT_TYPES.find(t => t.key === summaryTypeFilter) || {}).label || '';
+    subPillEl.innerHTML =
+      `<button class="sum-tab${summaryProductFilter==='all'?' active':''}" onclick="onSummaryProductClick('all')">All ${esc(typeLabel)}s</button>` +
+      visibleWatchedProducts
+        .sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''))
+        .map(p => `<button class="sum-tab${summaryProductFilter===p.id?' active':''}" onclick="onSummaryProductClick('${p.id}')">${esc(p.product_name)}</button>`)
+        .join('');
+  } else {
+    subPillEl.style.display = 'none';
+    subPillEl.innerHTML = '';
+    if (summaryTypeFilter === 'all') summaryProductFilter = 'all';
+  }
+
+  const activeBlocks = blocks.filter(b=>b.is_active);
+  const combos = getAICombosForProducts(visibleWatchedProductIds);
+  const today = todayStr();
+  const comboMap = {};
+  latestSpraysByAI.forEach(ls => { comboMap[ls.block_id+"_"+ls.ai_combo_key] = ls; });
+
+  // Overview cards — count block × visible-watched-product combos
   let overdue=0, dueSoon=0, allClear=0, noData=0;
   activeBlocks.forEach(b => {
     combos.forEach(c => {
-      const ls = map[b.id+"_"+c.key];
+      const ls = comboMap[b.id+"_"+c.key];
       if(!ls || !ls.next_spray_date) { noData++; return; }
       const dl = daysDiff(today, ls.next_spray_date);
       if(dl<0) overdue++;
@@ -599,7 +723,7 @@ function renderSummary() {
     <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>
     <div class="summary-card" style="background:rgba(128,128,128,0.08);border-color:rgba(128,128,128,0.3);"><div class="sc-label">No Data</div><div class="sc-value" style="color:var(--text-dim);">${noData}</div><div class="sc-sub">No spray history</div></div>`;
 
-  // Populate status filter
+  // Status filter dropdown
   const filterEl = document.getElementById("summary-status-filter");
   const uniqueStatuses = [...new Set(activeBlocks.map(b => {
     const bc = getBlockCrop(b.id);
@@ -607,28 +731,143 @@ function renderSummary() {
   }))].sort();
   filterEl.innerHTML = '<option value="">All Statuses</option>' + uniqueStatuses.map(s => `<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
 
-  // Build AI combo tabs — one combo per tab
-  if(summaryTab >= combos.length) summaryTab = 0;
-  document.getElementById("summary-tabs").innerHTML = combos.map((c, t) =>
-    `<button class="sum-tab${t===summaryTab?' active':''}" onclick="summaryTab=${t};renderSummaryTable()">${esc(c.label)}</button>`
-  ).join('');
-
-  renderSummaryTable();
-}
-
-function renderSummaryTable() {
-  const activeBlocks = blocks.filter(b=>b.is_active);
-  const combos = getAICombos();
-  const today = todayStr();
-  const map = {};
-  latestSpraysByAI.forEach(ls => { map[ls.block_id+"_"+ls.ai_combo_key] = ls; });
-
-  const combo = combos[summaryTab];
-  if(!combo) {
-    document.getElementById("summary-table-wrap").innerHTML = '<div class="empty-state">No active ingredients found. Enable products with AIs first.</div>';
+  // Empty state checks
+  const sectionsEl = document.getElementById("summary-sections");
+  if (!watchedProducts.length) {
+    sectionsEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;text-align:center;">
+      <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">No products being monitored.</div>
+      <div style="font-size:12px;color:var(--text-dim);">Click <strong>Add to Monitoring</strong> above to get started.</div>
+    </div>`;
+    return;
+  }
+  if (!visibleWatchedProducts.length) {
+    sectionsEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;">
+      <div style="font-size:13px;color:var(--text-muted);">No monitored products match the selected type filter.</div>
+    </div>`;
     return;
   }
 
+  // Decide which view to render:
+  // Level 2 — a specific product is selected → full 9-column block table for its AI combo
+  if (summaryProductFilter !== 'all') {
+    const product = visibleWatchedProducts.find(p => p.id === summaryProductFilter);
+    if (!product) { summaryProductFilter = 'all'; renderSummary(); return; }
+    const combo = getAICombosForProducts([product.id])[0];
+    if (!combo) {
+      sectionsEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;"><div style="font-size:13px;color:var(--text-muted);">This product has no active ingredients configured.</div></div>`;
+      return;
+    }
+    sectionsEl.innerHTML = renderSummarySection(combo, activeBlocks, comboMap, today);
+    return;
+  }
+
+  // Level 1 — simplified per-block view (either "All" top pill OR a type pill with "All Xs" sub-pill)
+  sectionsEl.innerHTML = renderSummaryLevel1(visibleWatchedProductIds, activeBlocks, today);
+}
+
+// Level 1 simplified per-block view
+function renderSummaryLevel1(watchedProductIds, activeBlocks, today) {
+  const watchedSet = new Set(watchedProductIds);
+  const showTypeCol = summaryTypeFilter === 'all';
+
+  // Find latest spray per block among watched products
+  const byBlock = {};
+  latestSpraysByAI.forEach(ls => {
+    if (!watchedSet.has(ls.product_id)) return;
+    const existing = byBlock[ls.block_id];
+    if (!existing || (ls.date_completed || '') > (existing.date_completed || '')) {
+      byBlock[ls.block_id] = ls;
+    }
+  });
+
+  // Build rows
+  let rows = activeBlocks.map(b => {
+    const bc = getBlockCrop(b.id);
+    const statusName = bc ? getCropStatusName(bc.status_id) : '—';
+    const ls = byBlock[b.id] || null;
+    const product = ls && ls.product_id ? getProduct(ls.product_id) : null;
+    const pIngs = product ? productIngredients.filter(pi => pi.product_id === product.id && pi.pnd_ingredients) : [];
+    const aiNames = pIngs.map(pi => pi.pnd_ingredients.name).sort().join(' + ');
+    const typeLabel = product ? (PRODUCT_TYPES.find(t => t.key === (product.product_type||'').toLowerCase()) || {}).label || '—' : '—';
+    const daysAgo = (ls && ls.date_completed) ? daysDiff(ls.date_completed, today) : null;
+    return {
+      blockId: b.id,
+      blockName: b.block_name,
+      statusName,
+      lastSprayed: ls ? ls.date_completed : null,
+      productName: product ? product.product_name : null,
+      aiNames,
+      typeLabel,
+      daysAgo
+    };
+  });
+
+  // Status filter
+  if (summaryStatusFilter) rows = rows.filter(r => r.statusName === summaryStatusFilter);
+
+  // Sort — nulls always at bottom, then by date direction
+  rows.sort((a,b) => {
+    const aNull = !a.lastSprayed, bNull = !b.lastSprayed;
+    if (aNull && bNull) return (a.blockName||'').localeCompare(b.blockName||'', undefined, {numeric:true});
+    if (aNull) return 1;
+    if (bNull) return -1;
+    const cmp = a.lastSprayed.localeCompare(b.lastSprayed);
+    return summarySortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const sortArrow = summarySortDir === 'asc' ? '▲' : '▼';
+  const sortTitle = summarySortDir === 'asc' ? 'Oldest first (click to flip)' : 'Newest first (click to flip)';
+
+  let html = '<div class="data-table" style="margin-bottom:14px;">';
+  html += '<div class="table-wrap"><table><thead><tr>' +
+    '<th style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th>' +
+    '<th style="min-width:80px;">Status</th>' +
+    `<th style="min-width:120px;cursor:pointer;user-select:none;" onclick="toggleSummarySort()" title="${sortTitle}">Last Sprayed <span style="color:var(--gold);font-size:10px;">${sortArrow}</span></th>` +
+    '<th style="min-width:70px;">Days Ago</th>' +
+    '<th>Product Sprayed (AI + Name)</th>' +
+    (showTypeCol ? '<th style="min-width:90px;">Type</th>' : '') +
+  '</tr></thead><tbody>';
+
+  if (!rows.length) {
+    html += `<tr><td colspan="${showTypeCol?6:5}" class="empty-state">No blocks match the selected filter</td></tr>`;
+  } else {
+    rows.forEach(r => {
+      const rowStyle = r.lastSprayed ? '' : ' style="opacity:0.55;"';
+      const productCell = r.productName
+        ? `<div style="font-weight:600;color:var(--white);">${esc(r.productName)}</div><div style="font-size:11px;color:var(--text-dim);">AI: ${esc(r.aiNames || '—')}</div>`
+        : '<span style="color:var(--text-dim);">No spray history</span>';
+      html += `<tr${rowStyle}>`;
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(r.blockName)}</td>`;
+      html += `<td><span class="badge ${blockStatusBadgeClass(r.statusName)}">${esc(r.statusName)}</span></td>`;
+      html += `<td style="white-space:nowrap;">${r.lastSprayed ? fmtDateShort(r.lastSprayed) : '—'}</td>`;
+      html += `<td style="white-space:nowrap;">${r.daysAgo != null ? r.daysAgo + 'd' : '—'}</td>`;
+      html += `<td>${productCell}</td>`;
+      if (showTypeCol) html += `<td style="font-size:11px;">${esc(r.typeLabel)}</td>`;
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function toggleSummarySort() {
+  summarySortDir = summarySortDir === 'asc' ? 'desc' : 'asc';
+  renderSummary();
+}
+
+function onSummaryTypeClick(key) {
+  summaryTypeFilter = key;
+  summaryProductFilter = 'all';
+  saveTypeFilter();
+  renderSummary();
+}
+
+function onSummaryProductClick(id) {
+  summaryProductFilter = id;
+  renderSummary();
+}
+
+function renderSummarySection(combo, activeBlocks, map, today) {
   // Active jobs for products in this combo
   const activeJobStatuses = ['Planned','In Progress','Partially Completed','Suspended'];
   const ajMap = {};
@@ -658,18 +897,16 @@ function renderSummaryTable() {
     return (a.block_name||'').localeCompare(b.block_name||'', undefined, {numeric:true});
   });
 
-  document.querySelectorAll('.sum-tab').forEach((btn,i) => btn.classList.toggle('active', i===summaryTab));
-
-  // AI combo label + products list
+  // AI combo header + product list
   const aiPills = combo.names.map(n => '<span style="background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:4px 14px;font-size:13px;font-weight:600;">' + esc(n) + '</span>').join(' ');
   const prodNames = combo.productIds.map(pid => { const p=getProduct(pid); return p?p.product_name:'?'; }).join(', ');
 
-  let html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
+  let html = '<div class="data-table" style="margin-bottom:14px;">';
+  html += '<div class="table-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;">' +
     aiPills +
-    '<span style="font-size:12px;color:var(--text-dim);">Products: ' + esc(prodNames) + '</span>' +
+    '<span style="font-size:11px;color:var(--text-dim);">Products: ' + esc(prodNames) + '</span>' +
   '</div>';
-
-  html += '<table><thead><tr>' +
+  html += '<div class="table-wrap"><table><thead><tr>' +
     '<th style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:80px;">Block</th>' +
     '<th style="min-width:70px;">Status</th>' +
     '<th style="min-width:60px;">Variety</th>' +
@@ -681,53 +918,133 @@ function renderSummaryTable() {
     '<th>Product Used</th>' +
   '</tr></thead><tbody>';
 
-  let prevStatus = null;
-  enriched.forEach(b => {
-    if(b._statusName !== prevStatus) {
-      if(prevStatus !== null) html += `<tr><td colspan="9" style="height:4px;padding:0;background:var(--border);"></td></tr>`;
-      prevStatus = b._statusName;
-    }
+  if(!enriched.length) {
+    html += `<tr><td colspan="9" class="empty-state">No blocks match the selected filter</td></tr>`;
+  } else {
+    let prevStatus = null;
+    enriched.forEach(b => {
+      if(b._statusName !== prevStatus) {
+        if(prevStatus !== null) html += `<tr><td colspan="9" style="height:4px;padding:0;background:var(--border);"></td></tr>`;
+        prevStatus = b._statusName;
+      }
+      const ls = map[b.id+"_"+combo.key];
+      const hasData = ls && ls.next_spray_date;
+      const rowStyle = hasData ? '' : ' style="opacity:0.55;"';
+      const cellJobs = ajMap[b.id] || [];
+      let jobIcons = '';
+      const schedJob = cellJobs.find(j=>j.job_type==='Scheduled');
+      const intvJob = cellJobs.find(j=>j.job_type==='Intervention');
+      if(schedJob) jobIcons += `<span title="Scheduled job — Worker: ${esc(schedJob.worker_name)}, Planned: ${fmtDateShort(schedJob.planned_date)}, Status: ${esc(schedJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">🔧</span>`;
+      if(intvJob) jobIcons += `<span title="Intervention — Worker: ${esc(intvJob.worker_name)}, Planned: ${fmtDateShort(intvJob.planned_date)}, Status: ${esc(intvJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">⚡</span>`;
+      const productUsed = hasData && ls.product_id ? (getProduct(ls.product_id)?.product_name || '—') : '—';
+      html += `<tr${rowStyle}>`;
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
+      html += `<td><span class="badge ${blockStatusBadgeClass(b._statusName)}">${esc(b._statusName)}</span></td>`;
+      html += `<td style="font-size:11px;white-space:nowrap;">${esc(b._variety)}</td>`;
+      html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b._datePlanted)}</td>`;
+      if(!hasData) {
+        html += `<td style="color:var(--text-dim);">No data</td><td>—</td><td>—</td><td>—${jobIcons}</td><td>—</td>`;
+      } else {
+        const ds = daysDiff(ls.date_completed, today);
+        const dl = daysDiff(today, ls.next_spray_date);
+        let bg = '';
+        if(dl<0) bg='background:rgba(232,96,96,0.1);';
+        else if(dl<=7) bg='background:rgba(232,160,32,0.1);';
+        const dlColor = dl<0?"color:var(--red);font-weight:700;":dl<=7?"color:var(--gold);font-weight:700;":"color:var(--green-light);";
+        html += `<td style="${bg}">${fmtDateShort(ls.date_completed)}</td>`;
+        html += `<td style="${bg}">${ds!=null?ds+"d":"—"}</td>`;
+        html += `<td style="${bg}">${fmtDateShort(ls.next_spray_date)}</td>`;
+        html += `<td style="${bg}${dlColor}">${dl!=null?dl+"d":"—"}${jobIcons}</td>`;
+        html += `<td style="font-size:11px;color:var(--text-dim);">${esc(productUsed)}</td>`;
+      }
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div></div>';
+  return html;
+}
 
-    const ls = map[b.id+"_"+combo.key];
-    const hasData = ls && ls.next_spray_date;
-    const rowStyle = hasData ? '' : ' style="opacity:0.55;"';
+// ============================================================
+// WATCHLIST MANAGEMENT
+// ============================================================
+function removeFromWatchlist(productId) {
+  summaryWatchlist = summaryWatchlist.filter(id => id !== productId);
+  saveWatchlist();
+  renderSummary();
+}
 
-    const cellJobs = ajMap[b.id] || [];
-    let jobIcons = '';
-    const schedJob = cellJobs.find(j=>j.job_type==='Scheduled');
-    const intvJob = cellJobs.find(j=>j.job_type==='Intervention');
-    if(schedJob) jobIcons += `<span title="Scheduled job — Worker: ${esc(schedJob.worker_name)}, Planned: ${fmtDateShort(schedJob.planned_date)}, Status: ${esc(schedJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">🔧</span>`;
-    if(intvJob) jobIcons += `<span title="Intervention — Worker: ${esc(intvJob.worker_name)}, Planned: ${fmtDateShort(intvJob.planned_date)}, Status: ${esc(intvJob.status)}" style="font-size:11px;cursor:help;margin-left:3px;">⚡</span>`;
+function clearWatchlist() {
+  if (typeof confirmAction === 'function') {
+    confirmAction('Clear Watchlist', 'Remove all products from monitoring?', function() {
+      summaryWatchlist = [];
+      saveWatchlist();
+      renderSummary();
+    });
+  } else {
+    summaryWatchlist = [];
+    saveWatchlist();
+    renderSummary();
+  }
+}
 
-    const productUsed = hasData && ls.product_id ? (getProduct(ls.product_id)?.product_name || '—') : '—';
+function openAddToMonitoringModal() {
+  document.getElementById('addMonitoringSearch').value = '';
+  renderAddMonitoringList();
+  document.getElementById('addMonitoringModal').style.display = 'flex';
+}
+function closeAddMonitoringModal() {
+  document.getElementById('addMonitoringModal').style.display = 'none';
+}
 
-    html += `<tr${rowStyle}>`;
-    html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(b.block_name)}</td>`;
-    html += `<td><span class="badge ${blockStatusBadgeClass(b._statusName)}">${esc(b._statusName)}</span></td>`;
-    html += `<td style="font-size:11px;white-space:nowrap;">${esc(b._variety)}</td>`;
-    html += `<td style="font-size:11px;white-space:nowrap;">${monthsFromPlant(b._datePlanted)}</td>`;
-
-    if(!hasData) {
-      html += `<td style="color:var(--text-dim);">No data</td><td>—</td><td>—</td><td>—${jobIcons}</td><td>—</td>`;
-    } else {
-      const ds = daysDiff(ls.date_completed, today);
-      const dl = daysDiff(today, ls.next_spray_date);
-      let bg = '';
-      if(dl<0) bg='background:rgba(232,96,96,0.1);';
-      else if(dl<=7) bg='background:rgba(232,160,32,0.1);';
-      const dlColor = dl<0?"color:var(--red);font-weight:700;":dl<=7?"color:var(--gold);font-weight:700;":"color:var(--green-light);";
-      html += `<td style="${bg}">${fmtDateShort(ls.date_completed)}</td>`;
-      html += `<td style="${bg}">${ds!=null?ds+"d":"—"}</td>`;
-      html += `<td style="${bg}">${fmtDateShort(ls.next_spray_date)}</td>`;
-      html += `<td style="${bg}${dlColor}">${dl!=null?dl+"d":"—"}${jobIcons}</td>`;
-      html += `<td style="font-size:11px;color:var(--text-dim);">${esc(productUsed)}</td>`;
-    }
-    html += '</tr>';
+function renderAddMonitoringList() {
+  const search = (document.getElementById('addMonitoringSearch').value || '').toLowerCase();
+  const activeProducts = products.filter(p => p.is_active);
+  // Group by type
+  const byType = {};
+  activeProducts.forEach(p => {
+    const t = (p.product_type || 'other').toLowerCase();
+    if (!byType[t]) byType[t] = [];
+    const aiNames = productIngredients
+      .filter(pi => pi.product_id === p.id && pi.pnd_ingredients)
+      .map(pi => pi.pnd_ingredients.name)
+      .join(', ');
+    const matches = !search || p.product_name.toLowerCase().includes(search) || (aiNames||'').toLowerCase().includes(search);
+    if (matches) byType[t].push({ ...p, _ai: aiNames });
   });
 
-  if(!enriched.length) html += `<tr><td colspan="9" class="empty-state">No blocks match the selected filter</td></tr>`;
-  html += '</tbody></table>';
-  document.getElementById("summary-table-wrap").innerHTML = html;
+  const typeLabelMap = { fungicide:'Fungicide', pesticide:'Pesticide', herbicide:'Herbicide', pgr:'PGR', adjuvant:'Adjuvant', carbide:'Carbide', other:'Other' };
+  const typeOrder = ['fungicide','pesticide','herbicide','pgr','adjuvant','carbide','other'];
+
+  let html = '';
+  let anyShown = false;
+  typeOrder.forEach(t => {
+    const list = (byType[t] || []).sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''));
+    if (!list.length) return;
+    anyShown = true;
+    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gold);margin:12px 4px 6px;letter-spacing:0.5px;">${typeLabelMap[t] || t}</div>`;
+    html += list.map(p => {
+      const isWatched = summaryWatchlist.includes(p.id);
+      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:12px;${isWatched?'background:rgba(74,124,63,0.12);':''}" onmouseover="this.style.background='var(--bg-hover)';" onmouseout="this.style.background='${isWatched?'rgba(74,124,63,0.12)':'transparent'}';">
+        <input type="checkbox" class="monitor-cb" value="${p.id}" ${isWatched?'checked':''} style="accent-color:var(--green);cursor:pointer;">
+        <div style="flex:1;">
+          <div style="color:var(--white);font-weight:600;">${esc(p.product_name)}</div>
+          <div style="color:var(--text-dim);font-size:10px;">AI: ${esc(p._ai || '—')}</div>
+        </div>
+      </label>`;
+    }).join('');
+  });
+
+  if (!anyShown) html = '<div class="empty-state" style="padding:20px;font-size:12px;">No products found.</div>';
+  document.getElementById('addMonitoringList').innerHTML = html;
+}
+
+function saveMonitoringSelection() {
+  const selected = [...document.querySelectorAll('.monitor-cb:checked')].map(cb => cb.value);
+  summaryWatchlist = selected;
+  saveWatchlist();
+  closeAddMonitoringModal();
+  renderSummary();
+  if (typeof notify === 'function') notify('Monitoring list updated', 'success');
 }
 
 // ============================================================
