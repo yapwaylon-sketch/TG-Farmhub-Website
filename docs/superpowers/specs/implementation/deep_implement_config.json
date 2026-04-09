@@ -1,0 +1,92 @@
+{
+  "plugin_root": "C:\\Users\\yapwa\\.claude\\plugins\\cache\\piercelamb-plugins\\deep-implement\\0.2.1",
+  "sections_dir": "C:\\Users\\yapwa\\OneDrive\\TG Web and Android Project\\TG Farmhub Website\\docs\\superpowers\\specs\\sections",
+  "target_dir": "C:\\Users\\yapwa\\OneDrive\\TG Web and Android Project\\TG Farmhub Website",
+  "state_dir": "C:\\Users\\yapwa\\OneDrive\\TG Web and Android Project\\TG Farmhub Website\\docs\\superpowers\\specs\\implementation",
+  "git_root": "C:\\Users\\yapwa\\OneDrive\\TG Web and Android Project\\TG Farmhub Website",
+  "commit_style": "conventional",
+  "test_command": "uv run pytest",
+  "sections": [
+    "section-01-db-migration",
+    "section-02-data-loading",
+    "section-03-payment-terms-customer",
+    "section-04-qb-cleanup",
+    "section-05-create-invoice",
+    "section-06-invoice-list",
+    "section-07-invoice-document",
+    "section-08-approval-workflow",
+    "section-09-invoice-payments",
+    "section-10-credit-notes",
+    "section-11-payments-tab",
+    "section-12-statement-of-account",
+    "section-13-dashboard",
+    "section-14-reports"
+  ],
+  "sections_state": {
+    "section-01-db-migration": {
+      "status": "complete",
+      "commit_hash": "4fca6ae"
+    },
+    "section-02-data-loading": {
+      "status": "complete",
+      "commit_hash": "50d8be7"
+    },
+    "section-03-payment-terms-customer": {
+      "status": "complete",
+      "commit_hash": "b43a1fe"
+    },
+    "section-04-qb-cleanup": {
+      "status": "complete",
+      "commit_hash": "113b9a0"
+    },
+    "section-05-create-invoice": {
+      "status": "complete",
+      "commit_hash": "72b4196"
+    },
+    "section-06-invoice-list": {
+      "status": "complete",
+      "commit_hash": "adb61f8"
+    },
+    "section-07-invoice-document": {
+      "status": "complete",
+      "commit_hash": "ef52b9c"
+    },
+    "section-08-approval-workflow": {
+      "status": "complete",
+      "commit_hash": "a33448d"
+    },
+    "section-09-invoice-payments": {
+      "status": "complete",
+      "commit_hash": "aedb8bd"
+    },
+    "section-10-credit-notes": {
+      "status": "complete",
+      "commit_hash": "a3d29c3"
+    },
+    "section-11-payments-tab": {
+      "status": "complete",
+      "commit_hash": "0e679e1"
+    },
+    "section-12-statement-of-account": {
+      "status": "complete",
+      "commit_hash": "d047db4"
+    },
+    "section-13-dashboard": {
+      "status": "complete",
+      "commit_hash": "e5b5db6"
+    },
+    "section-14-reports": {
+      "status": "complete",
+      "commit_hash": "2218c70"
+    }
+  },
+  "pre_commit": {
+    "present": false,
+    "type": "none",
+    "config_file": null,
+    "native_hook": null,
+    "may_modify_files": false,
+    "detected_formatters": []
+  },
+  "created_at": "2026-04-04T02:00:27.556658+00:00"
+}
