@@ -1,8 +1,11 @@
 # Local Netlify folder
 .netlify
 
-# Claude Code local settings (syncs via OneDrive, not needed in git)
-.claude/
+# Claude Code local settings — per-PC state stays ignored,
+# but project-scoped skills/agents DO sync via git so both PCs share them.
+.claude/*
+!.claude/skills/
+!.claude/agents/
 
 # Sub-projects (separate Netlify deploys, same Supabase DB)
 # Nanas is now its own repo at yapwaylon-sketch/TG-Nanas-Growth-TV,
