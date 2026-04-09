@@ -3383,9 +3383,7 @@ function renderCustomerCards() {
 
     html += '<tr' + dimStyle + '>';
     html += '<td style="color:var(--text-muted);font-size:12px;">' + (idx + 1) + '</td>';
-    html += '<td><a href="javascript:void(0)" onclick="scOpenDetail(\'' + esc(c.id) + '\')" style="font-weight:700;color:var(--green-light);text-decoration:none;">' + esc(c.name) + '</a>';
-    if (c.address) html += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.address) + '</div>';
-    html += '</td>';
+    html += '<td><a href="javascript:void(0)" onclick="scOpenDetail(\'' + esc(c.id) + '\')" style="font-weight:700;color:var(--green-light);text-decoration:none;">' + esc(c.name) + '</a></td>';
     html += '<td>' + esc(c.contact_person || '\u2014') + '</td>';
     html += '<td>' + esc(c.phone || '\u2014') + '</td>';
     html += '<td><span class="badge badge-outline">' + scTypeLabel(c.type) + '</span></td>';
