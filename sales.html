@@ -1907,7 +1907,11 @@ function soRenderCard(o, status, color, label) {
 
   var h = '<div class="sales-card sales-card-status-' + esc(status) + '" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
   h += '<div class="sales-card-status-banner" style="background:' + color + ';"><span class="status-banner-label">' + label + '</span></div>';
+  var orderBranch = o.branch_id ? getBranch(o.branch_id) : null;
   h += '<div class="sales-card-customer">' + esc(custName) + '</div>';
+  if (orderBranch) {
+    h += '<div style="padding:0 14px 2px;font-size:11px;color:var(--text-muted);font-weight:400;">' + esc(orderBranch.name) + '</div>';
+  }
   if (o.assigned_worker_id) {
     var aw = allWorkers.find(function(w) { return w.id === o.assigned_worker_id; });
     h += '<div style="padding:0 14px 2px;font-size:11px;color:var(--green-light);">Assigned: ' + esc(aw ? aw.name : '\u2014') + '</div>';
@@ -2237,6 +2241,15 @@ function soRenderDetail() {
   html += '<div class="so-detail-section-title">Customer</div>';
   html += '<div class="so-detail-grid">';
   html += '<div class="so-detail-field"><div class="so-detail-label">Name</div><div class="so-detail-value">' + esc(cust ? cust.name : '\u2014') + '</div></div>';
+  if (o.branch_id) {
+    var detailBranch = getBranch(o.branch_id);
+    if (detailBranch) {
+      html += '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;grid-column:1/-1;">';
+      html += '<strong>Deliver To:</strong> ' + esc(detailBranch.name);
+      if (detailBranch.address) html += ' \u2014 ' + esc(detailBranch.address.split('\n')[0]);
+      html += '</div>';
+    }
+  }
   html += '<div class="so-detail-field"><div class="so-detail-label">Phone</div><div class="so-detail-value">' + esc(cust ? (cust.phone || '\u2014') : '\u2014') + '</div></div>';
   if (cust && cust.address) {
     html += '<div class="so-detail-field" style="grid-column:1/-1;"><div class="so-detail-label">Address</div><div class="so-detail-value">' + esc(cust.address) + '</div></div>';
