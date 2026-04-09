@@ -5534,12 +5534,28 @@ function generateCreditNoteA4(cnId) {
   html += '<div class="a4-title">CREDIT NOTE</div>';
   html += '<div class="a4-doc-number">' + esc(cn.id) + '</div>';
 
-  // Info Grid
-  html += '<div class="a4-info-grid">';
-  html += '<div class="a4-info-label">CN Number:</div><div class="a4-info-value">' + esc(cn.id) + '</div>';
-  html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value">' + esc(cust ? cust.name : '—') + '</div>';
-  html += '<div class="a4-info-label">Credit Date:</div><div class="a4-info-value">' + fmtDate(cn.credit_date) + '</div>';
-  html += '<div class="a4-info-label">Invoice Ref:</div><div class="a4-info-value">' + esc(cn.invoice_id || '—') + '</div>';
+  // Bill To + CN Details (two-column layout)
+  html += '<div style="display:flex;gap:24px;margin:16px 0;">';
+
+  // Left: Bill To
+  html += '<div style="flex:1;">';
+  html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Bill To</div>';
+  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? cust.name : '\u2014') + '</div>';
+  if (cust && cust.ssm_brn) html += '<div style="font-size:11px;color:#333;margin-top:2px;">SSM/BRN: ' + esc(cust.ssm_brn) + '</div>';
+  if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
+  if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
+  html += '</div>';
+
+  // Right: CN Details
+  html += '<div style="min-width:200px;">';
+  html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Credit Note Details</div>';
+  html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">CN Number:</td><td>' + esc(cn.id) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Credit Date:</td><td>' + fmtDate(cn.credit_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice Ref:</td><td>' + esc(cn.invoice_id || '\u2014') + '</td></tr>';
+  html += '</table>';
+  html += '</div>';
+
   html += '</div>';
 
   // Reason
@@ -5625,28 +5641,31 @@ function generateInvoiceA4(invoiceId) {
   html += '<div class="a4-title">INVOICE</div>';
   html += '<div class="a4-doc-number">' + esc(inv.id) + '</div>';
 
-  // Info Grid
-  html += '<div class="a4-info-grid">';
-  html += '<div class="a4-info-label">Invoice No:</div><div class="a4-info-value">' + esc(inv.id) + '</div>';
-  html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value">' + esc(cust ? cust.name : '—') + '</div>';
-  html += '<div class="a4-info-label">Invoice Date:</div><div class="a4-info-value">' + fmtDate(inv.invoice_date) + '</div>';
-  if (cust && cust.address) {
-    html += '<div class="a4-info-label">Address:</div><div class="a4-info-value">' + esc(cust.address) + '</div>';
-  } else {
-    html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
-  }
-  html += '<div class="a4-info-label">Due Date:</div><div class="a4-info-value">' + fmtDate(inv.due_date) + '</div>';
-  if (cust && cust.ssm_brn) {
-    html += '<div class="a4-info-label">SSM/BRN:</div><div class="a4-info-value">' + esc(cust.ssm_brn) + '</div>';
-  } else {
-    html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
-  }
-  html += '<div class="a4-info-label">Payment Terms:</div><div class="a4-info-value">' + esc(termsLabel) + '</div>';
-  if (cust && cust.tin) {
-    html += '<div class="a4-info-label">TIN:</div><div class="a4-info-value">' + esc(cust.tin) + '</div>';
-  } else {
-    html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
-  }
+  // Bill To + Invoice Details (two-column layout)
+  html += '<div style="display:flex;gap:24px;margin:16px 0;">';
+
+  // Left: Bill To
+  html += '<div style="flex:1;">';
+  html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Bill To</div>';
+  html += '<div style="font-size:14px;font-weight:700;color:#000;">' + esc(cust ? cust.name : '\u2014') + '</div>';
+  if (cust && cust.ssm_brn) html += '<div style="font-size:11px;color:#333;margin-top:2px;">SSM/BRN: ' + esc(cust.ssm_brn) + '</div>';
+  if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
+  if (cust && cust.ic_number) html += '<div style="font-size:11px;color:#333;">IC: ' + esc(cust.ic_number) + '</div>';
+  if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
+  if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(cust.phone) + '</div>';
+  html += '</div>';
+
+  // Right: Invoice Details
+  html += '<div style="min-width:200px;">';
+  html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Invoice Details</div>';
+  html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice No:</td><td>' + esc(inv.id) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice Date:</td><td>' + fmtDate(inv.invoice_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Due Date:</td><td>' + fmtDate(inv.due_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Payment Terms:</td><td>' + esc(termsLabel) + '</td></tr>';
+  html += '</table>';
+  html += '</div>';
+
   html += '</div>';
 
   // Items Table
@@ -5723,8 +5742,6 @@ function generateInvoiceA4(invoiceId) {
   html += 'TG Agro Fruits Sdn. Bhd.';
   html += '</div>';
 
-  // e-Invoice Placeholder
-  html += '<div class="a4-einvoice-placeholder">e-Invoice: Pending</div>';
 
   // Signature Block
   html += '<div class="a4-sig-section">';
