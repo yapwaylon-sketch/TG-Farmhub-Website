@@ -8038,28 +8038,59 @@ async function soDownloadDocAsImage() {
   }
 }
 
-// ── Share: image via Web Share API (mobile), fallback to download popup ──
+// ── Share: capture each A4 page as separate image, share via Web Share API ──
 async function soShareDoc() {
   var isA4 = document.getElementById('so-doc-modal').classList.contains('a4-mode');
-  var docEl = isA4
-    ? document.getElementById('so-doc-a4-content').querySelector('.a4-page')
-    : document.getElementById('so-doc-content');
+  var a4Container = document.getElementById('so-doc-a4-content');
+  var pages = isA4 ? a4Container.querySelectorAll('.a4-page') : null;
+  var docEl = isA4 ? (pages && pages[0]) : document.getElementById('so-doc-content');
   if (!docEl) { notify('No document to share', 'warning'); return; }
 
-  notify('Generating image...', 'info');
+  var pageCount = pages ? pages.length : 1;
+  notify('Generating image' + (pageCount > 1 ? 's' : '') + '...', 'info');
 
   try {
-    var canvas = await html2canvas(docEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
-    var blob = await new Promise(function(resolve) { canvas.toBlob(function(b) { resolve(b); }, 'image/png'); });
+    // Temporarily remove modal scroll constraint so html2canvas captures full height
+    var modalWrap = document.querySelector('#so-doc-modal .doc-modal-wrap');
+    var origMaxH = '', origOverflow = '';
+    if (modalWrap) {
+      origMaxH = modalWrap.style.maxHeight;
+      origOverflow = modalWrap.style.overflowY;
+      modalWrap.style.maxHeight = 'none';
+      modalWrap.style.overflowY = 'visible';
+    }
 
-    soDocImageBlob = blob;
+    // Capture each page as a separate image
+    var blobs = [];
+    var urls = [];
+    var elements = (pages && pages.length > 0) ? pages : [docEl];
+    for (var i = 0; i < elements.length; i++) {
+      var canvas = await html2canvas(elements[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      var blob = await new Promise(function(resolve) { canvas.toBlob(function(b) { resolve(b); }, 'image/png'); });
+      blobs.push(blob);
+      urls.push(URL.createObjectURL(blob));
+    }
+
+    // Restore modal scroll constraint
+    if (modalWrap) {
+      modalWrap.style.maxHeight = origMaxH;
+      modalWrap.style.overflowY = origOverflow;
+    }
+
+    // Store for fallback download
+    soDocImageBlob = blobs[0];
     if (soDocImageUrl) URL.revokeObjectURL(soDocImageUrl);
-    soDocImageUrl = URL.createObjectURL(blob);
+    soDocImageUrl = urls[0];
+    soDocAllBlobs = blobs;
+    soDocAllUrls = urls;
 
-    // Try Web Share API (mobile)
+    // Try Web Share API with all images (mobile)
     if (navigator.share && navigator.canShare) {
-      var file = new File([blob], soDocFileName('png'), { type: 'image/png' });
-      var shareData = { files: [file], title: soDocFileName('png') };
+      var files = blobs.map(function(b, idx) {
+        var suffix = blobs.length > 1 ? '_p' + (idx + 1) : '';
+        return new File([b], soDocFileName('').replace(/\.$/, '') + suffix + '.png', { type: 'image/png' });
+      });
+      var shareData = { files: files, title: soDocFileName('png') };
       if (navigator.canShare(shareData)) {
         try {
           await navigator.share(shareData);
@@ -8071,21 +8102,37 @@ async function soShareDoc() {
       }
     }
 
-    // Fallback: show download + WhatsApp popup
+    // Fallback: show download + WhatsApp popup with all pages
     var preview = document.getElementById('so-doc-share-preview');
-    preview.innerHTML = '<img src="' + soDocImageUrl + '" style="max-width:100%;max-height:200px;border:1px solid var(--border);border-radius:6px;">';
-    document.getElementById('so-doc-share-desc').textContent = soDocFileName('png');
+    var previewHtml = '';
+    urls.forEach(function(u, idx) {
+      previewHtml += '<div style="margin-bottom:8px;">';
+      if (urls.length > 1) previewHtml += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Page ' + (idx + 1) + '</div>';
+      previewHtml += '<img src="' + u + '" style="max-width:100%;max-height:180px;border:1px solid var(--border);border-radius:6px;">';
+      previewHtml += '</div>';
+    });
+    preview.innerHTML = previewHtml;
+    document.getElementById('so-doc-share-desc').textContent = pageCount + ' page' + (pageCount > 1 ? 's' : '') + ' — ' + soDocFileName('png');
     document.getElementById('so-doc-download-btn').onclick = function() {
-      var a = document.createElement('a'); a.href = soDocImageUrl; a.download = soDocFileName('png');
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      soDocAllBlobs.forEach(function(b, idx) {
+        var u = soDocAllUrls[idx];
+        var suffix = soDocAllBlobs.length > 1 ? '_p' + (idx + 1) : '';
+        var a = document.createElement('a'); a.href = u; a.download = soDocFileName('').replace(/\.$/, '') + suffix + '.png';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      });
       notify('Downloaded!', 'success');
     };
-    document.getElementById('so-doc-download-btn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download';
+    document.getElementById('so-doc-download-btn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download' + (pageCount > 1 ? ' All' : '');
     document.getElementById('so-doc-share-modal').style.display = 'flex';
   } catch (e) {
     notify('Failed to generate image: ' + e.message, 'error');
+    // Restore modal in case of error
+    if (modalWrap) { modalWrap.style.maxHeight = origMaxH; modalWrap.style.overflowY = origOverflow; }
   }
 }
+
+var soDocAllBlobs = [];
+var soDocAllUrls = [];
 
 function soOpenWhatsAppDoc() {
   var msg, cust;
