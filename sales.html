@@ -56,11 +56,11 @@
     </div>
     <div class="nav-item" id="nav-customers" onclick="switchTab('customers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="nav-label">Manage Customers</span>
+      <span class="nav-label">Customers</span>
     </div>
     <div class="nav-item" id="nav-products" onclick="switchTab('products')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-      <span class="nav-label">Manage Products</span>
+      <span class="nav-label">Products</span>
     </div>
     <div class="nav-item" id="nav-drivers" onclick="switchTab('drivers')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -1227,6 +1227,7 @@ var systemUsers = [];
 var invoices = [], invoiceItems = [], invoiceOrders = [], invoicePayments = [], creditNotes = [];
 var currentTab = 'dashboard';
 var soDetailOrderId = null;
+var soOpenedFromCustomer = null;
 var soEditOrderId = null;
 
 // SESSION GUARD + INIT
@@ -1271,6 +1272,21 @@ function switchTab(tab, skipHistory) {
 // Browser back button: go to previous tab instead of leaving page
 window.addEventListener('popstate', function(e) {
   if (e.state && e.state.tab) {
+    // If popping back to a customer detail state, restore it
+    if (e.state.customerDetail) {
+      soDetailOrderId = null;
+      soOpenedFromCustomer = null;
+      currentTab = 'customers';
+      document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+      document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+      var pg = document.getElementById('page-customers');
+      if (pg) pg.classList.add('active');
+      var nv = document.getElementById('nav-customers');
+      if (nv) nv.classList.add('active');
+      scDetailCustomerId = e.state.customerDetail;
+      renderCustomers();
+      return;
+    }
     switchTab(e.state.tab, true);
   } else {
     // No more history — stay on dashboard
@@ -2129,6 +2145,21 @@ function soOpenDetail(orderId) {
   soRenderDetail();
 }
 
+function soOpenFromCustomer(orderId, custId) {
+  soOpenedFromCustomer = custId;
+  scDetailCustomerId = null;
+  currentTab = 'orders';
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var page = document.getElementById('page-orders');
+  if (page) page.classList.add('active');
+  var nav = document.getElementById('nav-orders');
+  if (nav) nav.classList.add('active');
+  history.pushState({ tab: 'orders', fromCustomer: custId }, '', '#orders');
+  soDetailOrderId = orderId;
+  soRenderDetail();
+}
+
 function soGoToOrder(orderId) {
   // Navigate to order detail from any tab without resetting
   currentTab = 'orders';
@@ -2141,11 +2172,25 @@ function soGoToOrder(orderId) {
   history.pushState({ tab: 'orders' }, '', '#orders');
   soDetailOrderId = orderId;
   scDetailCustomerId = null;
+  soOpenedFromCustomer = null;
   soRenderDetail();
 }
 
 function soBackToList() {
   soDetailOrderId = null;
+  if (soOpenedFromCustomer) {
+    var custId = soOpenedFromCustomer;
+    soOpenedFromCustomer = null;
+    currentTab = 'customers';
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+    var page = document.getElementById('page-customers');
+    if (page) page.classList.add('active');
+    var nav = document.getElementById('nav-customers');
+    if (nav) nav.classList.add('active');
+    scOpenDetail(custId);
+    return;
+  }
   renderOrders();
 }
 
@@ -2177,10 +2222,11 @@ function soRenderDetail() {
   var html = '';
 
   // Back button
+  var backLabel = soOpenedFromCustomer ? 'Back to Customer' : 'Back to Orders';
   html += '<div style="margin-bottom:10px;">';
   html += '<a href="javascript:void(0)" onclick="soBackToList()" style="font-size:13px;color:var(--green-light);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">';
   html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>';
-  html += 'Back to Orders</a>';
+  html += backLabel + '</a>';
   html += '</div>';
 
   // Header: doc number + customer + status
@@ -3259,6 +3305,10 @@ var scSearchTerm = '';
 var scFilterType = '';
 var scFilterPayment = '';
 var scDetailCustomerId = null;
+var scOrderPeriod = '3m';
+var scOrderDateFrom = '';
+var scOrderDateTo = '';
+var scCollapsedMonths = {};
 
 function renderCustomers() {
   if (scDetailCustomerId) { scRenderDetail(); return; }
@@ -3534,9 +3584,16 @@ function scToggleActive(id) {
   }
 }
 
-function scOpenDetail(id) {
+function scOpenDetail(id, skipHistory) {
   scDetailCustomerId = id;
+  if (!skipHistory) history.pushState({ tab: 'customers', customerDetail: id }, '', '#customers');
   renderCustomers();
+}
+
+function scToggleMonth(key) {
+  var cur = scCollapsedMonths[key];
+  scCollapsedMonths[key] = !cur;
+  scRenderDetail();
 }
 
 function scToggleAllOutstanding(checked) {
@@ -3990,26 +4047,103 @@ function scRenderDetail() {
     html += '</div>';
   }
 
-  // ── All Orders ──
+  // ── All Orders (grouped by month, period filter, collapsible) ──
   html += '<div class="so-detail-section">';
-  html += '<div class="so-detail-section-title">All Orders (' + custOrders.length + ')</div>';
-  if (custOrders.length) {
-    custOrders.sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || ''); });
-    html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-    html += '<thead><tr><th>Doc #</th><th>Type</th><th>Date</th><th>Status</th><th style="text-align:right;">Total</th><th>Payment</th></tr></thead><tbody>';
-    custOrders.forEach(function(o) {
-      html += '<tr style="cursor:pointer;" onclick="scDetailCustomerId=null;soFilterStatus=\'\';switchTab(\'orders\');setTimeout(function(){soOpenDetail(\'' + esc(o.id) + '\')},100);">';
-      html += '<td style="font-weight:600;">' + esc(o.doc_number || o.id) + '</td>';
-      html += '<td><span class="badge ' + docTypeBadgeClass(o.doc_type) + '">' + docTypeLabel(o.doc_type) + '</span></td>';
-      html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
-      html += '<td><span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span></td>';
-      html += '<td style="text-align:right;font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
-      html += '<td><span class="badge badge-' + esc(o.payment_status || 'unpaid') + '">' + soPaymentLabel(o.payment_status) + '</span></td>';
-      html += '</tr>';
+  html += '<div class="so-detail-section-title" style="margin-bottom:8px;">All Orders</div>';
+
+  // Quick period pills
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">';
+  ['3m','6m','1y','all'].forEach(function(p) {
+    var labels = {'3m':'3 Months','6m':'6 Months','1y':'1 Year','all':'All Time'};
+    var active = scOrderPeriod === p && !scOrderDateFrom && !scOrderDateTo;
+    html += '<button onclick="scOrderPeriod=\'' + p + '\';scOrderDateFrom=\'\';scOrderDateTo=\'\';scRenderDetail()" style="padding:4px 10px;font-size:12px;border-radius:6px;border:1px solid ' + (active ? 'var(--green)' : 'var(--overlay-subtle)') + ';background:' + (active ? 'var(--green)' : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text)') + ';cursor:pointer;font-weight:' + (active ? '600' : '400') + ';">' + labels[p] + '</button>';
+  });
+  html += '</div>';
+
+  // Custom date range
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">';
+  html += '<span style="font-size:12px;color:var(--text-muted);">Custom:</span>';
+  html += '<input type="date" value="' + esc(scOrderDateFrom) + '" onchange="scOrderDateFrom=this.value;scOrderPeriod=\'custom\';scRenderDetail()" style="font-size:12px;padding:3px 6px;">';
+  html += '<span style="font-size:12px;color:var(--text-muted);">to</span>';
+  html += '<input type="date" value="' + esc(scOrderDateTo) + '" onchange="scOrderDateTo=this.value;scOrderPeriod=\'custom\';scRenderDetail()" style="font-size:12px;padding:3px 6px;">';
+  if (scOrderDateFrom || scOrderDateTo) {
+    html += '<button onclick="scOrderDateFrom=\'\';scOrderDateTo=\'\';scOrderPeriod=\'3m\';scRenderDetail()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--overlay-subtle);background:transparent;color:var(--text-muted);cursor:pointer;">Clear</button>';
+  }
+  html += '</div>';
+
+  // Filter orders by period
+  var filtered;
+  if (scOrderDateFrom || scOrderDateTo) {
+    filtered = custOrders.filter(function(o) {
+      var d = o.order_date || '';
+      if (scOrderDateFrom && d < scOrderDateFrom) return false;
+      if (scOrderDateTo && d > scOrderDateTo) return false;
+      return true;
     });
-    html += '</tbody></table></div>';
+  } else if (scOrderPeriod !== 'all') {
+    var now = new Date();
+    if (scOrderPeriod === '3m') now.setMonth(now.getMonth() - 3);
+    else if (scOrderPeriod === '6m') now.setMonth(now.getMonth() - 6);
+    else if (scOrderPeriod === '1y') now.setFullYear(now.getFullYear() - 1);
+    var cutoff = now.toISOString().slice(0, 10);
+    filtered = custOrders.filter(function(o) { return (o.order_date || '') >= cutoff; });
   } else {
-    html += '<div style="color:var(--text-muted);font-size:13px;">No orders yet</div>';
+    filtered = custOrders.slice();
+  }
+  filtered.sort(function(a, b) { return (b.order_date || '').localeCompare(a.order_date || ''); });
+
+  if (filtered.length) {
+    // Group by month
+    var months = {};
+    filtered.forEach(function(o) {
+      var key = (o.order_date || '').slice(0, 7) || 'unknown';
+      if (!months[key]) months[key] = [];
+      months[key].push(o);
+    });
+    var monthKeys = Object.keys(months).sort(function(a, b) { return b.localeCompare(a); });
+    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // Set defaults for months not yet toggled: first expanded, rest collapsed
+    monthKeys.forEach(function(key, idx) {
+      if (!(key in scCollapsedMonths)) scCollapsedMonths[key] = idx > 0;
+    });
+
+    monthKeys.forEach(function(key, idx) {
+      var grp = months[key];
+      var label = key;
+      if (key !== 'unknown') {
+        var parts = key.split('-');
+        label = monthNames[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+      }
+      var monthTotal = grp.reduce(function(s, o) { return s + (parseFloat(o.grand_total) || 0); }, 0);
+      var collapsed = scCollapsedMonths[key];
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div onclick="scToggleMonth(\'' + esc(key) + '\')" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--overlay-subtle);border-radius:6px;cursor:pointer;user-select:none;">';
+      html += '<span style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;">';
+      html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;transition:transform 0.2s;transform:rotate(' + (collapsed ? '0' : '90') + 'deg);"><polyline points="9 6 15 12 9 18"/></svg>';
+      html += esc(label) + ' <span style="font-weight:400;color:var(--text-muted);">(' + grp.length + ')</span></span>';
+      html += '<span style="font-weight:600;font-size:13px;">' + formatRM(monthTotal) + '</span>';
+      html += '</div>';
+      if (!collapsed) {
+        html += '<div class="table-wrap" style="margin-top:6px;"><table class="data-table" style="margin:0;">';
+        html += '<thead><tr><th>Doc #</th><th>Type</th><th>Date</th><th>Status</th><th style="text-align:right;">Total</th><th>Payment</th></tr></thead><tbody>';
+        grp.forEach(function(o) {
+          html += '<tr style="cursor:pointer;" onclick="soOpenFromCustomer(\'' + esc(o.id) + '\',\'' + esc(scDetailCustomerId) + '\')">';
+          html += '<td style="font-weight:600;">' + esc(o.doc_number || o.id) + '</td>';
+          html += '<td><span class="badge ' + docTypeBadgeClass(o.doc_type) + '">' + docTypeLabel(o.doc_type) + '</span></td>';
+          html += '<td>' + esc(o.order_date || '\u2014') + '</td>';
+          html += '<td><span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span></td>';
+          html += '<td style="text-align:right;font-weight:600;">' + formatRM(parseFloat(o.grand_total) || 0) + '</td>';
+          html += '<td><span class="badge badge-' + esc(o.payment_status || 'unpaid') + '">' + soPaymentLabel(o.payment_status) + '</span></td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+      html += '</div>';
+    });
+    html += '<div style="font-size:12px;color:var(--text-muted);text-align:right;">Showing ' + filtered.length + ' of ' + custOrders.length + ' orders</div>';
+  } else {
+    html += '<div style="color:var(--text-muted);font-size:13px;">' + (custOrders.length ? 'No orders in this period' : 'No orders yet') + '</div>';
   }
   html += '</div>';
 
