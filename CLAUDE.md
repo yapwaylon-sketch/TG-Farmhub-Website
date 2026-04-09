@@ -89,7 +89,7 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 
 ## Netlify Deployment
 - Site ID: `a0ac5d18-a968-414c-a531-c78ed390e5c2`
-- Netlify token: `nfp_jQof4DyVHjPEN4xRxHU6WxxjKhPM3Aav414e`
+- Netlify token: `nfp_otZ4XU2D5uL9r9Z5g7SEL99asLGWLb997832` (no expiration; rotated 2026-04-09 — previous token `nfp_jQof...414e` was revoked/dead)
 - Domain: `tgfarmhub.com`
 - Deploy: `netlify deploy --prod --dir=.` (or zip upload via Netlify API)
 
