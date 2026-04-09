@@ -1149,7 +1149,7 @@
 <script>
 // CONFIG
 var currentUser = null;
-var customers = [], salesProducts = [], orders = [], orderItems = [], payments = [], returns = [];
+var customers = [], salesProducts = [], orders = [], orderItems = [], payments = [], returns = [], branches = [];
 var varieties = [];
 var allWorkers = [];
 var salesDrivers = [];
@@ -1241,7 +1241,8 @@ async function loadAllData() {
     sbQuery(sb.from('sales_invoice_items').select('*').eq('company_id', cid)),
     sbQuery(sb.from('sales_invoice_orders').select('*').eq('company_id', cid)),
     sbQuery(sb.from('sales_invoice_payments').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_credit_notes').select('*').eq('company_id', cid).order('created_at', {ascending: false}))
+    sbQuery(sb.from('sales_credit_notes').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
+    sbQuery(sb.from('sales_customer_branches').select('*').eq('company_id', cid).eq('is_active', true).order('name'))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
@@ -1258,6 +1259,15 @@ async function loadAllData() {
   invoiceOrders = results[12] || [];
   invoicePayments = results[13] || [];
   creditNotes = results[14] || [];
+  branches = results[15] || [];
+}
+
+function getCustomerBranches(customerId) {
+  return branches.filter(function(b) { return b.customer_id === customerId && b.is_active !== false; });
+}
+
+function getBranch(branchId) {
+  return branches.find(function(b) { return b.id === branchId; });
 }
 
 // SYNC
@@ -5934,7 +5944,8 @@ function generateInvoiceA4(invoiceId) {
       html += '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:6px;">';
       html += '<div style="font-size:12px;font-weight:700;color:#000;">' + esc(o.doc_number || o.id) + '</div>';
       html += '<div style="font-size:11px;color:#666;">';
-      html += 'Date: ' + fmtDate(o.delivery_date || o.order_date);
+      html += 'DO Date: ' + fmtDate(o.order_date);
+      if (o.delivery_date) html += ' &nbsp;|&nbsp; Delivery: ' + fmtDate(o.delivery_date);
       if (o.driver_name) html += ' &nbsp;|&nbsp; Driver: ' + esc(o.driver_name);
       html += '</div>';
       html += '</div>';
