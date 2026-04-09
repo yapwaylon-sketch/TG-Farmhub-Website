@@ -8050,13 +8050,17 @@ async function soShareDocPDF() {
   notify('Generating PDF...', 'info');
 
   try {
-    // Build a clean clone for PDF rendering
-    var clone = a4Container.cloneNode(true);
-    // Remove contenteditable attributes (they add blue outlines in some renderers)
-    clone.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
+    // Create a temporary off-screen container with the same ID so CSS selectors still match
+    var tempWrapper = document.createElement('div');
+    tempWrapper.id = 'so-doc-a4-content';
+    tempWrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;';
+    tempWrapper.innerHTML = a4Container.innerHTML;
+    // Remove contenteditable attributes
+    tempWrapper.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
+    document.body.appendChild(tempWrapper);
 
     var opt = {
-      margin: [5, 5, 5, 5],
+      margin: [8, 5, 8, 5],
       filename: soDocFileName('pdf'),
       image: { type: 'jpeg', quality: 0.92 },
       html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
@@ -8064,7 +8068,8 @@ async function soShareDocPDF() {
       pagebreak: { mode: ['css'], avoid: ['tr'] }
     };
 
-    var pdfBlob = await html2pdf().set(opt).from(clone).outputPdf('blob');
+    var pdfBlob = await html2pdf().set(opt).from(tempWrapper).outputPdf('blob');
+    document.body.removeChild(tempWrapper);
 
     // Try Web Share API (mobile — WhatsApp accepts PDF)
     if (navigator.share && navigator.canShare) {
