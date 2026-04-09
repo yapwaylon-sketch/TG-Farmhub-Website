@@ -828,6 +828,13 @@
       <div style="margin-top:6px;">
         <a href="javascript:void(0)" onclick="soAddCustomerInline()" style="font-size:12px;color:var(--green-light);">+ Add New Customer</a>
       </div>
+      <!-- Branch Selection (hidden until customer selected) -->
+      <div id="so-branch-section" style="display:none;margin-top:8px;">
+        <div class="so-section-label" style="font-size:11px;">DELIVER TO</div>
+        <select id="so-branch" style="width:100%;">
+          <option value="">— No branch selected —</option>
+        </select>
+      </div>
     </div>
 
     <!-- Section B: Order Details -->
@@ -7458,6 +7465,8 @@ function openNewOrderModal(editOrderId) {
   document.getElementById('so-doc-type').value = 'cash_sales';
   document.getElementById('so-channel').value = 'whatsapp';
   document.getElementById('so-notes').value = '';
+  document.getElementById('so-branch-section').style.display = 'none';
+  document.getElementById('so-branch').innerHTML = '<option value="">— No branch selected —</option>';
   document.getElementById('so-subtotal').textContent = 'RM 0.00';
 
   var modalTitle = document.getElementById('so-modal-title');
@@ -7473,6 +7482,14 @@ function openNewOrderModal(editOrderId) {
 
     // Set customer
     if (o.customer_id) soSelectCustomer(o.customer_id);
+
+    // Pre-select branch if order has one
+    if (o.branch_id) {
+      var brSelect = document.getElementById('so-branch');
+      if (brSelect.querySelector('option[value="' + o.branch_id + '"]')) {
+        brSelect.value = o.branch_id;
+      }
+    }
 
     // Set fields
     var editOrderDate = o.order_date || todayStr();
@@ -7579,6 +7596,25 @@ function soSelectCustomer(customerId) {
 
   // Check for unused debit notes
   soCheckDebitNotes(customerId);
+
+  // Show branch dropdown if customer has branches
+  var custBranches = getCustomerBranches(customerId);
+  var brSection = document.getElementById('so-branch-section');
+  var brSelect = document.getElementById('so-branch');
+  if (custBranches.length > 0) {
+    brSelect.innerHTML = '<option value="">— No branch selected —</option>';
+    custBranches.forEach(function(b) {
+      var opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.name + (b.address ? ' — ' + b.address.split('\n')[0] : '');
+      if (b.is_default) opt.selected = true;
+      brSelect.appendChild(opt);
+    });
+    brSection.style.display = '';
+  } else {
+    brSection.style.display = 'none';
+    brSelect.innerHTML = '<option value="">— No branch selected —</option>';
+  }
 }
 
 function soClearCustomer() {
@@ -7590,6 +7626,8 @@ function soClearCustomer() {
   document.getElementById('so-cust-search').value = '';
   var banner = document.getElementById('so-dn-banner');
   if (banner) banner.remove();
+  document.getElementById('so-branch-section').style.display = 'none';
+  document.getElementById('so-branch').innerHTML = '<option value="">— No branch selected —</option>';
 }
 
 function soAddCustomerInline() {
@@ -7813,7 +7851,8 @@ async function soSaveOrder() {
         channel: document.getElementById('so-channel').value,
         subtotal: subtotalVal,
         grand_total: subtotalVal,
-        notes: document.getElementById('so-notes').value.trim() || null
+        notes: document.getElementById('so-notes').value.trim() || null,
+        branch_id: document.getElementById('so-branch').value || null
       };
 
       var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', soEditOrderId).select());
@@ -7875,6 +7914,7 @@ async function soSaveOrder() {
         grand_total: subtotalVal,
         payment_status: 'unpaid',
         notes: document.getElementById('so-notes').value.trim() || null,
+        branch_id: document.getElementById('so-branch').value || null,
         created_by: currentUser.id,
         company_id: getCompanyId()
       };
