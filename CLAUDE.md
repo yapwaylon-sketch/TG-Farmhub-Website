@@ -20,6 +20,7 @@
 - Project syncs between two Windows PCs (main PC + secondary PC) via git/GitHub — migrated off OneDrive on 2026-04-09
   - Both PCs: `C:\dev\TG-Farmhub-Website` (and `C:\dev\TG-Nanas-Growth-TV` as a sibling)
   - Daily workflow: `git pull --ff-only origin main` when sitting down, `git push origin main` when standing up
+  - Shell aliases `gitpull` and `gitpush` set up on both PCs in Git Bash (`~/.bashrc`), PowerShell (`$PROFILE`), and CMD (doskey via `HKCU AutoRun` → `C:\Users\yapwa\cmd-aliases.cmd`). User prefers typing `gitpull`/`gitpush` over the full commands. Claude's Bash tool still uses the full form because it runs in a non-interactive shell that doesn't load user profiles.
   - Never work on both PCs at the same time on the same repo
   - If `git pull --ff-only` errors with "non-fast-forward", you forgot to push from the other PC — push from there first
 
