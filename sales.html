@@ -1401,11 +1401,12 @@ async function invRecomputeInvoice(invoiceId) {
     if (iResult) iResult.forEach(function(ii) { invoiceItems.push(ii); });
   }
 
-  // Update invoice totals
+  // Update invoice totals and capture new updated_at (so callers using sbUpdateWithLock don't get stale timestamp)
   var grandTotal = subtotal - (parseFloat(inv.credit_total) || 0);
-  await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
+  var updResult = await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
   inv.subtotal = subtotal;
   inv.grand_total = subtotal;
+  if (updResult && updResult[0] && updResult[0].updated_at) inv.updated_at = updResult[0].updated_at;
 
   return subtotal;
 }
