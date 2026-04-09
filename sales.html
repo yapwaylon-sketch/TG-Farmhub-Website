@@ -6249,6 +6249,13 @@ async function invCreateDraftInvoice() {
   var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
   if (!selectedIds.length) { notify('Select at least one DO', 'warning'); return; }
 
+  // Guard: only one draft invoice at a time (prevents mid-sequence gaps on cancel)
+  var existingDraft = invoices.find(function(i) { return i.status === 'draft'; });
+  if (existingDraft) {
+    notify('A draft invoice already exists (' + existingDraft.id + '). Approve or cancel it before creating a new one.', 'warning');
+    return;
+  }
+
   // Guard: all selected DOs must belong to the same customer
   var custIdSet = invSelectedCustomerIds();
   if (custIdSet.length > 1) {
