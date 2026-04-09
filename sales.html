@@ -7926,9 +7926,35 @@ async function soPrintThermal() {
   if (!docEl) { notify('No document to print', 'warning'); return; }
   notify('Preparing print...', 'info', 2000);
   try {
-    var canvas = await html2canvas(docEl, {
-      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false
-    });
+    // Multi-page support for A4 documents
+    var a4Pages = isA4 ? document.getElementById('so-doc-a4-content').querySelectorAll('.a4-page') : null;
+    var canvas;
+
+    if (a4Pages && a4Pages.length > 1) {
+      var canvases = [];
+      for (var pi = 0; pi < a4Pages.length; pi++) {
+        canvases.push(await html2canvas(a4Pages[pi], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }));
+      }
+      var totalHeight = 0, maxWidth = 0;
+      var pageGap = 20;
+      canvases.forEach(function(c) { totalHeight += c.height; maxWidth = Math.max(maxWidth, c.width); });
+      totalHeight += pageGap * (canvases.length - 1);
+      canvas = document.createElement('canvas');
+      canvas.width = maxWidth;
+      canvas.height = totalHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, maxWidth, totalHeight);
+      var yOffset = 0;
+      canvases.forEach(function(c, idx) {
+        ctx.drawImage(c, 0, yOffset);
+        yOffset += c.height;
+        if (idx < canvases.length - 1) { ctx.fillStyle = '#cccccc'; ctx.fillRect(0, yOffset, maxWidth, 2); yOffset += pageGap; }
+      });
+    } else {
+      canvas = await html2canvas(docEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    }
+
     var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     window.location.href = 'rawbt:' + dataUrl;
   } catch (e) {
@@ -7946,12 +7972,41 @@ async function soShareDoc() {
   notify('Generating image...', 'info');
 
   try {
-    var canvas = await html2canvas(docEl, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false
-    });
+    // Capture all A4 pages (invoice may have DO summary attachment on page 2+)
+    var a4Pages = isA4 ? document.getElementById('so-doc-a4-content').querySelectorAll('.a4-page') : null;
+    var canvas;
+
+    if (a4Pages && a4Pages.length > 1) {
+      // Multi-page: render each page, stitch vertically
+      var canvases = [];
+      for (var pi = 0; pi < a4Pages.length; pi++) {
+        canvases.push(await html2canvas(a4Pages[pi], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }));
+      }
+      var totalHeight = 0, maxWidth = 0;
+      var pageGap = 20; // px gap between pages
+      canvases.forEach(function(c) { totalHeight += c.height; maxWidth = Math.max(maxWidth, c.width); });
+      totalHeight += pageGap * (canvases.length - 1);
+
+      canvas = document.createElement('canvas');
+      canvas.width = maxWidth;
+      canvas.height = totalHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, maxWidth, totalHeight);
+      var yOffset = 0;
+      canvases.forEach(function(c, idx) {
+        ctx.drawImage(c, 0, yOffset);
+        yOffset += c.height;
+        if (idx < canvases.length - 1) {
+          // Draw a thin gray line between pages
+          ctx.fillStyle = '#cccccc';
+          ctx.fillRect(0, yOffset, maxWidth, 2);
+          yOffset += pageGap;
+        }
+      });
+    } else {
+      canvas = await html2canvas(docEl, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    }
 
     // Convert to blob
     var blob = await new Promise(function(resolve) {
