@@ -5,5 +5,20 @@
 .claude/
 
 # Sub-projects (separate Netlify deploys, same Supabase DB)
+# NOTE: moving to their own GitHub repos (yapwaylon-sketch/TG-Nanas-Growth-TV,
+# yapwaylon-sketch/TG-Weather-Monitoring) — keep ignored here.
 TG Nanas Growth TV/
 TG Weather Monitoring Website/
+
+# Node / tooling
+node_modules/
+
+# Supabase CLI local cache (project-ref, pooler-url, version pins)
+supabase/.temp/
+
+# Superpowers / deep-plan scratch output
+.superpowers/
+docs/superpowers/specs/sections/.prompts/
+
+# Icon design scratch (icons/modules/ is committed, icons/test/ is not)
+icons/test/
