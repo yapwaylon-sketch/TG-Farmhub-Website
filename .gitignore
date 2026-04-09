@@ -5,9 +5,9 @@
 .claude/
 
 # Sub-projects (separate Netlify deploys, same Supabase DB)
-# NOTE: moving to their own GitHub repos (yapwaylon-sketch/TG-Nanas-Growth-TV,
-# yapwaylon-sketch/TG-Weather-Monitoring) — keep ignored here.
-TG Nanas Growth TV/
+# Nanas is now its own repo at yapwaylon-sketch/TG-Nanas-Growth-TV,
+# cloned as a sibling at C:\dev\TG-Nanas-Growth-TV (no longer a subfolder).
+# Weather is still deferred — lives outside the project folder entirely.
 TG Weather Monitoring Website/
 
 # Node / tooling
