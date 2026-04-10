@@ -234,6 +234,14 @@
       </button>
     </div>
     <input type="hidden" id="user-edit-id" value="">
+    <div id="user-worker-row" class="form-row" style="margin-bottom:8px;">
+      <div class="form-field" style="flex:1;">
+        <label>Pull from Workers <span style="font-weight:400;color:var(--text-muted);">(optional — auto-fills name &amp; username)</span></label>
+        <select id="user-worker-select" onchange="userWorkerSelected()" style="width:100%;">
+          <option value="">— Enter manually —</option>
+        </select>
+      </div>
+    </div>
     <div class="form-row">
       <div class="form-field">
         <label>Display Name</label>
@@ -697,8 +705,12 @@ function showHub() {
 
   showHubPage("modules");
   renderModuleCards();
-  loadCompanyOverview();
-  if (currentUser.role === "admin") renderUsers();
+  if (currentUser.role === "admin") {
+    loadCompanyOverview();
+    renderUsers();
+  } else {
+    document.getElementById('company-overview').style.display = 'none';
+  }
 }
 
 async function showHubPage(page) {
@@ -905,7 +917,7 @@ function renderUsers() {
 // ============================================================
 // USER MODAL + PERMISSIONS EDITOR
 // ============================================================
-function openUserModal(editUser) {
+async function openUserModal(editUser) {
   document.getElementById("user-edit-id").value = editUser ? editUser.id : "";
   document.getElementById("user-modal-title").textContent = editUser ? "Edit User" : "Add User";
   document.getElementById("user-display-name").value = editUser ? editUser.displayName : "";
@@ -914,11 +926,43 @@ function openUserModal(editUser) {
   document.getElementById("user-pin").placeholder = editUser ? "Leave blank to keep, or enter new 6-digit PIN" : "e.g. 123456";
   document.getElementById("user-role").value = editUser ? editUser.role : "staff";
 
+  // Show/hide worker pull row (only for new users)
+  var workerRow = document.getElementById("user-worker-row");
+  workerRow.style.display = editUser ? "none" : "";
+  if (!editUser) await loadWorkerOptions();
+
   const perms = editUser ? mergePermissions(editUser.permissions) : getDefaultPermissions();
   buildPermPanels(perms);
   updatePermVisibility();
 
   document.getElementById("user-modal").style.display = "flex";
+}
+
+async function loadWorkerOptions() {
+  var sel = document.getElementById("user-worker-select");
+  sel.innerHTML = '<option value="">— Enter manually —</option>';
+  // Load all active workers from both companies
+  var data = await sbQuery(sb.from("workers").select("id,name,company_id").eq("active", true).order("name"));
+  if (!data || !data.length) return;
+  // Exclude workers that already have a user account with the same display name
+  var existingNames = users.map(function(u) { return u.displayName.toLowerCase(); });
+  var available = data.filter(function(w) { return existingNames.indexOf(w.name.toLowerCase()) < 0; });
+  if (!available.length) { sel.innerHTML += '<option disabled>All workers already have accounts</option>'; return; }
+  available.forEach(function(w) {
+    var co = w.company_id === 'tg_agro_fruits' ? 'AF' : 'AB';
+    sel.innerHTML += '<option value="' + w.id + '" data-name="' + esc(w.name) + '">' + esc(w.name) + ' (' + co + ')</option>';
+  });
+}
+
+function userWorkerSelected() {
+  var sel = document.getElementById("user-worker-select");
+  var opt = sel.options[sel.selectedIndex];
+  if (!sel.value) return;
+  var name = opt.getAttribute("data-name");
+  document.getElementById("user-display-name").value = name;
+  // Auto-generate username: lowercase, spaces to dots, remove special chars
+  var username = name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
+  document.getElementById("user-username").value = username;
 }
 
 function mergePermissions(existing) {
@@ -996,6 +1040,14 @@ function toggleAllPerms(moduleKey) {
 
 function updatePermStatus(moduleKey) {
   const m = MODULES.find(mod => mod.key === moduleKey);
+  const viewCb = document.getElementById("perm-" + moduleKey + "-view");
+
+  // Auto-check "view" if any other permission is ticked
+  if (viewCb) {
+    const anyOtherChecked = m.permissions.some(p => p.key !== 'view' && document.getElementById("perm-" + moduleKey + "-" + p.key).checked);
+    if (anyOtherChecked && !viewCb.checked) viewCb.checked = true;
+  }
+
   const checked = m.permissions.filter(p => document.getElementById("perm-" + moduleKey + "-" + p.key).checked).length;
   const total = m.permissions.length;
   const allChecked = checked === total;

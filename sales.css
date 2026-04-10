@@ -1197,6 +1197,22 @@
   background: var(--bg-input);
 }
 
+.so-add-photo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  min-height: 120px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--green-light);
+  background: transparent;
+  transition: border-color 0.2s;
+}
+.so-add-photo-btn:hover { border-color: var(--green-light); }
+
 /* Timeline dot checkmark centering */
 .timeline-dot {
   display: flex;

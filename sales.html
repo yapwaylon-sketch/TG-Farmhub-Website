@@ -199,7 +199,7 @@
 
 <!-- BOTTOM ACTION BAR -->
 <div class="bottom-actions" id="bottom-actions">
-  <button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>
+  <button class="btn btn-primary" id="btn-bottom-new-order" onclick="openNewOrderModal()">+ New Order</button>
 </div>
 
 </div>
@@ -229,13 +229,23 @@
     <div class="form-field">
       <label for="sp-category">CATEGORY</label>
       <select id="sp-category" style="width:100%;" onchange="spCategoryChange()">
-        <option value="whole_crown">Whole with Crown</option>
-        <option value="whole_no_crown">Whole without Crown</option>
-        <option value="slice">Slices</option>
-        <option value="peeled">Peeled Whole</option>
-        <option value="slice_box">Slices (Box)</option>
-        <option value="chunk_box">Chunks (Box)</option>
-        <option value="ring_box">Rings (Box)</option>
+        <optgroup label="Pineapple">
+          <option value="whole_crown">Whole with Crown</option>
+          <option value="whole_no_crown">Whole without Crown</option>
+          <option value="slice">Slices</option>
+          <option value="peeled">Peeled Whole</option>
+          <option value="slice_box">Slices (Box)</option>
+          <option value="chunk_box">Chunks (Box)</option>
+          <option value="ring_box">Rings (Box)</option>
+        </optgroup>
+        <optgroup label="Other Fruits">
+          <option value="fruit_whole">Whole Fruit</option>
+          <option value="fruit_cut">Cut / Sliced</option>
+          <option value="fruit_box">Box / Pack</option>
+        </optgroup>
+        <optgroup label="General">
+          <option value="other">Other</option>
+        </optgroup>
       </select>
     </div>
     <div class="form-row">
@@ -1219,6 +1229,12 @@
 <script>
 // CONFIG
 var currentUser = null;
+function salesCan(perm) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+  var p = currentUser.permissions && currentUser.permissions.sales;
+  return p && p[perm];
+}
 var customers = [], salesProducts = [], orders = [], orderItems = [], payments = [], returns = [], branches = [];
 var varieties = [];
 var allWorkers = [];
@@ -1249,12 +1265,28 @@ var soEditOrderId = null;
   injectCompanySwitcher();
   startInactivityTimer();
   startSessionCheck();
+
+  // Gate sidebar tabs and buttons by permission
+  if (!salesCan('payments'))        document.getElementById('nav-payments').style.display = 'none';
+  if (!salesCan('delivery'))        document.getElementById('nav-drivers').style.display = 'none';
+  if (!salesCan('manageCustomers')) { document.getElementById('nav-products').style.display = 'none'; document.getElementById('nav-customers').style.display = 'none'; }
+  if (!salesCan('export'))          document.getElementById('nav-reports').style.display = 'none';
+  if (currentUser.role !== 'admin') document.getElementById('nav-invoicing').style.display = 'none';
+  if (!salesCan('createOrder'))     document.getElementById('btn-bottom-new-order').style.display = 'none';
+
   await loadAllData();
   renderCurrentTab();
 })();
 
 // TAB SWITCHING
 function switchTab(tab, skipHistory) {
+  // Permission gate — prevent navigating to restricted tabs
+  if (tab === 'payments' && !salesCan('payments')) { notify('No access to Payments', 'warning'); return; }
+  if (tab === 'invoicing' && currentUser.role !== 'admin') { notify('Admin access required', 'warning'); return; }
+  if (tab === 'customers' && !salesCan('manageCustomers')) { notify('No access to Customers', 'warning'); return; }
+  if (tab === 'products' && !salesCan('manageCustomers')) { notify('No access to Products', 'warning'); return; }
+  if (tab === 'drivers' && !salesCan('delivery')) { notify('No access to Drivers', 'warning'); return; }
+  if (tab === 'reports' && !salesCan('export')) { notify('No access to Reports', 'warning'); return; }
   // Reset detail views when switching tabs
   soDetailOrderId = null;
   scDetailCustomerId = null;
@@ -1596,37 +1628,39 @@ function renderDashboard() {
   var toPrepProducts = getProductBreakdown(toPrepOrders);
   var readyProducts = getProductBreakdown(readyOrders);
 
-  // --- Row 1: Financial summary (compact) ---
-  html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'payments\')">';
-  html += '<div class="sc-label">Unpaid CS</div>';
-  html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Draft Invoices</div>';
-  html += '<div class="sc-value" style="font-size:16px;color:' + (draftInvoiceCount > 0 ? '#999' : 'var(--text-muted)') + ';">' + draftInvoiceCount + (draftInvoiceCount > 0 ? ' (' + formatRM(draftInvoiceAmount) + ')' : '') + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Outstanding Invoices</div>';
-  html += '<div class="sc-value" style="font-size:18px;color:#5B9BD5;">' + formatRM(outstandingInvoices) + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Overdue Invoices</div>';
-  html += '<div class="sc-value" style="font-size:16px;color:' + (overdueCount > 0 ? 'var(--critical)' : 'var(--text-muted)') + ';">' + overdueCount + (overdueCount > 0 ? ' (' + formatRM(overdueAmount) + ')' : '') + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
-  html += '<div class="sc-label">Uninvoiced DOs</div>';
-  html += '<div class="sc-value" style="font-size:16px;color:#5B9BD5;">' + uninvoicedDOCount + (uninvoicedDOCount > 0 ? ' (' + formatRM(uninvoicedDOAmount) + ')' : '') + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:90px;border-color:var(--gold);">';
-  html += '<div class="sc-label">Total Owed</div>';
-  html += '<div class="sc-value" style="font-size:18px;color:var(--critical);">' + formatRM(totalOwed) + '</div>';
-  html += '</div>';
-  html += '<div class="summary-card" style="flex:1;min-width:70px;">';
-  html += '<div class="sc-label">Today</div>';
-  html += '<div class="sc-value" style="font-size:18px;">' + ordersToday + '</div>';
-  html += '</div>';
-  html += '</div>';
+  // --- Row 1: Financial summary (compact) — admin/payments only ---
+  if (salesCan('payments')) {
+    html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'payments\')">';
+    html += '<div class="sc-label">Unpaid CS</div>';
+    html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+    html += '<div class="sc-label">Draft Invoices</div>';
+    html += '<div class="sc-value" style="font-size:16px;color:' + (draftInvoiceCount > 0 ? '#999' : 'var(--text-muted)') + ';">' + draftInvoiceCount + (draftInvoiceCount > 0 ? ' (' + formatRM(draftInvoiceAmount) + ')' : '') + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+    html += '<div class="sc-label">Outstanding Invoices</div>';
+    html += '<div class="sc-value" style="font-size:18px;color:#5B9BD5;">' + formatRM(outstandingInvoices) + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+    html += '<div class="sc-label">Overdue Invoices</div>';
+    html += '<div class="sc-value" style="font-size:16px;color:' + (overdueCount > 0 ? 'var(--critical)' : 'var(--text-muted)') + ';">' + overdueCount + (overdueCount > 0 ? ' (' + formatRM(overdueAmount) + ')' : '') + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'invoicing\')">';
+    html += '<div class="sc-label">Uninvoiced DOs</div>';
+    html += '<div class="sc-value" style="font-size:16px;color:#5B9BD5;">' + uninvoicedDOCount + (uninvoicedDOCount > 0 ? ' (' + formatRM(uninvoicedDOAmount) + ')' : '') + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:90px;border-color:var(--gold);">';
+    html += '<div class="sc-label">Total Owed</div>';
+    html += '<div class="sc-value" style="font-size:18px;color:var(--critical);">' + formatRM(totalOwed) + '</div>';
+    html += '</div>';
+    html += '<div class="summary-card" style="flex:1;min-width:70px;">';
+    html += '<div class="sc-label">Today</div>';
+    html += '<div class="sc-value" style="font-size:18px;">' + ordersToday + '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
 
   // --- Row 2: Operational cards (side by side) ---
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">';
@@ -1866,7 +1900,7 @@ function renderOrders() {
 
   // Header actions
   document.getElementById('orders-header-actions').innerHTML =
-    '<button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>';
+    salesCan('createOrder') ? '<button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>' : '';
 
   var body = document.getElementById('orders-body');
 
@@ -2373,19 +2407,22 @@ function soRenderDetail() {
   html += '<div class="so-detail-section-title">Actions</div>';
   html += '<div class="so-detail-actions">';
 
+  var canOrder = salesCan('createOrder');
+  var canDeliver = salesCan('delivery');
+
   if (o.status === 'pending') {
-    html += '<button class="btn btn-primary" id="btn-start-prep" onclick="soShowPrepModal(\'' + esc(o.id) + '\')">Start Preparing</button>';
-    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
-    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+    if (canOrder) html += '<button class="btn btn-primary" id="btn-start-prep" onclick="soShowPrepModal(\'' + esc(o.id) + '\')">Start Preparing</button>';
+    if (canOrder) html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
+    if (canOrder) html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'preparing') {
-    html += '<button class="btn btn-primary" id="btn-mark-prepared" onclick="soMarkPrepared(\'' + esc(o.id) + '\')">Mark Prepared</button>';
-    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
-    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+    if (canOrder) html += '<button class="btn btn-primary" id="btn-mark-prepared" onclick="soMarkPrepared(\'' + esc(o.id) + '\')">Mark Prepared</button>';
+    if (canOrder) html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
+    if (canOrder) html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'prepared') {
     if (o.fulfillment === 'delivery') {
-      html += '<button class="btn btn-primary" id="btn-assign-driver" onclick="soAssignDriver(\'' + esc(o.id) + '\')">Assign Driver & Deliver</button>';
+      if (canDeliver) html += '<button class="btn btn-primary" id="btn-assign-driver" onclick="soAssignDriver(\'' + esc(o.id) + '\')">Assign Driver & Deliver</button>';
     } else {
-      html += '<button class="btn btn-primary" id="btn-mark-collected" onclick="soMarkCollected(\'' + esc(o.id) + '\')">Mark Collected</button>';
+      if (canDeliver) html += '<button class="btn btn-primary" id="btn-mark-collected" onclick="soMarkCollected(\'' + esc(o.id) + '\')">Mark Collected</button>';
     }
     var docLabel = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
     html += '<button class="btn btn-outline" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
@@ -2394,10 +2431,10 @@ function soRenderDetail() {
     html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
     html += 'Print A4 ' + docLabel + '</button>';
-    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
-    html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
+    if (canOrder) html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
+    if (canOrder) html += '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="soCancelOrder(\'' + esc(o.id) + '\')">Cancel Order</button>';
   } else if (o.status === 'delivering') {
-    html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
+    if (canDeliver) html += '<button class="btn btn-primary" id="btn-mark-delivered" onclick="soMarkDelivered(\'' + esc(o.id) + '\')">Mark Delivered</button>';
     var docLabel = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
     html += '<button class="btn btn-outline" onclick="soGenerateDoc(\'' + esc(o.id) + '\')" style="gap:6px;">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
@@ -2405,7 +2442,7 @@ function soRenderDetail() {
     html += '<button class="btn btn-outline" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')" style="gap:6px;border-color:var(--gold);color:var(--gold);">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg>';
     html += 'Print A4 ' + docLabel + '</button>';
-    html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
+    if (canOrder) html += '<button class="btn btn-outline" onclick="soEditOrder(\'' + esc(o.id) + '\')">Edit Order</button>';
   }
 
   // Delete button for cancelled/completed orders (admin only)
@@ -2459,7 +2496,7 @@ function soRenderDetail() {
     html += '</tbody></table></div>';
   }
 
-  if (payStatus !== 'paid' && o.status === 'completed') {
+  if (payStatus !== 'paid' && o.status === 'completed' && salesCan('payments')) {
     html += '<button class="btn btn-outline btn-sm" onclick="payOpenModal(\'' + esc(o.id) + '\')">Record Payment</button>';
   }
   html += '</div>';
@@ -2497,7 +2534,7 @@ function soRenderDetail() {
   } else {
     html += '<div style="font-size:13px;color:var(--text-muted);">No returns for this order.</div>';
   }
-  if (o.status === 'completed') {
+  if (o.status === 'completed' && salesCan('createOrder')) {
     html += '<button class="btn btn-outline btn-sm" onclick="retOpenModal(\'' + esc(o.id) + '\')" style="margin-top:10px;">+ Add Return</button>';
   }
   html += '</div>';
@@ -2505,35 +2542,57 @@ function soRenderDetail() {
   // Photos — always show section
   html += '<div class="so-detail-section">';
   html += '<div class="so-detail-section-title">Photos</div>';
-  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;">';
 
-  // Preparation photo
-  html += '<div class="so-detail-photo">';
-  if (o.prep_photo_url) {
-    html += '<img src="' + esc(o.prep_photo_url) + '" alt="Prep photo" onclick="window.open(this.src,\'_blank\')">';
+  // Collect all prep photos (initial + extras)
+  var prepPhotos = [];
+  if (o.prep_photo_url) prepPhotos.push(o.prep_photo_url);
+  if (o.prep_photos && Array.isArray(o.prep_photos)) prepPhotos = prepPhotos.concat(o.prep_photos);
+
+  // Collect all delivery photos (initial + extras)
+  var delPhotos = [];
+  if (o.delivery_photo_url) delPhotos.push(o.delivery_photo_url);
+  if (o.delivery_photos && Array.isArray(o.delivery_photos)) delPhotos = delPhotos.concat(o.delivery_photos);
+
+  // Preparation photos
+  html += '<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Preparation</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">';
+  if (prepPhotos.length > 0) {
+    prepPhotos.forEach(function(url, i) {
+      var bustUrl = esc(url) + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
+      html += '<div class="so-detail-photo">';
+      html += '<img src="' + bustUrl + '" alt="Prep photo ' + (i+1) + '" onclick="window.open(\'' + esc(url) + '\',\'_blank\')">';
+      html += '<label style="display:block;text-align:center;padding:3px;cursor:pointer;font-size:10px;color:var(--green-light);">Replace<input type="file" accept="image/*" capture="environment" onchange="soReplacePhoto(\'' + esc(o.id) + '\',\'prep\',' + i + ',this)" style="display:none;"></label>';
+      html += '<a href="javascript:void(0)" onclick="soDeletePhoto(\'' + esc(o.id) + '\',\'prep\',' + i + ')" style="display:block;text-align:center;font-size:10px;color:#c0392b;cursor:pointer;">Remove</a>';
+      html += '</div>';
+    });
   } else {
-    html += '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-dim);font-size:11px;">No photo</div>';
+    html += '<div style="width:140px;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-dim);font-size:11px;border-radius:8px;">No photo</div>';
   }
-  html += '<div class="so-detail-photo-label">Preparation</div>';
-  if (!o.prep_photo_url && o.status !== 'pending') {
-    html += '<label style="display:block;text-align:center;padding:4px;cursor:pointer;font-size:10px;color:var(--green-light);">+ Add<input type="file" accept="image/*" capture="environment" onchange="soUploadStagePhoto(\'' + esc(o.id) + '\',\'prep_photo_url\',this)" style="display:none;"></label>';
+  if (o.status !== 'pending') {
+    html += '<label class="so-add-photo-btn">+ Add Photo<input type="file" accept="image/*" capture="environment" onchange="soAddExtraPhoto(\'' + esc(o.id) + '\',\'prep\',this)" style="display:none;"></label>';
   }
-  html += '</div>';
+  html += '</div></div>';
 
-  // Delivery photo
-  html += '<div class="so-detail-photo">';
-  if (o.delivery_photo_url) {
-    html += '<img src="' + esc(o.delivery_photo_url) + '" alt="Delivery photo" onclick="window.open(this.src,\'_blank\')">';
+  // Delivery photos
+  html += '<div><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Delivery</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">';
+  if (delPhotos.length > 0) {
+    delPhotos.forEach(function(url, i) {
+      var bustUrl = esc(url) + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
+      html += '<div class="so-detail-photo">';
+      html += '<img src="' + bustUrl + '" alt="Delivery photo ' + (i+1) + '" onclick="window.open(\'' + esc(url) + '\',\'_blank\')">';
+      html += '<label style="display:block;text-align:center;padding:3px;cursor:pointer;font-size:10px;color:var(--green-light);">Replace<input type="file" accept="image/*" capture="environment" onchange="soReplacePhoto(\'' + esc(o.id) + '\',\'delivery\',' + i + ',this)" style="display:none;"></label>';
+      html += '<a href="javascript:void(0)" onclick="soDeletePhoto(\'' + esc(o.id) + '\',\'delivery\',' + i + ')" style="display:block;text-align:center;font-size:10px;color:#c0392b;cursor:pointer;">Remove</a>';
+      html += '</div>';
+    });
   } else {
-    html += '<div style="width:100%;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-dim);font-size:11px;">No photo</div>';
+    html += '<div style="width:140px;height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-dim);font-size:11px;border-radius:8px;">No photo</div>';
   }
-  html += '<div class="so-detail-photo-label">Delivery</div>';
-  if (!o.delivery_photo_url && (o.status === 'delivering' || o.status === 'completed')) {
-    html += '<label style="display:block;text-align:center;padding:4px;cursor:pointer;font-size:10px;color:var(--green-light);">+ Add<input type="file" accept="image/*" capture="environment" onchange="soUploadStagePhoto(\'' + esc(o.id) + '\',\'delivery_photo_url\',this)" style="display:none;"></label>';
+  if (o.status === 'delivering' || o.status === 'completed' || o.status === 'preparing' || o.status === 'prepared') {
+    html += '<label class="so-add-photo-btn">+ Add Photo<input type="file" accept="image/*" capture="environment" onchange="soAddExtraPhoto(\'' + esc(o.id) + '\',\'delivery\',this)" style="display:none;"></label>';
   }
-  html += '</div>';
+  html += '</div></div>';
 
-  html += '</div>';
   html += '</div>';
 
   // Notes
@@ -2566,7 +2625,9 @@ async function soUpdateStatus(orderId, newStatus, extraData) {
 var CATEGORY_BM = {
   whole_crown: 'Biji (Bermahkota)', whole_no_crown: 'Biji (Tanpa Mahkota)',
   slice: 'Hirisan', peeled: 'Kupas', slice_box: 'Hirisan (Kotak)',
-  chunk_box: 'Ketulan (Kotak)', ring_box: 'Gelang (Kotak)'
+  chunk_box: 'Ketulan (Kotak)', ring_box: 'Gelang (Kotak)',
+  fruit_whole: 'Buah (Biji)', fruit_cut: 'Potong / Hirisan',
+  fruit_box: 'Kotak / Pek', other: 'Lain-lain'
 };
 
 function getProductNameBM(prod) {
@@ -2634,6 +2695,7 @@ var soPrepOrderId = null;
 var soPrepMsg = '';
 
 function soShowPrepModal(orderId) {
+  if (!salesCan('createOrder')) { notify('No permission', 'warning'); return; }
   soPrepOrderId = orderId;
 
   // Populate worker dropdown
@@ -2707,6 +2769,7 @@ async function soPrepConfirm() {
 var soPrepQtyOrderId = null;
 
 async function soMarkPrepared(orderId) {
+  if (!salesCan('createOrder')) { notify('No permission', 'warning'); return; }
   soPrepQtyOrderId = orderId;
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
 
@@ -2834,14 +2897,14 @@ async function soPrepQtyConfirm() {
 }
 
 function soShowPrepPhoto(orderId) {
-  soShowPhotoModal('Preparation Photo', 'Photo is required before marking as prepared.', orderId, 'prep', async function(photoUrl) {
+  soShowPhotoModal('Preparation Photo', 'Take a photo of the prepared order.', orderId, 'prep', async function(photoUrl) {
     var btn = document.getElementById('btn-mark-prepared');
     if (btn) btnLoading(btn, true);
     var extra = photoUrl ? { prep_photo_url: photoUrl } : {};
     var ok = await soUpdateStatus(orderId, 'prepared', extra);
     if (btn) btnLoading(btn, false, 'Mark Prepared');
     if (ok) { notify('Order marked as prepared' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); }
-  }, true);
+  }, false);
 }
 
 // Generic photo modal — supports camera + album
@@ -2864,6 +2927,14 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
   if (skipBtn) skipBtn.style.display = required ? 'none' : '';
 
   modal.style.display = 'flex';
+
+  // X close button — treat as skip so the flow still completes
+  var closeBtn = modal.querySelector('.modal-close');
+  if (closeBtn) {
+    var closeClone = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(closeClone, closeBtn);
+    closeClone.onclick = function() { closeModal('so-photo-modal'); onComplete(null); };
+  }
 
   document.getElementById('so-photo-skip-btn').onclick = function() {
     closeModal('so-photo-modal');
@@ -2942,6 +3013,7 @@ function getDriverName(driverId, driverSource) {
 }
 
 function soAssignDriver(orderId) {
+  if (!salesCan('delivery')) { notify('No permission', 'warning'); return; }
   var modal = document.getElementById('so-driver-modal');
   var sel = document.getElementById('so-driver-select');
   sel.innerHTML = '<option value="">Select a driver...</option>';
@@ -2992,6 +3064,7 @@ async function soConfirmDriver() {
 }
 
 function soMarkCollected(orderId) {
+  if (!salesCan('delivery')) { notify('No permission', 'warning'); return; }
   confirmAction('Mark as Collected?', 'Confirm that the customer has collected this order?', async function() {
     var btn = document.getElementById('btn-mark-collected');
     if (btn) btnLoading(btn, true);
@@ -3004,6 +3077,7 @@ function soMarkCollected(orderId) {
 var soDeliveryQtyOrderId = null;
 
 async function soMarkDelivered(orderId) {
+  if (!salesCan('delivery')) { notify('No permission', 'warning'); return; }
   // Show quantity confirmation first (driver adjusts for damage in transit)
   soDeliveryQtyOrderId = orderId;
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
@@ -3255,6 +3329,7 @@ async function soWalkInConfirm() {
 }
 
 function soCancelOrder(orderId) {
+  if (!salesCan('createOrder')) { notify('No permission', 'warning'); return; }
   var reasonHtml = '<div style="margin-bottom:8px;">This will cancel the order. This action cannot be undone.</div>';
   reasonHtml += '<div class="form-field" style="margin-top:12px;"><label>REASON FOR CANCELLATION <span style="color:var(--danger);">*</span></label>';
   reasonHtml += '<input type="text" id="so-cancel-reason" placeholder="e.g. Customer changed mind, duplicate order" style="width:100%;"></div>';
@@ -3295,6 +3370,7 @@ function soDeleteOrder(orderId) {
 }
 
 function soEditOrder(orderId) {
+  if (!salesCan('createOrder')) { notify('No permission to edit orders', 'warning'); return; }
   var o = orders.find(function(x) { return x.id === orderId; });
   if (!o) return;
   if (o.status === 'completed' || o.status === 'cancelled') { notify('Cannot edit ' + o.status + ' orders', 'warning'); return; }
@@ -3314,7 +3390,7 @@ function renderCustomers() {
   if (scDetailCustomerId) { scRenderDetail(); return; }
   // Header actions
   document.getElementById('customers-header-actions').innerHTML =
-    '<button class="btn btn-primary" onclick="scOpenModal()">+ Add Customer</button>';
+    salesCan('manageCustomers') ? '<button class="btn btn-primary" onclick="scOpenModal()">+ Add Customer</button>' : '';
 
   var body = document.getElementById('customers-body');
 
@@ -3390,8 +3466,10 @@ function renderCustomerCards() {
     html += '<td><span class="badge badge-' + paymentTermsBadgeClass(c.payment_terms_days) + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></td>';
     html += '<td>' + rrHtml + '</td>';
     html += '<td><div style="display:flex;gap:4px;">';
-    html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="scToggleActive(\'' + c.id + '\')">' + (c.is_active === false ? 'Activate' : 'Deactivate') + '</button>';
+    if (salesCan('manageCustomers')) {
+      html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
+      html += '<button class="btn btn-outline btn-sm" onclick="scToggleActive(\'' + c.id + '\')">' + (c.is_active === false ? 'Activate' : 'Deactivate') + '</button>';
+    }
     html += '</div></td>';
     html += '</tr>';
   });
@@ -3484,6 +3562,7 @@ function scCheckPhone() {
 }
 
 async function scSaveCustomer() {
+  if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sc-edit-id').value;
   var name = document.getElementById('sc-name').value.trim();
   var phone = document.getElementById('sc-phone').value.trim();
@@ -3795,7 +3874,7 @@ function scRenderDetail() {
   if (c.credit_limit) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Credit Limit</div><div style="color:var(--text);">RM ' + parseFloat(c.credit_limit).toFixed(2) + '</div></div>';
   html += '</div>';
   html += '<div style="margin-top:10px;display:flex;gap:8px;">';
-  html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + esc(c.id) + '\')">Edit Customer</button>';
+  if (salesCan('manageCustomers')) html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + esc(c.id) + '\')">Edit Customer</button>';
   html += '<button class="btn btn-outline btn-sm" onclick="soGenerateStatement(\'' + esc(c.id) + '\')" style="gap:4px;border-color:var(--gold);color:var(--gold);">';
   html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
   html += 'Print Statement</button>';
@@ -4150,7 +4229,7 @@ function scRenderDetail() {
 function renderProducts() {
   // Header actions
   document.getElementById('products-header-actions').innerHTML =
-    '<button class="btn btn-primary" onclick="spOpenModal()">+ Add Product</button>';
+    salesCan('manageCustomers') ? '<button class="btn btn-primary" onclick="spOpenModal()">+ Add Product</button>' : '';
 
   var body = document.getElementById('products-body');
   if (!salesProducts.length) {
@@ -4199,8 +4278,10 @@ function renderProducts() {
       html += '<td>' + formatRM(p.default_price || 0) + '</td>';
       html += '<td>' + statusBadge + '</td>';
       html += '<td><div style="display:flex;gap:4px;">';
-      html += '<button class="btn btn-outline btn-sm" onclick="spOpenModal(\'' + p.id + '\')">Edit</button>';
-      html += '<button class="btn btn-outline btn-sm" onclick="spToggleActive(\'' + p.id + '\')">' + toggleLabel + '</button>';
+      if (salesCan('manageCustomers')) {
+        html += '<button class="btn btn-outline btn-sm" onclick="spOpenModal(\'' + p.id + '\')">Edit</button>';
+        html += '<button class="btn btn-outline btn-sm" onclick="spToggleActive(\'' + p.id + '\')">' + toggleLabel + '</button>';
+      }
       html += '</div></td>';
       html += '</tr>';
     });
@@ -4214,7 +4295,9 @@ function spCategoryLabel(cat) {
   var labels = {
     whole_crown: 'Whole (Crown)', whole_no_crown: 'Whole (No Crown)',
     slice: 'Slices', peeled: 'Peeled', slice_box: 'Slices (Box)',
-    chunk_box: 'Chunks (Box)', ring_box: 'Rings (Box)'
+    chunk_box: 'Chunks (Box)', ring_box: 'Rings (Box)',
+    fruit_whole: 'Whole Fruit', fruit_cut: 'Cut / Sliced',
+    fruit_box: 'Box / Pack', other: 'Other'
   };
   return labels[cat] || cat || '-';
 }
@@ -4272,6 +4355,7 @@ function spOpenModal(editId) {
 }
 
 async function spSaveProduct() {
+  if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sp-edit-id').value;
   var name = document.getElementById('sp-name').value.trim();
   var nameBM = document.getElementById('sp-name-bm').value.trim();
@@ -4825,6 +4909,7 @@ function payOpenModalMulti(orderIds, totalBalance) {
 
 // Open payment modal
 function payOpenModal(orderId) {
+  if (!salesCan('payments')) { notify('No permission to record payments', 'warning'); return; }
   var o = orders.find(function(x) { return x.id === orderId; });
   if (!o) return;
   var balance = orderBalance(o);
@@ -7079,7 +7164,7 @@ function rptRenderFilters() {
     return '<option value="' + esc(p.id) + '">' + esc((v ? v.name + ' — ' : '') + p.name) + '</option>';
   }).join('');
   var varOpts = varieties.map(function(v) { return '<option value="' + esc(v.id) + '">' + esc(v.name) + '</option>'; }).join('') + '<option value="_none">No Variety</option>';
-  var catOpts = ['whole_crown','whole_no_crown','slice','peeled','slice_box','chunk_box','ring_box'].map(function(c) {
+  var catOpts = ['whole_crown','whole_no_crown','slice','peeled','slice_box','chunk_box','ring_box','fruit_whole','fruit_cut','fruit_box','other'].map(function(c) {
     return '<option value="' + c + '">' + esc(spCategoryLabel(c)) + '</option>';
   }).join('');
   var driverOpts = allWorkers.map(function(w) { return '<option value="' + esc(w.id) + '">' + esc(w.name) + '</option>'; }).join('');
@@ -7528,6 +7613,7 @@ function rptGenerate() {
 }
 
 function rptExportCSV() {
+  if (!salesCan('export')) { notify('No permission to export', 'warning'); return; }
   if (!rptData || !rptData.rows) return;
   var escCSV = function(v) {
     var s = String(v != null ? v : '');
@@ -7601,6 +7687,7 @@ async function soToggleWalkIn() {
 }
 
 function openNewOrderModal(editOrderId) {
+  if (!salesCan('createOrder')) { notify('No permission to create/edit orders', 'warning'); return; }
   soEditOrderId = editOrderId || null;
   soItems = [];
   soSelectedCustomer = null;
@@ -8457,34 +8544,148 @@ function soGenerateDocA4(orderId) {
   document.getElementById('so-doc-modal').style.display = 'flex';
 }
 
-async function soUploadStagePhoto(orderId, field, input) {
+// Get all photos for a stage as an array (initial + extras)
+function soGetPhotos(o, stage) {
+  var urlField = stage + '_photo_url';
+  var arrField = stage + '_photos';
+  var photos = [];
+  if (o[urlField]) photos.push(o[urlField]);
+  if (o[arrField] && Array.isArray(o[arrField])) photos = photos.concat(o[arrField]);
+  return photos;
+}
+
+// Upload a file and return the public URL
+async function soUploadPhotoBlob(blob, orderId, filename) {
+  var path = 'orders/' + orderId + '/' + filename;
+  var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+  if (result.error) { notify('Upload failed', 'error'); return null; }
+  var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
+  return urlResult.data.publicUrl;
+}
+
+// Resize and upload a photo file, returns public URL
+function soResizeAndUpload(file, orderId, filename) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = async function() {
+      var canvas = document.createElement('canvas');
+      var maxW = 1200;
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(async function(blob) {
+        var url = await soUploadPhotoBlob(blob, orderId, filename);
+        resolve(url);
+      }, 'image/jpeg', 0.8);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Replace a specific photo at index
+async function soReplacePhoto(orderId, stage, index, input) {
   if (!input.files || !input.files[0]) return;
   notify('Uploading photo...', 'info');
-  var file = input.files[0];
-  var canvas = document.createElement('canvas');
-  var img = new Image();
-  img.onload = async function() {
-    var maxW = 1200;
-    var w = img.width, h = img.height;
-    if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-    canvas.toBlob(async function(blob) {
-      var path = 'orders/' + orderId + '/' + field + '.jpg';
-      var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-      if (result.error) { notify('Upload failed', 'error'); return; }
-      var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
-      var photoUrl = urlResult.data.publicUrl;
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var urlField = stage + '_photo_url';
+  var arrField = stage + '_photos';
+
+  if (index === 0 && o[urlField]) {
+    // Replace the initial photo
+    var filename = urlField + '-' + Date.now() + '.jpg';
+    var newUrl = await soResizeAndUpload(input.files[0], orderId, filename);
+    if (!newUrl) return;
+    var updateData = {};
+    updateData[urlField] = newUrl;
+    await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+    o[urlField] = newUrl;
+  } else {
+    // Replace an extra photo in the array
+    var arrIndex = o[urlField] ? index - 1 : index;
+    var extras = (o[arrField] && Array.isArray(o[arrField])) ? o[arrField].slice() : [];
+    var filename = stage + '_extra_' + Date.now() + '.jpg';
+    var newUrl = await soResizeAndUpload(input.files[0], orderId, filename);
+    if (!newUrl) return;
+    extras[arrIndex] = newUrl;
+    var updateData = {};
+    updateData[arrField] = extras;
+    await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+    o[arrField] = extras;
+  }
+  notify('Photo replaced', 'success');
+  soRenderDetail();
+}
+
+// Add an extra photo
+async function soAddExtraPhoto(orderId, stage, input) {
+  if (!input.files || !input.files[0]) return;
+  notify('Uploading photo...', 'info');
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var urlField = stage + '_photo_url';
+  var arrField = stage + '_photos';
+
+  var filename = stage + '_extra_' + Date.now() + '.jpg';
+  var newUrl = await soResizeAndUpload(input.files[0], orderId, filename);
+  if (!newUrl) return;
+
+  // If no initial photo yet, set it as the initial
+  if (!o[urlField]) {
+    var updateData = {};
+    updateData[urlField] = newUrl;
+    await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+    o[urlField] = newUrl;
+  } else {
+    // Append to extras array
+    var extras = (o[arrField] && Array.isArray(o[arrField])) ? o[arrField].slice() : [];
+    extras.push(newUrl);
+    var updateData = {};
+    updateData[arrField] = extras;
+    await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+    o[arrField] = extras;
+  }
+  notify('Photo added', 'success');
+  soRenderDetail();
+}
+
+// Delete a photo at index
+async function soDeletePhoto(orderId, stage, index) {
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+  var urlField = stage + '_photo_url';
+  var arrField = stage + '_photos';
+  var allPhotos = soGetPhotos(o, stage);
+  if (allPhotos.length <= 0) return;
+
+  confirmAction('Remove Photo', 'Remove this photo? This cannot be undone.', async function() {
+    if (index === 0 && o[urlField]) {
+      // Removing the initial photo — promote first extra if available
+      var extras = (o[arrField] && Array.isArray(o[arrField])) ? o[arrField].slice() : [];
       var updateData = {};
-      updateData[field] = photoUrl;
+      if (extras.length > 0) {
+        updateData[urlField] = extras.shift();
+        updateData[arrField] = extras;
+      } else {
+        updateData[urlField] = null;
+      }
       await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
-      var idx = orders.findIndex(function(x) { return x.id === orderId; });
-      if (idx >= 0) orders[idx][field] = photoUrl;
-      notify('Photo uploaded', 'success');
-      soRenderDetail();
-    }, 'image/jpeg', 0.8);
-  };
-  img.src = URL.createObjectURL(file);
+      o[urlField] = updateData[urlField];
+      o[arrField] = updateData[arrField] || [];
+    } else {
+      // Removing an extra photo
+      var arrIndex = o[urlField] ? index - 1 : index;
+      var extras = (o[arrField] && Array.isArray(o[arrField])) ? o[arrField].slice() : [];
+      extras.splice(arrIndex, 1);
+      var updateData = {};
+      updateData[arrField] = extras;
+      await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
+      o[arrField] = extras;
+    }
+    notify('Photo removed', 'success');
+    soRenderDetail();
+  });
 }
 
 function closeDocModal() {
