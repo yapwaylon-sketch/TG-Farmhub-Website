@@ -427,6 +427,8 @@ function injectCompanySwitcher() {
 function closeModal(id) {
   var el = document.getElementById(id);
   if (el) el.style.display = "none";
+  // Clean up calendar popup if open (sales module)
+  if (typeof calClose === 'function') calClose();
 }
 
 // Show save tick animation

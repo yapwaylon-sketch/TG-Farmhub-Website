@@ -58,6 +58,7 @@
         <div class="hub-user-name" id="hub-user-name"></div>
         <div class="hub-user-role" id="hub-user-role"></div>
       </div>
+      <button class="btn btn-outline" onclick="openChangePin()" style="font-size:12px;padding:6px 12px;">Change PIN</button>
       <button class="btn btn-outline" onclick="doLogout()" style="font-size:12px;padding:6px 12px;">Logout</button>
     </div>
   </div>
@@ -413,8 +414,6 @@ let currentUser = null;
 // ============================================================
 // HELPERS
 // ============================================================
-function closeModal(id) { document.getElementById(id).style.display = "none"; }
-
 function mapUserFromDb(row) {
   return {
     id: row.id, username: row.username, pin: row.pin,
@@ -543,7 +542,7 @@ async function doLogin() {
   // Generate session token for multi-device detection
   var token = Date.now().toString(36) + Math.random().toString(36).substr(2);
   localStorage.setItem("tgfarmhub_session_token", token);
-  await sbQuery(sb.from("users").update({ session_token: token }).eq("id", user.id));
+  await sbQuery(sb.from("users").update({ session_token: token }).eq("id", user.id).select());
   startSessionCheck();
 
   // Check if force PIN update needed
@@ -553,27 +552,6 @@ async function doLogin() {
     showHub();
   }
   startInactivityTimer();
-}
-
-// Multi-device session check — runs every 30 seconds
-var sessionCheckInterval = null;
-function startSessionCheck() {
-  if (sessionCheckInterval) clearInterval(sessionCheckInterval);
-  sessionCheckInterval = setInterval(async function() {
-    if (!currentUser) return;
-    var localToken = localStorage.getItem("tgfarmhub_session_token");
-    if (!localToken) return;
-    var result = await sbQuery(sb.from("users").select("session_token").eq("id", currentUser.id));
-    if (result && result[0] && result[0].session_token !== localToken) {
-      clearInterval(sessionCheckInterval);
-      notify("You have been logged out — another device signed in", "warning");
-      setTimeout(function() {
-        localStorage.removeItem("tgfarmhub_user");
-        localStorage.removeItem("tgfarmhub_session_token");
-        window.location.href = "index.html";
-      }, 2000);
-    }
-  }, 30000);
 }
 
 function handleFailedLogin() {
@@ -871,13 +849,13 @@ async function loadCompanyOverview() {
   var afOutstanding = afOrders.filter(function(o) { return o.payment_status !== 'paid'; }).reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
 
   container.innerHTML =
-    '<div style="background:var(--card-bg);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
+    '<div style="background:var(--bg-card);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
       '<div style="font-weight:700;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><img src="assets/logo.png?v=2" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;"> TG Agro Fruits</div>' +
       '<div style="font-size:13px;color:var(--text-muted);">Orders: <b style="color:var(--text);">' + afOrders.length + '</b></div>' +
       '<div style="font-size:13px;color:var(--text-muted);">Revenue: <b style="color:var(--text);">RM ' + afRevenue.toFixed(2) + '</b></div>' +
       '<div style="font-size:13px;color:var(--text-muted);">Outstanding: <b style="color:var(--gold);">RM ' + afOutstanding.toFixed(2) + '</b></div>' +
     '</div>' +
-    '<div style="background:var(--card-bg);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
+    '<div style="background:var(--bg-card);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
       '<div style="font-weight:700;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><img src="assets/logo-agribusiness.png" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;"> TG Agribusiness</div>' +
       '<div style="font-size:13px;color:var(--text-muted);">Active Workers: <b style="color:var(--text);">' + (workersAB || []).length + '</b></div>' +
       '<div style="font-size:13px;color:var(--text-muted);">Active Spray Jobs: <b style="color:var(--text);">' + (jobsAB || []).length + '</b></div>' +
@@ -1291,11 +1269,25 @@ async function addCrop() {
   await loadFarmConfig(); renderCropList();
 }
 
-async function editCropName(id, oldName) {
-  const name = prompt('Edit crop name:', oldName);
-  if (!name || name === oldName) return;
+function editCropName(id, oldName) {
+  let mc = document.getElementById('fc-modal-container');
+  if (!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+  mc.innerHTML =
+    '<div class="modal-overlay" style="display:flex;">' +
+      '<div class="modal-box" style="max-width:380px;">' +
+        '<div class="modal-header"><div class="modal-title">Edit Crop Name</div><button class="modal-close" onclick="fcCloseFcModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+        '<div style="padding:0 0 8px;"><input type="text" id="fc-edit-name-input" value="' + esc(oldName) + '" style="width:100%;padding:8px 12px;font-size:14px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;" onkeydown="if(event.key===\'Enter\')fcDoRenameCrop(\'' + id + '\',\'' + esc(oldName).replace(/'/g, "\\'") + '\')"></div>' +
+        '<div class="modal-actions"><button class="btn btn-outline" onclick="fcCloseFcModal()">Cancel</button><button class="btn btn-primary" onclick="fcDoRenameCrop(\'' + id + '\',\'' + esc(oldName).replace(/'/g, "\\'") + '\')">Save</button></div>' +
+      '</div>' +
+    '</div>';
+  setTimeout(function() { var inp = document.getElementById('fc-edit-name-input'); if (inp) { inp.focus(); inp.select(); } }, 50);
+}
+async function fcDoRenameCrop(id, oldName) {
+  const name = (document.getElementById('fc-edit-name-input').value || '').trim();
+  if (!name || name === oldName) { fcCloseFcModal(); return; }
   const result = await sbQuery(sb.from('crops').update({ name }).eq('id', id).select());
   if (result === null) return;
+  fcCloseFcModal();
   notify('Crop renamed');
   await loadFarmConfig(); renderCropList();
 }
@@ -1345,11 +1337,25 @@ async function saveVarietyDays(id) {
   notify('Variety days saved');
 }
 
-async function editVarietyName(id, oldName) {
-  const name = prompt('Edit variety name:', oldName);
-  if (!name || name === oldName) return;
+function editVarietyName(id, oldName) {
+  let mc = document.getElementById('fc-modal-container');
+  if (!mc) { mc = document.createElement('div'); mc.id = 'fc-modal-container'; document.body.appendChild(mc); }
+  mc.innerHTML =
+    '<div class="modal-overlay" style="display:flex;">' +
+      '<div class="modal-box" style="max-width:380px;">' +
+        '<div class="modal-header"><div class="modal-title">Edit Variety Name</div><button class="modal-close" onclick="fcCloseFcModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+        '<div style="padding:0 0 8px;"><input type="text" id="fc-edit-name-input" value="' + esc(oldName) + '" style="width:100%;padding:8px 12px;font-size:14px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;" onkeydown="if(event.key===\'Enter\')fcDoRenameVariety(\'' + id + '\',\'' + esc(oldName).replace(/'/g, "\\'") + '\')"></div>' +
+        '<div class="modal-actions"><button class="btn btn-outline" onclick="fcCloseFcModal()">Cancel</button><button class="btn btn-primary" onclick="fcDoRenameVariety(\'' + id + '\',\'' + esc(oldName).replace(/'/g, "\\'") + '\')">Save</button></div>' +
+      '</div>' +
+    '</div>';
+  setTimeout(function() { var inp = document.getElementById('fc-edit-name-input'); if (inp) { inp.focus(); inp.select(); } }, 50);
+}
+async function fcDoRenameVariety(id, oldName) {
+  const name = (document.getElementById('fc-edit-name-input').value || '').trim();
+  if (!name || name === oldName) { fcCloseFcModal(); return; }
   const result = await sbQuery(sb.from('crop_varieties').update({ name }).eq('id', id).select());
   if (result === null) return;
+  fcCloseFcModal();
   notify('Variety renamed');
   await loadFarmConfig(); renderCropList();
 }
@@ -1599,6 +1605,20 @@ function fcCloseDeleteModal() {
   const mc = document.getElementById('fc-modal-container');
   if(mc) mc.innerHTML = '';
 }
+
+// Unified close for all fc-modal-container modals
+function fcCloseFcModal() {
+  const mc = document.getElementById('fc-modal-container');
+  if(mc) mc.innerHTML = '';
+}
+
+// Escape key closes any open Farm Config modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const mc = document.getElementById('fc-modal-container');
+    if (mc && mc.innerHTML.trim()) { mc.innerHTML = ''; e.stopPropagation(); }
+  }
+});
 
 async function fcExecuteDeleteBlock(blockId) {
   const result = await sbQuery(sb.from('pnd_blocks').delete().eq('id', blockId).select());

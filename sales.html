@@ -215,19 +215,19 @@
     </div>
     <input type="hidden" id="sp-edit-id" value="">
     <div class="form-field">
-      <label>VARIETY</label>
+      <label for="sp-variety">VARIETY</label>
       <select id="sp-variety" style="width:100%;"></select>
     </div>
     <div class="form-field">
-      <label>PRODUCT NAME</label>
+      <label for="sp-name">PRODUCT NAME</label>
       <input type="text" id="sp-name" placeholder="e.g., Whole Fruit >1kg (Crown)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>NAMA BM <span style="font-weight:400;color:var(--text-muted);">(untuk WhatsApp)</span></label>
+      <label for="sp-name-bm">NAMA BM <span style="font-weight:400;color:var(--text-muted);">(untuk WhatsApp)</span></label>
       <input type="text" id="sp-name-bm" placeholder="e.g., Biji Mahkota >1kg" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>CATEGORY</label>
+      <label for="sp-category">CATEGORY</label>
       <select id="sp-category" style="width:100%;" onchange="spCategoryChange()">
         <option value="whole_crown">Whole with Crown</option>
         <option value="whole_no_crown">Whole without Crown</option>
@@ -240,7 +240,7 @@
     </div>
     <div class="form-row">
       <div class="form-field">
-        <label>UNIT</label>
+        <label for="sp-unit">UNIT</label>
         <select id="sp-unit" style="width:100%;" onchange="spUnitChange()">
           <option value="kg">kg</option>
           <option value="pcs">pcs</option>
@@ -248,7 +248,7 @@
         </select>
       </div>
       <div class="form-field">
-        <label>DEFAULT PRICE (RM)</label>
+        <label for="sp-price">DEFAULT PRICE (RM)</label>
         <input type="number" id="sp-price" step="0.01" min="0" placeholder="0.00" style="width:100%;">
       </div>
     </div>
@@ -257,11 +257,11 @@
     </div>
     <div class="form-row">
       <div class="form-field">
-        <label>PCS PER BOX <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="sp-box-qty">PCS PER BOX <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="number" id="sp-box-qty" min="1" step="1" placeholder="e.g., 5" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>WEIGHT RANGE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="sp-weight-range">WEIGHT RANGE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="text" id="sp-weight-range" placeholder="e.g., 400-450g" style="width:100%;">
       </div>
     </div>
@@ -283,37 +283,37 @@
     </div>
     <input type="hidden" id="sc-edit-id" value="">
     <div class="form-field">
-      <label>PHONE</label>
+      <label for="sc-phone">PHONE</label>
       <input type="tel" id="sc-phone" placeholder="e.g., 012-3456789" style="width:100%;" onblur="scCheckPhone()">
       <div id="sc-dup-warning" class="duplicate-warning" style="display:none;color:#E8A020;font-size:12px;margin-top:4px;padding:6px 8px;background:rgba(232,160,32,0.1);border-radius:6px;"></div>
     </div>
     <div class="form-field">
-      <label>NAME</label>
+      <label for="sc-name">NAME</label>
       <input type="text" id="sc-name" placeholder="Customer or company name" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>REGISTRATION NAME</label>
+      <label for="sc-registration-name">REGISTRATION NAME</label>
       <input type="text" id="sc-registration-name" placeholder="Legal company name (optional)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>CONTACT PERSON</label>
+      <label for="sc-contact-person">CONTACT PERSON</label>
       <input type="text" id="sc-contact-person" placeholder="Contact person name (optional)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>EMAIL</label>
+      <label for="sc-email">EMAIL</label>
       <input type="email" id="sc-email" placeholder="e.g., accounts@company.com (optional)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>BILLING / HQ ADDRESS</label>
+      <label for="sc-address">BILLING / HQ ADDRESS</label>
       <textarea id="sc-address" rows="2" placeholder="Main office / billing address (optional)" style="width:100%;"></textarea>
     </div>
     <div class="form-field">
-      <label>SECONDARY PHONE</label>
+      <label for="sc-secondary-phone">SECONDARY PHONE</label>
       <input type="tel" id="sc-secondary-phone" placeholder="Alternate contact number (optional)" style="width:100%;">
     </div>
     <div class="form-row">
       <div class="form-field">
-        <label>TYPE</label>
+        <label for="sc-type">TYPE</label>
         <select id="sc-type" style="width:100%;">
           <option value="wholesale">Wholesale</option>
           <option value="retail">Retail</option>
@@ -321,7 +321,7 @@
         </select>
       </div>
       <div class="form-field">
-        <label>CHANNEL</label>
+        <label for="sc-channel">CHANNEL</label>
         <select id="sc-channel" style="width:100%;">
           <option value="whatsapp_delivery">WhatsApp (Delivery)</option>
           <option value="whatsapp_collect">WhatsApp (Collect)</option>
@@ -330,7 +330,7 @@
       </div>
     </div>
     <div class="form-field">
-      <label>PAYMENT TERMS</label>
+      <label for="sc-payment-terms">PAYMENT TERMS</label>
       <select id="sc-payment-terms" style="width:100%;">
         <option value="0">COD (Cash on Delivery)</option>
         <option value="7">Net 7</option>
@@ -341,30 +341,30 @@
     </div>
     <div class="form-row">
       <div class="form-field">
-        <label>CREDIT LIMIT (RM)</label>
+        <label for="sc-credit-limit">CREDIT LIMIT (RM)</label>
         <input type="number" id="sc-credit-limit" placeholder="Optional" style="width:100%;" min="0" step="0.01">
       </div>
       <div class="form-field">
-        <label>CURRENCY</label>
+        <label for="sc-currency">CURRENCY</label>
         <select id="sc-currency" style="width:100%;">
           <option value="MYR">MYR</option>
         </select>
       </div>
     </div>
     <div class="form-field">
-      <label>SSM / BRN</label>
+      <label for="sc-ssm-brn">SSM / BRN</label>
       <input type="text" id="sc-ssm-brn" placeholder="e.g., 1234567-A" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>TIN</label>
+      <label for="sc-tin">TIN</label>
       <input type="text" id="sc-tin" placeholder="e.g., C1234567890" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>IC NUMBER</label>
+      <label for="sc-ic-number">IC NUMBER</label>
       <input type="text" id="sc-ic-number" placeholder="e.g., 900101-13-1234" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>NOTES</label>
+      <label for="sc-notes">NOTES</label>
       <textarea id="sc-notes" rows="2" placeholder="Optional notes" style="width:100%;"></textarea>
     </div>
     <div class="modal-actions">
@@ -386,19 +386,19 @@
     <input type="hidden" id="br-edit-id" value="">
     <input type="hidden" id="br-customer-id" value="">
     <div class="form-field">
-      <label>BRANCH NAME</label>
+      <label for="br-name">BRANCH NAME</label>
       <input type="text" id="br-name" placeholder="e.g., MY DAILY MART 08 (Times Square)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>ADDRESS</label>
+      <label for="br-address">ADDRESS</label>
       <textarea id="br-address" rows="3" placeholder="Full delivery address" style="width:100%;"></textarea>
     </div>
     <div class="form-field">
-      <label>CONTACT PERSON</label>
+      <label for="br-contact-person">CONTACT PERSON</label>
       <input type="text" id="br-contact-person" placeholder="Branch contact (optional)" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>PHONE</label>
+      <label for="br-phone">PHONE</label>
       <input type="tel" id="br-phone" placeholder="Branch phone (optional)" style="width:100%;">
     </div>
     <div class="form-field">
@@ -427,7 +427,7 @@
       </button>
     </div>
     <div class="form-field">
-      <label>SELECT DRIVER</label>
+      <label for="so-driver-select">SELECT DRIVER</label>
       <select id="so-driver-select" style="width:100%;"></select>
     </div>
     <div class="modal-actions">
@@ -474,18 +474,18 @@
       <div id="so-delpay-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
       <input type="hidden" id="so-delpay-order-id" value="">
       <div class="form-field">
-        <label>AMOUNT (RM)</label>
+        <label for="so-delpay-amount">AMOUNT (RM)</label>
         <input type="number" id="so-delpay-amount" step="0.01" min="0.01" placeholder="0.00" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>METHOD</label>
+        <label for="so-delpay-method">METHOD</label>
         <select id="so-delpay-method" style="width:100%;">
           <option value="cash">Cash</option>
           <option value="bank_transfer">Bank Transfer</option>
         </select>
       </div>
       <div class="form-field">
-        <label>REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="so-delpay-reference">REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="text" id="so-delpay-reference" placeholder="Bank ref number" style="width:100%;">
       </div>
     </div>
@@ -510,19 +510,19 @@
       <div id="so-walkin-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;"></div>
 
       <div class="form-field" style="margin-bottom:12px;">
-        <label>PAYMENT METHOD</label>
+        <label for="so-walkin-method">PAYMENT METHOD</label>
         <select id="so-walkin-method" style="width:100%;">
           <option value="cash">Cash</option>
           <option value="bank_transfer">Bank Transfer</option>
         </select>
       </div>
       <div class="form-field" style="margin-bottom:14px;">
-        <label>REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="so-walkin-reference">REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="text" id="so-walkin-reference" placeholder="Bank ref / receipt number" style="width:100%;">
       </div>
 
       <div class="form-field" style="margin-bottom:14px;">
-        <label>PHOTO <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="so-walkin-photo">PHOTO <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="file" id="so-walkin-photo" accept="image/*" capture="environment" style="width:100%;">
       </div>
     </div>
@@ -547,11 +547,11 @@
       <div id="stmt-customer-name" style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:12px;"></div>
       <div class="form-row">
         <div class="form-field">
-          <label>FROM</label>
+          <label for="stmt-date-from">FROM</label>
           <input type="date" id="stmt-date-from" style="width:100%;">
         </div>
         <div class="form-field">
-          <label>TO</label>
+          <label for="stmt-date-to">TO</label>
           <input type="date" id="stmt-date-to" style="width:100%;">
         </div>
       </div>
@@ -622,7 +622,7 @@
     </div>
     <div style="padding:16px;overflow-y:auto;flex:1;">
       <div class="form-field" style="margin-bottom:14px;">
-        <label>ASSIGN TO WORKER</label>
+        <label for="so-prep-worker">ASSIGN TO WORKER</label>
         <select id="so-prep-worker" style="width:100%;" onchange="soPrepWorkerChanged()">
           <option value="">— No assignment —</option>
         </select>
@@ -842,7 +842,7 @@
       <div class="so-section-label">ORDER DETAILS</div>
       <div class="form-row">
         <div class="form-field">
-          <label>ORDER DATE</label>
+          <label for="so-order-date">ORDER DATE</label>
           <input type="hidden" id="so-order-date">
           <div class="cal-input" onclick="calOpen('so-order-date', this)">
             <span class="cal-input-text" id="so-order-date-display">Select date...</span>
@@ -850,7 +850,7 @@
           </div>
         </div>
         <div class="form-field">
-          <label>DELIVERY DATE</label>
+          <label for="so-delivery-date">DELIVERY DATE</label>
           <input type="hidden" id="so-delivery-date">
           <div class="cal-input" onclick="calOpen('so-delivery-date', this)">
             <span class="cal-input-text" id="so-delivery-date-display">Select date...</span>
@@ -860,11 +860,11 @@
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label>DELIVERY TIME</label>
+          <label for="so-delivery-time">DELIVERY TIME</label>
           <input type="time" id="so-delivery-time" style="width:100%;">
         </div>
         <div class="form-field">
-          <label>FULFILLMENT</label>
+          <label for="so-fulfillment">FULFILLMENT</label>
           <select id="so-fulfillment" style="width:100%;">
             <option value="delivery">Delivery</option>
             <option value="collection">Collection</option>
@@ -873,14 +873,14 @@
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label>DOC TYPE</label>
+          <label for="so-doc-type">DOC TYPE</label>
           <select id="so-doc-type" style="width:100%;">
             <option value="cash_sales">Cash Sales (CS)</option>
             <option value="delivery_order">Delivery Order (DO)</option>
           </select>
         </div>
         <div class="form-field">
-          <label>CHANNEL</label>
+          <label for="so-channel">CHANNEL</label>
           <select id="so-channel" style="width:100%;">
             <option value="whatsapp">WhatsApp</option>
             <option value="walkin">Walk-in</option>
@@ -942,11 +942,11 @@
     </div>
 
     <div class="form-field">
-      <label>PAYMENT DATE</label>
+      <label for="pay-date">PAYMENT DATE</label>
       <input type="date" id="pay-date" style="width:100%;">
     </div>
     <div class="form-field">
-      <label>TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+      <label for="pay-slip-file">TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
       <div id="pay-slip-preview" style="display:none;margin-bottom:8px;position:relative;">
         <img id="pay-slip-img" src="" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">
         <button onclick="payClearSlip()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">&times;</button>
@@ -958,7 +958,7 @@
       </label>
     </div>
     <div class="form-field">
-      <label>NOTES (optional)</label>
+      <label for="pay-notes">NOTES (optional)</label>
       <textarea id="pay-notes" rows="2" placeholder="Payment notes" style="width:100%;"></textarea>
     </div>
     </div>
@@ -982,11 +982,11 @@
       <div id="inv-pay-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
       <input type="hidden" id="inv-pay-invoice-id" value="">
       <div class="form-field">
-        <label>AMOUNT (RM)</label>
+        <label for="inv-pay-amount">AMOUNT (RM)</label>
         <input type="number" id="inv-pay-amount" step="0.01" min="0.01" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>METHOD</label>
+        <label for="inv-pay-method">METHOD</label>
         <select id="inv-pay-method" style="width:100%;">
           <option value="bank_transfer">Bank Transfer</option>
           <option value="cash">Cash</option>
@@ -994,15 +994,15 @@
         </select>
       </div>
       <div class="form-field">
-        <label>REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="inv-pay-reference">REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="text" id="inv-pay-reference" placeholder="e.g. cheque number, bank ref" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>PAYMENT DATE</label>
+        <label for="inv-pay-date">PAYMENT DATE</label>
         <input type="date" id="inv-pay-date" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="inv-pay-slip-file">TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <div id="inv-pay-slip-preview" style="display:none;margin-bottom:8px;position:relative;">
           <img id="inv-pay-slip-img" src="" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">
           <button onclick="invPayClearSlip()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">&times;</button>
@@ -1014,7 +1014,7 @@
         </label>
       </div>
       <div class="form-field">
-        <label>NOTES <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="inv-pay-notes">NOTES <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <textarea id="inv-pay-notes" rows="2" placeholder="Payment notes" style="width:100%;"></textarea>
       </div>
     </div>
@@ -1038,21 +1038,21 @@
       <div id="cn-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:var(--text-muted);"></div>
       <input type="hidden" id="cn-invoice-id" value="">
       <div class="form-field">
-        <label>LINKED RETURN <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="cn-return-id">LINKED RETURN <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <select id="cn-return-id" style="width:100%;" onchange="cnReturnChanged()">
           <option value="">None — manual adjustment</option>
         </select>
       </div>
       <div class="form-field">
-        <label>CREDIT DATE</label>
+        <label for="cn-date">CREDIT DATE</label>
         <input type="date" id="cn-date" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>AMOUNT (RM)</label>
+        <label for="cn-amount">AMOUNT (RM)</label>
         <input type="number" id="cn-amount" step="0.01" min="0.01" style="width:100%;">
       </div>
       <div class="form-field">
-        <label>REASON (required)</label>
+        <label for="cn-reason">REASON (required)</label>
         <input type="text" id="cn-reason" placeholder="Reason for credit" style="width:100%;">
       </div>
     </div>
@@ -1109,11 +1109,11 @@
       <input type="hidden" id="inv-ed-invoice-id" value="">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-field">
-          <label>INVOICE DATE</label>
+          <label for="inv-ed-date">INVOICE DATE</label>
           <input type="date" id="inv-ed-date" onchange="invEdUpdateDueDate()" style="width:100%;">
         </div>
         <div class="form-field">
-          <label>PAYMENT TERMS</label>
+          <label for="inv-ed-terms">PAYMENT TERMS</label>
           <select id="inv-ed-terms" style="width:100%;" onchange="invEdUpdateDueDate()">
             <option value="0">COD</option>
             <option value="7">Net 7</option>
@@ -1125,7 +1125,7 @@
       </div>
       <div style="font-size:12px;color:var(--text-muted);margin:4px 0 12px;">Due date: <strong id="inv-ed-due-date" style="color:var(--text);"></strong></div>
       <div class="form-field">
-        <label>NOTES <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <label for="inv-ed-notes">NOTES <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <textarea id="inv-ed-notes" rows="2" placeholder="Invoice notes" style="width:100%;"></textarea>
       </div>
       <div style="margin-top:14px;">
@@ -1157,7 +1157,7 @@
         <strong>This action cannot be undone.</strong> The invoice will be marked as voided. All items and history are preserved for audit. A credit note will be auto-generated to zero the balance. Linked DOs will be freed for re-invoicing.
       </div>
       <div class="form-field">
-        <label>REASON FOR VOIDING <span style="color:var(--danger);">*</span></label>
+        <label for="inv-void-reason">REASON FOR VOIDING <span style="color:var(--danger);">*</span></label>
         <input type="text" id="inv-void-reason" placeholder="e.g. Customer requested redo, wrong DO included" style="width:100%;">
       </div>
     </div>
@@ -1179,25 +1179,25 @@
     </div>
     <input type="hidden" id="ret-order-id" value="">
     <div class="form-field">
-      <label>ORDER ITEM <span style="color:var(--red);">*</span></label>
+      <label for="ret-item">ORDER ITEM <span style="color:var(--red);">*</span></label>
       <select id="ret-item" style="width:100%;" onchange="retItemChange()"></select>
     </div>
     <div class="form-row">
       <div class="form-field">
-        <label>QUANTITY RETURNED <span style="color:var(--red);">*</span></label>
+        <label for="ret-qty">QUANTITY RETURNED <span style="color:var(--red);">*</span></label>
         <input type="number" id="ret-qty" step="0.01" min="0.01" placeholder="0" style="width:100%;" oninput="retCalcAmount()">
       </div>
       <div class="form-field">
-        <label>AMOUNT (RM)</label>
+        <label for="ret-amount">AMOUNT (RM)</label>
         <input type="number" id="ret-amount" step="0.01" min="0" placeholder="0.00" style="width:100%;">
       </div>
     </div>
     <div class="form-field">
-      <label>REASON</label>
+      <label for="ret-reason">REASON</label>
       <textarea id="ret-reason" rows="2" placeholder="Reason for return" style="width:100%;"></textarea>
     </div>
     <div class="form-field">
-      <label>RESOLUTION <span style="color:var(--red);">*</span></label>
+      <label for="ret-resolution">RESOLUTION <span style="color:var(--red);">*</span></label>
       <select id="ret-resolution" style="width:100%;">
         <option value="deduct">Deduct from balance</option>
         <option value="refund">Refund</option>
@@ -1205,7 +1205,7 @@
       </select>
     </div>
     <div class="form-field">
-      <label>PHOTO (optional)</label>
+      <label for="ret-photo-input">PHOTO (optional)</label>
       <input type="file" id="ret-photo-input" accept="image/*" capture="environment" style="width:100%;font-size:12px;">
     </div>
     <div class="modal-actions">
@@ -1461,7 +1461,7 @@ async function invRecomputeInvoice(invoiceId) {
   if (!inv) return 0;
 
   // Delete existing invoice items
-  await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
+  await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId).select());
   invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
 
   // Get all linked DOs
@@ -3274,17 +3274,17 @@ function soDeleteOrder(orderId) {
   var custName = getCustomerName(o.customer_id);
   confirmAction('Delete Order Permanently?', 'Delete ' + (o.doc_number || o.id) + ' (' + custName + ')? This will permanently remove the order, its items, and any payments. This cannot be undone.', async function() {
     // Delete returns/debit notes first
-    await sbQuery(sb.from('sales_returns').delete().eq('order_id', orderId));
+    await sbQuery(sb.from('sales_returns').delete().eq('order_id', orderId).select());
     returns = returns.filter(function(x) { return x.order_id !== orderId; });
     // Delete payments
-    await sbQuery(sb.from('sales_payments').delete().eq('order_id', orderId));
+    await sbQuery(sb.from('sales_payments').delete().eq('order_id', orderId).select());
     payments = payments.filter(function(x) { return x.order_id !== orderId; });
     // Delete order items
-    var r1 = await sbQuery(sb.from('sales_order_items').delete().eq('order_id', orderId));
-    if (r1 && r1.error) { notify('Failed to delete items: ' + r1.error.message, 'error'); return; }
+    var r1 = await sbQuery(sb.from('sales_order_items').delete().eq('order_id', orderId).select());
+    if (r1 === null) { notify('Failed to delete items', 'error'); return; }
     // Delete the order
-    var r2 = await sbQuery(sb.from('sales_orders').delete().eq('id', orderId));
-    if (r2 && r2.error) { notify('Failed to delete order: ' + r2.error.message, 'error'); return; }
+    var r2 = await sbQuery(sb.from('sales_orders').delete().eq('id', orderId).select());
+    if (r2 === null) { notify('Failed to delete order', 'error'); return; }
     // Remove from local arrays
     orders = orders.filter(function(x) { return x.id !== orderId; });
     orderItems = orderItems.filter(function(x) { return x.order_id !== orderId; });
@@ -6525,11 +6525,11 @@ async function invCancelInvoice(invoiceId) {
       }
 
       // Delete credit notes, items, junction
-      await sbQuery(sb.from('sales_credit_notes').delete().eq('invoice_id', invoiceId));
+      await sbQuery(sb.from('sales_credit_notes').delete().eq('invoice_id', invoiceId).select());
       creditNotes = creditNotes.filter(function(cn) { return cn.invoice_id !== invoiceId; });
-      await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId));
+      await sbQuery(sb.from('sales_invoice_items').delete().eq('invoice_id', invoiceId).select());
       invoiceItems = invoiceItems.filter(function(ii) { return ii.invoice_id !== invoiceId; });
-      await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId));
+      await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).select());
       invoiceOrders = invoiceOrders.filter(function(io) { return io.invoice_id !== invoiceId; });
 
       // Set status to cancelled (with optimistic lock to prevent race with concurrent approve)
@@ -6657,7 +6657,7 @@ async function invEditDraftSave() {
     for (var i = 0; i < invEdRemovedDOs.length; i++) {
       var oid = invEdRemovedDOs[i];
       // Delete junction row
-      await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', oid));
+      await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', oid).select());
       invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === oid); });
       // Null the invoice_id on the order
       await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', oid).select());
@@ -6814,7 +6814,7 @@ async function invUnlinkDO(invoiceId, orderId) {
         var oldTotal = parseFloat(inv.grand_total) || 0;
 
         // 1. Remove junction row
-        await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId));
+        await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId).select());
         invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === orderId); });
 
         // 2. Null the invoice_id on the order
