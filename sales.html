@@ -2981,7 +2981,9 @@ async function soProcessPhotoFile(file, orderId, type) {
       canvas.toBlob(async function(blob) {
         var path = 'orders/' + orderId + '/' + type + '-' + Date.now() + '.jpg';
         notify('Uploading photo...', 'info');
-        var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        var result = await sbUpload(function() {
+          return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        });
         if (result.error) { notify('Upload failed', 'error'); resolve(null); return; }
         var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
         resolve(urlResult.data.publicUrl);
@@ -5061,7 +5063,9 @@ async function payUploadSlip(paymentId) {
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       canvas.toBlob(async function(blob) {
         var path = 'payment-slips/' + paymentId + '.jpg';
-        var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        var result = await sbUpload(function() {
+          return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        });
         if (result.error) { console.error('Slip upload error:', result.error); resolve(null); return; }
         var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
         resolve(urlResult.data.publicUrl);
@@ -6004,7 +6008,9 @@ async function invPayUploadSlip(paymentId) {
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       canvas.toBlob(async function(blob) {
         var path = 'payment-slips/' + paymentId + '.jpg';
-        var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        var result = await sbUpload(function() {
+          return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        });
         if (result.error) { console.error('Slip upload error:', result.error); resolve(null); return; }
         var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
         resolve(urlResult.data.publicUrl);
@@ -8557,7 +8563,9 @@ function soGetPhotos(o, stage) {
 // Upload a file and return the public URL
 async function soUploadPhotoBlob(blob, orderId, filename) {
   var path = 'orders/' + orderId + '/' + filename;
-  var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+  var result = await sbUpload(function() {
+    return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+  });
   if (result.error) { notify('Upload failed', 'error'); return null; }
   var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
   return urlResult.data.publicUrl;
@@ -9545,7 +9553,9 @@ async function retUploadPhoto(orderId, returnId) {
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       canvas.toBlob(async function(blob) {
         var path = orderId + '/return-' + returnId + '.jpg';
-        var result = await sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        var result = await sbUpload(function() {
+          return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        });
         if (result.error) { notify('Photo upload failed', 'warning'); resolve(null); return; }
         var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
         resolve(urlResult.data.publicUrl);

@@ -144,21 +144,34 @@ async function sbQuery(queryPromise, loadingMsg) {
     return null;
   }
 
-  try {
-    var result = await queryPromise;
-    if (spinner) hideLoading(spinner);
-    if (result.error) {
-      console.error("Supabase error:", result.error);
-      notify(result.error.message || "Database error", "error", 5000);
-      return null;
+  // Retry on transient network errors (TypeError: Failed to fetch).
+  // Re-awaiting the same Supabase builder triggers a fresh fetch via its .then().
+  var lastError;
+  for (var attempt = 0; attempt <= SBQUERY_MAX_RETRIES; attempt++) {
+    try {
+      var result = await queryPromise;
+      if (result.error) {
+        // DB-level error (RLS, constraint, etc.) — don't retry
+        if (spinner) hideLoading(spinner);
+        console.error("Supabase error:", result.error);
+        notify(result.error.message || "Database error", "error", 5000);
+        return null;
+      }
+      if (spinner) hideLoading(spinner);
+      return result.data;
+    } catch(e) {
+      lastError = e;
+      console.warn("Network error (sbQuery attempt " + (attempt + 1) + "/" + (SBQUERY_MAX_RETRIES + 1) + "):", e && e.message);
+      if (attempt < SBQUERY_MAX_RETRIES) {
+        await new Promise(function(r) { setTimeout(r, SBQUERY_BASE_DELAY * Math.pow(2, attempt)); });
+      }
     }
-    return result.data;
-  } catch(e) {
-    if (spinner) hideLoading(spinner);
-    console.error("Network error:", e);
-    notify("Connection error — please check your internet", "error", 5000);
-    return null;
   }
+
+  if (spinner) hideLoading(spinner);
+  console.error("All read attempts failed:", lastError);
+  notify("Connection error — please check your internet", "error", 5000);
+  return null;
 }
 
 // Retry wrapper for critical mutations (insert/update/delete).
@@ -206,6 +219,50 @@ async function sbMutate(queryFn, loadingMsg) {
 // ============================================================
 // Optimistic Locking — prevent concurrent edit overwrites
 // ============================================================
+
+// Retry wrapper for Supabase Storage uploads (or any call that returns { data, error }).
+// Pass a function that invokes the upload so it can be re-run on network errors.
+// Returns the raw { data, error } result so callers can keep their existing error checks.
+// Usage:
+//   var result = await sbUpload(function() {
+//     return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+//   });
+//   if (result.error) { /* handle */ }
+async function sbUpload(uploadFn, loadingMsg) {
+  var spinner = null;
+  if (loadingMsg) spinner = showLoading(loadingMsg);
+
+  if (!navigator.onLine) {
+    if (spinner) hideLoading(spinner);
+    notify("You are offline — upload cancelled", "error", 5000);
+    return { data: null, error: { message: "offline" } };
+  }
+
+  var lastError;
+  for (var attempt = 0; attempt <= SBQUERY_MAX_RETRIES; attempt++) {
+    try {
+      var result = await uploadFn();
+      if (result && result.error) {
+        // Storage-layer error (permissions, bucket missing, etc.) — don't retry
+        if (spinner) hideLoading(spinner);
+        console.error("Storage error:", result.error);
+        return result;
+      }
+      if (spinner) hideLoading(spinner);
+      return result;
+    } catch(e) {
+      lastError = e;
+      console.warn("Upload network error (attempt " + (attempt + 1) + "/" + (SBQUERY_MAX_RETRIES + 1) + "):", e && e.message);
+      if (attempt < SBQUERY_MAX_RETRIES) {
+        await new Promise(function(r) { setTimeout(r, SBQUERY_BASE_DELAY * Math.pow(2, attempt)); });
+      }
+    }
+  }
+
+  if (spinner) hideLoading(spinner);
+  console.error("All upload attempts failed:", lastError);
+  return { data: null, error: { message: (lastError && lastError.message) || "Network error" } };
+}
 
 // Updates a record only if its updated_at matches the expected value.
 // If another user modified the record since it was loaded, shows a conflict warning.
