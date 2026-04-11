@@ -391,7 +391,14 @@ function trapFocus(modalEl) {
   modalEl._trapHandler = function(e) {
     if (e.key === "Escape") {
       releaseFocus(modalEl);
-      modalEl.style.display = "none";
+      // Hide the outer .modal-overlay (the grey backdrop), not the inner .modal-box.
+      // Hiding only the inner box leaves the overlay covering the page → frozen screen.
+      var overlay = modalEl.closest('.modal-overlay') || modalEl;
+      if (overlay.id) {
+        closeModal(overlay.id);
+      } else {
+        overlay.style.display = "none";
+      }
       return;
     }
     if (e.key !== "Tab") return;
