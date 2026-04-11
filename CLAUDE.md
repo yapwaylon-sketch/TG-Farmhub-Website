@@ -56,6 +56,8 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `display-sales.html` | TV display for packing station (token auth, auto-refresh, status-grouped orders) |
 | `seedlings.html` | Oil Palm Seedlings module (batches, bookings, collections, L3.1 tracking, reports) |
 | `seedlings.css` | Seedlings module styles |
+| `tender.html` | Tender Monitoring module (dashboard, local orders, documents, reports, AI LO import) |
+| `tender.css` | Tender module styles |
 | `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
 | `shared.js` | Shared JS (session guard, Supabase init, sidebar logic, sbMutate, sbUpdateWithLock) |
 | `{module}.css` | Per-module styles (index.css, inventory.css, workers.css, spraytracker.css, growthtracker.css) |
@@ -109,10 +111,12 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 9. **TV Display (Sales)** — `display-sales.html`, read-only packing station display, password gate (session-based), auto-refresh 60s, auto-rotate pages
 
 ### Coming Soon (Not Built)
-*(None currently)*
+- **Oil Palm Seedlings Growth** — Monitor oil palm seedling growth stages and nursery health
+- **Staff Claims** — Personal expense claims, approvals, and reimbursement tracking
 
 ### Recently Built
 10. **Oil Palm Seedlings** (`seedlings.html` + `seedlings.css`) — Batch lifecycle management, booking with deposit/payment tracking, collection with L3.1 certificate tracking, walk-in cash sales, printable booking slips, MPOB monthly reports, batch summary, cash flow projection. Under TG Agribusiness. 7 DB tables (`seedling_suppliers`, `seedling_batches`, `seedling_batch_events`, `seedling_customers`, `seedling_bookings`, `seedling_payments`, `seedling_collections`). Supabase storage bucket: `seedling-photos`. Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`, Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
+11. **Tender Monitoring** (`tender.html` + `tender.css`) — Government tender tracking for LPNM pineapple sucker supply contracts. Dashboard with key metrics (qty/value/payment/expiry alerts), Local Order tracking grouped by batch with status workflow (pending→preparing→delivering→delivered→invoiced→paid), document management (SST/contract/bond/LO/submissions grouped by type), 3 reports (summary/batch completion/payment status). AI-powered LO PDF import via Claude API (pdf.js renders → Claude Vision extracts fields → editable preview → batch save). Under TG Agribusiness, Projects Monitoring category. 3 DB tables (`tenders`, `tender_los`, `tender_documents`) + `app_config` for API key storage. Supabase storage bucket: `tender-documents`.
 
 ## Architecture — Growth Data Flow
 
@@ -176,7 +180,7 @@ All migrations have been applied to Supabase. Migration `.sql` files were remove
 - **Data scoping**: All SELECT queries filter `.eq('company_id', getCompanyId())` on company-owned tables. All INSERTs include `company_id: getCompanyId()`.
 - **Workers exception**: Workers table loaded WITHOUT company_id filter in sales/inventory/spray/delivery — Agro Fruits needs Agribusiness workers for driver/assignment dropdowns
 - **Farm Config growth_records**: Hardcoded `company_id: 'tg_agribusiness'` on inserts (Farm Config is shared but growth records always Agribusiness)
-- **Tables WITHOUT company_id** (never filter/insert): audit_log, block_crops, companies, crop_statuses, crop_varieties, crops, id_counters, payroll_entries, payroll_responsibilities, pnd_block_statuses, pnd_blocks, sales_drivers, task_entries, task_units, users
+- **Tables WITHOUT company_id** (never filter/insert): app_config, audit_log, block_crops, companies, crop_statuses, crop_varieties, crops, id_counters, payroll_entries, payroll_responsibilities, pnd_block_statuses, pnd_blocks, sales_drivers, task_entries, task_units, users
 - **Views WITHOUT company_id**: pnd_latest_sprays, pnd_latest_sprays_by_ai (do NOT filter these)
 - **localStorage key**: `tgfarmhub_company` stores selected company (defaults to `tg_agro_fruits`)
 - **Company Overview**: Hub page shows both companies' key numbers (hardcoded, not filtered by selection)
@@ -388,6 +392,46 @@ Printable/shareable document — office address header, items table, deposit/bal
 - Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`
 - Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
 
+## Tender Monitoring Module — Architecture
+
+### Tables (3 + 1 config)
+| Table | Purpose |
+|-------|---------|
+| `tenders` | Master tender records — tender_no, variety, dates, qty, price, value, bond, status |
+| `tender_los` | Local Orders — per-LO tracking with status workflow, delivery/invoice/payment fields |
+| `tender_documents` | File attachments per tender or LO — SST, contracts, bonds, submissions |
+| `app_config` | Key-value config store — holds Anthropic API key for AI import |
+
+### LO Status Workflow
+`pending` → `preparing` → `delivering` → `delivered` → `invoiced` → `paid`
+
+Each transition prompts for relevant fields: delivering/delivered→DO number+date, invoiced→invoice no+date, paid→amount+ref+bank.
+
+### Hub Category Banners (TG Agribusiness)
+Modules grouped under 3 banners via `MODULE_CATEGORIES` in index.html:
+- **Operations**: Pineapple Spray, Pineapple Growth, Oil Palm Sales, Oil Palm Growth (coming soon), Inventory
+- **Management**: Worker Management, Staff Claims (coming soon)
+- **Projects Monitoring**: Tender
+
+### AI LO PDF Import
+Upload LO PDF → pdf.js (CDN 3.11.174) renders pages to canvas → base64 JPEG → Claude API (Sonnet, vision) extracts fields (lo_number, dates, recipient, area, officer, qty) → editable preview table → batch save. API key stored in `app_config` table, loaded automatically on modal open. Requires `anthropic-dangerous-direct-browser-access` header for browser CORS.
+
+### Sidebar Tabs (4)
+Local Orders, Documents, Dashboard, Reports
+
+### ID Prefixes (company code AB-)
+| Entity | Prefix | Example |
+|--------|--------|---------|
+| Tender | TD | AB-TD001 |
+| Local Order | LO | AB-LO001 |
+| Document | TF | AB-TF001 |
+
+### Supabase Storage
+Bucket: `tender-documents` (public). Path: `{tender_id}/{timestamp}.{ext}`
+
+### Current Tenders
+- **AB-TD003**: LPNM.400-5/8/24 (MD2) — 1,500,000 sulur, RM1.78, RM2,670,000, 2-year contract (Mar 2026 – Mar 2028), bond RM66,750
+
 ## Sub-Projects (same folder, separate deploys)
 These live inside this folder but are gitignored. They share the same Supabase database and read from the same tables.
 
@@ -416,6 +460,9 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [ ] **Farm Map Module** (`farmmap.html`) — Google Maps integration, draw block polygons, satellite imagery, area calculation (see details below)
 - [ ] **`display-spray.html`** — TV display for Spray Tracker (KIV, needs spec)
 - [x] **Seedlings Module** (`seedlings.html`) — Batch lifecycle, booking/collection, L3.1 tracking, MPOB monthly reports, cash flow projection, booking slips (2026-04-10)
+- [x] **Tender Monitoring** (`tender.html`) — Government tender tracking, LO workflow, document management, AI PDF import (2026-04-10)
+- [ ] **Oil Palm Seedlings Growth** — Monitor seedling growth stages and nursery health (coming soon)
+- [ ] **Staff Claims** — Personal expense claims, approvals, reimbursement tracking (coming soon)
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
 
@@ -486,6 +533,8 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 
 - [x] **Company logos on hub + sidebars** (2026-04-10): Hub page shows both company logos side by side (header + login). Sidebar in modules uses company-specific logo: Sales/Delivery → `logo.png` (Agro Fruits), Inventory/Workers/Spray/Growth → `logo-agribusiness.png` (Agribusiness, cropped + transparent bg). Company switcher redesigned as segmented pill toggle (text only). Assets: `logo-agribusiness.png` (transparent), `logo-agribusiness.jpg` (cropped), `logo-agribusiness-original.jpg` (original with excess whitespace).
 - [x] **Oil Palm Seedlings module** (2026-04-10): Full 8-phase build. 7 DB tables + RLS + triggers. 6 sidebar tabs (Batches, Bookings, Collections, Customers, Suppliers, Reports). Batch lifecycle (pre_nursery→main_nursery→selling→sold_out→closed), transplant with doubleton tracking, culling logs. Booking with deposit/payment tracking + payment-controlled collections (can't collect more than paid for). L3.1 certificate tracking per collection. Walk-in cash sales. Cross-company customer detection (links to Agro Fruits customers by phone). Printable booking slip with T&C. 3 reports: MPOB Monthly, Batch Summary, Cash Flow Projection (all with print + CSV export). Photo upload for collections (seedlings + L3.1 page). Allocation % per batch (default 50%). Two company addresses: office (Lot 1609) for slips, farm (Lot 174) for L3.1. Migration: `supabase/seedlings_migration.sql`. Supabase storage: `seedling-photos` bucket.
+- [x] **Hub category banners** (2026-04-10): TG Agribusiness modules on hub page now grouped under 3 category banners — Operations (Pineapple Spray, Pineapple Growth, Oil Palm Sales, Oil Palm Growth, Inventory), Management (Worker Management, Staff Claims), Projects Monitoring (Tender). Flat grid preserved for Agro Fruits (just Sales). `MODULE_CATEGORIES` config in index.html, `category` field on each module, `renderModuleCards()` renders banners with inner grids. Coming-soon modules shown as disabled cards. Module renames: "PND Spray Tracker"→"Pineapple Spray", "Growth Tracker"→"Pineapple Growth", "Oil Palm Seedlings"→"Oil Palm Sales", "Inventory Management"→"Inventory". New coming-soon entries: `seedlinggrowth`, `staffclaims`, `tender`.
+- [x] **Tender Monitoring module** (2026-04-10): Full build — `tender.html` + `tender.css`. 4 sidebar tabs (Dashboard, Local Orders, Documents, Reports). Tender selector pills in sidebar to switch between tenders. Dashboard: 8 metric cards (qty/delivered/remaining/%/contract value/invoiced/paid/outstanding), expiry alerts (overdue red, expiring-soon gold), batch progress bars. Local Orders: table grouped by batch with status filter + search, add/edit modal, status transitions with field prompts (delivering→DO+date, invoiced→invoice no+date, paid→amount+ref+bank), expiry row highlighting, running balance. Documents: file upload to `tender-documents` Supabase bucket, grouped by doc type (SST/contract/bond/LO/submission/invoice/report/extension/other), optional LO linking, view/delete. Reports: Tender Summary, Batch Completion, Payment Status (all printable). AI LO PDF import: pdf.js CDN renders pages → Claude API (Sonnet) vision extracts fields → editable preview table → batch save. API key stored in `app_config` DB table, loaded automatically. DB: 3 tables (`tenders`, `tender_los`, `tender_documents`) + `app_config` table + `tender-documents` storage bucket. Migration: `supabase/tender_migration.sql`. LO status workflow: pending→preparing→delivering→delivered→invoiced→paid. First tender seeded from SST: LPNM.400-5/8/24 (MD2), 1,500,000 sulur, RM1.78/sulur, RM2,670,000, 2-year contract, bond RM66,750.
 - [x] **Full-site audit + fixes** (2026-04-10): 28 issues found across 8 modules (usability + DB linking focus). Fixed: 23 missing `.select()` on deletes (Supabase v2), undefined `--card-bg` CSS var, duplicate `startSessionCheck()`/`closeModal()` in index.html (interval leak + lost focus cleanup), added "Change PIN" button to hub, replaced `prompt()` with styled modals for crop/variety rename, Escape key on Farm Config modals, `for=` on 67 sales labels, `calClose()` cleanup in `closeModal()`, XSS escape in inventory alert. 3 low P3 remaining (workers XSS on internal data, TV interval IDs, overview counts cancelled orders).
 
 ## Audit Results (2026-04-10 — all P1/P2 fixed, 3 low-priority P3 remaining)
