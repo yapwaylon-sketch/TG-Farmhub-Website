@@ -370,8 +370,15 @@ function confirmAction(title, message, onConfirm, danger) {
   document.getElementById("tg-confirm-close").onclick = closeConfirm;
   document.getElementById("tg-confirm-cancel").onclick = closeConfirm;
   document.getElementById("tg-confirm-btn").onclick = function() {
-    closeConfirm();
-    if (onConfirm) onConfirm();
+    // Run onConfirm FIRST so its synchronous portion (e.g. reading form inputs
+    // injected into `message`) can access the still-mounted modal. Async work
+    // continues in the background; closeConfirm runs in finally so a thrown
+    // sync error in onConfirm never leaves the modal stuck on screen.
+    try {
+      if (onConfirm) onConfirm();
+    } finally {
+      closeConfirm();
+    }
   };
 
   trapFocus(modal.querySelector(".modal-box"));
