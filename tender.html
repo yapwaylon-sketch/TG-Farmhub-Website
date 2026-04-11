@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="assets/logo-agribusiness.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tender — TG FarmHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="tender.css">
+<script src="shared.js"></script>
+</head>
+<body>
+<div id="tg-loading" style="position:fixed;inset:0;background:#FAF6EF;z-index:99999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;"><span style="color:#6B4C8A;font-size:28px;font-weight:800;font-family:sans-serif;letter-spacing:1px;">Loading Module</span><span style="color:#D4AF37;font-size:13px;font-family:sans-serif;">TG Agribusiness</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="app">
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+      <div class="sidebar-logo"><img src="assets/logo-agribusiness.png" alt="TG"></div>
+      <div>
+        <div class="sidebar-brand-text">Tender</div>
+        <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+          TG FarmHub
+        </div>
+      </div>
+    </a>
+    <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+      <button onclick="doLogout()" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
+    </div>
+  </div>
+  <div id="company-switcher"></div>
+  <!-- Tender Selector -->
+  <div class="tender-selector" id="tender-selector-area"></div>
+  <!-- Nav Tabs -->
+  <nav class="sidebar-nav" aria-label="Module navigation">
+    <div class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span class="nav-label">Dashboard</span>
+    </div>
+    <div class="nav-item" data-page="los" onclick="navigateTo('los')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span class="nav-label">Local Orders</span>
+    </div>
+    <div class="nav-item" data-page="documents" onclick="navigateTo('documents')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span class="nav-label">Documents</span>
+    </div>
+    <div class="nav-item" data-page="reports" onclick="navigateTo('reports')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="nav-label">Reports</span>
+    </div>
+  </nav>
+  <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+    <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
+    <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Change PIN
+    </button>
+    <button onclick="doLogout()" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-label">Logout</span>
+    </button>
+  </div>
+  <div class="sidebar-sync" onclick="syncAll()">
+    <svg id="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    <span id="sync-text">Synced just now</span>
+  </div>
+</div>
+<!-- MAIN CONTENT -->
+<main class="main-content" id="main-content" role="main">
+  <div id="page-dashboard" class="page active"></div>
+  <div id="page-los" class="page"></div>
+  <div id="page-documents" class="page"></div>
+  <div id="page-reports" class="page"></div>
+</main>
+</div>
+
+<!-- TENDER MODAL -->
+<div class="modal-overlay" id="td-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 id="td-modal-title">Add Tender</h3>
+      <button class="modal-close" onclick="closeTdModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="td-modal-body">
+      <div class="form-group"><label>Tender No *</label><input id="td-tender-no" class="form-control" placeholder="e.g. LPNM.400-5-8-24"></div>
+      <div class="form-group"><label>Title</label><input id="td-title" class="form-control" placeholder="e.g. MD2 Suckers 2026-2027"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Variety *</label><select id="td-variety" class="form-control"><option value="MD2">MD2</option><option value="SG1">SG1</option></select></div>
+        <div class="form-group"><label>Issuer *</label><input id="td-issuer" class="form-control" value="LPNM"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Start Date</label><input id="td-start" type="date" class="form-control"></div>
+        <div class="form-group"><label>End Date</label><input id="td-end" type="date" class="form-control"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Total Qty (suckers)</label><input id="td-qty" type="number" class="form-control" placeholder="0"></div>
+        <div class="form-group"><label>Unit Price (RM)</label><input id="td-price" type="number" step="0.01" class="form-control" placeholder="0.00"></div>
+        <div class="form-group"><label>Total Value (RM)</label><input id="td-value" type="number" step="0.01" class="form-control" placeholder="Auto-calculated" readonly style="background:var(--bg);"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Bond Amount (RM)</label><input id="td-bond-amt" type="number" step="0.01" class="form-control"></div>
+        <div class="form-group"><label>Bond Provider</label><input id="td-bond-provider" class="form-control" placeholder="e.g. Allianz"></div>
+        <div class="form-group"><label>Bond Policy No</label><input id="td-bond-policy" class="form-control"></div>
+      </div>
+      <div class="form-group"><label>Status</label><select id="td-status" class="form-control"><option value="active">Active</option><option value="completed">Completed</option><option value="expired">Expired</option></select></div>
+      <div class="form-group"><label>Notes</label><textarea id="td-notes" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeTdModal()">Cancel</button>
+      <button class="btn btn-primary" id="td-save-btn" onclick="saveTender()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LO MODAL -->
+<div class="modal-overlay" id="lo-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px;">
+    <div class="modal-header">
+      <h3 id="lo-modal-title">Add Local Order</h3>
+      <button class="modal-close" onclick="closeLoModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Batch No *</label><input id="lo-batch" type="number" min="1" class="form-control" value="1"></div>
+        <div class="form-group"><label>Seq No</label><input id="lo-seq" type="number" min="1" class="form-control" value="1"></div>
+        <div class="form-group"><label>Qty (suckers) *</label><input id="lo-qty" type="number" class="form-control" placeholder="42000"></div>
+      </div>
+      <div class="form-group"><label>LO Number *</label><input id="lo-number" class="form-control" placeholder="e.g. LO2600719"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>LO Date</label><input id="lo-date" type="date" class="form-control"></div>
+        <div class="form-group"><label>LO Expiry</label><input id="lo-expiry" type="date" class="form-control"></div>
+      </div>
+      <div class="form-group"><label>Recipient Name *</label><input id="lo-recipient" class="form-control" placeholder="Full name"></div>
+      <div class="form-group"><label>Area / Location</label><input id="lo-area" class="form-control" placeholder="e.g. Samarahan"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Officer Name</label><input id="lo-officer" class="form-control"></div>
+        <div class="form-group"><label>Officer Phone</label><input id="lo-phone" class="form-control" placeholder="e.g. 017-8517534"></div>
+      </div>
+      <div class="form-group"><label>Remarks</label><textarea id="lo-remarks" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeLoModal()">Cancel</button>
+      <span id="lo-delete-area"></span>
+      <button class="btn btn-primary" id="lo-save-btn" onclick="saveLO()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LO STATUS MODAL -->
+<div class="modal-overlay" id="lo-status-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 id="lo-status-title">Update Status</h3>
+      <button class="modal-close" onclick="closeStatusModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="lo-status-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeStatusModal()">Cancel</button>
+      <button class="btn btn-primary" id="lo-status-save" onclick="saveStatusChange()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- DOCUMENT UPLOAD MODAL -->
+<div class="modal-overlay" id="doc-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>Upload Document</h3>
+      <button class="modal-close" onclick="closeDocModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Document Type *</label>
+        <select id="doc-type" class="form-control">
+          <option value="sst">SST (Surat Setuju Terima)</option>
+          <option value="contract">Contract Agreement</option>
+          <option value="bond">Bond / Insurance</option>
+          <option value="lo_letter">LO Letter</option>
+          <option value="submission">Document Submission</option>
+          <option value="invoice">Invoice</option>
+          <option value="report">Report</option>
+          <option value="extension">Extension Letter</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Link to LO (optional)</label>
+        <select id="doc-lo-link" class="form-control"><option value="">— Tender-level document —</option></select>
+      </div>
+      <div class="form-group"><label>File *</label><input id="doc-file" type="file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDocModal()">Cancel</button>
+      <button class="btn btn-primary" id="doc-save-btn" onclick="uploadDocument()">Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT LO MODAL -->
+<div class="modal-overlay" id="import-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:640px;">
+    <div class="modal-header">
+      <h3>Import LO from PDF</h3>
+      <button class="modal-close" onclick="closeImportModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="import-step-1">
+        <input id="import-api-key" type="hidden" value="">
+        <div class="form-group">
+          <label>LO PDF File *</label>
+          <input id="import-file" type="file" class="form-control" accept=".pdf">
+        </div>
+        <div class="form-group">
+          <label>Batch No</label>
+          <input id="import-batch" type="number" min="1" class="form-control" value="1">
+        </div>
+        <button class="btn btn-primary" id="import-extract-btn" onclick="extractFromPDF()" style="width:100%;">Extract with AI</button>
+      </div>
+      <div id="import-step-2" style="display:none;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Review the extracted data below, then save.</div>
+        <div id="import-preview"></div>
+      </div>
+      <div id="import-progress" style="display:none;text-align:center;padding:20px;">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;">Processing PDF...</div>
+        <div id="import-progress-text" style="font-size:12px;color:var(--text-muted);">Rendering pages...</div>
+      </div>
+    </div>
+    <div class="modal-footer" id="import-footer">
+      <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="import-save-btn" onclick="saveImportedLOs()" style="display:none;">Save All LOs</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+var currentUser = null;
+var tenders = [];
+var currentTender = null;
+var los = [];
+var documents = [];
+var currentTab = 'dashboard';
+var editingTenderId = null;
+var editingLoId = null;
+var statusChangeLoId = null;
+var statusChangeTarget = null;
+var loStatusFilter = 'all';
+var loSearch = '';
+var currentReport = 'summary';
+
+var LO_STATUSES = ['pending','preparing','delivering','delivered','invoiced','paid'];
+var LO_STATUS_LABELS = {
+  pending: 'Pending', preparing: 'Preparing', delivering: 'Delivering',
+  delivered: 'Delivered', invoiced: 'Invoiced', paid: 'Paid'
+};
+var DOC_TYPE_LABELS = {
+  sst: 'SST', contract: 'Contract', bond: 'Bond / Insurance', lo_letter: 'LO Letter',
+  submission: 'Submission', invoice: 'Invoice', report: 'Report', extension: 'Extension', other: 'Other'
+};
+
+// ============================================================
+// INIT
+// ============================================================
+(async function init() {
+  try {
+    // Session guard
+    var userData = localStorage.getItem('tgfarmhub_user');
+    if (!userData) { location.href = 'index.html'; return; }
+    try { currentUser = JSON.parse(userData); } catch(e) { location.href = 'index.html'; return; }
+
+    // Force company to Agribusiness
+    setCompanyId('tg_agribusiness');
+
+    // Inject company switcher
+    injectCompanySwitcher();
+    document.querySelectorAll('.company-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var cid = btn.getAttribute('data-company');
+        if (cid !== 'tg_agribusiness') {
+          setCompanyId(cid);
+          location.href = 'index.html';
+        }
+      });
+    });
+
+    // Inject user badge
+    injectUserBadge(currentUser);
+
+    // Start session management
+    startInactivityTimer();
+    startSessionCheck();
+
+    // Load data
+    await loadAllData();
+    renderTenderSelector();
+    renderCurrentTab();
+  } catch(e) {
+    console.error('Init error:', e);
+    notify('Failed to initialize', 'error');
+  } finally {
+    var el = document.getElementById('tg-loading');
+    if (el) el.style.display = 'none';
+  }
+})();
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadAllData() {
+  var companyId = getCompanyId();
+  var res = await sbQuery(sb.from('tenders').select('*').eq('company_id', companyId).order('created_at', { ascending: false }));
+  tenders = res || [];
+  if (tenders.length && !currentTender) {
+    var active = tenders.find(function(t) { return t.status === 'active'; });
+    currentTender = active || tenders[0];
+  }
+  if (currentTender) {
+    await loadTenderData();
+  } else {
+    los = [];
+    documents = [];
+  }
+}
+
+async function loadTenderData() {
+  if (!currentTender) { los = []; documents = []; return; }
+  var res = await Promise.all([
+    sbQuery(sb.from('tender_los').select('*').eq('tender_id', currentTender.id).order('batch_no').order('seq_no')),
+    sbQuery(sb.from('tender_documents').select('*').eq('tender_id', currentTender.id).order('uploaded_at', { ascending: false }))
+  ]);
+  los = res[0] || [];
+  documents = res[1] || [];
+}
+
+async function syncAll() {
+  var icon = document.getElementById('sync-icon');
+  if (icon) icon.style.animation = 'spin 1s linear infinite';
+  await loadAllData();
+  renderTenderSelector();
+  renderCurrentTab();
+  if (icon) icon.style.animation = '';
+  var txt = document.getElementById('sync-text');
+  if (txt) txt.textContent = 'Synced just now';
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigateTo(page) {
+  currentTab = page;
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  document.querySelectorAll('.page').forEach(function(el) {
+    el.classList.toggle('active', el.id === 'page-' + page);
+  });
+  renderCurrentTab();
+  history.replaceState(null, '', '#' + page);
+}
+
+function renderCurrentTab() {
+  if (currentTab === 'dashboard') renderDashboard();
+  else if (currentTab === 'los') renderLOs();
+  else if (currentTab === 'documents') renderDocuments();
+  else if (currentTab === 'reports') renderReports();
+}
+
+// ============================================================
+// TENDER SELECTOR
+// ============================================================
+function renderTenderSelector() {
+  var area = document.getElementById('tender-selector-area');
+  if (!tenders.length) {
+    area.innerHTML = '<div class="tender-selector-label">No tenders yet</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openTdModal()" style="font-size:11px;">+ Add Tender</button>';
+    return;
+  }
+  var pills = tenders.map(function(t) {
+    var isActive = currentTender && currentTender.id === t.id;
+    return '<div class="tender-pill' + (isActive ? ' active' : '') + '" onclick="switchTender(\'' + t.id + '\')">' +
+      esc(t.variety) + ' — ' + esc(t.tender_no) +
+      (t.status !== 'active' ? ' <span class="lo-badge lo-badge-' + t.status + '" style="font-size:8px;padding:1px 5px;margin-left:4px;">' + t.status + '</span>' : '') +
+      '</div>';
+  }).join('');
+  area.innerHTML = '<div class="tender-selector-label">Select Tender</div>' +
+    '<div class="tender-pills">' + pills + '</div>' +
+    '<button class="tender-manage-btn" onclick="openTdModal()">+ Add Tender</button>';
+}
+
+async function switchTender(id) {
+  currentTender = tenders.find(function(t) { return t.id === id; }) || null;
+  await loadTenderData();
+  renderTenderSelector();
+  renderCurrentTab();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function fmtNum(n) {
+  if (n == null) return '0';
+  return Number(n).toLocaleString();
+}
+function fmtRM(n) {
+  if (n == null) return 'RM 0.00';
+  return 'RM ' + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  var dt = new Date(d);
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  var now = new Date(); now.setHours(0,0,0,0);
+  var d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.ceil((d - now) / 86400000);
+}
+function loIsCompleted(lo) {
+  return ['delivered','invoiced','paid'].indexOf(lo.status) >= 0;
+}
+function getTenderBalance() {
+  if (!currentTender) return 0;
+  var delivered = los.filter(loIsCompleted).reduce(function(s, lo) { return s + (lo.qty || 0); }, 0);
+  return currentTender.total_qty - delivered;
+}
+
+// ============================================================
+// TENDER CRUD
+// ============================================================
+function openTdModal(id) {
+  editingTenderId = id || null;
+  var m = document.getElementById('td-modal');
+  document.getElementById('td-modal-title').textContent = id ? 'Edit Tender' : 'Add Tender';
+  if (id) {
+    var t = tenders.find(function(x) { return x.id === id; });
+    if (!t) return;
+    document.getElementById('td-tender-no').value = t.tender_no || '';
+    document.getElementById('td-title').value = t.title || '';
+    document.getElementById('td-variety').value = t.variety || 'MD2';
+    document.getElementById('td-issuer').value = t.issuer || 'LPNM';
+    document.getElementById('td-start').value = t.start_date || '';
+    document.getElementById('td-end').value = t.end_date || '';
+    document.getElementById('td-qty').value = t.total_qty || '';
+    document.getElementById('td-price').value = t.unit_price || '';
+    document.getElementById('td-value').value = t.total_value || '';
+    document.getElementById('td-bond-amt').value = t.bond_amount || '';
+    document.getElementById('td-bond-provider').value = t.bond_provider || '';
+    document.getElementById('td-bond-policy').value = t.bond_policy_no || '';
+    document.getElementById('td-status').value = t.status || 'active';
+    document.getElementById('td-notes').value = t.notes || '';
+  } else {
+    ['td-tender-no','td-title','td-issuer','td-start','td-end','td-qty','td-price','td-value','td-bond-amt','td-bond-provider','td-bond-policy','td-notes'].forEach(function(id) {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('td-issuer').value = 'LPNM';
+    document.getElementById('td-variety').value = 'MD2';
+    document.getElementById('td-status').value = 'active';
+  }
+  m.style.display = 'flex';
+}
+
+function closeTdModal() { document.getElementById('td-modal').style.display = 'none'; editingTenderId = null; }
+
+async function saveTender() {
+  var tenderNo = document.getElementById('td-tender-no').value.trim();
+  var variety = document.getElementById('td-variety').value;
+  if (!tenderNo || !variety) { notify('Tender No and Variety are required', 'error'); return; }
+  var qty = parseInt(document.getElementById('td-qty').value) || 0;
+  var price = parseFloat(document.getElementById('td-price').value) || 0;
+  var data = {
+    tender_no: tenderNo,
+    title: document.getElementById('td-title').value.trim() || null,
+    variety: variety,
+    issuer: document.getElementById('td-issuer').value.trim() || 'LPNM',
+    start_date: document.getElementById('td-start').value || null,
+    end_date: document.getElementById('td-end').value || null,
+    total_qty: qty,
+    unit_price: price || null,
+    total_value: (qty && price) ? qty * price : (parseFloat(document.getElementById('td-value').value) || null),
+    bond_amount: parseFloat(document.getElementById('td-bond-amt').value) || null,
+    bond_provider: document.getElementById('td-bond-provider').value.trim() || null,
+    bond_policy_no: document.getElementById('td-bond-policy').value.trim() || null,
+    status: document.getElementById('td-status').value,
+    notes: document.getElementById('td-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+  var btn = document.getElementById('td-save-btn');
+  btnLoading(btn, true);
+  try {
+    if (editingTenderId) {
+      await sbQuery(sb.from('tenders').update(data).eq('id', editingTenderId).select());
+    } else {
+      data.id = await dbNextId('TD');
+      await sbQuery(sb.from('tenders').insert(data).select());
+    }
+    closeTdModal();
+    await loadAllData();
+    if (!currentTender && tenders.length) currentTender = tenders[0];
+    renderTenderSelector();
+    renderCurrentTab();
+    notify(editingTenderId ? 'Tender updated' : 'Tender added', 'success');
+  } catch(e) { notify('Error saving tender', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+// Auto-calc total value
+document.getElementById('td-qty').addEventListener('input', calcTenderValue);
+document.getElementById('td-price').addEventListener('input', calcTenderValue);
+function calcTenderValue() {
+  var q = parseInt(document.getElementById('td-qty').value) || 0;
+  var p = parseFloat(document.getElementById('td-price').value) || 0;
+  document.getElementById('td-value').value = q && p ? (q * p).toFixed(2) : '';
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  var page = document.getElementById('page-dashboard');
+  if (!currentTender) {
+    page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3><p>Add a tender to get started.</p><button class="btn btn-primary" onclick="openTdModal()">+ Add Tender</button></div>';
+    return;
+  }
+  var t = currentTender;
+  var totalQty = t.total_qty || 0;
+  var deliveredQty = los.filter(loIsCompleted).reduce(function(s, lo) { return s + (lo.qty || 0); }, 0);
+  var remaining = totalQty - deliveredQty;
+  var pct = totalQty ? Math.round(deliveredQty / totalQty * 100) : 0;
+  var totalValue = parseFloat(t.total_value) || 0;
+  var invoicedQty = los.filter(function(lo) { return lo.status === 'invoiced' || lo.status === 'paid'; }).reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
+  var invoicedVal = invoicedQty * (parseFloat(t.unit_price)||0);
+  var paidAmt = los.filter(function(lo) { return lo.status === 'paid'; }).reduce(function(s,lo) { return s + (parseFloat(lo.payment_amount)||0); }, 0);
+  var outstanding = invoicedVal - paidAmt;
+
+  // Expiry alerts
+  var now = new Date(); now.setHours(0,0,0,0);
+  var overdue = [];
+  var expiring = [];
+  los.forEach(function(lo) {
+    if (loIsCompleted(lo)) return;
+    var d = daysUntil(lo.lo_expiry);
+    if (d !== null && d < 0) overdue.push(lo);
+    else if (d !== null && d <= 14) expiring.push(lo);
+  });
+
+  var html = '';
+  // Tender info banner
+  html += '<div class="td-info-banner">' +
+    '<div class="td-info-item"><div class="td-info-label">Tender No</div><div class="td-info-value">' + esc(t.tender_no) + '</div></div>' +
+    '<div class="td-info-item"><div class="td-info-label">Variety</div><div class="td-info-value">' + esc(t.variety) + '</div></div>' +
+    '<div class="td-info-item"><div class="td-info-label">Period</div><div class="td-info-value">' + fmtDate(t.start_date) + ' — ' + fmtDate(t.end_date) + '</div></div>' +
+    '<div class="td-info-item"><div class="td-info-label">Status</div><div class="td-info-value"><span class="lo-badge tender-badge-' + t.status + '">' + t.status + '</span></div></div>' +
+    '<div style="margin-left:auto;"><button class="btn btn-outline btn-sm" onclick="openTdModal(\'' + t.id + '\')" style="font-size:11px;">Edit Tender</button></div>' +
+    '</div>';
+
+  // Metric cards
+  html += '<div class="td-metrics">';
+  html += metricCard('Total Qty', fmtNum(totalQty), 'suckers');
+  html += metricCard('Delivered', fmtNum(deliveredQty), pct + '% complete',
+    '<div class="td-progress-bar"><div class="td-progress-fill td-progress-green" style="width:' + pct + '%"></div></div>');
+  html += metricCard('Remaining', fmtNum(remaining), 'suckers left');
+  html += metricCard('LOs Total', los.length + '', los.filter(function(lo){return lo.status==='paid';}).length + ' paid');
+  html += metricCard('Contract Value', fmtRM(totalValue), '');
+  html += metricCard('Invoiced', fmtRM(invoicedVal), fmtNum(invoicedQty) + ' suckers');
+  html += metricCard('Paid', fmtRM(paidAmt), '');
+  html += metricCard('Outstanding', fmtRM(outstanding > 0 ? outstanding : 0), outstanding > 0 ? 'unpaid' : 'all clear', '', outstanding > 0 ? 'color:#EF4444;' : 'color:#22C55E;');
+  html += '</div>';
+
+  // Expiry alerts
+  if (overdue.length || expiring.length) {
+    html += '<div class="td-alerts"><h3>Expiry Alerts</h3>';
+    overdue.forEach(function(lo) {
+      html += '<div class="td-alert-card td-alert-overdue" onclick="navigateTo(\'los\')">' +
+        '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expired ' + fmtDate(lo.lo_expiry) + ' (' + Math.abs(daysUntil(lo.lo_expiry)) + ' days ago)</span></div>' +
+        '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
+    });
+    expiring.forEach(function(lo) {
+      html += '<div class="td-alert-card td-alert-expiring" onclick="navigateTo(\'los\')">' +
+        '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expires ' + fmtDate(lo.lo_expiry) + ' (' + daysUntil(lo.lo_expiry) + ' days left)</span></div>' +
+        '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Batch progress
+  var batches = {};
+  los.forEach(function(lo) {
+    var b = lo.batch_no || 0;
+    if (!batches[b]) batches[b] = { total: 0, completed: 0, qty: 0, qtyDone: 0 };
+    batches[b].total++;
+    batches[b].qty += lo.qty || 0;
+    if (loIsCompleted(lo)) { batches[b].completed++; batches[b].qtyDone += lo.qty || 0; }
+  });
+  var batchKeys = Object.keys(batches).sort(function(a,b) { return a-b; });
+  if (batchKeys.length) {
+    html += '<div class="td-batch-section"><h3 style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Batch Progress</h3>';
+    batchKeys.forEach(function(b) {
+      var info = batches[b];
+      var bpct = info.total ? Math.round(info.completed / info.total * 100) : 0;
+      html += '<div class="td-batch-row">' +
+        '<div class="td-batch-label">Batch ' + b + '</div>' +
+        '<div class="td-batch-bar"><div class="td-batch-bar-fill td-progress-green" style="width:' + bpct + '%"></div></div>' +
+        '<div class="td-batch-stats">' + info.completed + '/' + info.total + ' LOs · ' + fmtNum(info.qtyDone) + '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+  }
+
+  page.innerHTML = html;
+}
+
+function metricCard(label, value, sub, extra, style) {
+  return '<div class="td-metric-card">' +
+    '<div class="td-metric-label">' + label + '</div>' +
+    '<div class="td-metric-value"' + (style ? ' style="' + style + '"' : '') + '>' + value + '</div>' +
+    (sub ? '<div class="td-metric-sub">' + sub + '</div>' : '') +
+    (extra || '') + '</div>';
+}
+
+// ============================================================
+// LOCAL ORDERS TAB
+// ============================================================
+function renderLOs() {
+  var page = document.getElementById('page-los');
+  if (!currentTender) {
+    page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3><p>Add a tender first.</p></div>';
+    return;
+  }
+  var html = '';
+  // Header
+  html += '<div class="td-section-header"><h2>Local Orders</h2><div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="btn btn-primary btn-sm" onclick="openLoModal()" style="font-size:12px;">+ Add LO</button>' +
+    '<button class="btn btn-outline btn-sm" onclick="openImportModal()" style="font-size:12px;">Import LO (PDF)</button>' +
+    '</div></div>';
+
+  // Filters
+  html += '<div class="td-filter-bar">' +
+    '<select onchange="loStatusFilter=this.value;renderLOs();" style="min-width:120px;">' +
+    '<option value="all"' + (loStatusFilter==='all'?' selected':'') + '>All Statuses</option>';
+  LO_STATUSES.forEach(function(s) {
+    html += '<option value="' + s + '"' + (loStatusFilter===s?' selected':'') + '>' + LO_STATUS_LABELS[s] + '</option>';
+  });
+  html += '</select>' +
+    '<input type="text" placeholder="Search LO no, recipient..." value="' + esc(loSearch) + '" oninput="loSearch=this.value;renderLOs();">' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-left:auto;">Balance: <strong style="color:var(--text);">' + fmtNum(getTenderBalance()) + '</strong></div>' +
+    '</div>';
+
+  // Filter LOs
+  var filtered = los.filter(function(lo) {
+    if (loStatusFilter !== 'all' && lo.status !== loStatusFilter) return false;
+    if (loSearch) {
+      var q = loSearch.toLowerCase();
+      if (!((lo.lo_number||'').toLowerCase().indexOf(q) >= 0 ||
+            (lo.recipient_name||'').toLowerCase().indexOf(q) >= 0 ||
+            (lo.area||'').toLowerCase().indexOf(q) >= 0)) return false;
+    }
+    return true;
+  });
+
+  if (!filtered.length) {
+    html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">No local orders found.</div>';
+    page.innerHTML = html;
+    return;
+  }
+
+  // Group by batch
+  var batchGroups = {};
+  filtered.forEach(function(lo) {
+    var b = lo.batch_no || 0;
+    if (!batchGroups[b]) batchGroups[b] = [];
+    batchGroups[b].push(lo);
+  });
+  var batchKeys = Object.keys(batchGroups).sort(function(a,b) { return a-b; });
+
+  html += '<div class="lo-table-wrap"><table class="lo-table"><thead><tr>' +
+    '<th>#</th><th>LO No</th><th>LO Date</th><th>Expiry</th><th>Recipient</th><th>Area</th><th>Officer</th>' +
+    '<th>Qty</th><th>DO No</th><th>Delivery</th><th>Invoice</th><th>Payment</th><th>Status</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  batchKeys.forEach(function(b) {
+    var batchLos = batchGroups[b];
+    var batchQty = batchLos.reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
+    var batchDone = batchLos.filter(loIsCompleted).length;
+    html += '<tr class="lo-batch-header"><td colspan="14">Batch ' + b +
+      ' <span style="font-weight:400;font-size:11px;color:var(--text-muted);margin-left:8px;">' +
+      batchDone + '/' + batchLos.length + ' completed · ' + fmtNum(batchQty) + ' suckers</span></td></tr>';
+
+    batchLos.forEach(function(lo) {
+      var days = daysUntil(lo.lo_expiry);
+      var rowClass = '';
+      if (!loIsCompleted(lo) && days !== null) {
+        if (days < 0) rowClass = ' lo-row-overdue';
+        else if (days <= 14) rowClass = ' lo-row-expiring';
+      }
+      var nextStatus = getNextStatus(lo.status);
+      html += '<tr class="' + rowClass + '">' +
+        '<td>' + lo.seq_no + '</td>' +
+        '<td><strong>' + esc(lo.lo_number || '—') + '</strong></td>' +
+        '<td>' + fmtDate(lo.lo_date) + '</td>' +
+        '<td>' + fmtDate(lo.lo_expiry) + (days !== null && !loIsCompleted(lo) ? '<br><span style="font-size:10px;color:' + (days<0?'#EF4444':days<=14?'#D4AF37':'var(--text-muted)') + ';">' + (days<0 ? Math.abs(days)+'d overdue' : days+'d left') + '</span>' : '') + '</td>' +
+        '<td>' + esc(lo.recipient_name || '—') + '</td>' +
+        '<td style="font-size:11px;">' + esc(lo.area || '—') + '</td>' +
+        '<td style="font-size:11px;">' + esc(lo.officer_name || '—') + (lo.officer_phone ? '<br>' + esc(lo.officer_phone) : '') + '</td>' +
+        '<td style="text-align:right;font-weight:600;">' + fmtNum(lo.qty) + '</td>' +
+        '<td>' + esc(lo.do_number || '—') + '</td>' +
+        '<td>' + fmtDate(lo.delivery_date) + '</td>' +
+        '<td>' + esc(lo.invoice_no || '—') + (lo.invoice_date ? '<br><span style="font-size:10px;">' + fmtDate(lo.invoice_date) + '</span>' : '') + '</td>' +
+        '<td>' + (lo.payment_date ? fmtDate(lo.payment_date) + (lo.payment_amount ? '<br><span style="font-size:10px;">' + fmtRM(lo.payment_amount) + '</span>' : '') : '—') + '</td>' +
+        '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td>' +
+        '<td style="white-space:nowrap;">' +
+          (nextStatus ? '<button class="lo-action-btn primary" onclick="openStatusChange(\'' + lo.id + '\',\'' + nextStatus + '\')" title="Move to ' + LO_STATUS_LABELS[nextStatus] + '">' + LO_STATUS_LABELS[nextStatus] + ' &#8594;</button> ' : '') +
+          '<button class="lo-action-btn" onclick="openLoModal(\'' + lo.id + '\')" title="Edit">Edit</button>' +
+        '</td></tr>';
+    });
+  });
+
+  html += '</tbody></table></div>';
+  page.innerHTML = html;
+}
+
+function getNextStatus(status) {
+  var idx = LO_STATUSES.indexOf(status);
+  return idx >= 0 && idx < LO_STATUSES.length - 1 ? LO_STATUSES[idx + 1] : null;
+}
+
+// ============================================================
+// LO CRUD
+// ============================================================
+function openLoModal(id) {
+  editingLoId = id || null;
+  document.getElementById('lo-modal-title').textContent = id ? 'Edit Local Order' : 'Add Local Order';
+  if (id) {
+    var lo = los.find(function(x) { return x.id === id; });
+    if (!lo) return;
+    document.getElementById('lo-batch').value = lo.batch_no || 1;
+    document.getElementById('lo-seq').value = lo.seq_no || 1;
+    document.getElementById('lo-qty').value = lo.qty || '';
+    document.getElementById('lo-number').value = lo.lo_number || '';
+    document.getElementById('lo-date').value = lo.lo_date || '';
+    document.getElementById('lo-expiry').value = lo.lo_expiry || '';
+    document.getElementById('lo-recipient').value = lo.recipient_name || '';
+    document.getElementById('lo-area').value = lo.area || '';
+    document.getElementById('lo-officer').value = lo.officer_name || '';
+    document.getElementById('lo-phone').value = lo.officer_phone || '';
+    document.getElementById('lo-remarks').value = lo.remarks || '';
+    document.getElementById('lo-delete-area').innerHTML = '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);font-size:11px;" onclick="deleteLO(\'' + id + '\')">Delete</button>';
+  } else {
+    ['lo-number','lo-date','lo-expiry','lo-recipient','lo-area','lo-officer','lo-phone','lo-remarks'].forEach(function(fid) {
+      document.getElementById(fid).value = '';
+    });
+    document.getElementById('lo-qty').value = '';
+    // Auto-fill batch and seq
+    var maxBatch = los.reduce(function(m, lo) { return Math.max(m, lo.batch_no || 0); }, 0);
+    var lastBatch = maxBatch || 1;
+    var seqInBatch = los.filter(function(lo) { return lo.batch_no === lastBatch; }).length;
+    document.getElementById('lo-batch').value = lastBatch;
+    document.getElementById('lo-seq').value = seqInBatch + 1;
+    document.getElementById('lo-delete-area').innerHTML = '';
+  }
+  document.getElementById('lo-modal').style.display = 'flex';
+}
+
+function closeLoModal() { document.getElementById('lo-modal').style.display = 'none'; editingLoId = null; }
+
+async function saveLO() {
+  var loNumber = document.getElementById('lo-number').value.trim();
+  var recipient = document.getElementById('lo-recipient').value.trim();
+  var qty = parseInt(document.getElementById('lo-qty').value) || 0;
+  if (!loNumber || !recipient || !qty) { notify('LO Number, Recipient, and Qty are required', 'error'); return; }
+  var data = {
+    tender_id: currentTender.id,
+    batch_no: parseInt(document.getElementById('lo-batch').value) || 1,
+    seq_no: parseInt(document.getElementById('lo-seq').value) || 1,
+    lo_number: loNumber,
+    lo_date: document.getElementById('lo-date').value || null,
+    lo_expiry: document.getElementById('lo-expiry').value || null,
+    recipient_name: recipient,
+    area: document.getElementById('lo-area').value.trim() || null,
+    officer_name: document.getElementById('lo-officer').value.trim() || null,
+    officer_phone: document.getElementById('lo-phone').value.trim() || null,
+    qty: qty,
+    remarks: document.getElementById('lo-remarks').value.trim() || null,
+    company_id: getCompanyId()
+  };
+  var btn = document.getElementById('lo-save-btn');
+  btnLoading(btn, true);
+  try {
+    if (editingLoId) {
+      await sbQuery(sb.from('tender_los').update(data).eq('id', editingLoId).select());
+    } else {
+      data.id = await dbNextId('LO');
+      await sbQuery(sb.from('tender_los').insert(data).select());
+    }
+    closeLoModal();
+    await loadTenderData();
+    renderCurrentTab();
+    notify(editingLoId ? 'LO updated' : 'LO added', 'success');
+  } catch(e) { notify('Error saving LO', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+async function deleteLO(id) {
+  confirmAction('Delete this Local Order?', 'This cannot be undone.', async function() {
+    await sbQuery(sb.from('tender_los').delete().eq('id', id).select());
+    closeLoModal();
+    await loadTenderData();
+    renderCurrentTab();
+    notify('LO deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// STATUS TRANSITIONS
+// ============================================================
+function openStatusChange(loId, targetStatus) {
+  statusChangeLoId = loId;
+  statusChangeTarget = targetStatus;
+  var lo = los.find(function(x) { return x.id === loId; });
+  if (!lo) return;
+  var body = document.getElementById('lo-status-body');
+  document.getElementById('lo-status-title').textContent = esc(lo.lo_number) + ' → ' + LO_STATUS_LABELS[targetStatus];
+  var html = '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Recipient: <strong>' + esc(lo.recipient_name) + '</strong></p>';
+
+  if (targetStatus === 'delivering' || targetStatus === 'delivered') {
+    html += '<div class="form-group"><label>DO Number</label><input id="st-do" class="form-control" value="' + esc(lo.do_number || '') + '"></div>';
+    html += '<div class="form-group"><label>Delivery Date</label><input id="st-delivery-date" type="date" class="form-control" value="' + (lo.delivery_date || '') + '"></div>';
+  }
+  if (targetStatus === 'invoiced') {
+    html += '<div class="form-group"><label>Invoice No</label><input id="st-invoice-no" class="form-control" value="' + esc(lo.invoice_no || '') + '"></div>';
+    html += '<div class="form-group"><label>Invoice Date</label><input id="st-invoice-date" type="date" class="form-control" value="' + (lo.invoice_date || '') + '"></div>';
+  }
+  if (targetStatus === 'paid') {
+    html += '<div class="form-group"><label>Payment Amount (RM)</label><input id="st-pay-amt" type="number" step="0.01" class="form-control" value="' + (lo.payment_amount || (lo.qty * (parseFloat(currentTender.unit_price)||0)).toFixed(2)) + '"></div>';
+    html += '<div class="form-group"><label>Payment Date</label><input id="st-pay-date" type="date" class="form-control" value="' + (lo.payment_date || '') + '"></div>';
+    html += '<div class="form-group"><label>Reference No</label><input id="st-pay-ref" class="form-control" value="' + esc(lo.payment_ref || '') + '"></div>';
+    html += '<div class="form-group"><label>Bank</label><input id="st-pay-bank" class="form-control" value="' + esc(lo.payment_bank || '') + '"></div>';
+  }
+  if (targetStatus === 'pending' || targetStatus === 'preparing') {
+    html += '<p style="font-size:12px;color:var(--text-muted);">Move status to <strong>' + LO_STATUS_LABELS[targetStatus] + '</strong>?</p>';
+  }
+
+  body.innerHTML = html;
+  document.getElementById('lo-status-modal').style.display = 'flex';
+}
+
+function closeStatusModal() { document.getElementById('lo-status-modal').style.display = 'none'; statusChangeLoId = null; statusChangeTarget = null; }
+
+async function saveStatusChange() {
+  if (!statusChangeLoId || !statusChangeTarget) return;
+  var data = { status: statusChangeTarget };
+
+  if (statusChangeTarget === 'delivering' || statusChangeTarget === 'delivered') {
+    var doEl = document.getElementById('st-do');
+    var ddEl = document.getElementById('st-delivery-date');
+    if (doEl) data.do_number = doEl.value.trim() || null;
+    if (ddEl) data.delivery_date = ddEl.value || null;
+  }
+  if (statusChangeTarget === 'invoiced') {
+    var inEl = document.getElementById('st-invoice-no');
+    var idEl = document.getElementById('st-invoice-date');
+    if (inEl) data.invoice_no = inEl.value.trim() || null;
+    if (idEl) data.invoice_date = idEl.value || null;
+  }
+  if (statusChangeTarget === 'paid') {
+    var paEl = document.getElementById('st-pay-amt');
+    var pdEl = document.getElementById('st-pay-date');
+    var prEl = document.getElementById('st-pay-ref');
+    var pbEl = document.getElementById('st-pay-bank');
+    if (paEl) data.payment_amount = parseFloat(paEl.value) || null;
+    if (pdEl) data.payment_date = pdEl.value || null;
+    if (prEl) data.payment_ref = prEl.value.trim() || null;
+    if (pbEl) data.payment_bank = pbEl.value.trim() || null;
+  }
+
+  var btn = document.getElementById('lo-status-save');
+  btnLoading(btn, true);
+  try {
+    await sbQuery(sb.from('tender_los').update(data).eq('id', statusChangeLoId).select());
+    closeStatusModal();
+    await loadTenderData();
+    renderCurrentTab();
+    notify('Status updated to ' + LO_STATUS_LABELS[statusChangeTarget], 'success');
+  } catch(e) { notify('Error updating status', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+// ============================================================
+// DOCUMENTS TAB
+// ============================================================
+function renderDocuments() {
+  var page = document.getElementById('page-documents');
+  if (!currentTender) {
+    page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3></div>';
+    return;
+  }
+  var html = '<div class="td-section-header"><h2>Documents</h2>' +
+    '<button class="btn btn-primary btn-sm" onclick="openDocModal()" style="font-size:12px;">+ Upload Document</button></div>';
+
+  if (!documents.length) {
+    html += '<div style="text-align:center;padding:40px;color:var(--text-muted);">No documents uploaded yet.</div>';
+    page.innerHTML = html;
+    return;
+  }
+
+  // Group by doc_type
+  var groups = {};
+  documents.forEach(function(d) {
+    var type = d.doc_type || 'other';
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(d);
+  });
+
+  var typeOrder = ['sst','contract','bond','lo_letter','submission','invoice','report','extension','other'];
+  typeOrder.forEach(function(type) {
+    if (!groups[type]) return;
+    html += '<div class="td-doc-group-header">' + DOC_TYPE_LABELS[type] + ' (' + groups[type].length + ')</div>';
+    html += '<div class="td-doc-grid">';
+    groups[type].forEach(function(d) {
+      var linkedLo = d.lo_id ? los.find(function(lo) { return lo.id === d.lo_id; }) : null;
+      html += '<div class="td-doc-card">' +
+        '<div class="td-doc-type">' + DOC_TYPE_LABELS[d.doc_type] + '</div>' +
+        '<div class="td-doc-name">' + esc(d.file_name) + '</div>' +
+        '<div class="td-doc-meta">' +
+          (linkedLo ? 'LO: ' + esc(linkedLo.lo_number) + ' · ' : '') +
+          fmtDate(d.uploaded_at) +
+        '</div>' +
+        '<div class="td-doc-actions">' +
+          '<a href="' + esc(d.file_url) + '" target="_blank" class="lo-action-btn primary">View</a>' +
+          '<button class="lo-action-btn" onclick="deleteDocument(\'' + d.id + '\',\'' + esc(d.file_name.replace(/'/g, "\\'")) + '\')">Delete</button>' +
+        '</div></div>';
+    });
+    html += '</div>';
+  });
+
+  page.innerHTML = html;
+}
+
+function openDocModal() {
+  // Populate LO dropdown
+  var sel = document.getElementById('doc-lo-link');
+  sel.innerHTML = '<option value="">— Tender-level document —</option>';
+  los.forEach(function(lo) {
+    sel.innerHTML += '<option value="' + lo.id + '">' + esc(lo.lo_number || lo.id) + ' — ' + esc(lo.recipient_name || '') + '</option>';
+  });
+  document.getElementById('doc-file').value = '';
+  document.getElementById('doc-type').value = 'other';
+  document.getElementById('doc-modal').style.display = 'flex';
+}
+
+function closeDocModal() { document.getElementById('doc-modal').style.display = 'none'; }
+
+async function uploadDocument() {
+  var fileInput = document.getElementById('doc-file');
+  var file = fileInput.files[0];
+  if (!file) { notify('Please select a file', 'error'); return; }
+  var docType = document.getElementById('doc-type').value;
+  var loId = document.getElementById('doc-lo-link').value || null;
+  var btn = document.getElementById('doc-save-btn');
+  btnLoading(btn, true);
+  try {
+    var ext = file.name.split('.').pop();
+    var path = currentTender.id + '/' + Date.now() + '.' + ext;
+    var { error: uploadErr } = await sb.storage.from('tender-documents').upload(path, file);
+    if (uploadErr) throw uploadErr;
+    var { data: urlData } = sb.storage.from('tender-documents').getPublicUrl(path);
+    var docData = {
+      id: await dbNextId('TF'),
+      tender_id: currentTender.id,
+      lo_id: loId,
+      doc_type: docType,
+      file_name: file.name,
+      file_url: urlData.publicUrl,
+      uploaded_by: currentUser.displayName || currentUser.username,
+      company_id: getCompanyId()
+    };
+    await sbQuery(sb.from('tender_documents').insert(docData).select());
+    closeDocModal();
+    await loadTenderData();
+    renderDocuments();
+    notify('Document uploaded', 'success');
+  } catch(e) { notify('Upload failed: ' + e.message, 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+async function deleteDocument(id, name) {
+  confirmAction('Delete document?', '<strong>' + name + '</strong> will be permanently deleted.', async function() {
+    await sbQuery(sb.from('tender_documents').delete().eq('id', id).select());
+    await loadTenderData();
+    renderDocuments();
+    notify('Document deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// REPORTS TAB
+// ============================================================
+function renderReports() {
+  var page = document.getElementById('page-reports');
+  if (!currentTender) {
+    page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3></div>';
+    return;
+  }
+  var html = '<div class="td-section-header"><h2>Reports</h2>' +
+    '<button class="btn btn-outline btn-sm" onclick="window.print()" style="font-size:11px;">Print</button></div>';
+
+  html += '<div class="td-report-selector">';
+  ['summary','batch','payment'].forEach(function(r) {
+    var labels = { summary: 'Tender Summary', batch: 'Batch Completion', payment: 'Payment Status' };
+    html += '<button class="td-report-btn' + (currentReport===r?' active':'') + '" onclick="currentReport=\'' + r + '\';renderReports();">' + labels[r] + '</button>';
+  });
+  html += '</div>';
+
+  html += '<div class="td-report-content">';
+  if (currentReport === 'summary') html += renderSummaryReport();
+  else if (currentReport === 'batch') html += renderBatchReport();
+  else if (currentReport === 'payment') html += renderPaymentReport();
+  html += '</div>';
+
+  page.innerHTML = html;
+}
+
+function renderSummaryReport() {
+  var t = currentTender;
+  var deliveredQty = los.filter(loIsCompleted).reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
+  var pct = t.total_qty ? Math.round(deliveredQty / t.total_qty * 100) : 0;
+  var statusCounts = {};
+  LO_STATUSES.forEach(function(s) { statusCounts[s] = 0; });
+  los.forEach(function(lo) { statusCounts[lo.status] = (statusCounts[lo.status]||0) + 1; });
+
+  var html = '<h3 style="margin:0 0 16px;">Tender Summary — ' + esc(t.tender_no) + '</h3>';
+  html += '<table><tbody>' +
+    '<tr><td style="font-weight:600;width:180px;">Tender No</td><td>' + esc(t.tender_no) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Title</td><td>' + esc(t.title || '—') + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Variety</td><td>' + esc(t.variety) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Issuer</td><td>' + esc(t.issuer) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Period</td><td>' + fmtDate(t.start_date) + ' — ' + fmtDate(t.end_date) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Total Qty</td><td>' + fmtNum(t.total_qty) + ' suckers</td></tr>' +
+    '<tr><td style="font-weight:600;">Delivered</td><td>' + fmtNum(deliveredQty) + ' (' + pct + '%)</td></tr>' +
+    '<tr><td style="font-weight:600;">Remaining</td><td>' + fmtNum(t.total_qty - deliveredQty) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Contract Value</td><td>' + fmtRM(t.total_value) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Unit Price</td><td>' + fmtRM(t.unit_price) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Bond</td><td>' + (t.bond_amount ? fmtRM(t.bond_amount) + ' — ' + esc(t.bond_provider || '') : '—') + '</td></tr>' +
+    '</tbody></table>';
+
+  html += '<h4 style="margin:20px 0 10px;">LO Status Breakdown</h4><table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>';
+  LO_STATUSES.forEach(function(s) {
+    html += '<tr><td><span class="lo-badge lo-badge-' + s + '">' + LO_STATUS_LABELS[s] + '</span></td><td>' + statusCounts[s] + '</td></tr>';
+  });
+  html += '<tr style="font-weight:700;"><td>Total</td><td>' + los.length + '</td></tr></tbody></table>';
+  return html;
+}
+
+function renderBatchReport() {
+  var batches = {};
+  los.forEach(function(lo) {
+    var b = lo.batch_no || 0;
+    if (!batches[b]) batches[b] = [];
+    batches[b].push(lo);
+  });
+  var batchKeys = Object.keys(batches).sort(function(a,b) { return a-b; });
+  var html = '<h3 style="margin:0 0 16px;">Batch Completion Report</h3>';
+
+  batchKeys.forEach(function(b) {
+    var bLos = batches[b];
+    var done = bLos.filter(loIsCompleted).length;
+    html += '<h4 style="margin:16px 0 8px;">Batch ' + b + ' (' + done + '/' + bLos.length + ' completed)</h4>';
+    html += '<table><thead><tr><th>#</th><th>LO No</th><th>Recipient</th><th>Qty</th><th>Delivery</th><th>Status</th></tr></thead><tbody>';
+    bLos.forEach(function(lo) {
+      html += '<tr><td>' + lo.seq_no + '</td><td>' + esc(lo.lo_number||'—') + '</td><td>' + esc(lo.recipient_name||'—') + '</td>' +
+        '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td><td>' + fmtDate(lo.delivery_date) + '</td>' +
+        '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  });
+  return html;
+}
+
+function renderPaymentReport() {
+  var invoiced = los.filter(function(lo) { return lo.status === 'invoiced' || lo.status === 'paid'; });
+  var totalInvoiced = invoiced.reduce(function(s,lo) { return s + (lo.qty||0) * (parseFloat(currentTender.unit_price)||0); }, 0);
+  var totalPaid = invoiced.filter(function(lo) { return lo.status === 'paid'; }).reduce(function(s,lo) { return s + (parseFloat(lo.payment_amount)||0); }, 0);
+
+  var html = '<h3 style="margin:0 0 16px;">Payment Status Report</h3>';
+  html += '<div style="display:flex;gap:20px;margin-bottom:16px;">' +
+    '<div><span style="font-size:11px;color:var(--text-muted);">Total Invoiced</span><br><strong>' + fmtRM(totalInvoiced) + '</strong></div>' +
+    '<div><span style="font-size:11px;color:var(--text-muted);">Total Paid</span><br><strong style="color:#22C55E;">' + fmtRM(totalPaid) + '</strong></div>' +
+    '<div><span style="font-size:11px;color:var(--text-muted);">Outstanding</span><br><strong style="color:#EF4444;">' + fmtRM(totalInvoiced - totalPaid) + '</strong></div>' +
+    '</div>';
+
+  if (!invoiced.length) {
+    html += '<p style="color:var(--text-muted);">No invoiced or paid LOs yet.</p>';
+    return html;
+  }
+
+  html += '<table><thead><tr><th>LO No</th><th>Recipient</th><th>Qty</th><th>Amount</th><th>Payment Date</th><th>Reference</th><th>Bank</th><th>Status</th></tr></thead><tbody>';
+  invoiced.forEach(function(lo) {
+    var amt = (lo.qty||0) * (parseFloat(currentTender.unit_price)||0);
+    html += '<tr><td>' + esc(lo.lo_number||'—') + '</td><td>' + esc(lo.recipient_name||'—') + '</td>' +
+      '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td>' +
+      '<td style="text-align:right;">' + fmtRM(amt) + '</td>' +
+      '<td>' + fmtDate(lo.payment_date) + '</td>' +
+      '<td>' + esc(lo.payment_ref || '—') + '</td>' +
+      '<td>' + esc(lo.payment_bank || '—') + '</td>' +
+      '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+// ============================================================
+// AI LO IMPORT
+// ============================================================
+var importedLOs = [];
+
+async function openImportModal() {
+  // Load API key from database
+  var keyRow = await sbQuery(sb.from('app_config').select('value').eq('key', 'anthropic_api_key').single());
+  var savedKey = (keyRow && keyRow.value) || localStorage.getItem('tg_anthropic_key') || '';
+  if (!savedKey) { notify('No API key configured. Contact admin.', 'error'); return; }
+  document.getElementById('import-api-key').value = savedKey;
+  document.getElementById('import-file').value = '';
+  var maxBatch = los.reduce(function(m, lo) { return Math.max(m, lo.batch_no || 0); }, 0);
+  document.getElementById('import-batch').value = maxBatch + 1;
+  document.getElementById('import-step-1').style.display = '';
+  document.getElementById('import-step-2').style.display = 'none';
+  document.getElementById('import-progress').style.display = 'none';
+  document.getElementById('import-save-btn').style.display = 'none';
+  importedLOs = [];
+  document.getElementById('import-modal').style.display = 'flex';
+}
+
+function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
+
+async function extractFromPDF() {
+  var apiKey = document.getElementById('import-api-key').value.trim();
+  if (!apiKey) { notify('No API key configured. Contact admin.', 'error'); return; }
+
+  var fileInput = document.getElementById('import-file');
+  var file = fileInput.files[0];
+  if (!file) { notify('Please select a PDF file', 'error'); return; }
+
+  var batchNo = parseInt(document.getElementById('import-batch').value) || 1;
+
+  // Show progress
+  document.getElementById('import-step-1').style.display = 'none';
+  document.getElementById('import-progress').style.display = '';
+  document.getElementById('import-progress-text').textContent = 'Reading PDF...';
+
+  try {
+    // Read file as array buffer
+    var arrayBuffer = await file.arrayBuffer();
+
+    // Render PDF pages to images using pdf.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    var numPages = pdf.numPages;
+    document.getElementById('import-progress-text').textContent = 'Rendering ' + numPages + ' page(s)...';
+
+    var images = [];
+    for (var i = 1; i <= Math.min(numPages, 5); i++) {
+      var page = await pdf.getPage(i);
+      var scale = 2;
+      var viewport = page.getViewport({ scale: scale });
+      var canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      var ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      images.push(dataUrl.split(',')[1]); // base64 only
+    }
+
+    document.getElementById('import-progress-text').textContent = 'Sending to Claude for extraction...';
+
+    // Build Claude API request
+    var content = [];
+    images.forEach(function(img, idx) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: img }
+      });
+    });
+    content.push({
+      type: 'text',
+      text: 'This is an LO (Local Order / Pesanan Tempatan) document from LPNM (Lembaga Perindustrian Nanas Malaysia) for pineapple sucker supply. Extract the following fields from it:\n\n' +
+        '- lo_number: The LO number (e.g. LO2600719)\n' +
+        '- lo_date: Date of the LO (format: YYYY-MM-DD)\n' +
+        '- lo_expiry: Expiry date of the LO (format: YYYY-MM-DD)\n' +
+        '- recipient_name: Name of the recipient/farmer (Penerima)\n' +
+        '- area: Location/area (Kawasan/Alamat)\n' +
+        '- officer_name: LPNM officer name (Pegawai)\n' +
+        '- officer_phone: Officer phone number\n' +
+        '- qty: Total quantity of suckers ordered (number only)\n\n' +
+        'If the document contains multiple LOs, extract each one separately.\n\n' +
+        'Return ONLY a JSON array of objects with these fields. No markdown, no explanation. Example:\n' +
+        '[{"lo_number":"LO2600719","lo_date":"2026-06-19","lo_expiry":"2026-08-03","recipient_name":"Turi Bin Tar","area":"Samarahan","officer_name":"Mohd Farith","officer_phone":"017-8517534","qty":42000}]'
+    });
+
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: content }]
+      })
+    });
+
+    if (!response.ok) {
+      var errBody = await response.text();
+      throw new Error('API error ' + response.status + ': ' + errBody);
+    }
+
+    var result = await response.json();
+    var text = result.content[0].text.trim();
+
+    // Parse JSON from response (handle potential markdown wrapping)
+    if (text.startsWith('```')) {
+      text = text.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
+    }
+    var extracted = JSON.parse(text);
+    if (!Array.isArray(extracted)) extracted = [extracted];
+
+    // Assign batch and seq numbers
+    var existingInBatch = los.filter(function(lo) { return lo.batch_no === batchNo; }).length;
+    extracted.forEach(function(lo, idx) {
+      lo.batch_no = batchNo;
+      lo.seq_no = existingInBatch + idx + 1;
+      lo.qty = parseInt(lo.qty) || 0;
+    });
+    importedLOs = extracted;
+
+    // Show preview
+    document.getElementById('import-progress').style.display = 'none';
+    document.getElementById('import-step-2').style.display = '';
+    document.getElementById('import-save-btn').style.display = '';
+    renderImportPreview();
+
+  } catch(e) {
+    console.error('Import error:', e);
+    document.getElementById('import-progress').style.display = 'none';
+    document.getElementById('import-step-1').style.display = '';
+    notify('Import failed: ' + e.message, 'error');
+  }
+}
+
+function renderImportPreview() {
+  var html = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;">' + importedLOs.length + ' LO(s) extracted</div>';
+  html += '<div style="overflow-x:auto;"><table class="lo-table" style="min-width:700px;"><thead><tr>' +
+    '<th>Batch</th><th>#</th><th>LO No</th><th>LO Date</th><th>Expiry</th><th>Recipient</th><th>Area</th><th>Officer</th><th>Qty</th>' +
+    '</tr></thead><tbody>';
+  importedLOs.forEach(function(lo, idx) {
+    html += '<tr>' +
+      '<td><input type="number" value="' + lo.batch_no + '" style="width:50px;" onchange="importedLOs[' + idx + '].batch_no=parseInt(this.value)||1"></td>' +
+      '<td>' + lo.seq_no + '</td>' +
+      '<td><input value="' + esc(lo.lo_number||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].lo_number=this.value"></td>' +
+      '<td><input type="date" value="' + (lo.lo_date||'') + '" onchange="importedLOs[' + idx + '].lo_date=this.value"></td>' +
+      '<td><input type="date" value="' + (lo.lo_expiry||'') + '" onchange="importedLOs[' + idx + '].lo_expiry=this.value"></td>' +
+      '<td><input value="' + esc(lo.recipient_name||'') + '" style="width:140px;" onchange="importedLOs[' + idx + '].recipient_name=this.value"></td>' +
+      '<td><input value="' + esc(lo.area||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].area=this.value"></td>' +
+      '<td><input value="' + esc(lo.officer_name||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].officer_name=this.value"></td>' +
+      '<td><input type="number" value="' + (lo.qty||0) + '" style="width:70px;" onchange="importedLOs[' + idx + '].qty=parseInt(this.value)||0"></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('import-preview').innerHTML = html;
+}
+
+async function saveImportedLOs() {
+  if (!importedLOs.length) return;
+  var btn = document.getElementById('import-save-btn');
+  btnLoading(btn, true);
+  try {
+    var companyId = getCompanyId();
+    for (var i = 0; i < importedLOs.length; i++) {
+      var lo = importedLOs[i];
+      var data = {
+        id: await dbNextId('LO'),
+        tender_id: currentTender.id,
+        batch_no: lo.batch_no || 1,
+        seq_no: lo.seq_no || (i + 1),
+        lo_number: lo.lo_number || null,
+        lo_date: lo.lo_date || null,
+        lo_expiry: lo.lo_expiry || null,
+        recipient_name: lo.recipient_name || null,
+        area: lo.area || null,
+        officer_name: lo.officer_name || null,
+        officer_phone: lo.officer_phone || null,
+        qty: lo.qty || 0,
+        company_id: companyId
+      };
+      await sbQuery(sb.from('tender_los').insert(data).select());
+    }
+    closeImportModal();
+    await loadTenderData();
+    renderCurrentTab();
+    notify(importedLOs.length + ' LO(s) imported', 'success');
+  } catch(e) { notify('Error saving imported LOs: ' + e.message, 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+// ============================================================
+// HASH ROUTING
+// ============================================================
+(function() {
+  var hash = location.hash.replace('#','');
+  if (['dashboard','los','documents','reports'].indexOf(hash) >= 0) {
+    navigateTo(hash);
+  }
+})();
+</script>
+</body>
+</html>

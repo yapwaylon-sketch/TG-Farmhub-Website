@@ -287,6 +287,12 @@
 // ============================================================
 // MODULE DEFINITIONS — add new modules here in the future
 // ============================================================
+const MODULE_CATEGORIES = {
+  operations: { label: "Operations", order: 1 },
+  management: { label: "Management", order: 2 },
+  projects: { label: "Projects Monitoring", order: 3 }
+};
+
 const MODULES = [
   {
     key: "sales",
@@ -306,45 +312,11 @@ const MODULES = [
     ]
   },
   {
-    key: "inventory",
-    name: "Inventory Management",
-    icon: "📦",
-    iconImg: "icons/modules/inventory.png",
-    desc: "Track farm inputs — stock in, stock out, suppliers, reports, and stock checks",
-    url: "inventory.html",
-    active: true,
-    permissions: [
-      { key: "view", label: "View products & stock levels" },
-      { key: "stockIn", label: "Record Stock In (receive goods)" },
-      { key: "stockOut", label: "Record Stock Out (issue to workers)" },
-      { key: "stockCheck", label: "Perform Stock Check (physical count)" },
-      { key: "editProducts", label: "Add / edit product details" },
-      { key: "manageSuppliers", label: "Add / edit / delete suppliers" },
-      { key: "editTransactions", label: "Edit past transactions" },
-      { key: "deleteTransactions", label: "Delete transactions" },
-      { key: "export", label: "Export reports (CSV / PDF)" },
-    ]
-  },
-  {
-    key: "workers",
-    name: "Worker Management",
-    icon: "👷",
-    iconImg: "icons/modules/workers.png",
-    desc: "Worker profiles, monthly payroll, task-based pay, deductions, and reports",
-    url: "workers.html",
-    active: true,
-    permissions: [
-      { key: "view", label: "View worker list & profiles" },
-      { key: "edit", label: "Add / edit worker details" },
-      { key: "payroll", label: "View & edit payroll entries" },
-      { key: "summary", label: "View monthly summary & reports" },
-    ]
-  },
-  {
     key: "spraytracker",
-    name: "PND Spray Tracker",
+    name: "Pineapple Spray",
     icon: "🌿",
     iconImg: "icons/modules/spray-tracker.png",
+    category: "operations",
     desc: "Log and manage fungicide & pesticide spray applications across all farm blocks",
     url: "spraytracker.html",
     active: true,
@@ -356,9 +328,10 @@ const MODULES = [
   },
   {
     key: "growthtracker",
-    name: "Growth Tracker",
+    name: "Pineapple Growth",
     icon: "🌱",
     iconImg: "icons/modules/growth-tracker.png",
+    category: "operations",
     desc: "Monitor block growth, induction schedules, and harvest planning",
     url: "growthtracker.html",
     active: true,
@@ -395,9 +368,10 @@ const MODULES = [
   },
   {
     key: "seedlings",
-    name: "Oil Palm Seedlings",
+    name: "Oil Palm Sales",
     icon: "🌴",
     iconImg: "icons/modules/seedlings.png",
+    category: "operations",
     desc: "Batch management, bookings, collections, L3.1 tracking, and MPOB reports",
     url: "seedlings.html",
     active: true,
@@ -408,6 +382,82 @@ const MODULES = [
       { key: "recordCollections", label: "Process collections & L3.1" },
       { key: "manageCustomers", label: "Add / edit customers" },
       { key: "manageSuppliers", label: "Add / edit suppliers" },
+      { key: "viewReports", label: "Access reports" },
+    ]
+  },
+  {
+    key: "seedlinggrowth",
+    name: "Oil Palm Growth",
+    icon: "🌴",
+    category: "operations",
+    desc: "Monitor oil palm seedling growth stages and nursery health",
+    url: null,
+    active: false,
+    permissions: [
+      { key: "view", label: "View seedling growth data" },
+    ]
+  },
+  {
+    key: "inventory",
+    name: "Inventory",
+    icon: "📦",
+    iconImg: "icons/modules/inventory.png",
+    category: "operations",
+    desc: "Track farm inputs — stock in, stock out, suppliers, reports, and stock checks",
+    url: "inventory.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View products & stock levels" },
+      { key: "stockIn", label: "Record Stock In (receive goods)" },
+      { key: "stockOut", label: "Record Stock Out (issue to workers)" },
+      { key: "stockCheck", label: "Perform Stock Check (physical count)" },
+      { key: "editProducts", label: "Add / edit product details" },
+      { key: "manageSuppliers", label: "Add / edit / delete suppliers" },
+      { key: "editTransactions", label: "Edit past transactions" },
+      { key: "deleteTransactions", label: "Delete transactions" },
+      { key: "export", label: "Export reports (CSV / PDF)" },
+    ]
+  },
+  {
+    key: "workers",
+    name: "Worker Management",
+    icon: "👷",
+    iconImg: "icons/modules/workers.png",
+    category: "management",
+    desc: "Worker profiles, monthly payroll, task-based pay, deductions, and reports",
+    url: "workers.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View worker list & profiles" },
+      { key: "edit", label: "Add / edit worker details" },
+      { key: "payroll", label: "View & edit payroll entries" },
+      { key: "summary", label: "View monthly summary & reports" },
+    ]
+  },
+  {
+    key: "staffclaims",
+    name: "Staff Claims",
+    icon: "📋",
+    category: "management",
+    desc: "Personal expense claims, approvals, and reimbursement tracking",
+    url: null,
+    active: false,
+    permissions: [
+      { key: "view", label: "View and submit claims" },
+    ]
+  },
+  {
+    key: "tender",
+    name: "Tender",
+    icon: "📁",
+    category: "projects",
+    desc: "Monitor government tenders — LO tracking, delivery, invoicing, and payments",
+    url: "tender.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View tenders and local orders" },
+      { key: "manage", label: "Add / edit tenders and LOs" },
+      { key: "documents", label: "Upload / delete documents" },
       { key: "viewReports", label: "Access reports" },
     ]
   }
@@ -812,35 +862,61 @@ function switchCompany(companyId) {
 // ============================================================
 // MODULE CARDS
 // ============================================================
+function renderModuleCard(m) {
+  const hasAccess = hasModuleAccess(m.key);
+  const clickable = m.active && hasAccess;
+  const badgeClass = m.active ? "badge-active" : "badge-soon";
+  const badgeText = m.active ? "Active" : "Coming Soon";
+  return `
+    <div class="module-card${clickable ? "" : " disabled"}"
+      onclick="${clickable ? "window.location.href='" + m.url + "?session=" + currentUser.id + "'" : ""}"
+      title="${!m.active ? "Coming soon" : !hasAccess ? "No access — contact admin" : "Open " + m.name}">
+      <span class="module-badge ${badgeClass}">${badgeText}</span>
+      <span class="module-icon">${m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon}</span>
+      <div class="module-name">${m.name}</div>
+      <div class="module-desc">${m.desc}</div>
+      ${!hasAccess && m.active ? '<div style="font-size:11px;color:var(--critical);margin-top:10px;">🔒 No access — contact admin</div>' : ""}
+    </div>
+  `;
+}
+
 function renderModuleCards() {
   const grid = document.getElementById("module-grid");
-  grid.innerHTML = MODULES.map(m => {
-    const hasAccess = hasModuleAccess(m.key);
-    const clickable = m.active && hasAccess;
-    const badgeClass = m.active ? "badge-active" : "badge-soon";
-    const badgeText = m.active ? "Active" : "Coming Soon";
+  const selectedCompany = getCompanyId();
 
-    // Skip hub-page entries (they are not module cards)
-    if (m.hubPage) return "";
+  // Filter visible modules (not hubPage, visible for company)
+  const visible = MODULES.filter(m => {
+    if (m.hubPage) return false;
+    if (!isModuleVisible(m.key)) return false;
+    return true;
+  });
 
-    // Filter by selected company
-    if (!isModuleVisible(m.key)) return "";
+  // If no categories needed (e.g. Agro Fruits), render flat grid
+  const hasCats = visible.some(m => m.category);
+  if (!hasCats) {
+    grid.innerHTML = visible.map(m => renderModuleCard(m)).join("");
+    return;
+  }
 
-    // Hide coming-soon modules from non-admin users who have no access
-    if (!m.active && currentUser.role !== "admin") return "";
+  // Group by category, maintaining defined order within Operations:
+  // pineapple spray, pineapple growth, inventory, oil palm sales, oil palm growth
+  const catOrder = Object.keys(MODULE_CATEGORIES).sort((a, b) => MODULE_CATEGORIES[a].order - MODULE_CATEGORIES[b].order);
+  let html = "";
+  catOrder.forEach(cat => {
+    const catModules = visible.filter(m => m.category === cat);
+    if (!catModules.length) return;
+    const label = MODULE_CATEGORIES[cat].label;
+    html += '<div class="module-category-banner">' + label + '</div>';
+    html += '<div class="module-grid-inner">' + catModules.map(m => renderModuleCard(m)).join("") + '</div>';
+  });
 
-    return `
-      <div class="module-card${clickable ? "" : " disabled"}"
-        onclick="${clickable ? "window.location.href='" + m.url + "?session=" + currentUser.id + "'" : ""}"
-        title="${!m.active ? "Coming soon" : !hasAccess ? "No access — contact admin" : "Open " + m.name}">
-        <span class="module-badge ${badgeClass}">${badgeText}</span>
-        <span class="module-icon">${m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon}</span>
-        <div class="module-name">${m.name}</div>
-        <div class="module-desc">${m.desc}</div>
-        ${!hasAccess && m.active ? '<div style="font-size:11px;color:var(--critical);margin-top:10px;">🔒 No access — contact admin</div>' : ""}
-      </div>
-    `;
-  }).join("");
+  // Uncategorized modules (shouldn't happen for Agribusiness, but safety)
+  const uncategorized = visible.filter(m => !m.category);
+  if (uncategorized.length) {
+    html += uncategorized.map(m => renderModuleCard(m)).join("");
+  }
+
+  grid.innerHTML = html;
 }
 
 // ============================================================

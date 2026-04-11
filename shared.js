@@ -383,7 +383,10 @@ const MODULE_COMPANY = {
   spraytracker: 'tg_agribusiness',
   growthtracker: 'tg_agribusiness',
   farmconfig: 'shared',
-  seedlings: 'tg_agribusiness'
+  seedlings: 'tg_agribusiness',
+  seedlinggrowth: 'tg_agribusiness',
+  staffclaims: 'tg_agribusiness',
+  tender: 'tg_agribusiness'
 };
 
 function getCompanyId() {

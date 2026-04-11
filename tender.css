@@ -1,0 +1,463 @@
+/* ============================================================
+   Tender Monitoring Module — Styles
+   ============================================================ */
+
+/* --- Tender Selector --- */
+.tender-selector {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tender-selector-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.tender-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tender-pill {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.tender-pill:hover { border-color: var(--gold); color: var(--text); }
+.tender-pill.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+.tender-manage-btn {
+  font-size: 10px;
+  color: var(--green-light);
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  text-align: left;
+}
+.tender-manage-btn:hover { color: var(--gold); }
+
+/* --- No Tender State --- */
+.no-tender-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.no-tender-state h3 { color: var(--text); margin-bottom: 8px; }
+
+/* --- Status Badges --- */
+.lo-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.lo-badge-pending { background: rgba(150,150,150,0.15); color: #888; }
+.lo-badge-preparing { background: rgba(59,130,246,0.15); color: #3B82F6; }
+.lo-badge-delivering { background: rgba(212,175,55,0.15); color: #D4AF37; }
+.lo-badge-delivered { background: rgba(34,197,94,0.15); color: #22C55E; }
+.lo-badge-invoiced { background: rgba(107,76,138,0.15); color: #6B4C8A; }
+.lo-badge-paid { background: rgba(16,185,129,0.15); color: #10B981; }
+
+/* --- Tender Status Badges --- */
+.tender-badge-active { background: rgba(34,197,94,0.15); color: #22C55E; }
+.tender-badge-completed { background: rgba(107,76,138,0.15); color: #6B4C8A; }
+.tender-badge-expired { background: rgba(239,68,68,0.15); color: #EF4444; }
+
+/* --- Dashboard --- */
+.td-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.td-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+}
+.td-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+.td-metric-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+}
+.td-metric-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.td-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.td-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.td-progress-green { background: #22C55E; }
+.td-progress-gold { background: #D4AF37; }
+
+/* --- Alert Cards --- */
+.td-alerts { margin-bottom: 24px; }
+.td-alerts h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.td-alert-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.td-alert-card:hover { border-color: var(--gold); }
+.td-alert-overdue { border-left: 4px solid #EF4444; }
+.td-alert-expiring { border-left: 4px solid #D4AF37; }
+
+/* --- Batch Progress --- */
+.td-batch-section { margin-bottom: 24px; }
+.td-batch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.td-batch-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 80px;
+}
+.td-batch-bar {
+  flex: 1;
+  height: 20px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+}
+.td-batch-bar-fill {
+  height: 100%;
+  transition: width 0.3s;
+}
+.td-batch-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 80px;
+  text-align: right;
+}
+
+/* --- LO Table --- */
+.lo-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.lo-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+  font-size: 12px;
+}
+.lo-table th {
+  background: var(--bg);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  padding: 10px 8px;
+  text-align: left;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom: 2px solid var(--border);
+}
+.lo-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text);
+}
+.lo-table tr:hover td { background: rgba(212,175,55,0.04); }
+.lo-table tr.lo-row-overdue td { background: rgba(239,68,68,0.06); }
+.lo-table tr.lo-row-expiring td { background: rgba(212,175,55,0.06); }
+
+/* Batch header row */
+.lo-batch-header {
+  background: var(--bg) !important;
+  cursor: pointer;
+}
+.lo-batch-header td {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  padding: 12px 8px;
+  border-bottom: 2px solid var(--border);
+}
+
+/* --- LO Action Buttons --- */
+.lo-action-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.lo-action-btn:hover { border-color: var(--gold); color: var(--text); }
+.lo-action-btn.primary {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+.lo-action-btn.primary:hover { opacity: 0.9; }
+
+/* --- Filter Bar --- */
+.td-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.td-filter-bar select,
+.td-filter-bar input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: inherit;
+}
+.td-filter-bar input { flex: 1; min-width: 180px; max-width: 280px; }
+
+/* --- Documents Grid --- */
+.td-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.td-doc-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.td-doc-card:hover { border-color: var(--gold); }
+.td-doc-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--green-light);
+}
+.td-doc-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+.td-doc-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.td-doc-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+.td-doc-group-header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 16px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.td-doc-group-header:first-child { padding-top: 0; }
+
+/* --- Reports --- */
+.td-report-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.td-report-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.td-report-btn:hover { border-color: var(--gold); color: var(--text); }
+.td-report-btn.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+.td-report-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+.td-report-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.td-report-content th {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 2px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.td-report-content td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+/* --- Section Header --- */
+.td-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.td-section-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+/* --- Tender Info Banner --- */
+.td-info-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.td-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.td-info-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+.td-info-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Import Preview --- */
+#import-preview input {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  background: var(--bg-card);
+  color: var(--text);
+}
+#import-preview input:focus {
+  border-color: var(--gold);
+  outline: none;
+}
+
+/* --- Print --- */
+@media print {
+  .sidebar, .td-filter-bar, .td-section-header button,
+  .lo-action-btn, .td-report-selector, .tender-selector,
+  .sidebar-sync, #sidebar-user { display: none !important; }
+  .main-content { margin-left: 0 !important; padding: 20px !important; }
+  .td-report-content { border: none; padding: 0; }
+}
+
+/* --- Mobile --- */
+@media (max-width: 768px) {
+  .td-metrics { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .td-metric-value { font-size: 20px; }
+  .td-doc-grid { grid-template-columns: 1fr; }
+  .td-info-banner { flex-direction: column; gap: 10px; }
+  .td-filter-bar { flex-direction: column; align-items: stretch; }
+  .td-filter-bar input { max-width: 100%; }
+}
+
+@media (min-width: 1024px) {
+  .td-section-header h2 { font-size: 20px; }
+  .td-metric-value { font-size: 28px; }
+}
