@@ -477,7 +477,7 @@
 <!-- DELIVERY PAYMENT MODAL -->
 <!-- DELIVERY PAYMENT DECISION MODAL (Step 3) -->
 <div id="so-paydecision-modal" class="modal-overlay" role="dialog" aria-label="Payment Decision" style="display:none;">
-  <div class="modal-box" style="max-width:400px;">
+  <div class="modal-box" style="max-width:400px;" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title">Payment</div>
       <button class="modal-close" onclick="closeModal('so-paydecision-modal')">
@@ -613,7 +613,7 @@
   <div class="modal-box" style="max-width:500px;max-height:85vh;display:flex;flex-direction:column;">
     <div class="modal-header" style="flex-shrink:0;">
       <div class="modal-title">Confirm Prepared Quantities</div>
-      <button class="modal-close" onclick="closeModal('so-prepqty-modal')">
+      <button class="modal-close" onclick="soClosePrepqtyModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -623,7 +623,7 @@
       <div id="so-prepqty-total" style="text-align:right;font-size:15px;font-weight:800;color:var(--gold-light);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);"></div>
     </div>
     <div class="modal-actions" style="flex-shrink:0;gap:8px;">
-      <button class="btn btn-outline" onclick="closeModal('so-prepqty-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="soClosePrepqtyModal()">Cancel</button>
       <button class="btn btn-primary" id="so-prepqty-confirm" onclick="soPrepQtyConfirm()">Confirm & Continue</button>
     </div>
   </div>
@@ -3018,6 +3018,16 @@ function soPrepQtyRecalc() {
   document.getElementById('so-prepqty-total').textContent = 'Total: RM ' + total.toFixed(2);
 }
 
+function soClosePrepqtyModal() {
+  // Clean up both pending states when Cancel/X is clicked
+  if (soDeliveryPending) { soDeliveryPending = null; notify('Delivery cancelled', 'info'); }
+  if (soPrepPending) { soPrepPending = null; notify('Preparation cancelled', 'info'); }
+  // Reset confirm button to default prep handler
+  var btn = document.getElementById('so-prepqty-confirm');
+  if (btn) { btn.onclick = soPrepQtyConfirm; btn.textContent = 'Confirm & Continue'; }
+  closeModal('so-prepqty-modal');
+}
+
 function soPrepQtyConfirm() {
   if (!soPrepPending) return;
   var orderId = soPrepQtyOrderId;
@@ -4834,7 +4844,8 @@ function recalcPaymentStatus(orderId) {
   if (!o) return;
   var totalPaid = payments.filter(function(p) { return p.order_id === orderId; }).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
   o.amount_paid = totalPaid;
-  if (totalPaid >= (parseFloat(o.grand_total) || 0)) o.payment_status = 'paid';
+  var grandTotal = parseFloat(o.grand_total) || 0;
+  if (grandTotal > 0 && totalPaid >= grandTotal) o.payment_status = 'paid';
   else if (totalPaid > 0) o.payment_status = 'partial';
   else o.payment_status = 'unpaid';
 }
