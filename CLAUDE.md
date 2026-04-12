@@ -69,11 +69,12 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `*.sql` | Database migration scripts |
 
 ## Git
-- **Main repo**: github.com/yapwaylon-sketch/TG-Farmhub-Website (public, main branch) — local at `C:\dev\TG-Farmhub-Website` on both Windows PCs
-- **Nanas TV repo**: github.com/yapwaylon-sketch/TG-Nanas-Growth-TV (public, main branch) — local at `C:\dev\TG-Nanas-Growth-TV` on both Windows PCs (split out 2026-04-09 from being a gitignored sub-folder of the main repo)
-- **Weather sub-project**: NOT yet on GitHub. Lives at `C:\Users\yapwa\OneDrive\TG Web and Android Project\TG Projects Deffered\TG Weather Monitoring Website\` (still on OneDrive, deferred to a dedicated future session — needs MET token rotation, repo structure decision, Netlify build source verification before it can be moved off OneDrive)
+- **Single repo**: github.com/yapwaylon-sketch/TG-Farmhub-Website (public, main branch) — local at `C:\dev\TG-Farmhub-Website` on both Windows PCs
+- Everything is in this one repo: all modules, TV displays (display-growth, display-sales, display-spray), weather site (weather/), Netlify functions (netlify/functions/)
+- **Archived repos** (2026-04-12): `TG-Nanas-Growth-TV`, `tg-weather-netlify` — code merged into main repo
 
 ## Supabase
+- **Plan**: Pro ($25/month) — daily backups, point-in-time recovery, 8GB DB, 100GB storage
 - Project ref: `qwlagcriiyoflseduvvc`
 - Region: ap-northeast-1 (Tokyo)
 - API: `https://qwlagcriiyoflseduvvc.supabase.co`
@@ -432,27 +433,30 @@ Bucket: `tender-documents` (public). Path: `{tender_id}/{timestamp}.{ext}`
 ### Current Tenders
 - **AB-TD003**: LPNM.400-5/8/24 (MD2) — 1,500,000 sulur, RM1.78, RM2,670,000, 2-year contract (Mar 2026 – Mar 2028), bond RM66,750
 
-## Sub-Projects (same folder, separate deploys)
-These live inside this folder but are gitignored. They share the same Supabase database and read from the same tables.
+## Consolidated Architecture (2026-04-12)
+Everything lives in one repo, one Netlify site, one Supabase project, one domain. No sub-projects.
 
-### TG Nanas Growth TV
-- **Folder**: `TG Nanas Growth TV/`
-- **File**: `index.html` (single-page, read-only TV display for growth data)
-- **Netlify site**: nanasgrowth.netlify.app (site ID: `6c4382a2-098b-4c47-b46f-bb37a3ab3542`)
-- **Custom domain**: nanasgrowth.tgfarmhub.com
-- **Reads from**: `growth_records`, `pnd_blocks`, `crop_varieties` (same Supabase DB)
-- **Auth**: No login, read-only, 4K TV optimized
-- **Behavior**: Rotates status pages every 30s, auto-splits large groups, data refresh every 5min
+### TV Displays (all in this repo)
+| File | Purpose | Auth |
+|------|---------|------|
+| `display-growth.html` | Nanas Growth TV (was nanasgrowth.tgfarmhub.com) | Password gate |
+| `display-sales.html` | Sales Packing Station TV | Password gate |
+| `display-spray.html` | PND Spray Tracker TV | Password gate |
+| `weather/index.html` | Weather Monitoring (was weather.tgfarmhub.com) | None |
 
-### TG Weather Monitoring Website
-- **Folder**: `TG Weather Monitoring Website/`
-- **Deploy folder**: `TG Weather Monitoring Website/tg-weather-netlify/`
-- **Domain**: weather.tgfarmhub.com
-- **Reads from**: Same Supabase DB (weather-related tables)
-- **Docs**: `USER_GUIDE.html`, `USER_GUIDE.pdf`
+### Weather System
+- **Netlify functions**: `netlify/functions/` — `davis-logger.js` (every 15 min), `davis-proxy.js`, `met-proxy.js`
+- **DB tables**: `station_readings`, `model_snapshots` (in production Supabase)
+- **Data flow**: Davis station → WeatherLink cloud → davis-logger.js → Supabase; Open-Meteo → davis-logger.js → Supabase; MET Malaysia → met-proxy.js → displayed directly
+- **API keys**: Davis (key+secret), MET Malaysia token, Open-Meteo (free, no key)
+- **Deploy**: Must use Netlify CLI (not file API) because of functions: `npx netlify-cli deploy --prod --dir=. --functions=netlify/functions --site=a0ac5d18-a968-414c-a531-c78ed390e5c2 --auth=TOKEN`
 
-### Important: When changing DB schema
-If you modify tables that these sub-projects read from (especially `growth_records`, `pnd_blocks`, `crop_varieties`), check and update the sub-project `index.html` files too.
+### Deleted (2026-04-12)
+- Supabase project `zcxeobfouxsxxgjreoew` (TG Weather) — deleted, tables migrated to production
+- Netlify sites: `nanasgrowth` + `tgweather` — deleted
+- GitHub repos: `TG-Nanas-Growth-TV` + `tg-weather-netlify` — archived
+- Cloudflare DNS: `nanasgrowth` + `weather` CNAME records — removed
+- OneDrive: `TG Projects Deffered\TG Weather Monitoring Website\` — deleted
 
 ## Blueprint — What's Next
 - [x] **Sales Module** (`sales.html` + `delivery.html` + `display-sales.html`) — **DONE** (2026-03-21)
@@ -536,6 +540,8 @@ If you modify tables that these sub-projects read from (especially `growth_recor
 - [x] **Hub category banners** (2026-04-10): TG Agribusiness modules on hub page now grouped under 3 category banners — Operations (Pineapple Spray, Pineapple Growth, Oil Palm Sales, Oil Palm Growth, Inventory), Management (Worker Management, Staff Claims), Projects Monitoring (Tender). Flat grid preserved for Agro Fruits (just Sales). `MODULE_CATEGORIES` config in index.html, `category` field on each module, `renderModuleCards()` renders banners with inner grids. Coming-soon modules shown as disabled cards. Module renames: "PND Spray Tracker"→"Pineapple Spray", "Growth Tracker"→"Pineapple Growth", "Oil Palm Seedlings"→"Oil Palm Sales", "Inventory Management"→"Inventory". New coming-soon entries: `seedlinggrowth`, `staffclaims`, `tender`.
 - [x] **Tender Monitoring module** (2026-04-10): Full build — `tender.html` + `tender.css`. 4 sidebar tabs (Dashboard, Local Orders, Documents, Reports). Tender selector pills in sidebar to switch between tenders. Dashboard: 8 metric cards (qty/delivered/remaining/%/contract value/invoiced/paid/outstanding), expiry alerts (overdue red, expiring-soon gold), batch progress bars. Local Orders: table grouped by batch with status filter + search, add/edit modal, status transitions with field prompts (delivering→DO+date, invoiced→invoice no+date, paid→amount+ref+bank), expiry row highlighting, running balance. Documents: file upload to `tender-documents` Supabase bucket, grouped by doc type (SST/contract/bond/LO/submission/invoice/report/extension/other), optional LO linking, view/delete. Reports: Tender Summary, Batch Completion, Payment Status (all printable). AI LO PDF import: pdf.js CDN renders pages → Claude API (Sonnet) vision extracts fields → editable preview table → batch save. API key stored in `app_config` DB table, loaded automatically. DB: 3 tables (`tenders`, `tender_los`, `tender_documents`) + `app_config` table + `tender-documents` storage bucket. Migration: `supabase/tender_migration.sql`. LO status workflow: pending→preparing→delivering→delivered→invoiced→paid. First tender seeded from SST: LPNM.400-5/8/24 (MD2), 1,500,000 sulur, RM1.78/sulur, RM2,670,000, 2-year contract, bond RM66,750.
 - [x] **Full-site audit + fixes** (2026-04-10): 28 issues found across 8 modules (usability + DB linking focus). Fixed: 23 missing `.select()` on deletes (Supabase v2), undefined `--card-bg` CSS var, duplicate `startSessionCheck()`/`closeModal()` in index.html (interval leak + lost focus cleanup), added "Change PIN" button to hub, replaced `prompt()` with styled modals for crop/variety rename, Escape key on Farm Config modals, `for=` on 67 sales labels, `calClose()` cleanup in `closeModal()`, XSS escape in inventory alert. 3 low P3 remaining (workers XSS on internal data, TV interval IDs, overview counts cancelled orders).
+- [x] **Sales atomic delivery flow** (2026-04-12): Refactored Mark Delivered into atomic commit — qty adjustment, delivery photo, payment decision (Pay Later/Receive Payment with YES/NO confirm), collect payment modal all save to memory, single DB commit at end. Mark Prepared also refactored to atomic (qty + photo + status in one commit). Photo upload mandatory for both prep and delivery (Skip button removed). Worker assignment mandatory for Start Preparing. Fixed shared prepqty modal handler leak between delivery and prep flows. Bank transfer slip upload added to delivery payment modal.
+- [x] **Consolidation — one repo, one site, one DB** (2026-04-12): Merged Nanas Growth TV (`display-growth.html`) and Weather Monitoring (`weather/` + `netlify/functions/`) into main repo. Migrated weather DB tables (`station_readings` + `model_snapshots`, ~109K rows) from separate Supabase project into production. Deleted 2 Netlify sites (nanasgrowth, tgweather), archived 2 GitHub repos, removed 2 Cloudflare DNS records. Supabase upgraded to Pro ($25/month) for daily backups + PITR. Deploy now uses Netlify CLI (supports functions).
 
 ## Audit Results (2026-04-10 — all P1/P2 fixed, 3 low-priority P3 remaining)
 Full-site audit covering hub (index.html), sales, inventory, workers, spraytracker, growthtracker, delivery, display-sales, display-spray. Focus: usability + database linking.
