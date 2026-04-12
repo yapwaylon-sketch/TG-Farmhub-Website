@@ -196,7 +196,7 @@ body { overflow: auto; height: auto; min-height: 100vh; }
     <h2>&#127821; Deliveries</h2>
     <div class="login-sub">Sign in to view pending deliveries</div>
     <input type="text" id="login-username" placeholder="Username" autocomplete="off">
-    <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6" onkeydown="if(event.key==='Enter')doLogin();">
+    <input type="password" id="login-pin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*" onkeydown="if(event.key==='Enter')doLogin();" oninput="if(this.value.length===6)doLogin();" onkeypress="if(event.charCode<48||event.charCode>57)event.preventDefault();">
     <button class="btn-login" onclick="doLogin()">Sign In</button>
   </div>
 </div>
@@ -229,6 +229,73 @@ body { overflow: auto; height: auto; min-height: 100vh; }
       <span class="arrow">&#9660;</span>
     </button>
     <div id="completed-list"></div>
+  </div>
+</div>
+
+<!-- Qty Confirmation Modal -->
+<div id="del-qty-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal('del-qty-modal')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-title">Confirm Delivered Quantities</div>
+    <div class="modal-subtitle" style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Adjust if items were damaged or short.</div>
+    <div id="del-qty-items"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('del-qty-modal')">Cancel</button>
+      <button class="btn btn-primary" id="del-qty-confirm-btn" onclick="delQtyConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Modal -->
+<div id="del-photo-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+    <div class="modal-title">Delivery Photo</div>
+    <div class="modal-subtitle" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Take a photo as proof of delivery.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" id="del-photo-take" style="min-height:48px;">Take Photo</button>
+      <button class="btn btn-outline" id="del-photo-album" style="min-height:48px;">From Album</button>
+    </div>
+    <input type="file" id="del-photo-input" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="del-photo-input-album" accept="image/*" style="display:none;">
+  </div>
+</div>
+
+<!-- Payment Decision Modal (CS only) -->
+<div id="del-paydecision-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+    <div class="modal-title">Payment Collection</div>
+    <div id="del-paydecision-info" style="font-size:13px;margin-bottom:16px;"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" style="min-height:48px;" onclick="delPayDecision('now')">Collect Payment Now</button>
+      <button class="btn btn-outline" style="min-height:48px;" onclick="delPayDecision('later')">Pay Later</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Collection Modal -->
+<div id="del-pay-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="delPayDecision('later')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-title">Receive Payment</div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Amount (RM)</label>
+      <input type="number" id="del-pay-amount" step="0.01" min="0.01" style="width:100%;padding:10px;font-size:16px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text);">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Method</label>
+      <select id="del-pay-method" style="width:100%;padding:10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text);">
+        <option value="cash">Cash</option>
+        <option value="bank_transfer">Bank Transfer</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="delPayDecision('later')">Skip</button>
+      <button class="btn btn-primary" id="del-pay-confirm-btn" onclick="delPayConfirm()">Confirm Payment</button>
+    </div>
   </div>
 </div>
 
@@ -280,28 +347,46 @@ function doLogin() {
 
   clearLoginAttempts();
   currentUser = user;
-  sessionStorage.setItem('tgfarmhub_delivery_user', JSON.stringify({ id: user.id, username: user.username, displayName: user.displayName || user.username }));
+  localStorage.setItem('tgfarmhub_delivery_user', JSON.stringify({ id: user.id, username: user.username, displayName: user.displayName || user.username }));
+  localStorage.setItem('tgfarmhub_delivery_last_user', user.username);
+  // Write session token for multi-device detection
+  var token = Date.now() + '-' + Math.random().toString(36).slice(2);
+  currentUser.session_token = token;
+  sbQuery(sb.from('users').update({ session_token: token }).eq('id', user.id).select());
   showApp();
 }
 
 function tryRestoreSession() {
   try {
-    var s = JSON.parse(sessionStorage.getItem('tgfarmhub_delivery_user'));
+    var s = JSON.parse(localStorage.getItem('tgfarmhub_delivery_user'));
     if (s && s.id) {
       var u = users.find(function(x) { return x.id === s.id; });
       if (u) { currentUser = u; return true; }
     }
   } catch(e) {}
+  // Pre-fill last username
+  var lastUser = localStorage.getItem('tgfarmhub_delivery_last_user');
+  if (lastUser) document.getElementById('login-username').value = lastUser;
   return false;
 }
 
 function doLogout() {
   currentUser = null;
-  sessionStorage.removeItem('tgfarmhub_delivery_user');
+  localStorage.removeItem('tgfarmhub_delivery_user');
   if (refreshTimer) clearInterval(refreshTimer);
+  if (sessionCheckTimer) clearInterval(sessionCheckTimer);
+  if (inactivityTimer) clearTimeout(inactivityTimer);
   document.getElementById('app-main').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+  // Pre-fill last username on logout
+  var lastUser = localStorage.getItem('tgfarmhub_delivery_last_user');
+  if (lastUser) document.getElementById('login-username').value = lastUser;
+  document.getElementById('login-pin').value = '';
 }
+
+var sessionCheckTimer = null;
+var inactivityTimer = null;
+var INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 minutes
 
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
@@ -310,6 +395,31 @@ function showApp() {
   // Auto-refresh every 30 seconds
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshData, 30000);
+  // Multi-device session check every 30 seconds
+  if (sessionCheckTimer) clearInterval(sessionCheckTimer);
+  sessionCheckTimer = setInterval(async function() {
+    if (!currentUser) return;
+    var data = await sbQuery(sb.from('users').select('session_token').eq('id', currentUser.id));
+    if (data && data[0] && data[0].session_token && data[0].session_token !== currentUser.session_token) {
+      notify('Logged in from another device', 'warning');
+      doLogout();
+    }
+  }, 30000);
+  // Inactivity timeout
+  resetInactivityTimer();
+  ['touchstart', 'click', 'keydown', 'scroll'].forEach(function(evt) {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+}
+
+function resetInactivityTimer() {
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(function() {
+    if (currentUser) {
+      notify('Session expired due to inactivity', 'warning');
+      doLogout();
+    }
+  }, INACTIVITY_TIMEOUT);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -318,7 +428,6 @@ function showApp() {
 async function loadAllData() {
   var results = await Promise.all([
     sbQuery(sb.from('sales_orders').select('*').eq('company_id', 'tg_agro_fruits').in('status', ['delivering', 'completed']).order('created_at', { ascending: false })),
-    sbQuery(sb.from('sales_order_items').select('*').eq('company_id', 'tg_agro_fruits')),
     sbQuery(sb.from('sales_customers').select('*').eq('company_id', 'tg_agro_fruits')),
     sbQuery(sb.from('sales_products').select('*').eq('company_id', 'tg_agro_fruits')),
     sbQuery(sb.from('crop_varieties').select('id,name')),
@@ -326,11 +435,18 @@ async function loadAllData() {
   ]);
 
   orders = results[0] || [];
-  orderItems = results[1] || [];
-  customers = results[2] || [];
-  salesProducts = results[3] || [];
-  varieties = results[4] || [];
-  allWorkers = results[5] || [];
+  customers = results[1] || [];
+  salesProducts = results[2] || [];
+  varieties = results[3] || [];
+  allWorkers = results[4] || [];
+
+  // Load items only for displayed orders (not all historical items)
+  var orderIds = orders.map(function(o) { return o.id; });
+  if (orderIds.length > 0) {
+    orderItems = await sbQuery(sb.from('sales_order_items').select('*').in('order_id', orderIds)) || [];
+  } else {
+    orderItems = [];
+  }
 
   renderDeliveries();
 }
@@ -375,8 +491,16 @@ function getItemDisplay(item) {
   if (item.index_min != null && item.index_max != null) {
     parts.push('(Index ' + item.index_min + '-' + item.index_max + ')');
   }
-  var qty = item.quantity != null ? item.quantity : 0;
-  var unit = item.unit || 'kg';
+  var isPcs = item.order_pcs != null;
+  var qty, unit;
+  if (isPcs) {
+    qty = item.order_pcs;
+    unit = 'pcs';
+    if (item.quantity > 0) qty += ' (' + item.quantity + (item.unit || 'kg') + ')';
+  } else {
+    qty = item.quantity != null ? item.quantity : 0;
+    unit = item.unit || 'kg';
+  }
   return { label: parts.join(' '), qty: qty, unit: unit };
 }
 
@@ -392,7 +516,7 @@ function renderDeliveries() {
     if (o.status === 'delivering') {
       delivering.push(o);
     } else if (o.status === 'completed') {
-      var checkDate = o.delivery_date || '';
+      var checkDate = o.completed_at ? o.completed_at.slice(0, 10) : (o.delivery_date || '');
       if (checkDate === today) completedToday.push(o);
     }
   });
@@ -515,28 +639,257 @@ function renderCompletedCard(o) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MARK DELIVERED
+// MARK DELIVERED — Atomic Flow
+// Step 1: Qty confirmation → Step 2: Photo → Step 3: Payment (CS) → Commit
 // ═══════════════════════════════════════════════════════════════
+var delPending = null; // { orderId, items: [], photoUrl, payment: null }
+
+// Step 1: Show qty confirmation modal
 function markDelivered(orderId) {
   var o = orders.find(function(x) { return x.id === orderId; });
   if (!o) return;
-  var cust = findCustomer(o.customer_id);
-  var custName = cust ? cust.name : 'this customer';
+  var items = orderItems.filter(function(i) { return i.order_id === orderId; });
 
-  confirmAction('Confirm Delivery', 'Confirm delivery to ' + custName + '?', async function() {
-    var result = await sbQuery(
-      sb.from('sales_orders').update({ status: 'completed' }).eq('id', orderId).select(),
-      'Updating order...'
-    );
-    if (result) {
-      notify('Delivery completed!', 'success');
-      // Update local state
-      o.status = 'completed';
-      renderDeliveries();
-      // Show document
-      showDoc(orderId);
-    }
+  delPending = { orderId: orderId, items: [], photoUrl: null, payment: null };
+
+  var html = '';
+  items.forEach(function(item, idx) {
+    var display = getItemDisplay(item);
+    var isPcs = item.order_pcs != null;
+    var currentQty = isPcs ? (item.quantity || 0) : (item.quantity || 0);
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">';
+    html += '<div style="flex:1;font-size:13px;">' + esc(display.label);
+    if (isPcs) html += '<br><span style="font-size:11px;color:var(--text-muted);">Ordered: ' + item.order_pcs + ' pcs</span>';
+    html += '</div>';
+    html += '<input type="number" step="0.01" min="0" value="' + currentQty + '" data-item-id="' + esc(item.id) + '" data-price="' + (item.unit_price || 0) + '" data-is-pcs="' + (isPcs ? '1' : '0') + '" class="del-qty-input" style="width:80px;padding:8px;text-align:center;font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:8px;background:var(--bg-input);color:var(--text);">';
+    html += '<span style="font-size:12px;color:var(--text-muted);min-width:24px;">' + esc(isPcs ? 'kg' : (item.unit || 'kg')) + '</span>';
+    html += '</div>';
   });
+  document.getElementById('del-qty-items').innerHTML = html;
+  document.getElementById('del-qty-modal').style.display = 'flex';
+}
+
+// Step 1 confirm
+function delQtyConfirm() {
+  if (!delPending) return;
+  var inputs = document.querySelectorAll('.del-qty-input');
+  var pendingItems = [];
+  inputs.forEach(function(inp) {
+    var qty = parseFloat(inp.value) || 0;
+    var price = parseFloat(inp.getAttribute('data-price')) || 0;
+    pendingItems.push({
+      id: inp.getAttribute('data-item-id'),
+      quantity: qty,
+      line_total: qty * price
+    });
+  });
+  delPending.items = pendingItems;
+  closeModal('del-qty-modal');
+
+  // Step 2: Photo
+  delShowPhoto();
+}
+
+// Step 2: Photo modal
+function delShowPhoto() {
+  var modal = document.getElementById('del-photo-modal');
+  modal.style.display = 'flex';
+
+  document.getElementById('del-photo-take').onclick = function() {
+    modal.style.display = 'none';
+    var input = document.getElementById('del-photo-input');
+    input.value = '';
+    input.onchange = async function() {
+      if (!input.files.length) {
+        // Cancelled — abort flow
+        delPending = null;
+        notify('Delivery cancelled', 'info');
+        return;
+      }
+      notify('Uploading photo...', 'info');
+      var url = await delUploadPhoto(input.files[0]);
+      delPending.photoUrl = url;
+      delAfterPhoto();
+    };
+    input.click();
+  };
+
+  document.getElementById('del-photo-album').onclick = function() {
+    modal.style.display = 'none';
+    var input = document.getElementById('del-photo-input-album');
+    input.value = '';
+    input.onchange = async function() {
+      if (!input.files.length) {
+        delPending = null;
+        notify('Delivery cancelled', 'info');
+        return;
+      }
+      notify('Uploading photo...', 'info');
+      var url = await delUploadPhoto(input.files[0]);
+      delPending.photoUrl = url;
+      delAfterPhoto();
+    };
+    input.click();
+  };
+}
+
+// Photo upload helper
+function delUploadPhoto(file) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = async function() {
+      URL.revokeObjectURL(img.src);
+      var canvas = document.createElement('canvas');
+      var maxW = 1200;
+      var w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(async function(blob) {
+        var path = 'orders/' + delPending.orderId + '/delivery-' + Date.now() + '.jpg';
+        var result = await sbUpload(function() {
+          return sb.storage.from('sales-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        });
+        if (result.error) { notify('Photo upload failed', 'error'); resolve(null); return; }
+        var urlResult = sb.storage.from('sales-photos').getPublicUrl(path);
+        resolve(urlResult.data.publicUrl);
+      }, 'image/jpeg', 0.8);
+    };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// After photo: CS → payment decision, DO → commit
+function delAfterPhoto() {
+  if (!delPending) return;
+  var o = orders.find(function(x) { return x.id === delPending.orderId; });
+  if (!o) return;
+
+  if (o.doc_type === 'cash_sales') {
+    // Recalculate balance from pending items
+    var newGrand = 0;
+    delPending.items.forEach(function(it) { newGrand += it.line_total; });
+    var paid = parseFloat(o.amount_paid) || 0;
+    var balance = newGrand - paid;
+    if (balance > 0.01) {
+      document.getElementById('del-paydecision-info').innerHTML =
+        '<strong>Cash Sales — ' + esc(o.doc_number || o.id) + '</strong><br>' +
+        'New total: <strong>' + formatRM(newGrand) + '</strong><br>' +
+        'Outstanding: <strong style="color:var(--gold);">' + formatRM(balance) + '</strong>';
+      document.getElementById('del-pay-amount').value = balance.toFixed(2);
+      document.getElementById('del-pay-amount').max = balance.toFixed(2);
+      document.getElementById('del-paydecision-modal').style.display = 'flex';
+      return;
+    }
+  }
+
+  // DO or already paid CS — commit directly
+  delCommitAll();
+}
+
+// Step 3: Payment decision
+function delPayDecision(choice) {
+  closeModal('del-paydecision-modal');
+  if (choice === 'now') {
+    document.getElementById('del-pay-modal').style.display = 'flex';
+  } else {
+    // Pay later — commit without payment
+    delCommitAll();
+  }
+}
+
+// Step 3b: Payment confirm
+async function delPayConfirm() {
+  var amount = parseFloat(document.getElementById('del-pay-amount').value) || 0;
+  var method = document.getElementById('del-pay-method').value;
+  if (amount <= 0) { notify('Enter a valid amount', 'warning'); return; }
+
+  var payId = await dbNextId('SY');
+  delPending.payment = {
+    id: payId,
+    amount: amount,
+    method: method
+  };
+
+  closeModal('del-pay-modal');
+  delCommitAll();
+}
+
+// Final commit — single atomic write
+async function delCommitAll() {
+  if (!delPending) return;
+  var pending = delPending;
+  var orderId = pending.orderId;
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) { delPending = null; return; }
+
+  // Disable all Mark Delivered buttons
+  var btns = document.querySelectorAll('.btn-deliver');
+  btns.forEach(function(b) { b.disabled = true; });
+
+  try {
+    // 1. Update each item's quantity and line_total
+    for (var i = 0; i < pending.items.length; i++) {
+      var it = pending.items[i];
+      await sbQuery(sb.from('sales_order_items').update({
+        quantity: it.quantity,
+        line_total: it.line_total
+      }).eq('id', it.id).select());
+      // Update local
+      var localItem = orderItems.find(function(x) { return x.id === it.id; });
+      if (localItem) { localItem.quantity = it.quantity; localItem.line_total = it.line_total; }
+    }
+
+    // 2. Recalculate grand total from items
+    var newGrand = 0;
+    pending.items.forEach(function(it) { newGrand += it.line_total; });
+    var returnsTotal = parseFloat(o.returns_total) || 0;
+    newGrand = newGrand - returnsTotal;
+
+    // 3. Build order update
+    var orderUpdate = {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      grand_total: newGrand
+    };
+    if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
+
+    // 4. Insert payment if collected
+    if (pending.payment) {
+      var payData = {
+        id: pending.payment.id,
+        order_id: orderId,
+        amount: pending.payment.amount,
+        payment_date: getTodayStr(),
+        method: pending.payment.method,
+        created_by: currentUser ? currentUser.id : null,
+        company_id: 'tg_agro_fruits'
+      };
+      await sbQuery(sb.from('sales_payments').insert(payData).select());
+
+      var totalPaid = (parseFloat(o.amount_paid) || 0) + pending.payment.amount;
+      orderUpdate.amount_paid = totalPaid;
+      orderUpdate.payment_status = totalPaid >= newGrand ? 'paid' : 'partial';
+    }
+
+    // 5. Commit order status
+    var result = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
+    if (!result) { notify('Failed to update order', 'error'); return; }
+
+    // 6. Update local state
+    Object.assign(o, orderUpdate);
+
+    notify('Delivery completed!', 'success');
+    delPending = null;
+    renderDeliveries();
+    showDoc(orderId);
+
+  } catch(e) {
+    notify('Error: ' + e.message, 'error');
+  } finally {
+    btns.forEach(function(b) { b.disabled = false; });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -645,10 +998,22 @@ function showDoc(orderId) {
   } else {
     var payStatus = o.payment_status || 'unpaid';
     var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
+    var payColor = payStatus === 'paid' ? '#060' : '#c00';
     html += '<div style="margin-bottom:6px;"><strong>Payment:</strong> CASH</div>';
-    html += '<div><strong>Status:</strong> ' + payLabel + '</div>';
+    html += '<div><strong>Status:</strong> <span style="color:' + payColor + ';font-weight:700;">' + payLabel + '</span></div>';
   }
   html += '</div>';
+
+  // Bank details (CS only)
+  if (!isDO) {
+    html += '<div style="margin-top:8px;padding:6px;border:1px solid #000;font-size:9px;line-height:1.5;">';
+    html += '<strong>Payment via Bank Transfer:</strong><br>';
+    html += 'Public Bank Berhad<br>';
+    html += 'A/C: 3243036710<br>';
+    html += 'TG Agro Fruits Sdn Bhd<br>';
+    html += '<em>Please WhatsApp your payment slip to 012-3286661 once transferred. Thank you.</em>';
+    html += '</div>';
+  }
 
   // Footer
   html += '<div class="doc-footer">';

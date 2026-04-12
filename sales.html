@@ -209,7 +209,7 @@
   <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title" id="sp-modal-title">Add Product</div>
-      <button class="modal-close" onclick="closeModal('sp-modal')">
+      <button class="modal-close" onclick="salesFormDirty=false;closeModal('sp-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -276,7 +276,7 @@
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('sp-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="salesFormDirty=false;closeModal('sp-modal')">Cancel</button>
       <button class="btn btn-primary" id="sp-save-btn" onclick="spSaveProduct()">Add Product</button>
     </div>
   </div>
@@ -287,7 +287,7 @@
   <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title" id="sc-modal-title">Add Customer</div>
-      <button class="modal-close" onclick="closeModal('sc-modal')">
+      <button class="modal-close" onclick="salesFormDirty=false;closeModal('sc-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -378,7 +378,7 @@
       <textarea id="sc-notes" rows="2" placeholder="Optional notes" style="width:100%;"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('sc-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="salesFormDirty=false;closeModal('sc-modal')">Cancel</button>
       <button class="btn btn-primary" id="sc-save-btn" onclick="scSaveCustomer()">Add Customer</button>
     </div>
   </div>
@@ -826,7 +826,7 @@
     </div>
     <div class="modal-actions" style="gap:8px;flex-wrap:wrap;">
       <button class="btn btn-outline" onclick="closeModal('so-doc-share-modal')">Cancel</button>
-      <button class="btn btn-outline" id="so-doc-download-btn" onclick="soDownloadDocImage()" style="gap:6px;">
+      <button class="btn btn-outline" id="so-doc-download-btn" onclick="soDownloadDocAsImage()" style="gap:6px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download
       </button>
@@ -843,7 +843,7 @@
   <div class="modal-box so-modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title" id="so-modal-title">New Order</div>
-      <button class="modal-close" onclick="closeModal('so-modal')">
+      <button class="modal-close" onclick="salesFormDirty=false;closeModal('so-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -950,7 +950,7 @@
 
     <!-- Section E: Actions -->
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal('so-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="salesFormDirty=false;closeModal('so-modal')">Cancel</button>
       <button class="btn btn-primary" id="so-save-btn" onclick="soSaveOrder()">Create Order</button>
     </div>
   </div>
@@ -1277,6 +1277,12 @@ var soDetailOrderId = null;
 var soOpenedFromCustomer = null;
 var soEditOrderId = null;
 
+// Unsaved data protection
+var salesFormDirty = false;
+window.addEventListener('beforeunload', function(e) {
+  if (salesFormDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
 // SESSION GUARD + INIT
 (async function init() {
   var stored = localStorage.getItem("tgfarmhub_user");
@@ -1300,7 +1306,8 @@ var soEditOrderId = null;
   // Gate sidebar tabs and buttons by permission
   if (!salesCan('payments'))        document.getElementById('nav-payments').style.display = 'none';
   if (!salesCan('delivery'))        document.getElementById('nav-drivers').style.display = 'none';
-  if (!salesCan('manageCustomers')) { document.getElementById('nav-products').style.display = 'none'; document.getElementById('nav-customers').style.display = 'none'; }
+  if (!salesCan('manageCustomers')) document.getElementById('nav-customers').style.display = 'none';
+  if (!salesCan('manageProducts'))  document.getElementById('nav-products').style.display = 'none';
   if (!salesCan('export'))          document.getElementById('nav-reports').style.display = 'none';
   if (currentUser.role !== 'admin') document.getElementById('nav-invoicing').style.display = 'none';
   if (!salesCan('createOrder'))     document.getElementById('btn-bottom-new-order').style.display = 'none';
@@ -1315,7 +1322,7 @@ function switchTab(tab, skipHistory) {
   if (tab === 'payments' && !salesCan('payments')) { notify('No access to Payments', 'warning'); return; }
   if (tab === 'invoicing' && currentUser.role !== 'admin') { notify('Admin access required', 'warning'); return; }
   if (tab === 'customers' && !salesCan('manageCustomers')) { notify('No access to Customers', 'warning'); return; }
-  if (tab === 'products' && !salesCan('manageCustomers')) { notify('No access to Products', 'warning'); return; }
+  if (tab === 'products' && !salesCan('manageProducts')) { notify('No access to Products', 'warning'); return; }
   if (tab === 'drivers' && !salesCan('delivery')) { notify('No access to Drivers', 'warning'); return; }
   if (tab === 'reports' && !salesCan('export')) { notify('No access to Reports', 'warning'); return; }
   // Reset detail views when switching tabs
@@ -3008,14 +3015,20 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
 
   modal.style.display = 'flex';
 
-  // X close button — if required, just close without proceeding; if optional, treat as skip
+  // X close button — cancel the entire flow and clean up pending state
   var closeBtn = modal.querySelector('.modal-close');
   if (closeBtn) {
     var closeClone = closeBtn.cloneNode(true);
     closeBtn.parentNode.replaceChild(closeClone, closeBtn);
     closeClone.onclick = function() {
       closeModal('so-photo-modal');
-      if (!required) onComplete(null);
+      if (required) {
+        soPrepPending = null;
+        soDeliveryPending = null;
+        notify('Operation cancelled', 'info');
+      } else {
+        onComplete(null);
+      }
     };
   }
 
@@ -3030,7 +3043,11 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
     var input = document.getElementById('so-photo-input');
     input.value = '';
     input.onchange = async function() {
-      if (!input.files.length) { if (!required) onComplete(null); return; }
+      if (!input.files.length) {
+        if (required) { soPrepPending = null; soDeliveryPending = null; notify('Operation cancelled', 'info'); }
+        else { onComplete(null); }
+        return;
+      }
       var photoUrl = await soProcessPhotoFile(input.files[0], orderId, type);
       onComplete(photoUrl);
     };
@@ -3043,7 +3060,11 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
     var input = document.getElementById('so-photo-input-album');
     input.value = '';
     input.onchange = async function() {
-      if (!input.files.length) { if (!required) onComplete(null); return; }
+      if (!input.files.length) {
+        if (required) { soPrepPending = null; soDeliveryPending = null; notify('Operation cancelled', 'info'); }
+        else { onComplete(null); }
+        return;
+      }
       var photoUrl = await soProcessPhotoFile(input.files[0], orderId, type);
       onComplete(photoUrl);
     };
@@ -3055,6 +3076,7 @@ async function soProcessPhotoFile(file, orderId, type) {
   return new Promise(function(resolve) {
     var img = new Image();
     img.onload = async function() {
+      URL.revokeObjectURL(img.src);
       var canvas = document.createElement('canvas');
       var maxW = 1200;
       var w = img.width, h = img.height;
@@ -3072,6 +3094,7 @@ async function soProcessPhotoFile(file, orderId, type) {
         resolve(urlResult.data.publicUrl);
       }, 'image/jpeg', 0.8);
     };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -3763,6 +3786,7 @@ function scOpenModal(editId) {
   }
 
   modal.style.display = 'flex';
+  salesFormDirty = true;
   trapFocus(modal.querySelector('.modal-box'));
 }
 
@@ -3845,6 +3869,7 @@ async function scSaveCustomer() {
   }
 
   btnLoading(btn, false, editId ? 'Save Changes' : 'Add Customer');
+  salesFormDirty = false;
   closeModal('sc-modal');
   document.getElementById('sc-modal').style.zIndex = '';
 
@@ -4448,7 +4473,7 @@ function scRenderDetail() {
 function renderProducts() {
   // Header actions
   document.getElementById('products-header-actions').innerHTML =
-    salesCan('manageCustomers') ? '<button class="btn btn-primary" onclick="spOpenModal()">+ Add Product</button>' : '';
+    salesCan('manageProducts') ? '<button class="btn btn-primary" onclick="spOpenModal()">+ Add Product</button>' : '';
 
   var body = document.getElementById('products-body');
   if (!salesProducts.length) {
@@ -4497,7 +4522,7 @@ function renderProducts() {
       html += '<td>' + formatRM(p.default_price || 0) + '</td>';
       html += '<td>' + statusBadge + '</td>';
       html += '<td><div style="display:flex;gap:4px;">';
-      if (salesCan('manageCustomers')) {
+      if (salesCan('manageProducts')) {
         html += '<button class="btn btn-outline btn-sm" onclick="spOpenModal(\'' + p.id + '\')">Edit</button>';
         html += '<button class="btn btn-outline btn-sm" onclick="spToggleActive(\'' + p.id + '\')">' + toggleLabel + '</button>';
       }
@@ -4570,11 +4595,12 @@ function spOpenModal(editId) {
   spCategoryChange();
   spUnitChange();
   modal.style.display = 'flex';
+  salesFormDirty = true;
   trapFocus(modal.querySelector('.modal-box'));
 }
 
 async function spSaveProduct() {
-  if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
+  if (!salesCan('manageProducts')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sp-edit-id').value;
   var name = document.getElementById('sp-name').value.trim();
   var nameBM = document.getElementById('sp-name-bm').value.trim();
@@ -4614,6 +4640,7 @@ async function spSaveProduct() {
   }
 
   btnLoading(btn, false, editId ? 'Save Changes' : 'Add Product');
+  salesFormDirty = false;
   closeModal('sp-modal');
   renderProducts();
 }
@@ -5165,6 +5192,17 @@ async function paySavePayment() {
   try { orderIds = JSON.parse(orderIdRaw); } catch(e) { orderIds = [orderIdRaw]; }
   if (!Array.isArray(orderIds)) orderIds = [orderIds];
 
+  // Overpayment guard — reject if amount exceeds total outstanding balance
+  var totalBalance = 0;
+  orderIds.forEach(function(oid) {
+    var o = orders.find(function(x) { return x.id === oid; });
+    if (o) totalBalance += Math.max(0, orderBalance(o));
+  });
+  if (amount > totalBalance + 0.01) {
+    notify('Amount (RM ' + amount.toFixed(2) + ') exceeds outstanding balance (RM ' + totalBalance.toFixed(2) + ')', 'warning');
+    return;
+  }
+
   var btn = document.getElementById('pay-save-btn');
   btnLoading(btn, true);
 
@@ -5273,6 +5311,7 @@ async function payUploadSlip(paymentId) {
 
   return new Promise(function(resolve) {
     img.onload = async function() {
+      URL.revokeObjectURL(img.src);
       var maxW = 1200;
       var w = img.width, h = img.height;
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
@@ -5288,6 +5327,7 @@ async function payUploadSlip(paymentId) {
         resolve(urlResult.data.publicUrl);
       }, 'image/jpeg', 0.8);
     };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -6216,8 +6256,9 @@ async function invPayUploadSlip(paymentId) {
   var canvas = document.createElement('canvas');
   var img = new Image();
   return new Promise(function(resolve) {
-    img.onerror = function() { resolve(null); };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
     img.onload = async function() {
+      URL.revokeObjectURL(img.src);
       var maxW = 1200;
       var w = img.width, h = img.height;
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
@@ -7504,7 +7545,7 @@ function rptGenerate() {
       if (catFilter && prod.category !== catFilter) return;
       if (!byProduct[pid]) byProduct[pid] = { qty: 0, revenue: 0 };
       var qty = parseFloat(it.quantity) || 0;
-      var lineTotal = qty * (parseFloat(it.unit_price) || 0);
+      var lineTotal = parseFloat(it.line_total) || (qty * (parseFloat(it.unit_price) || 0));
       byProduct[pid].qty += qty;
       byProduct[pid].revenue += lineTotal;
       totalRevenue += lineTotal;
@@ -7565,7 +7606,7 @@ function rptGenerate() {
     var ageFilter = document.getElementById('rpt-age-range') ? document.getElementById('rpt-age-range').value : '';
 
     var unpaid = orders.filter(function(o) {
-      if (o.status === 'cancelled') return false;
+      if (o.status !== 'completed') return false;
       if (o.payment_status === 'paid') return false;
       if (docFilter && o.doc_type !== docFilter) return false;
       return true;
@@ -8002,6 +8043,7 @@ function openNewOrderModal(editOrderId) {
   soRenderItems();
   var modal = document.getElementById('so-modal');
   modal.style.display = 'flex';
+  salesFormDirty = true;
   trapFocus(modal.querySelector('.modal-box'));
 }
 
@@ -8360,6 +8402,7 @@ async function soSaveOrder() {
       if (idx >= 0) Object.assign(orders[idx], updateData);
 
       btnLoading(btn, false, 'Save Changes');
+      salesFormDirty = false;
       closeModal('so-modal');
       notify('Order updated');
       soRenderDetail();
@@ -8440,6 +8483,7 @@ async function soSaveOrder() {
       }
 
       btnLoading(btn, false, 'Create Order');
+      salesFormDirty = false;
       closeModal('so-modal');
 
       if (soIsWalkIn) {
@@ -8571,7 +8615,8 @@ function soGenerateDoc(orderId) {
     var payStatus = o.payment_status || 'unpaid';
     var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
     html += '<div style="margin-bottom:6px;"><strong>Payment:</strong> CASH</div>';
-    html += '<div><strong>Status:</strong> ' + payLabel + '</div>';
+    var payColor = payStatus === 'paid' ? '#060' : '#c00';
+    html += '<div><strong>Status:</strong> <span style="color:' + payColor + ';font-weight:700;">' + payLabel + '</span></div>';
   }
   html += '</div>';
 
@@ -8724,7 +8769,8 @@ function soGenerateDocA4(orderId) {
     } else {
       var payStatus = o.payment_status || 'unpaid';
       var payLabel = payStatus === 'paid' ? 'PAID' : (payStatus === 'partial' ? 'PARTIAL' : 'UNPAID');
-      html += '<strong>Payment:</strong> CASH &nbsp;&nbsp;&nbsp; <strong>Status:</strong> ' + payLabel;
+      var payColor = payStatus === 'paid' ? '#060' : '#c00';
+      html += '<strong>Payment:</strong> CASH &nbsp;&nbsp;&nbsp; <strong>Status:</strong> <span style="color:' + payColor + ';font-weight:700;">' + payLabel + '</span>';
     }
     html += '</div>';
 
@@ -8793,6 +8839,7 @@ function soResizeAndUpload(file, orderId, filename) {
   return new Promise(function(resolve) {
     var img = new Image();
     img.onload = async function() {
+      URL.revokeObjectURL(img.src);
       var canvas = document.createElement('canvas');
       var maxW = 1200;
       var w = img.width, h = img.height;
@@ -8804,6 +8851,7 @@ function soResizeAndUpload(file, orderId, filename) {
         resolve(url);
       }, 'image/jpeg', 0.8);
     };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -8923,7 +8971,11 @@ function closeDocModal() {
   document.getElementById('so-doc-a4-content').style.display = 'none';
   soDocCurrentOrderId = null;
   soDocCurrentInvoiceId = null;
-  if (soDocImageUrl) { URL.revokeObjectURL(soDocImageUrl); soDocImageUrl = null; }
+  // Revoke all blob URLs to prevent memory leaks
+  if (soDocAllUrls && soDocAllUrls.length) { soDocAllUrls.forEach(function(u) { URL.revokeObjectURL(u); }); soDocAllUrls = []; }
+  else if (soDocImageUrl) { URL.revokeObjectURL(soDocImageUrl); }
+  soDocImageUrl = null;
+  soDocAllBlobs = [];
   soDocImageBlob = null;
 }
 
@@ -9196,7 +9248,7 @@ function soOpenWhatsAppDoc() {
   }
 
   // Download the image first
-  soDownloadDocImage();
+  soDownloadDocAsImage();
 
   closeModal('so-doc-share-modal');
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
@@ -9762,6 +9814,7 @@ async function retUploadPhoto(orderId, returnId) {
     var file = input.files[0];
     var img = new Image();
     img.onload = async function() {
+      URL.revokeObjectURL(img.src);
       var canvas = document.createElement('canvas');
       var maxW = 1200;
       var w = img.width, h = img.height;
@@ -9778,7 +9831,7 @@ async function retUploadPhoto(orderId, returnId) {
         resolve(urlResult.data.publicUrl);
       }, 'image/jpeg', 0.8);
     };
-    img.onerror = function() { resolve(null); };
+    img.onerror = function() { URL.revokeObjectURL(img.src); resolve(null); };
     img.src = URL.createObjectURL(file);
   });
 }
