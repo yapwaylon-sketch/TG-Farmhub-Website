@@ -8233,6 +8233,304 @@ function openNewOrderModal(editOrderId) {
   soRenderItems();
   openModal('so-modal');
   salesFormDirty = true;
+
+  // Initialize wizard on mobile
+  if (window.innerWidth <= 768) {
+    soWizInit();
+  }
+}
+
+// ═════════════════���══════════════════���══════════════════════════
+// MOBILE WIZARD — Step navigation, customer, toggles
+// ═════════��══════════════════��══════════════════════════════════
+var soWizStep = 1;
+var soWizSelectedVariety = null;
+var soWizSelectedProduct = null;
+
+function soWizInit() {
+  soWizStep = 1;
+  var isEdit = !!soEditOrderId;
+
+  // Title
+  document.getElementById('so-wiz-title').textContent = isEdit ? 'Edit Order' : 'New Order';
+
+  // Reset wizard customer UI
+  document.getElementById('so-wiz-cust-search').value = '';
+  document.getElementById('so-wiz-cust-results').style.display = 'none';
+  document.getElementById('so-wiz-cust-badge').style.display = 'none';
+  document.getElementById('so-wiz-cust-section').style.display = '';
+  document.getElementById('so-wiz-walkin-btn').classList.remove('active');
+
+  // Sync delivery date/time from desktop form (already set by openNewOrderModal)
+  var dd = document.getElementById('so-delivery-date').value || todayStr();
+  document.getElementById('so-wiz-ddate-display').textContent = fmtDateNice(dd);
+  document.getElementById('so-wiz-dtime').value = document.getElementById('so-delivery-time').value || '';
+
+  // Sync toggles from desktop form values
+  soWizSetToggle('so-wiz-fulfillment', document.getElementById('so-fulfillment').value);
+  soWizSetToggle('so-wiz-doctype', document.getElementById('so-doc-type').value);
+  soWizSetToggle('so-wiz-channel', document.getElementById('so-channel').value);
+
+  // If editing with a customer, show badge
+  if (soSelectedCustomer) {
+    soWizShowCustBadge(soSelectedCustomer);
+  }
+
+  // If walk-in was set (editing a walk-in order)
+  if (soIsWalkIn) {
+    document.getElementById('so-wiz-walkin-btn').classList.add('active');
+    document.getElementById('so-wiz-cust-section').style.display = 'none';
+  }
+
+  // Sync order date display
+  var od = document.getElementById('so-order-date').value || todayStr();
+  var odEl = document.getElementById('so-wiz-odate-display');
+  if (odEl) odEl.textContent = (od === todayStr()) ? 'Today' : fmtDateNice(od);
+
+  // Notes
+  document.getElementById('so-wiz-notes').value = document.getElementById('so-notes').value || '';
+
+  soWizShowStep();
+}
+
+function soWizShowStep() {
+  // Show/hide steps
+  for (var i = 1; i <= 3; i++) {
+    var el = document.getElementById('so-wiz-step' + i);
+    if (el) el.style.display = (i === soWizStep) ? '' : 'none';
+  }
+
+  // Progress bar
+  var pf = document.getElementById('so-wiz-pfill');
+  if (pf) pf.style.width = (soWizStep * 33.33) + '%';
+
+  // Bottom bar buttons
+  var backBtn = document.getElementById('so-wiz-back');
+  var nextBtn = document.getElementById('so-wiz-next');
+  backBtn.textContent = '\u2190 Back';
+
+  if (soWizStep === 1) {
+    nextBtn.textContent = 'Next: Add Items \u2192';
+    nextBtn.classList.remove('green');
+  } else if (soWizStep === 2) {
+    nextBtn.textContent = 'Next: Review \u2192';
+    nextBtn.classList.remove('green');
+    soWizRenderPicker();
+    soWizRenderItemsList();
+  } else if (soWizStep === 3) {
+    var label = soEditOrderId ? 'Save Changes' : 'Create Order';
+    nextBtn.textContent = label;
+    nextBtn.classList.add('green');
+    soWizRenderReview();
+  }
+
+  // Scroll to top of wizard
+  var wiz = document.querySelector('.so-wizard');
+  if (wiz) wiz.scrollTop = 0;
+}
+
+function soWizNext() {
+  if (soWizStep === 1) {
+    // Validate customer
+    if (!soIsWalkIn && !soSelectedCustomer) {
+      notify('Please select a customer', 'warning');
+      return;
+    }
+    // Sync step 1 fields to desktop form
+    soWizSyncStep1();
+    soWizStep = 2;
+  } else if (soWizStep === 2) {
+    // Validate at least one item
+    var validItems = soItems.filter(function(i) { return i.productId; });
+    if (!validItems.length) {
+      notify('Please add at least one item', 'warning');
+      return;
+    }
+    soWizStep = 3;
+  } else if (soWizStep === 3) {
+    // Submit
+    soWizSyncAll();
+    soSaveOrder();
+    return;
+  }
+  soWizShowStep();
+}
+
+function soWizBack() {
+  if (soWizStep === 1) {
+    salesFormDirty = false;
+    closeModal('so-modal');
+    return;
+  }
+  soWizStep--;
+  soWizShowStep();
+}
+
+// ── Sync wizard → desktop form fields ──
+function soWizSyncStep1() {
+  // Delivery time
+  document.getElementById('so-delivery-time').value = document.getElementById('so-wiz-dtime').value || '';
+  // Toggles → dropdowns
+  document.getElementById('so-fulfillment').value = soWizGetToggleVal('so-wiz-fulfillment');
+  document.getElementById('so-doc-type').value = soWizGetToggleVal('so-wiz-doctype');
+  document.getElementById('so-channel').value = soWizGetToggleVal('so-wiz-channel');
+}
+
+function soWizSyncAll() {
+  soWizSyncStep1();
+  document.getElementById('so-notes').value = document.getElementById('so-wiz-notes').value || '';
+}
+
+// ── Toggle buttons ──
+function soWizToggle(btn) {
+  var parent = btn.parentElement;
+  parent.querySelectorAll('.so-wiz-toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function soWizSetToggle(containerId, value) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  container.querySelectorAll('.so-wiz-toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-val') === value);
+  });
+}
+
+function soWizGetToggleVal(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return '';
+  var active = container.querySelector('.so-wiz-toggle-btn.active');
+  return active ? active.getAttribute('data-val') : '';
+}
+
+// ── Customer search (wizard) ──
+function soWizSearchCust() {
+  var q = document.getElementById('so-wiz-cust-search').value.toLowerCase().trim();
+  var results = document.getElementById('so-wiz-cust-results');
+  var matches = customers.filter(function(c) {
+    if (c.is_active === false) return false;
+    if (!q) return true;
+    return c.name.toLowerCase().indexOf(q) >= 0 || (c.phone && c.phone.indexOf(q) >= 0);
+  });
+  if (!matches.length) {
+    results.innerHTML = '<div class="so-wiz-cust-item" style="color:var(--text-muted);">No customers found</div>';
+    results.style.display = 'block';
+    return;
+  }
+  var html = '';
+  matches.slice(0, 10).forEach(function(c) {
+    html += '<div class="so-wiz-cust-item" onclick="soWizSelectCust(\'' + esc(c.id) + '\')">';
+    html += '<span class="so-wiz-cust-name">' + esc(c.name) + '</span>';
+    if (c.phone) html += '<span class="so-wiz-cust-phone">' + esc(c.phone) + '</span>';
+    html += '</div>';
+  });
+  results.innerHTML = html;
+  results.style.display = 'block';
+}
+
+function soWizSelectCust(customerId) {
+  // Use existing function to set state + auto-set doc type
+  soSelectCustomer(customerId);
+  // Update wizard UI
+  soWizShowCustBadge(soSelectedCustomer);
+  document.getElementById('so-wiz-cust-results').style.display = 'none';
+  document.getElementById('so-wiz-cust-search').value = '';
+  // Sync doc type toggle (soSelectCustomer may have changed it)
+  soWizSetToggle('so-wiz-doctype', document.getElementById('so-doc-type').value);
+}
+
+function soWizShowCustBadge(cust) {
+  var badge = document.getElementById('so-wiz-cust-badge');
+  badge.innerHTML = '<div><div style="font-weight:700;color:var(--text);font-size:14px;">' + esc(cust.name) + '</div>' +
+    (cust.phone ? '<div style="font-size:11px;color:var(--text-muted);">' + esc(cust.phone) + ' \u00b7 ' + (cust.payment_terms === 'cash' || !cust.payment_terms_days ? 'Cash' : 'Credit') + '</div>' : '') +
+    '</div><div style="color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;" onclick="soWizClearCust()">Change</div>';
+  badge.style.display = 'flex';
+  document.getElementById('so-wiz-cust-search').style.display = 'none';
+}
+
+function soWizClearCust() {
+  soClearCustomer();
+  document.getElementById('so-wiz-cust-badge').style.display = 'none';
+  document.getElementById('so-wiz-cust-search').style.display = '';
+  document.getElementById('so-wiz-cust-search').value = '';
+  document.getElementById('so-wiz-walkin-btn').classList.remove('active');
+}
+
+// ── Walk-in toggle (wizard) ──
+function soWizToggleWalkIn() {
+  var btn = document.getElementById('so-wiz-walkin-btn');
+  if (soIsWalkIn) {
+    // Turn off
+    soIsWalkIn = false;
+    btn.classList.remove('active');
+    document.getElementById('so-wiz-cust-section').style.display = '';
+    document.getElementById('so-wiz-cust-badge').style.display = 'none';
+    document.getElementById('so-wiz-cust-search').style.display = '';
+    soClearCustomer();
+    soWizSetToggle('so-wiz-fulfillment', 'delivery');
+    soWizSetToggle('so-wiz-channel', 'whatsapp');
+    soWizSetToggle('so-wiz-doctype', 'cash_sales');
+  } else {
+    // Turn on — use existing toggle which creates/finds walk-in customer
+    soToggleWalkIn().then(function() {
+      btn.classList.add('active');
+      document.getElementById('so-wiz-cust-section').style.display = 'none';
+      soWizSetToggle('so-wiz-fulfillment', 'collection');
+      soWizSetToggle('so-wiz-channel', 'walkin');
+      soWizSetToggle('so-wiz-doctype', 'cash_sales');
+    });
+  }
+}
+
+// ── Calendar integration — update wizard date display when calendar picks a date ──
+var _origCalUpdateDisplay = typeof calUpdateDisplay === 'function' ? calUpdateDisplay : null;
+if (_origCalUpdateDisplay) {
+  calUpdateDisplay = function(fieldId, value) {
+    _origCalUpdateDisplay(fieldId, value);
+    // Sync to wizard date display
+    if (fieldId === 'so-delivery-date') {
+      var el = document.getElementById('so-wiz-ddate-display');
+      if (el) el.textContent = (value === todayStr()) ? 'Today' : fmtDateNice(value);
+    }
+    if (fieldId === 'so-order-date') {
+      var el = document.getElementById('so-wiz-odate-display');
+      if (el) el.textContent = (value === todayStr()) ? 'Today' : fmtDateNice(value);
+    }
+  };
+}
+
+// Close wizard customer dropdown on outside click
+document.addEventListener('click', function(e) {
+  var section = document.getElementById('so-wiz-cust-section');
+  if (section && !section.contains(e.target)) {
+    document.getElementById('so-wiz-cust-results').style.display = 'none';
+  }
+});
+
+// ���─ Placeholder stubs for Phase 4 (item picker) and Phase 5 (review) ──
+function soWizRenderPicker() {
+  // Phase 4 will implement this
+  var picker = document.getElementById('so-wiz-picker');
+  if (!picker) return;
+  if (picker.innerHTML) return; // already rendered
+  picker.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Item picker loading...</div>';
+}
+
+function soWizRenderItemsList() {
+  // Phase 4 will implement this
+  var list = document.getElementById('so-wiz-items-list');
+  if (!list) return;
+  if (!soItems.length || !soItems[0].productId) {
+    list.innerHTML = '';
+    return;
+  }
+}
+
+function soWizRenderReview() {
+  // Phase 5 will implement this
+  var review = document.getElementById('so-wiz-review');
+  if (!review) return;
+  review.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Review loading...</div>';
 }
 
 function soSearchCustomers() {
