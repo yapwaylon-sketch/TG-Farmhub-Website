@@ -472,11 +472,38 @@
 </div>
 
 <!-- DELIVERY PAYMENT MODAL -->
+<!-- DELIVERY PAYMENT DECISION MODAL (Step 3) -->
+<div id="so-paydecision-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <div class="modal-title">Payment</div>
+      <button class="modal-close" onclick="closeModal('so-paydecision-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:16px;">
+      <div id="so-paydecision-info" style="background:var(--bg-hover);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:13px;color:var(--text-muted);"></div>
+      <div id="so-paydecision-buttons" style="display:flex;gap:10px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="soPayDecisionAsk('later')">Pay Later</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="soPayDecisionAsk('now')">Receive Payment</button>
+      </div>
+      <div id="so-paydecision-confirm" style="display:none;margin-top:14px;padding:12px;background:var(--bg-hover);border-radius:8px;text-align:center;">
+        <div id="so-paydecision-confirm-msg" style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button class="btn btn-outline" style="min-width:80px;" onclick="soPayDecisionNo()">No</button>
+          <button class="btn btn-primary" style="min-width:80px;" id="so-paydecision-yes-btn" onclick="soPayDecisionYes()">Yes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COLLECT PAYMENT MODAL (Step 4) -->
 <div id="so-delpay-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:420px;max-height:85vh;display:flex;flex-direction:column;">
     <div class="modal-header" style="flex-shrink:0;">
       <div class="modal-title">Collect Payment</div>
-      <button class="modal-close" onclick="closeModal('so-delpay-modal')">
+      <button class="modal-close" onclick="soDelPayBack()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -489,7 +516,7 @@
       </div>
       <div class="form-field">
         <label for="so-delpay-method">METHOD</label>
-        <select id="so-delpay-method" style="width:100%;">
+        <select id="so-delpay-method" style="width:100%;" onchange="soDelPayMethodChange()">
           <option value="cash">Cash</option>
           <option value="bank_transfer">Bank Transfer</option>
         </select>
@@ -498,10 +525,14 @@
         <label for="so-delpay-reference">REFERENCE <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
         <input type="text" id="so-delpay-reference" placeholder="Bank ref number" style="width:100%;">
       </div>
+      <div class="form-field" id="so-delpay-slip-field" style="display:none;">
+        <label for="so-delpay-slip">UPLOAD BANK TRANSFER SLIP <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+        <input type="file" id="so-delpay-slip" accept="image/*" style="width:100%;">
+      </div>
     </div>
     <div class="modal-actions" style="flex-shrink:0;gap:8px;">
-      <button class="btn btn-outline" id="so-delpay-skip-btn" onclick="soDelPaySkip()">Skip — Print Receipt</button>
-      <button class="btn btn-primary" id="so-delpay-confirm-btn" onclick="soDelPayConfirm()">Confirm Payment & Print</button>
+      <button class="btn btn-outline" onclick="soDelPayBack()">Back</button>
+      <button class="btn btn-primary" id="so-delpay-confirm-btn" onclick="soDelPayConfirm()">Confirm Payment</button>
     </div>
   </div>
 </div>
@@ -2750,12 +2781,13 @@ function soPrepSendWhatsApp() {
 }
 
 async function soPrepConfirm() {
+  var workerId = document.getElementById('so-prep-worker').value || null;
+  if (!workerId) { notify('Please select a worker to assign the job', 'warning'); return; }
+
   var btn = document.getElementById('so-prep-confirm-btn');
   if (btn) btnLoading(btn, true);
 
-  var workerId = document.getElementById('so-prep-worker').value || null;
-  var extra = {};
-  if (workerId) extra.assigned_worker_id = workerId;
+  var extra = { assigned_worker_id: workerId };
 
   var ok = await soUpdateStatus(soPrepOrderId, 'preparing', extra);
   if (btn) btnLoading(btn, false, 'Confirm & Start');
@@ -2767,10 +2799,19 @@ async function soPrepConfirm() {
 }
 
 var soPrepQtyOrderId = null;
+// Pending prep data — accumulated across steps, committed atomically
+var soPrepPending = null;
 
 async function soMarkPrepared(orderId) {
   if (!salesCan('createOrder')) { notify('No permission', 'warning'); return; }
   soPrepQtyOrderId = orderId;
+  soPrepPending = { orderId: orderId, items: [] };
+
+  // Reset shared modal handlers (in case abandoned delivery flow left stale handlers)
+  document.getElementById('so-prepqty-confirm').onclick = soPrepQtyConfirm;
+  document.getElementById('so-prepqty-modal').querySelector('.modal-title').textContent = 'Confirm Prepared Quantities';
+  document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Continue';
+
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
 
   var html = '<div class="table-wrap"><table class="data-table" style="margin:0;">';
@@ -2825,9 +2866,9 @@ function soPrepQtyRecalc() {
   document.getElementById('so-prepqty-total').textContent = 'Total: RM ' + total.toFixed(2);
 }
 
-async function soPrepQtyConfirm() {
+function soPrepQtyConfirm() {
+  if (!soPrepPending) return;
   var orderId = soPrepQtyOrderId;
-  var btn = document.getElementById('so-prepqty-confirm');
 
   // Pre-validate: every pcs-ordered line must have a weight > 0
   var weightInputs = document.querySelectorAll('.prepqty-input');
@@ -2840,17 +2881,15 @@ async function soPrepQtyConfirm() {
     }
   }
 
-  btnLoading(btn, true);
-
   // Build a map of itemId -> prepared pcs (for pcs-ordered lines)
   var pcsMap = {};
   document.querySelectorAll('.prepqty-pcs-input').forEach(function(inp) {
     pcsMap[inp.dataset.itemId] = parseInt(inp.value, 10) || 0;
   });
 
-  // Update each item's quantity + line_total + (for pcs lines) order_pcs + actual_weight_kg
+  // Save to memory only — no DB writes
   var inputs = document.querySelectorAll('.prepqty-input');
-  var grandTotal = 0;
+  var pendingItems = [];
   for (var i = 0; i < inputs.length; i++) {
     var inp = inputs[i];
     var itemId = inp.dataset.itemId;
@@ -2858,53 +2897,94 @@ async function soPrepQtyConfirm() {
     var newQty = parseFloat(inp.value) || 0;
     var price = parseFloat(inp.dataset.price) || 0;
     var lineTotal = newQty * price;
-    grandTotal += lineTotal;
 
-    var updatePayload = { quantity: newQty, line_total: lineTotal };
+    var itemData = { itemId: itemId, quantity: newQty, price: price, lineTotal: lineTotal };
     if (isPcsLine) {
-      updatePayload.actual_weight_kg = newQty;
-      updatePayload.order_pcs = pcsMap[itemId] || 0;
+      itemData.isPcs = true;
+      itemData.actualWeightKg = newQty;
+      itemData.orderPcs = pcsMap[itemId] || 0;
     }
-
-    // Update local array
-    var localItem = orderItems.find(function(x) { return x.id === itemId; });
-    if (localItem) {
-      localItem.quantity = newQty;
-      localItem.line_total = lineTotal;
-      if (isPcsLine) {
-        localItem.actual_weight_kg = newQty;
-        localItem.order_pcs = pcsMap[itemId] || 0;
-      }
-    }
-
-    // Update DB
-    await sbQuery(sb.from('sales_order_items').update(updatePayload).eq('id', itemId).select());
+    pendingItems.push(itemData);
   }
+  soPrepPending.items = pendingItems;
 
-  // Update order grand_total
-  var o = orders.find(function(x) { return x.id === orderId; });
-  if (o) {
-    var returnsTotal = parseFloat(o.returns_total) || 0;
-    o.grand_total = grandTotal - returnsTotal;
-    await sbQuery(sb.from('sales_orders').update({ grand_total: o.grand_total }).eq('id', orderId).select());
-  }
-
-  btnLoading(btn, false, 'Confirm & Continue');
   closeModal('so-prepqty-modal');
 
-  // Now proceed to photo step
+  // Proceed to photo step
   soShowPrepPhoto(orderId);
 }
 
 function soShowPrepPhoto(orderId) {
   soShowPhotoModal('Preparation Photo', 'Take a photo of the prepared order.', orderId, 'prep', async function(photoUrl) {
-    var btn = document.getElementById('btn-mark-prepared');
-    if (btn) btnLoading(btn, true);
-    var extra = photoUrl ? { prep_photo_url: photoUrl } : {};
-    var ok = await soUpdateStatus(orderId, 'prepared', extra);
+    // Photo taken — now commit everything atomically
+    soPrepPending.photoUrl = photoUrl;
+    await soPrepCommitAll();
+  }, true);
+}
+
+async function soPrepCommitAll() {
+  if (!soPrepPending) return;
+  var pending = soPrepPending;
+  var orderId = pending.orderId;
+
+  var btn = document.getElementById('btn-mark-prepared');
+  if (btn) btnLoading(btn, true);
+
+  try {
+    // 1. Update each item's quantity + line_total
+    var grandTotal = 0;
+    for (var i = 0; i < pending.items.length; i++) {
+      var it = pending.items[i];
+      grandTotal += it.lineTotal;
+
+      var updatePayload = { quantity: it.quantity, line_total: it.lineTotal };
+      if (it.isPcs) {
+        updatePayload.actual_weight_kg = it.actualWeightKg;
+        updatePayload.order_pcs = it.orderPcs;
+      }
+
+      var itemResult = await sbQuery(sb.from('sales_order_items').update(updatePayload).eq('id', it.itemId).select());
+      if (itemResult === null) { notify('Failed to update item quantities', 'error'); soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return; }
+
+      // Update local array
+      var localItem = orderItems.find(function(x) { return x.id === it.itemId; });
+      if (localItem) {
+        localItem.quantity = it.quantity;
+        localItem.line_total = it.lineTotal;
+        if (it.isPcs) {
+          localItem.actual_weight_kg = it.actualWeightKg;
+          localItem.order_pcs = it.orderPcs;
+        }
+      }
+    }
+
+    // 2. Update order: status + grand_total + photo
+    var o = orders.find(function(x) { return x.id === orderId; });
+    var returnsTotal = o ? (parseFloat(o.returns_total) || 0) : 0;
+    var newGrand = grandTotal - returnsTotal;
+
+    var orderUpdate = { status: 'prepared', grand_total: newGrand };
+    if (pending.photoUrl) orderUpdate.prep_photo_url = pending.photoUrl;
+
+    var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
+    if (orderResult === null) { notify('Failed to update order status', 'error'); soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return; }
+
+    // Update local
+    if (o) {
+      o.status = 'prepared';
+      o.grand_total = newGrand;
+      if (pending.photoUrl) o.prep_photo_url = pending.photoUrl;
+    }
+
     if (btn) btnLoading(btn, false, 'Mark Prepared');
-    if (ok) { notify('Order marked as prepared' + (photoUrl ? ' with photo' : ''), 'success'); soRenderDetail(); }
-  }, false);
+    notify('Order marked as prepared' + (pending.photoUrl ? ' with photo' : ''), 'success');
+    soPrepPending = null;
+    soRenderDetail();
+  } catch(e) {
+    soPrepPending = null;
+    if (btn) btnLoading(btn, false, 'Mark Prepared');
+    notify('Failed to mark prepared: ' + e.message, 'error');
+  }
 }
 
 // Generic photo modal — supports camera + album
@@ -2928,12 +3008,15 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
 
   modal.style.display = 'flex';
 
-  // X close button — treat as skip so the flow still completes
+  // X close button — if required, just close without proceeding; if optional, treat as skip
   var closeBtn = modal.querySelector('.modal-close');
   if (closeBtn) {
     var closeClone = closeBtn.cloneNode(true);
     closeBtn.parentNode.replaceChild(closeClone, closeBtn);
-    closeClone.onclick = function() { closeModal('so-photo-modal'); onComplete(null); };
+    closeClone.onclick = function() {
+      closeModal('so-photo-modal');
+      if (!required) onComplete(null);
+    };
   }
 
   document.getElementById('so-photo-skip-btn').onclick = function() {
@@ -2947,7 +3030,7 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
     var input = document.getElementById('so-photo-input');
     input.value = '';
     input.onchange = async function() {
-      if (!input.files.length) { onComplete(null); return; }
+      if (!input.files.length) { if (!required) onComplete(null); return; }
       var photoUrl = await soProcessPhotoFile(input.files[0], orderId, type);
       onComplete(photoUrl);
     };
@@ -2960,7 +3043,7 @@ function soShowPhotoModal(title, msg, orderId, type, onComplete, required) {
     var input = document.getElementById('so-photo-input-album');
     input.value = '';
     input.onchange = async function() {
-      if (!input.files.length) { onComplete(null); return; }
+      if (!input.files.length) { if (!required) onComplete(null); return; }
       var photoUrl = await soProcessPhotoFile(input.files[0], orderId, type);
       onComplete(photoUrl);
     };
@@ -3077,10 +3160,14 @@ function soMarkCollected(orderId) {
 }
 
 var soDeliveryQtyOrderId = null;
+// Pending delivery data — accumulated across steps, committed atomically at the end
+var soDeliveryPending = null;
 
 async function soMarkDelivered(orderId) {
   if (!salesCan('delivery')) { notify('No permission', 'warning'); return; }
-  // Show quantity confirmation first (driver adjusts for damage in transit)
+
+  // Initialize pending data
+  soDeliveryPending = { orderId: orderId, items: [], photoUrl: null, payment: null };
   soDeliveryQtyOrderId = orderId;
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
 
@@ -3110,7 +3197,7 @@ async function soMarkDelivered(orderId) {
   document.getElementById('so-prepqty-total').textContent = '';
   soDelQtyRecalc();
   document.getElementById('so-prepqty-modal').querySelector('.modal-title').textContent = 'Confirm Delivery Quantities';
-  document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Deliver';
+  document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Continue';
   document.getElementById('so-prepqty-confirm').onclick = soDelQtyConfirm;
   document.getElementById('so-prepqty-modal').style.display = 'flex';
 }
@@ -3129,85 +3216,146 @@ function soDelQtyRecalc() {
   document.getElementById('so-prepqty-total').textContent = 'Total: RM ' + total.toFixed(2);
 }
 
-async function soDelQtyConfirm() {
-  var orderId = soDeliveryQtyOrderId;
-  var btn = document.getElementById('so-prepqty-confirm');
-  btnLoading(btn, true);
+function soDelQtyConfirm() {
+  if (!soDeliveryPending) return;
 
-  // Update each item's quantity + line_total
+  // Save qty adjustments to memory only — no DB writes
   var inputs = document.querySelectorAll('.delqty-input');
-  var newSubtotal = 0;
+  var pendingItems = [];
   for (var i = 0; i < inputs.length; i++) {
     var inp = inputs[i];
-    var itemId = inp.dataset.itemId;
-    var newQty = parseFloat(inp.value) || 0;
-    var price = parseFloat(inp.dataset.price) || 0;
-    var newLine = newQty * price;
-    newSubtotal += newLine;
-
-    await sbQuery(sb.from('sales_order_items').update({ quantity: newQty, line_total: newLine }).eq('id', itemId).select());
-    var localItem = orderItems.find(function(x) { return x.id === itemId; });
-    if (localItem) { localItem.quantity = newQty; localItem.line_total = newLine; }
+    pendingItems.push({
+      itemId: inp.dataset.itemId,
+      quantity: parseFloat(inp.value) || 0,
+      price: parseFloat(inp.dataset.price) || 0,
+      lineTotal: (parseFloat(inp.value) || 0) * (parseFloat(inp.dataset.price) || 0)
+    });
   }
+  soDeliveryPending.items = pendingItems;
 
-  // Update order totals
-  var o = orders.find(function(x) { return x.id === orderId; });
-  if (o) {
-    var returnsTotal = parseFloat(o.returns_total) || 0;
-    var newGrand = Math.max(0, newSubtotal - returnsTotal);
-    await sbQuery(sb.from('sales_orders').update({ subtotal: newSubtotal, grand_total: newGrand }).eq('id', orderId).select());
-    o.subtotal = newSubtotal;
-    o.grand_total = newGrand;
-  }
-
-  btnLoading(btn, false, 'Confirm & Deliver');
   closeModal('so-prepqty-modal');
 
   // Reset modal handlers back to prep flow
   document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Continue';
   document.getElementById('so-prepqty-confirm').onclick = soPrepQtyConfirm;
 
-  // Now proceed with delivery photo + complete
-  soShowPhotoModal('Delivery Photo', 'Photo is required before marking as delivered.', orderId, 'delivery', async function(photoUrl) {
-    var extra = photoUrl ? { delivery_photo_url: photoUrl } : {};
-    var ok = await soUpdateStatus(orderId, 'completed', extra);
-    if (ok) { notify('Order delivered', 'success'); soRenderDetail(); soShowDelPayModal(orderId); }
+  // Step 2: Delivery photo (required)
+  soShowPhotoModal('Delivery Photo', 'Photo is required before marking as delivered.', soDeliveryPending.orderId, 'delivery', function(photoUrl) {
+    soDeliveryPending.photoUrl = photoUrl;
+    // Step 3: Payment decision
+    soShowPayDecision();
   }, true);
 }
 
-// ── Delivery Payment Flow ───────────────────────────────
-function soShowDelPayModal(orderId) {
-  var o = orders.find(function(x) { return x.id === orderId; });
-  if (!o) { soGenerateDoc(orderId); return; }
+// ── Step 3: Payment Decision ────────────────────────────
+var soPayDecisionChoice = null;
 
-  // Only show for cash sales with outstanding balance
+function soShowPayDecision() {
+  if (!soDeliveryPending) return;
+  var orderId = soDeliveryPending.orderId;
+  var o = orders.find(function(x) { return x.id === orderId; });
+  if (!o) return;
+
   var isDO = o.doc_type === 'delivery_order';
-  var balance = orderBalance(o);
-  if (isDO || balance <= 0) {
-    soGenerateDoc(orderId);
+
+  // DOs skip payment entirely — go straight to commit
+  if (isDO) {
+    soDeliveryCommitAll();
     return;
   }
 
+  // Calculate pending balance using in-memory qty adjustments
+  var newSubtotal = 0;
+  soDeliveryPending.items.forEach(function(it) { newSubtotal += it.lineTotal; });
+  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var pendingGrand = Math.max(0, newSubtotal - returnsTotal);
+  var currentPaid = parseFloat(o.amount_paid) || 0;
+  var pendingBalance = pendingGrand - currentPaid;
+
+  // Already fully paid — skip payment
+  if (pendingBalance <= 0) {
+    soDeliveryCommitAll();
+    return;
+  }
+
+  soDeliveryPending.pendingBalance = pendingBalance;
+  soDeliveryPending.pendingGrand = pendingGrand;
+
   var cust = customers.find(function(c) { return c.id === o.customer_id; });
+  document.getElementById('so-paydecision-info').innerHTML =
+    '<div style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + ' — ' + esc(cust ? cust.name : '\u2014') + '</div>' +
+    '<div>Total: <strong>' + formatRM(pendingGrand) + '</strong> — Balance: <strong style="color:var(--gold);">' + formatRM(pendingBalance) + '</strong></div>';
+
+  // Reset state
+  soPayDecisionChoice = null;
+  document.getElementById('so-paydecision-buttons').style.display = 'flex';
+  document.getElementById('so-paydecision-confirm').style.display = 'none';
+  document.getElementById('so-paydecision-modal').style.display = 'flex';
+}
+
+function soPayDecisionAsk(choice) {
+  soPayDecisionChoice = choice;
+  document.getElementById('so-paydecision-buttons').style.display = 'none';
+  var confirmDiv = document.getElementById('so-paydecision-confirm');
+  confirmDiv.style.display = 'block';
+  if (choice === 'later') {
+    document.getElementById('so-paydecision-confirm-msg').textContent = 'Confirm pay later?';
+  } else {
+    document.getElementById('so-paydecision-confirm-msg').textContent = 'Confirm payment received?';
+  }
+}
+
+function soPayDecisionNo() {
+  // Back to the two buttons
+  soPayDecisionChoice = null;
+  document.getElementById('so-paydecision-buttons').style.display = 'flex';
+  document.getElementById('so-paydecision-confirm').style.display = 'none';
+}
+
+function soPayDecisionYes() {
+  if (soPayDecisionChoice === 'later') {
+    // Commit without payment → doc generation
+    closeModal('so-paydecision-modal');
+    soDeliveryCommitAll();
+  } else {
+    // Open collect payment modal (Step 4)
+    closeModal('so-paydecision-modal');
+    soShowDelPayModal();
+  }
+}
+
+// ── Step 4: Collect Payment Modal ───────────────────────
+function soShowDelPayModal() {
+  if (!soDeliveryPending) return;
+  var orderId = soDeliveryPending.orderId;
+  var balance = soDeliveryPending.pendingBalance || 0;
+  var o = orders.find(function(x) { return x.id === orderId; });
+  var cust = o ? customers.find(function(c) { return c.id === o.customer_id; }) : null;
+
   document.getElementById('so-delpay-order-id').value = orderId;
   document.getElementById('so-delpay-info').innerHTML =
-    '<div style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + ' — ' + esc(cust ? cust.name : '\u2014') + '</div>' +
-    '<div>Total: <strong>' + formatRM(parseFloat(o.grand_total) || 0) + '</strong> — Balance: <strong style="color:var(--gold);">' + formatRM(balance) + '</strong></div>';
+    '<div style="font-weight:600;color:var(--text);">' + esc((o ? o.doc_number : '') || orderId) + ' — ' + esc(cust ? cust.name : '\u2014') + '</div>' +
+    '<div>Total: <strong>' + formatRM(soDeliveryPending.pendingGrand || 0) + '</strong> — Balance: <strong style="color:var(--gold);">' + formatRM(balance) + '</strong></div>';
   document.getElementById('so-delpay-amount').value = balance.toFixed(2);
   document.getElementById('so-delpay-amount').max = balance.toFixed(2);
   document.getElementById('so-delpay-method').value = 'cash';
   document.getElementById('so-delpay-reference').value = '';
+  document.getElementById('so-delpay-slip').value = '';
+  soDelPayMethodChange();
   document.getElementById('so-delpay-modal').style.display = 'flex';
 }
 
-function soDelPaySkip() {
-  var orderId = document.getElementById('so-delpay-order-id').value;
+function soDelPayMethodChange() {
+  var method = document.getElementById('so-delpay-method').value;
+  document.getElementById('so-delpay-slip-field').style.display = method === 'bank_transfer' ? 'block' : 'none';
+}
+
+function soDelPayBack() {
   closeModal('so-delpay-modal');
-  soGenerateDoc(orderId);
+  soShowPayDecision();
 }
 
 async function soDelPayConfirm() {
-  var orderId = document.getElementById('so-delpay-order-id').value;
   var amount = parseFloat(document.getElementById('so-delpay-amount').value);
   var method = document.getElementById('so-delpay-method').value;
   var reference = document.getElementById('so-delpay-reference').value.trim();
@@ -3217,39 +3365,108 @@ async function soDelPayConfirm() {
   var btn = document.getElementById('so-delpay-confirm-btn');
   btnLoading(btn, true);
 
+  // Upload bank slip if provided
+  var slipUrl = null;
+  var slipFile = document.getElementById('so-delpay-slip').files[0];
+  if (slipFile && method === 'bank_transfer') {
+    var path = 'payment-slips/' + soDeliveryPending.orderId + '-' + Date.now() + '.jpg';
+    var result = await sbUpload(function() {
+      return sb.storage.from('sales-photos').upload(path, slipFile, { contentType: slipFile.type, upsert: true });
+    });
+    if (result && !result.error) {
+      slipUrl = sb.storage.from('sales-photos').getPublicUrl(path).data.publicUrl;
+    }
+  }
+
+  // Store payment info in pending — not yet written to DB
+  soDeliveryPending.payment = {
+    amount: amount,
+    method: method,
+    reference: reference || null,
+    slipUrl: slipUrl
+  };
+
+  btnLoading(btn, false, 'Confirm Payment');
+  closeModal('so-delpay-modal');
+  soDeliveryCommitAll();
+}
+
+// ── Atomic Commit — all DB writes happen here ───────────
+async function soDeliveryCommitAll() {
+  if (!soDeliveryPending) return;
+  var pending = soDeliveryPending;
+  var orderId = pending.orderId;
+
+  notify('Saving delivery...', 'info');
+
   try {
-    var paymentId = await dbNextId('SY');
-    var payData = {
-      id: paymentId,
-      order_id: orderId,
-      amount: amount,
-      payment_date: todayStr(),
-      method: method,
-      reference: reference || null,
-      notes: 'Collected on delivery',
-      created_by: currentUser ? currentUser.id : null,
-      company_id: getCompanyId()
-    };
-
-    var result = await sbQuery(sb.from('sales_payments').insert(payData).select());
-    if (result === null) { btnLoading(btn, false, 'Confirm Payment & Print'); return; }
-
-    payments.unshift(result[0] || payData);
-    recalcPaymentStatus(orderId);
-
-    var o = orders.find(function(x) { return x.id === orderId; });
-    if (o) {
-      await sbQuery(sb.from('sales_orders').update({ amount_paid: o.amount_paid, payment_status: o.payment_status }).eq('id', orderId).select());
+    // 1. Insert payment first (if collected) — fails cleanly before any item/order writes
+    if (pending.payment) {
+      var paymentId = await dbNextId('SY');
+      var payData = {
+        id: paymentId,
+        order_id: orderId,
+        amount: pending.payment.amount,
+        payment_date: todayStr(),
+        method: pending.payment.method,
+        reference: pending.payment.reference,
+        slip_url: pending.payment.slipUrl || null,
+        notes: 'Collected on delivery',
+        created_by: currentUser ? currentUser.id : null,
+        company_id: getCompanyId()
+      };
+      var payResult = await sbQuery(sb.from('sales_payments').insert(payData).select());
+      if (payResult === null) { notify('Failed to save payment — please retry', 'error'); soDeliveryPending = null; return; }
+      payments.unshift(payResult[0] || payData);
     }
 
-    btnLoading(btn, false, 'Confirm Payment & Print');
-    closeModal('so-delpay-modal');
-    notify('Payment of ' + formatRM(amount) + ' collected', 'success');
+    // 2. Update each item's quantity + line_total
+    var newSubtotal = 0;
+    for (var i = 0; i < pending.items.length; i++) {
+      var it = pending.items[i];
+      newSubtotal += it.lineTotal;
+      var itemResult = await sbQuery(sb.from('sales_order_items').update({ quantity: it.quantity, line_total: it.lineTotal }).eq('id', it.itemId).select());
+      if (itemResult === null) { notify('Failed to update item quantities — please check order', 'error'); soDeliveryPending = null; return; }
+      var localItem = orderItems.find(function(x) { return x.id === it.itemId; });
+      if (localItem) { localItem.quantity = it.quantity; localItem.line_total = it.lineTotal; }
+    }
+
+    // 3. Update order: status + totals + photo + completed_at
+    var o = orders.find(function(x) { return x.id === orderId; });
+    var returnsTotal = o ? (parseFloat(o.returns_total) || 0) : 0;
+    var newGrand = Math.max(0, newSubtotal - returnsTotal);
+    var orderUpdate = {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      subtotal: newSubtotal,
+      grand_total: newGrand
+    };
+    if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
+
+    // Update payment status on order
+    if (o) {
+      o.subtotal = newSubtotal;
+      o.grand_total = newGrand;
+      o.status = 'completed';
+      o.completed_at = orderUpdate.completed_at;
+      if (pending.photoUrl) o.delivery_photo_url = pending.photoUrl;
+    }
+    recalcPaymentStatus(orderId);
+    if (o) {
+      orderUpdate.amount_paid = o.amount_paid;
+      orderUpdate.payment_status = o.payment_status;
+    }
+
+    await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
+
+    var payMsg = pending.payment ? ' — Payment of ' + formatRM(pending.payment.amount) + ' collected' : '';
+    notify('Order delivered' + payMsg, 'success');
+    soDeliveryPending = null;
     soRenderDetail();
     soGenerateDoc(orderId);
   } catch(e) {
-    btnLoading(btn, false, 'Confirm Payment & Print');
-    notify('Payment failed: ' + e.message, 'error');
+    soDeliveryPending = null;
+    notify('Delivery failed: ' + e.message, 'error');
   }
 }
 

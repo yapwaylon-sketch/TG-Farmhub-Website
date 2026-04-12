@@ -1,0 +1,2210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<title>TG Agro Fruits — Weather Intelligence Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CSS Variables & Reset
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #09090b;
+  --bg-subtle: #0c0a1a;
+  --surface: #18181b;
+  --surface-2: #27272a;
+  --border: rgba(63, 63, 70, 0.4);
+  --border-light: rgba(82, 82, 91, 0.6);
+  --text: #fafafa;
+  --text-dim: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #818cf8;
+  --accent-solid: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.12);
+  --green: #4ade80;
+  --green-dim: rgba(74, 222, 128, 0.1);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251, 191, 36, 0.1);
+  --red: #f87171;
+  --red-dim: rgba(248, 113, 113, 0.08);
+  --cyan: #22d3ee;
+  --ecmwf: #a78bfa;
+  --gfs: #38bdf8;
+  --icon-m: #34d399;
+  --davis: #fbbf24;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font: 'Outfit', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(34,211,238,0.03) 0%, transparent 50%),
+    linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Loading Overlay
+   ═══════════════════════════════════════════════════════════════ */
+#loadingOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+#loadingOverlay.done { opacity: 0; filter: blur(8px); pointer-events: none; }
+.loader-ring {
+  width: 44px; height: 44px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text {
+  margin-top: 20px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Top Row — branding + MetMalaysia side by side
+   ═══════════════════════════════════════════════════════════════ */
+.top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.branding-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.branding-card img {
+  height: 64px;
+  flex-shrink: 0;
+}
+.branding-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.branding-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.branding-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.status-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
+  50% { opacity: 0.5; box-shadow: 0 0 0 4px rgba(74,222,128,0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MetMalaysia Warning Card (right side of top row)
+   ═══════════════════════════════════════════════════════════════ */
+.met-warning-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 3px solid var(--border);
+}
+.met-warning-card .warn-icon { font-size: 1.4rem; flex-shrink: 0; display: none; }
+.met-warning-card .warn-content { flex: 1; }
+.met-warning-card .warn-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.met-warning-card .warn-text {
+  line-height: 1.4;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.met-warning-card .warn-placeholder {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+/* Active state — warning present */
+.met-warning-card.active {
+  border-left-color: var(--red);
+}
+.met-warning-card.active .warn-icon { display: block; }
+.met-warning-card.active .warn-label { color: var(--red); }
+.met-warning-card.active .warn-text { color: var(--text); font-weight: 500; }
+.met-warning-card.blink {
+  animation: warning-blink 2s ease-in-out infinite;
+}
+@keyframes warning-blink {
+  0%, 100% { border-color: rgba(248,113,113,0.3); background: var(--surface); }
+  50% { border-color: rgba(248,113,113,0.6); background: rgba(248,113,113,0.04); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Main Content
+   ═══════════════════════════════════════════════════════════════ */
+.content {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 12px 16px 40px;
+}
+/* Above-the-fold wrapper — locks to viewport on large screens */
+.above-fold {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding: 12px 16px 12px;
+  box-sizing: border-box;
+}
+.above-fold .top-row { flex-shrink: 0; }
+.above-fold .dashboard-grid {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+/* Bottom 3 cards fill remaining height */
+.above-fold .dashboard-grid > .card:not(.spray-card) {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Section headers */
+.section-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  padding-left: 14px;
+  position: relative;
+}
+.section-label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--cyan));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Cards
+   ═══════════════════════════════════════════════════════════════ */
+.card {
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(63, 63, 70, 0.5);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.card:hover {
+  border-color: var(--border-light);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.card-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard Grid — above the fold on 4K
+   ═══════════════════════════════════════════════════════════════ */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dashboard-grid > .spray-card {
+  grid-column: 1 / -1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Spray Advisory — verdict left, factors right
+   ═══════════════════════════════════════════════════════════════ */
+.spray-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+}
+.spray-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 200px;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+  gap: 6px;
+}
+.spray-indicator {
+  width: 100px; height: 100px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: box-shadow 0.3s ease;
+  overflow: hidden;
+}
+.spray-indicator img { width: 100%; height: 100%; object-fit: cover; }
+.spray-indicator.go { box-shadow: 0 0 30px rgba(74,222,128,0.15); }
+.spray-indicator.caution { box-shadow: 0 0 30px rgba(251,191,36,0.15); }
+.spray-indicator.nogo { box-shadow: 0 0 30px rgba(248,113,113,0.15); }
+.spray-verdict {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.spray-right {
+  flex: 1;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.spray-detail {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.spray-factors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.spray-factor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border);
+  transition: background 0.2s;
+}
+.spray-factor:hover { background: rgba(39,39,42,0.9); }
+.spray-factor.ok { border-left-color: var(--green); }
+.spray-factor.warn { border-left-color: var(--amber); }
+.spray-factor.bad { border-left-color: var(--red); }
+.spray-factor-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.spray-factor-value {
+  font-size: 0.9rem;
+  font-family: var(--mono);
+  color: var(--text);
+  font-weight: 600;
+}
+.spray-factor-note {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Rain Card — compact layout for viewport fit
+   ═══════════════════════════════════════════════════════════════ */
+.rain-card {
+  display: flex;
+  flex-direction: column;
+}
+.rain-card > .card-label { flex-shrink: 0; }
+.rain-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+.rain-gauge-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding-right: 16px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+.rain-gauge-svg { display: none; }
+.rain-pct {
+  font-size: 2.8rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1;
+}
+.rain-pct-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+.rain-hours-area {
+  flex: 1;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+.rain-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+.rain-hour-block {
+  border-radius: var(--radius-sm);
+  padding: 6px 6px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border-top: 3px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.rain-hour-block:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.rain-hour-time {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-family: var(--mono);
+  order: 0;
+}
+.rain-hour-icon {
+  font-size: 1.2rem;
+  margin: 1px 0;
+  order: 2;
+}
+.rain-hour-label {
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 1px 0;
+  order: 1;
+}
+.rain-hour-detail {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Davis + Model Cards — row 2 of dashboard
+   ═══════════════════════════════════════════════════════════════ */
+.davis-card { position: relative; }
+.davis-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--davis);
+  background: var(--amber-dim);
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  border: 2px solid rgba(251, 191, 36, 0.25);
+  transition: border-color 0.5s ease, color 0.5s ease, background 0.5s ease;
+}
+.davis-badge .badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--davis);
+  animation: pulse-dot 2s ease infinite;
+}
+.davis-card .readings-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.readings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 6px;
+}
+.reading {
+  display: flex;
+  flex-direction: column;
+}
+.reading-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.reading-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  line-height: 1.1;
+}
+.reading-value .unit {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.reading-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+/* Model conditions card */
+.model-conditions .readings-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.model-chips {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.model-chip {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.chip-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Below-the-fold: Secondary Grid
+   ═══════════════════════════════════════════════════════════════ */
+.secondary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Forecast
+   ═══════════════════════════════════════════════════════════════ */
+.forecast-card {
+  display: flex;
+  flex-direction: column;
+}
+.forecast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.forecast-toggle {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  padding: 2px;
+}
+.forecast-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 6px;
+}
+.forecast-toggle button.active {
+  background: var(--accent-solid);
+  color: #fff;
+}
+.forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  flex: 1;
+}
+.forecast-day {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 18px 10px;
+  text-align: center;
+  transition: transform 0.2s ease, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.forecast-day:hover {
+  transform: translateY(-2px);
+  background: rgba(39,39,42,0.9);
+}
+.fc-day-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.fc-emoji { font-size: 2rem; margin-bottom: 8px; }
+.fc-temps {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.fc-temps .lo { color: var(--text-dim); font-weight: 400; }
+.fc-rain {
+  font-size: 0.75rem;
+  color: var(--cyan);
+  font-family: var(--mono);
+  margin-top: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MetMalaysia Forecast Card
+   ═══════════════════════════════════════════════════════════════ */
+.met-today-card { padding: 20px; }
+.met-today-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.met-today-temps {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.met-temp-hi { color: var(--amber); }
+.met-temp-sep { color: var(--text-muted); margin: 0 4px; }
+.met-temp-lo { color: var(--cyan); }
+.met-today-date {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.met-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.met-period {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+.met-period:hover { transform: translateY(-1px); }
+.met-period-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.met-period-icon { font-size: 2.8rem; margin-bottom: 10px; }
+.met-period-text {
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Radar
+   ═══════════════════════════════════════════════════════════════ */
+.radar-card { display: flex; flex-direction: column; }
+#radarMap {
+  width: 100%;
+  flex: 1;
+  min-height: 350px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.radar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.radar-controls button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.radar-controls button:hover { border-color: var(--border-light); }
+.radar-controls button.active {
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  color: #fff;
+}
+.radar-time {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+.radar-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+.farm-tooltip {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  font-family: var(--mono) !important;
+  font-size: 0.7rem !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+  border-radius: 6px !important;
+}
+.farm-tooltip::before { border-right-color: var(--border) !important; }
+.leaflet-control-zoom a {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   24h History Chart
+   ═══════════════════════════════════════════════════════════════ */
+.history-card { display: flex; flex-direction: column; }
+.history-canvas {
+  width: 100%;
+  flex: 1;
+  min-height: 250px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Footer
+   ═══════════════════════════════════════════════════════════════ */
+.app-footer {
+  text-align: center;
+  padding: 16px 20px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1200px) {
+  .above-fold { height: auto; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .dashboard-grid > .spray-card { grid-column: 1; }
+  .secondary-grid { grid-template-columns: 1fr; }
+  .spray-card { flex-direction: column; }
+  .spray-left { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 16px; min-width: auto; flex-direction: row; gap: 16px; }
+  .rain-body { flex-direction: column; }
+  .rain-gauge-area { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 12px; }
+  .rain-hours-area { padding-left: 0; padding-top: 12px; }
+  .spray-right { padding-left: 0; padding-top: 16px; }
+  .forecast-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 768px) {
+  .content { padding: 12px 8px; }
+  .top-row { grid-template-columns: 1fr; }
+  .branding-card img { height: 40px; }
+  .branding-title { font-size: 1rem; }
+  .rain-hours-grid { grid-template-columns: repeat(2, 1fr); }
+  .davis-card .readings-grid { grid-template-columns: repeat(2, 1fr); }
+  .readings-grid { grid-template-columns: repeat(2, 1fr); }
+  .forecast-grid { grid-template-columns: repeat(3, 1fr); }
+  .spray-factors { grid-template-columns: 1fr; }
+  .met-forecast-grid { grid-template-columns: 1fr; }
+  #radarMap { min-height: 250px; }
+}
+
+/* 4K TV optimization — primary target */
+@media (min-width: 2560px) {
+  html { font-size: 22px; }
+  .content { padding: 10px 20px 40px; }
+  .top-row { margin-bottom: 8px; }
+  .dashboard-grid { gap: 12px; grid-template-columns: 1fr 1fr 1fr; }
+  .dashboard-grid > .spray-card { grid-column: 1 / -1; }
+  .branding-card img { height: 80px; }
+  .branding-title { font-size: 1.4rem; }
+  .spray-indicator { width: 160px; height: 160px; }
+  .spray-verdict { font-size: 2.2rem; }
+  .rain-pct { font-size: 3rem; }
+  .rain-hour-icon { font-size: 2rem; }
+  .rain-hour-label { font-size: 1.4rem; }
+  .reading-value { font-size: 2rem; }
+  .model-conditions .reading-value { font-size: 1.8rem; }
+  #radarMap { min-height: 500px; }
+}
+@media (min-width: 3200px) {
+  html { font-size: 26px; }
+}
+@media (min-width: 3840px) {
+  html { font-size: 28px; }
+  .branding-card img { height: 90px; }
+  .branding-title { font-size: 1.5rem; }
+  .spray-indicator { width: 180px; height: 180px; }
+  .spray-verdict { font-size: 2.5rem; }
+  .rain-pct { font-size: 3.5rem; }
+  .rain-gauge-svg { width: 180px; height: 110px; }
+  .rain-hour-icon { font-size: 2.2rem; }
+  .rain-hour-label { font-size: 1.6rem; }
+  .reading-value { font-size: 2.2rem; }
+}
+
+/* Color utilities */
+.c-green { color: var(--green); }
+.c-amber { color: var(--amber); }
+.c-red { color: var(--red); }
+.c-cyan { color: var(--cyan); }
+.c-accent { color: var(--accent); }
+
+/* Data source tags */
+.card-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.card-source .src-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.card-source .src-label { opacity: 0.6; }
+
+/* Password Gate */
+#pwGate {
+  position: fixed; inset: 0; z-index: 10001;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-family: var(--font);
+}
+#pwGate img { width: 96px; height: 96px; border-radius: 16px; margin-bottom: 24px; }
+#pwGate h1 { color: var(--text); font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; }
+#pwGate .gate-sub { color: var(--text-muted); font-size: 1rem; margin-bottom: 32px; }
+#pwGate input {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 24px;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-family: var(--font);
+  width: 320px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#pwGate input:focus { border-color: var(--green); }
+#pwGate button {
+  margin-top: 16px;
+  background: var(--green);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 48px;
+  color: #09090b;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+}
+#pwGate button:hover { opacity: 0.9; }
+#pwGate .gate-error {
+  color: var(--red);
+  font-size: 0.9rem;
+  margin-top: 12px;
+  min-height: 20px;
+}
+</style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="pwGate">
+  <img src="https://tgfarmhub.com/assets/logo.png" alt="TG">
+  <h1>TG Weather Monitoring</h1>
+  <div class="gate-sub">Enter password to continue</div>
+  <input type="password" id="pwInput" placeholder="Password" autocomplete="off" autofocus>
+  <div class="gate-error" id="pwError"></div>
+  <button onclick="checkPassword()">Unlock</button>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loadStatus">Connecting to weather models…</div>
+</div>
+
+<!-- Above the Fold — viewport-locked -->
+<div class="above-fold">
+
+  <!-- ═══ Top Row: Branding + MetMalaysia ═══ -->
+  <div class="top-row">
+    <div class="card branding-card">
+      <img src="https://tgfarmhub.com/assets/logo.png" alt="TG Agro Fruits">
+      <div class="branding-text">
+        <div class="branding-title">Weather Intelligence Dashboard</div>
+        <div class="branding-meta">
+          <span id="clockDisplay"></span>
+          <span id="lastUpdate"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card met-warning-card" id="metWarningBanner">
+      <span class="warn-icon">⚠️</span>
+      <div class="warn-content">
+        <div class="warn-label">MetMalaysia Weather Alert</div>
+        <div class="warn-text" id="metWarningText"><span class="warn-placeholder">No active weather alerts</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Dashboard Grid: Above the Fold ═══ -->
+  <div class="dashboard-grid">
+
+    <!-- Spray Advisory — verdict left, factors right -->
+    <div class="card spray-card">
+      <div class="spray-left">
+        <div class="spray-indicator" id="sprayIndicator">—</div>
+        <div class="spray-verdict" id="sprayVerdict">Checking…</div>
+        <div class="card-source" id="spraySource" style="border-top:none;margin-top:0;padding-top:0;justify-content:center;"><span class="src-label">Ensemble + Davis</span></div>
+      </div>
+      <div class="spray-right">
+        <div class="card-label">Spray Advisory</div>
+        <div class="spray-detail" id="sprayDetail">Analyzing rain forecast…</div>
+      </div>
+    </div>
+
+    <!-- Rain Outlook — percentage left, hours right -->
+    <div class="card rain-card">
+      <div class="card-label">Rain Outlook — Next 4 Hours</div>
+      <div class="rain-body">
+        <div class="rain-gauge-area">
+          <div class="rain-pct" id="rainPctBig">—</div>
+          <div class="rain-pct-label">chance of rain</div>
+        </div>
+        <div class="rain-hours-area">
+          <div class="rain-hours-grid" id="rainHoursGrid">
+            <div class="rain-hour-block"><div class="rain-hour-time">+1h</div><div class="rain-hour-pct">—</div><div class="rain-hour-mm">— mm</div></div>
+            <div class="rain-hour-block"><div class="rain-hour-time">+2h</div><div class="rain-hour-pct">—</div><div class="rain-hour-mm">— mm</div></div>
+            <div class="rain-hour-block"><div class="rain-hour-time">+3h</div><div class="rain-hour-pct">—</div><div class="rain-hour-mm">— mm</div></div>
+            <div class="rain-hour-block"><div class="rain-hour-time">+4h</div><div class="rain-hour-pct">—</div><div class="rain-hour-mm">— mm</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Davis Station — 4 column -->
+    <div class="card davis-card">
+      <div class="davis-badge"><span class="badge-dot" id="davisBadgeDot"></span> <span id="davisBadgeText">LIVE</span> <span class="status-dot" id="davisStatusDot" style="margin-left:6px;"></span></div>
+      <div class="card-label">Davis Vantage Vue — Farm Station</div>
+      <div class="readings-grid">
+        <div class="reading">
+          <div class="reading-label">Temperature</div>
+          <div class="reading-value" id="davisTemp">—<span class="unit">°C</span></div>
+          <div class="reading-sub" id="davisFeels">Feels like —</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Humidity</div>
+          <div class="reading-value" id="davisHum">—<span class="unit">%</span></div>
+          <div class="reading-sub" id="davisDew">Dew —</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Pressure</div>
+          <div class="reading-value" id="davisBar">—<span class="unit">hPa</span></div>
+          <div class="reading-sub" id="davisBarTrend">&nbsp;</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Wind</div>
+          <div class="reading-value" id="davisWind">—<span class="unit">km/h</span></div>
+          <div class="reading-sub" id="davisWindDir">—</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Rain Now</div>
+          <div class="reading-value" id="davisRainRate">—<span class="unit">mm/h</span></div>
+          <div class="reading-sub">&nbsp;</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Rain Today</div>
+          <div class="reading-value" id="davisRainDay">—<span class="unit">mm</span></div>
+          <div class="reading-sub">&nbsp;</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Last Reading</div>
+          <div class="reading-value" id="davisAge" style="font-size:1.1rem;">—</div>
+          <div class="reading-sub" id="davisLastTs">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Ensemble Conditions -->
+    <div class="card model-conditions">
+      <div class="card-label">Ensemble Model Average — 3 Models × 5 Grid Points</div>
+      <div class="readings-grid">
+        <div class="reading">
+          <div class="reading-label">Temperature</div>
+          <div class="reading-value" id="modelTemp">—<span class="unit">°C</span></div>
+          <div class="reading-sub" id="modelTempRange">Range: —</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Humidity</div>
+          <div class="reading-value" id="modelHum">—<span class="unit">%</span></div>
+          <div class="reading-sub" id="modelHumRange">Range: —</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">UV Index</div>
+          <div class="reading-value" id="modelUV">—</div>
+          <div class="reading-sub" id="modelUVDesc">&nbsp;</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Condition</div>
+          <div class="reading-value" id="modelCondEmoji" style="font-size:2.5rem;">—</div>
+          <div class="reading-sub" id="modelCondText">—</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Confidence</div>
+          <div class="reading-value c-accent" id="modelConfidence">—<span class="unit">%</span></div>
+          <div class="reading-sub">model agreement</div>
+        </div>
+        <div class="reading">
+          <div class="reading-label">Bias</div>
+          <div class="reading-value" id="modelBias">—<span class="unit">°C</span></div>
+          <div class="reading-sub">vs Davis station</div>
+        </div>
+      </div>
+      <div class="model-chips">
+        <div class="model-chip"><span class="chip-dot" style="background:var(--ecmwf)"></span> ECMWF</div>
+        <div class="model-chip"><span class="chip-dot" style="background:var(--gfs)"></span> GFS</div>
+        <div class="model-chip"><span class="chip-dot" style="background:var(--icon-m)"></span> ICON</div>
+      </div>
+    </div>
+
+  </div><!-- end dashboard-grid -->
+
+</div><!-- end above-fold -->
+
+<main class="content" style="padding-top:12px;">
+
+  <!-- ═══ Below the Fold: Secondary Grid ═══ -->
+  <div class="secondary-grid">
+
+    <!-- MetMalaysia Official Forecast -->
+    <div class="card met-today-card" id="metTodayCard">
+      <div class="card-label">MetMalaysia Official Forecast — Miri</div>
+      <div class="met-today-header">
+        <div class="met-today-temps">
+          <span class="met-temp-hi" id="metHiTemp">—</span>
+          <span class="met-temp-sep">/</span>
+          <span class="met-temp-lo" id="metLoTemp">—</span>
+        </div>
+        <div class="met-today-date" id="metForecastDate"></div>
+      </div>
+      <div class="met-forecast-grid" id="metForecastGrid">
+        <div class="met-period">
+          <div class="met-period-label">Morning</div>
+          <div class="met-period-icon" id="metMornIcon">—</div>
+          <div class="met-period-text" id="metMornText">—</div>
+        </div>
+        <div class="met-period">
+          <div class="met-period-label">Afternoon</div>
+          <div class="met-period-icon" id="metAftnIcon">—</div>
+          <div class="met-period-text" id="metAftnText">—</div>
+        </div>
+        <div class="met-period">
+          <div class="met-period-label">Night</div>
+          <div class="met-period-icon" id="metNightIcon">—</div>
+          <div class="met-period-text" id="metNightText">—</div>
+        </div>
+      </div>
+      <div class="card-source">
+        <span class="src-label">MetMalaysia API — Jabatan Meteorologi Malaysia</span>
+      </div>
+    </div>
+
+    <!-- Forecast 7-day / 24h -->
+    <div class="card forecast-card">
+      <div class="forecast-header">
+        <div class="card-label" style="margin-bottom:0">Forecast</div>
+        <div class="forecast-toggle">
+          <button class="active" id="btn7d" onclick="setForecastView('7d')">7 Day</button>
+          <button id="btn24h" onclick="setForecastView('24h')">24 Hour</button>
+        </div>
+      </div>
+      <div class="forecast-grid" id="forecastGrid"></div>
+      <div class="card-source">
+        <span class="src-dot" style="background:var(--ecmwf)"></span>
+        <span class="src-dot" style="background:var(--gfs)"></span>
+        <span class="src-dot" style="background:var(--icon-m)"></span>
+        <span class="src-label">ECMWF · GFS · ICON ensemble median × 5 grid points</span>
+      </div>
+    </div>
+
+  </div><!-- end secondary-grid -->
+
+  <!-- Radar + History side by side -->
+  <div class="secondary-grid">
+
+    <!-- Radar -->
+    <div class="card radar-card">
+      <div class="card-label">Rain Radar — Farm Area</div>
+      <div id="radarMap"></div>
+      <div class="radar-controls">
+        <button id="radarPlayBtn" onclick="toggleRadarPlay()">Play</button>
+        <input type="range" class="radar-slider" id="radarSlider" min="0" max="0" value="0" oninput="setRadarFrame(+this.value)">
+        <span class="radar-time" id="radarTimeLabel">—</span>
+      </div>
+      <div class="card-source">
+        <span class="src-label">RainViewer global radar mosaic · Updated every 10 min</span>
+      </div>
+    </div>
+
+    <!-- 24h History -->
+    <div class="card history-card">
+      <div class="card-label">24-Hour Station History</div>
+      <canvas class="history-canvas" id="historyCanvas"></canvas>
+      <div style="display:flex;gap:16px;margin-top:8px;justify-content:center;">
+        <div class="model-chip"><span class="chip-dot" style="background:var(--red)"></span> Temp °C</div>
+        <div class="model-chip"><span class="chip-dot" style="background:var(--cyan)"></span> Humidity %</div>
+        <div class="model-chip"><span class="chip-dot" style="background:var(--accent)"></span> Wind km/h</div>
+        <div class="model-chip"><span class="chip-dot" style="background:var(--green)"></span> Rain mm</div>
+      </div>
+      <div class="card-source">
+        <span class="src-dot" style="background:var(--davis)"></span>
+        <span class="src-label">Davis Vantage Vue via Supabase (15-min intervals)</span>
+      </div>
+    </div>
+
+  </div><!-- end secondary-grid -->
+
+</main>
+
+<footer class="app-footer">
+  TG Agro Fruits · Tukau, Miri, Sarawak · Data: ECMWF IFS, GFS NOAA, ICON DWD, MetMalaysia, Davis WeatherLink
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// PASSWORD GATE — session-based, re-prompts on browser restart
+// ═══════════════════════════════════════════════════════════════
+const TV_PASSWORD = "tgtukau892312";
+const SESSION_KEY = "tg_tv_auth";
+
+function checkPassword() {
+  const input = document.getElementById("pwInput");
+  const error = document.getElementById("pwError");
+  if (input.value === TV_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    document.getElementById("pwGate").style.display = "none";
+    document.getElementById("loadingOverlay").style.display = "flex";
+    init();
+    setInterval(init, CONFIG.refreshInterval);
+  } else {
+    error.textContent = "Incorrect password";
+    input.value = "";
+    input.focus();
+  }
+}
+
+document.getElementById("pwInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") checkPassword();
+});
+
+const tvAuthed = sessionStorage.getItem(SESSION_KEY) === "1";
+if (tvAuthed) {
+  document.getElementById("pwGate").style.display = "none";
+} else {
+  document.getElementById("loadingOverlay").style.display = "none";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Configuration
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+  center: { lat: 4.2723, lon: 113.9495 },
+  gridOffset: 0.09,
+  netlifyBase: '/.netlify/functions',
+  supabaseUrl: 'https://qwlagcriiyoflseduvvc.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA',
+  metToken: '31db1e47c66be6f654799689fc0c5cb10365e6f1',
+  metLocation: 'LOCATION:586',
+  refreshInterval: 5 * 60 * 1000,
+};
+
+const GRID_POINTS = [
+  { lat: CONFIG.center.lat, lon: CONFIG.center.lon, label: 'Center' },
+  { lat: CONFIG.center.lat + CONFIG.gridOffset, lon: CONFIG.center.lon, label: 'North' },
+  { lat: CONFIG.center.lat - CONFIG.gridOffset, lon: CONFIG.center.lon, label: 'South' },
+  { lat: CONFIG.center.lat, lon: CONFIG.center.lon + CONFIG.gridOffset, label: 'East' },
+  { lat: CONFIG.center.lat, lon: CONFIG.center.lon - CONFIG.gridOffset, label: 'West' },
+];
+
+const MODELS = [
+  { id: 'ecmwf', label: 'ECMWF', color: '#a78bfa', extra: '&models=ecmwf_ifs025' },
+  { id: 'gfs',   label: 'GFS',   color: '#38bdf8', extra: '&models=gfs_seamless' },
+  { id: 'icon',  label: 'ICON',  color: '#34d399', extra: '&models=icon_seamless' },
+];
+
+const OM_BASE = 'https://api.open-meteo.com';
+
+// ═══════════════════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════════════════
+const clean = a => a.filter(v => v != null && !isNaN(v));
+const median = a => {
+  const s = clean(a).sort((x, y) => x - y);
+  if (!s.length) return 0;
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const avg = a => { const s = clean(a); return s.length ? s.reduce((x, y) => x + y, 0) / s.length : 0; };
+const pct = (a, p) => { const s = clean(a).sort((x, y) => x - y); if (!s.length) return 0; return s[Math.min(Math.floor(p * s.length), s.length - 1)]; };
+const modeOf = arr => {
+  if (!arr.length) return 1;
+  const f = {}; arr.forEach(v => { f[v] = (f[v] || 0) + 1; });
+  return +Object.entries(f).sort((a, b) => b[1] - a[1])[0][0];
+};
+
+function wmo(code) {
+  if (code <= 1) return { t: 'Clear', e: '☀️' };
+  if (code <= 3) return { t: 'Partly Cloudy', e: '⛅' };
+  if (code <= 48) return { t: 'Overcast', e: '☁️' };
+  if (code <= 67) return { t: 'Rain', e: '🌧️' };
+  if (code <= 77) return { t: 'Sleet', e: '🌨️' };
+  if (code <= 82) return { t: 'Showers', e: '🌦️' };
+  return { t: 'Thunderstorm', e: '⛈️' };
+}
+
+function beaufort(kmh) {
+  if (kmh < 2) return 'Calm';
+  if (kmh < 6) return 'Light air';
+  if (kmh < 12) return 'Light breeze';
+  if (kmh < 20) return 'Gentle breeze';
+  if (kmh < 29) return 'Moderate';
+  if (kmh < 39) return 'Fresh breeze';
+  return 'Strong';
+}
+
+function dirLabel(d) {
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(d / 22.5) % 16];
+}
+
+function rainColor(pct) {
+  if (pct < 30) return 'var(--green)';
+  if (pct < 60) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() / 1000) - ts);
+  if (diff < 60) return `${diff} secs ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} mins ago`;
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return m > 0 ? `${h} hrs ${m} mins ago` : `${h} hrs ago`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Clock
+// ═══════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent = now.toLocaleString('en-MY', {
+    timeZone: 'Asia/Kuching', weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════════════════════
+// Data Fetching — Open-Meteo Ensemble
+// ═══════════════════════════════════════════════════════════════
+async function fetchModel(model, pt) {
+  const params = `latitude=${pt.lat}&longitude=${pt.lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max` +
+    `&hourly=precipitation,precipitation_probability,temperature_2m,weather_code,wind_speed_10m,uv_index` +
+    `&timezone=Asia/Kuching&forecast_days=7` + (model.extra || '');
+  const res = await fetch(`${OM_BASE}/v1/forecast?${params}`);
+  if (!res.ok) throw new Error(`${model.label} ${res.status}`);
+  return res.json();
+}
+
+async function fetchAllModels(setStatus) {
+  const results = [];
+  let done = 0;
+  const total = GRID_POINTS.length * MODELS.length;
+  const proms = [];
+  for (const pt of GRID_POINTS) {
+    for (const m of MODELS) {
+      proms.push(
+        fetchModel(m, pt)
+          .then(d => { done++; setStatus?.(`${done}/${total}`); results.push({ model: m.id, point: pt.label, data: d }); })
+          .catch(e => { done++; setStatus?.(`${done}/${total}`); console.warn(m.label, pt.label, e.message); })
+      );
+    }
+  }
+  await Promise.all(proms);
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Data Fetching — Davis via Netlify Proxy
+// ═══════════════════════════════════════════════════════════════
+async function fetchDavis() {
+  try {
+    const res = await fetch(`${CONFIG.netlifyBase}/davis-proxy`);
+    if (!res.ok) throw new Error(res.status);
+    return await res.json();
+  } catch (e) {
+    console.warn('Davis fetch failed:', e.message);
+    return null;
+  }
+}
+
+function parseDavis(data) {
+  if (!data) return null;
+
+  // Proxy returns pre-processed fields at top level
+  if (data.temp_c != null) {
+    const raw = data.raw;
+    const sensorData = raw?.sensors?.find(s => s.data?.[0]?.rainfall_day_clicks !== undefined)?.data?.[0];
+    return {
+      temp: data.temp_c,
+      hum: data.humidity,
+      wind: data.wind_speed_kmh,
+      windDir: data.wind_dir,
+      rainRate: data.rain_rate_mm,
+      rainDay: sensorData?.rainfall_day_mm ?? (sensorData?.rainfall_day_in != null ? Math.round(sensorData.rainfall_day_in * 25.4 * 10) / 10 : null),
+      bar: data.bar_hpa,
+      barTrend: data.bar_trend_hpa,
+      dew: data.dew_point_c,
+      feels: data.feels_like_c,
+      ts: data.ts,
+    };
+  }
+
+  // Fallback: raw API response with sensors array
+  if (!data.sensors) return null;
+  const r = { temp: null, hum: null, wind: null, windDir: null, rainRate: null, rainDay: null, bar: null, dew: null, feels: null, ts: null };
+  for (const sensor of data.sensors) {
+    if (!sensor.data?.length) continue;
+    const d = sensor.data[0];
+    if (d.temp != null) { r.temp = Math.round(((d.temp - 32) * 5 / 9) * 10) / 10; r.ts = d.ts; }
+    if (d.hum != null) r.hum = d.hum;
+    if (d.wind_speed_last != null) r.wind = Math.round(d.wind_speed_last * 1.60934 * 10) / 10;
+    if (d.wind_dir_last != null) r.windDir = d.wind_dir_last;
+    if (d.rain_rate_last != null) r.rainRate = Math.round(d.rain_rate_last * 25.4 * 10) / 10;
+    if (d.rain_day_in != null) r.rainDay = Math.round(d.rain_day_in * 25.4 * 10) / 10;
+    if (d.dew_point != null) r.dew = Math.round(((d.dew_point - 32) * 5 / 9) * 10) / 10;
+    if (d.heat_index != null) r.feels = Math.round(((d.heat_index - 32) * 5 / 9) * 10) / 10;
+    if (d.bar_sea_level != null) r.bar = Math.round(d.bar_sea_level * 33.8639 * 10) / 10;
+  }
+  return r.temp != null ? r : null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Data Fetching — MetMalaysia
+// ═══════════════════════════════════════════════════════════════
+async function fetchMetMalaysia() {
+  try {
+    const url = `/.netlify/functions/met-proxy?action=forecast&locationid=${CONFIG.metLocation}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    return await res.json();
+  } catch (e) {
+    console.warn('MetMalaysia:', e.message);
+    return null;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// Data Fetching — Supabase History
+// ═══════════════════════════════════════════════════════════════
+async function fetchHistory24h() {
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const url = `${CONFIG.supabaseUrl}/rest/v1/station_readings?select=ts,temp_c,humidity,wind_speed_kmh,rain_rate_mm&ts=gte.${since}&order=ts.asc&limit=200`;
+    const res = await fetch(url, {
+      headers: { 'apikey': CONFIG.supabaseAnonKey, 'Authorization': `Bearer ${CONFIG.supabaseAnonKey}` }
+    });
+    if (!res.ok) throw new Error(res.status);
+    return await res.json();
+  } catch (e) {
+    console.warn('History fetch:', e.message);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Analysis
+// ═══════════════════════════════════════════════════════════════
+function analyze(results) {
+  const cur = { temps: [], feels: [], hum: [], wind: [], windDir: [], codes: [] };
+  // Track per-model temperatures for true model agreement
+  const perModel = { ecmwf: [], gfs: [], icon: [] };
+  const daily = { max: [], min: [], uv: [], rp: [], rs: [], codes: [], sunrise: null, sunset: null };
+  const allHP = {}, allHProb = {}, allHTemp = {}, allHWind = {}, allHUV = {};
+  for (let d = 0; d < 7; d++) { daily.max[d] = []; daily.min[d] = []; daily.uv[d] = []; daily.rp[d] = []; daily.rs[d] = []; daily.codes[d] = []; }
+
+  results.forEach(r => {
+    const c = r.data.current, dy = r.data.daily, hr = r.data.hourly;
+    if (c) {
+      if (c.temperature_2m != null) {
+        cur.temps.push(c.temperature_2m);
+        if (perModel[r.model]) perModel[r.model].push(c.temperature_2m);
+      }
+      if (c.apparent_temperature != null) cur.feels.push(c.apparent_temperature);
+      if (c.relative_humidity_2m != null) cur.hum.push(c.relative_humidity_2m);
+      if (c.wind_speed_10m != null) cur.wind.push(c.wind_speed_10m);
+      if (c.wind_direction_10m != null) cur.windDir.push(c.wind_direction_10m);
+      if (c.weather_code != null) cur.codes.push(c.weather_code);
+    }
+    if (dy?.time) {
+      if (!daily.sunrise && dy.sunrise?.[0]) daily.sunrise = dy.sunrise[0];
+      if (!daily.sunset && dy.sunset?.[0]) daily.sunset = dy.sunset[0];
+      for (let d = 0; d < Math.min(7, dy.time.length); d++) {
+        if (dy.temperature_2m_max?.[d] != null) daily.max[d].push(dy.temperature_2m_max[d]);
+        if (dy.temperature_2m_min?.[d] != null) daily.min[d].push(dy.temperature_2m_min[d]);
+        if (dy.uv_index_max?.[d] != null) daily.uv[d].push(dy.uv_index_max[d]);
+        if (dy.precipitation_probability_max?.[d] != null) daily.rp[d].push(dy.precipitation_probability_max[d]);
+        if (dy.precipitation_sum?.[d] != null) daily.rs[d].push(dy.precipitation_sum[d]);
+        if (dy.weather_code?.[d] != null) daily.codes[d].push(dy.weather_code[d]);
+      }
+    }
+    if (hr?.time) {
+      hr.time.forEach((t, i) => {
+        if (!allHP[t]) allHP[t] = [];
+        if (!allHProb[t]) allHProb[t] = [];
+        if (!allHTemp[t]) allHTemp[t] = [];
+        if (!allHWind[t]) allHWind[t] = [];
+        if (!allHUV[t]) allHUV[t] = [];
+        allHP[t].push(hr.precipitation?.[i] || 0);
+        allHProb[t].push(hr.precipitation_probability?.[i] || 0);
+        if (hr.temperature_2m?.[i] != null) allHTemp[t].push(hr.temperature_2m[i]);
+        if (hr.wind_speed_10m?.[i] != null) allHWind[t].push(hr.wind_speed_10m[i]);
+        if (hr.uv_index?.[i] != null) allHUV[t].push(hr.uv_index[i]);
+      });
+    }
+  });
+
+  return { cur, perModel, daily, allHP, allHProb, allHTemp, allHWind, allHUV };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Rendering
+// ═══════════════════════════════════════════════════════════════
+let cachedAnalysis = null;
+let forecastView = '7d';
+
+function render(a, davis, radarPoint) {
+  cachedAnalysis = a;
+
+  // ── Rain probability (next 4 hours) ──
+  const now = new Date();
+  const hourKeys = Object.keys(a.allHProb).sort();
+  const currentIdx = hourKeys.findIndex(t => new Date(t) >= now);
+  const next4 = [];
+  for (let i = 0; i < 4; i++) {
+    const idx = currentIdx + i;
+    if (idx >= 0 && idx < hourKeys.length) {
+      const key = hourKeys[idx];
+      next4.push({
+        time: new Date(key),
+        prob: median(a.allHProb[key]),
+        mm: median(a.allHP[key]),
+      });
+    }
+  }
+
+  const maxProb = next4.length ? Math.max(...next4.map(h => h.prob)) : 0;
+  document.getElementById('rainPctBig').textContent = Math.round(maxProb) + '%';
+  document.getElementById('rainPctBig').style.color = rainColor(maxProb);
+
+  // Gauge removed — SVG hidden, percentage number is sufficient
+
+  // Hour blocks — visual-first design for farm workers
+  // Classification combines probability AND amount for accurate intensity labelling
+  const grid = document.getElementById('rainHoursGrid');
+  grid.innerHTML = next4.map((h, i) => {
+    const p = Math.round(h.prob);
+    const mm = h.mm;
+    let icon, label, bg, textCol;
+    if (p < 20 && mm < 0.5) {
+      icon = '☀️'; label = 'DRY';
+      bg = 'var(--green-dim)'; textCol = 'var(--green)';
+    } else if (p < 50 && mm < 1) {
+      icon = '🌤️'; label = 'LOW';
+      bg = 'var(--green-dim)'; textCol = 'var(--green)';
+    } else if ((p >= 70 && mm > 3) || mm > 5) {
+      icon = mm > 5 ? '⛈️' : '🌧️'; label = 'HEAVY';
+      bg = 'var(--red-dim)'; textCol = 'var(--red)';
+    } else if (p > 60 && mm > 1) {
+      icon = mm > 2 ? '🌧️' : '🌦️'; label = 'LIKELY';
+      bg = 'var(--amber-dim)'; textCol = 'var(--amber)';
+    } else {
+      icon = '🌥️'; label = 'MODERATE';
+      bg = 'var(--amber-dim)'; textCol = 'var(--amber)';
+    }
+    return `
+    <div class="rain-hour-block" style="background:${bg};border-top-color:${textCol}">
+      <div class="rain-hour-time">+${i + 1}h · ${h.time.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuching' })}</div>
+      <div class="rain-hour-label" style="color:${textCol}">${label}</div>
+      <div class="rain-hour-icon">${icon}</div>
+      <div class="rain-hour-detail">${p}%</div>
+      <div class="rain-hour-detail">${h.mm.toFixed(1)} mm</div>
+    </div>`;
+  }).join('');
+
+  // ── Model conditions ──
+  const mTemp = median(a.cur.temps);
+  const mHum = median(a.cur.hum);
+  const mWind = median(a.cur.wind);
+  const mWindDir = median(a.cur.windDir);
+  const mCond = wmo(modeOf(a.cur.codes));
+  // Use current hour's UV index instead of daily max
+  const uvKeys = Object.keys(a.allHUV).sort();
+  const uvIdx = uvKeys.findIndex(t => new Date(t) >= now);
+  const uvKey = uvIdx >= 0 ? uvKeys[uvIdx] : null;
+  const mUV = uvKey && a.allHUV[uvKey]?.length ? median(a.allHUV[uvKey]) : 0;
+
+  document.getElementById('modelTemp').innerHTML = `${mTemp.toFixed(1)}<span class="unit">°C</span>`;
+  document.getElementById('modelTempRange').textContent = `Range: ${pct(a.cur.temps, 0.1).toFixed(1)}–${pct(a.cur.temps, 0.9).toFixed(1)}°C`;
+  document.getElementById('modelHum').innerHTML = `${Math.round(mHum)}<span class="unit">%</span>`;
+  document.getElementById('modelHumRange').textContent = `Range: ${Math.round(pct(a.cur.hum, 0.1))}–${Math.round(pct(a.cur.hum, 0.9))}%`;
+  document.getElementById('modelCondEmoji').textContent = mCond.e;
+  document.getElementById('modelCondText').textContent = mCond.t;
+
+  if (mUV != null) {
+    document.getElementById('modelUV').textContent = mUV.toFixed(1);
+    const uvDesc = mUV < 3 ? 'Low' : mUV < 6 ? 'Moderate' : mUV < 8 ? 'High' : 'Very High';
+    document.getElementById('modelUVDesc').textContent = uvDesc;
+  }
+
+  // Confidence: how tightly the 3 models agree (compare model averages, not grid points)
+  // Scale: 0°C spread = 100%, 1°C = 80%, 2°C = 60%, 5°C = 0%
+  const modelAvgs = ['ecmwf', 'gfs', 'icon']
+    .map(m => a.perModel[m]?.length ? avg(a.perModel[m]) : null)
+    .filter(v => v != null);
+  const modelSpread = modelAvgs.length >= 2
+    ? Math.max(...modelAvgs) - Math.min(...modelAvgs)
+    : 5;
+  const confidence = Math.max(0, Math.min(100, Math.round(100 - modelSpread * 20)));
+  document.getElementById('modelConfidence').innerHTML = `${confidence}<span class="unit">%</span>`;
+
+  // Bias vs Davis
+  if (davis && davis.temp != null) {
+    const bias = davis.temp - mTemp;
+    const biasEl = document.getElementById('modelBias');
+    biasEl.innerHTML = `${bias > 0 ? '+' : ''}${bias.toFixed(1)}<span class="unit">°C</span>`;
+    biasEl.style.color = Math.abs(bias) > 2 ? 'var(--amber)' : 'var(--green)';
+  }
+
+  // ── Davis station ──
+  if (davis) {
+    document.getElementById('davisTemp').innerHTML = `${davis.temp.toFixed(1)}<span class="unit">°C</span>`;
+    document.getElementById('davisFeels').textContent = davis.feels != null ? `Feels like ${davis.feels.toFixed(1)}°C` : '';
+    document.getElementById('davisHum').innerHTML = `${Math.round(davis.hum)}<span class="unit">%</span>`;
+    document.getElementById('davisDew').textContent = davis.dew != null ? `Dew ${davis.dew.toFixed(1)}°C` : '';
+    document.getElementById('davisBar').innerHTML = davis.bar != null ? `${davis.bar.toFixed(0)}<span class="unit">hPa</span>` : '—';
+    if (davis.barTrend != null) {
+      const t = davis.barTrend;
+      const arrow = t > 0.5 ? '↑ Rising' : t < -0.5 ? '↓ Falling' : '→ Steady';
+      const color = t < -1 ? 'var(--red)' : t < -0.5 ? 'var(--amber)' : 'var(--text-dim)';
+      document.getElementById('davisBarTrend').innerHTML = `<span style="color:${color}">${arrow} (${t > 0 ? '+' : ''}${t.toFixed(1)} hPa/3h)</span>`;
+    }
+    document.getElementById('davisWind').innerHTML = `${davis.wind.toFixed(1)}<span class="unit">km/h</span>`;
+    document.getElementById('davisWindDir').textContent = davis.windDir != null ? dirLabel(davis.windDir) + ` (${davis.windDir}°)` : '';
+    document.getElementById('davisRainRate').innerHTML = `${davis.rainRate != null ? davis.rainRate.toFixed(1) : '0.0'}<span class="unit">mm/h</span>`;
+    document.getElementById('davisRainDay').innerHTML = `${davis.rainDay != null ? davis.rainDay.toFixed(1) : '0.0'}<span class="unit">mm</span>`;
+    document.getElementById('davisAge').textContent = davis.ts ? timeAgo(davis.ts) : '—';
+    // Freshness indicator — green (<15min), amber (15-30min), red (>30min)
+    const ageMins = davis.ts ? (Date.now() / 1000 - davis.ts) / 60 : Infinity;
+    const freshColor = ageMins < 15 ? 'var(--green)' : ageMins < 30 ? 'var(--amber)' : 'var(--red)';
+    const freshLabel = ageMins < 15 ? 'LIVE' : ageMins < 30 ? 'DELAYED' : 'STALE';
+    document.getElementById('davisStatusDot').style.background = freshColor;
+    document.querySelector('.davis-badge').style.borderColor = freshColor;
+    document.querySelector('.davis-badge').style.color = freshColor;
+    document.getElementById('davisBadgeDot').style.background = freshColor;
+    document.getElementById('davisBadgeText').textContent = freshLabel;
+  } else {
+    document.getElementById('davisStatusDot').style.background = 'var(--red)';
+    document.getElementById('davisBadgeDot').style.background = 'var(--red)';
+    document.getElementById('davisBadgeText').textContent = 'OFFLINE';
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SPRAY ADVISORY — Layered decision system
+  //
+  // Priority 1: Davis rain rate (ground truth — is it raining NOW?)
+  // Priority 2: Radar cross-check (is rain overhead/nearby?)
+  // Priority 3: Model ensemble (2-4h rainfast forecast window)
+  // Priority 4: Absorption conditions (temp, humidity)
+  // Priority 5: Context (pressure trend)
+  // ══════════════════════════════════════════════════════════════
+  const sprayEl = document.getElementById('sprayIndicator');
+  const sprayVerdict = document.getElementById('sprayVerdict');
+  const sprayDetail = document.getElementById('sprayDetail');
+  const cls = s => s === 0 ? 'ok' : s === 1 ? 'warn' : 'bad';
+  const factorCards = [];
+  let sprayLevel = 0; // 0=good, 1=caution, 2=nogo
+
+  // ── Priority 1: Davis rain rate (is it raining at the farm?) ──
+  const davisRainRate = davis?.rainRate ?? null;
+  let davisRainScore = 0;
+  if (davisRainRate != null) {
+    if (davisRainRate > 0.5) davisRainScore = 2;       // actively raining
+    else if (davisRainRate > 0) davisRainScore = 1;     // drizzle / trace
+  }
+  if (davisRainRate != null) {
+    const drNote = davisRainScore === 2 ? 'Raining now' : davisRainScore === 1 ? 'Light drizzle' : 'Dry';
+    factorCards.push({ label: 'Station', value: `${davisRainRate.toFixed(1)} mm/h`, note: drNote, score: davisRainScore });
+  }
+  if (davisRainScore === 2) sprayLevel = 2;
+  else if (davisRainScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+
+  // ── Priority 2: Radar cross-check (is rain overhead that Davis may miss?) ──
+  let radarScore = 0;
+  if (radarPoint) {
+    if (radarPoint.raining) {
+      radarScore = radarPoint.intensity >= 2 ? 2 : 1;  // moderate/heavy = nogo, light = caution
+    }
+    const rNote = !radarPoint.raining ? 'Clear' :
+      radarPoint.intensityLabel + ' rain detected';
+    factorCards.push({ label: 'Radar', value: radarPoint.raining ? radarPoint.intensityLabel : 'Clear', note: rNote, score: radarScore });
+  }
+  if (radarScore === 2) sprayLevel = 2;
+  else if (radarScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+
+  // ── Priority 3: Model ensemble forecast (2-4h rainfast window) ──
+  const rain2h = next4.slice(0, 2).reduce((s, h) => s + h.mm, 0);
+  const rain4h = next4.reduce((s, h) => s + h.mm, 0);
+  let forecastScore;
+  if (rain2h < 0.5 && rain4h < 2) {
+    forecastScore = 0; // negligible, safe rainfast window
+  } else if (rain2h < 2 && rain4h < 5) {
+    forecastScore = 1; // moderate risk
+  } else {
+    forecastScore = 2; // heavy rain expected
+  }
+  const fcNote = forecastScore === 0 ? 'Safe rainfast window' : forecastScore === 1 ? 'May wash off' : 'Will wash off';
+  factorCards.push({ label: 'Forecast', value: `${rain2h.toFixed(1)}mm/2h · ${rain4h.toFixed(1)}mm/4h`, note: fcNote, score: forecastScore });
+  if (forecastScore === 2) sprayLevel = 2;
+  else if (forecastScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+
+  // ── Priority 4: Absorption conditions (temp, humidity) ──
+  const sprayTemp = davis?.temp ?? mTemp;
+  const sprayHum = davis?.hum ?? mHum;
+
+  let tempScore;
+  if (sprayTemp >= 18 && sprayTemp <= 35) tempScore = 0;
+  else if (sprayTemp >= 15 && sprayTemp <= 38) tempScore = 1;
+  else tempScore = 2;
+  const tempNote = tempScore === 0 ? 'Good uptake' : tempScore === 1 ? 'Slower uptake' : (sprayTemp < 18 ? 'Too cool' : 'Too hot');
+  factorCards.push({ label: 'Temp', value: `${sprayTemp.toFixed(1)}°C`, note: tempNote, score: tempScore });
+  if (tempScore === 2) sprayLevel = 2;
+  else if (tempScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+
+  let humScore;
+  if (sprayHum >= 50) humScore = 0;
+  else if (sprayHum >= 40) humScore = 1;
+  else humScore = 2;
+  const humNote = humScore === 0 ? 'Droplets persist' : humScore === 1 ? 'Faster evaporation' : 'Spray evaporates';
+  factorCards.push({ label: 'Humidity', value: `${Math.round(sprayHum)}%`, note: humNote, score: humScore });
+  if (humScore === 2) sprayLevel = 2;
+  else if (humScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+
+  // ── Priority 5: Context — pressure trend (supplementary, caps at caution) ──
+  const barTrend = davis?.barTrend ?? null;
+  let pressureScore = 0;
+  if (barTrend != null) {
+    if (barTrend < -0.5) pressureScore = 1;
+    const pNote = pressureScore === 1 ? 'Falling' : 'Stable';
+    factorCards.push({ label: 'Pressure', value: `${barTrend > 0 ? '+' : ''}${barTrend.toFixed(1)} hPa/3h`, note: pNote, score: pressureScore });
+    if (pressureScore === 1) sprayLevel = Math.max(sprayLevel, 1);
+  }
+
+  // ── Verdict with spray icons (PNG) ──
+  const sprayImg = (src) => `<img src="${src}" width="64" height="64" alt="Spray advisory" style="object-fit:contain;">`;
+  if (sprayLevel === 0) {
+    sprayEl.className = 'spray-indicator go';
+    sprayEl.innerHTML = sprayImg('spray-go.png');
+    sprayVerdict.textContent = 'Good to Spray';
+    sprayVerdict.style.color = 'var(--green)';
+  } else if (sprayLevel === 1) {
+    sprayEl.className = 'spray-indicator caution';
+    sprayEl.innerHTML = sprayImg('spray-caution.png');
+    sprayVerdict.textContent = 'Caution — Spray With Care';
+    sprayVerdict.style.color = 'var(--amber)';
+  } else {
+    sprayEl.className = 'spray-indicator nogo';
+    sprayEl.innerHTML = sprayImg('spray-nogo.png');
+    sprayVerdict.textContent = 'Do Not Spray';
+    sprayVerdict.style.color = 'var(--red)';
+  }
+
+  // Render factor grid
+  sprayDetail.innerHTML = '<div class="spray-factors">' + factorCards.map(f =>
+    `<div class="spray-factor ${cls(f.score)}">
+      <div class="spray-factor-label">${f.label}</div>
+      <div class="spray-factor-value">${f.value}</div>
+      <div class="spray-factor-note">${f.note}</div>
+    </div>`
+  ).join('') + '</div>';
+
+  // Update spray source tag
+  const spraySource = document.getElementById('spraySource');
+  if (spraySource) {
+    const sources = [];
+    if (davis) sources.push('Davis station');
+    if (radarPoint) sources.push('RainViewer radar');
+    sources.push('ECMWF', 'GFS', 'ICON');
+    spraySource.innerHTML = '<span class="src-label">Source: ' + sources.join(' · ') + '</span>';
+  }
+
+  // ── Forecast ──
+  renderForecast(a);
+}
+
+function renderForecast(a) {
+  const grid = document.getElementById('forecastGrid');
+
+  if (forecastView === '7d') {
+    grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+    const days = [];
+    const now = new Date();
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(now);
+      date.setDate(date.getDate() + d);
+      const dayName = d === 0 ? 'Today' : date.toLocaleDateString('en-MY', { weekday: 'short', timeZone: 'Asia/Kuching' });
+      const hi = a.daily.max[d]?.length ? median(a.daily.max[d]) : null;
+      const lo = a.daily.min[d]?.length ? median(a.daily.min[d]) : null;
+      const rp = a.daily.rp[d]?.length ? Math.round(median(a.daily.rp[d])) : 0;
+      const code = a.daily.codes[d]?.length ? modeOf(a.daily.codes[d]) : 1;
+      const cond = wmo(code);
+      days.push(`
+        <div class="forecast-day">
+          <div class="fc-day-name">${dayName}</div>
+          <div class="fc-emoji">${cond.e}</div>
+          <div class="fc-temps">${hi != null ? hi.toFixed(0) : '—'}° <span class="lo">${lo != null ? lo.toFixed(0) : '—'}°</span></div>
+          <div class="fc-rain">🌧 ${rp}%</div>
+        </div>
+      `);
+    }
+    grid.innerHTML = days.join('');
+  } else {
+    // 24-hour view
+    const hourKeys = Object.keys(a.allHTemp).sort();
+    const now = new Date();
+    const next24 = hourKeys.filter(t => {
+      const d = new Date(t);
+      return d >= now && d <= new Date(now.getTime() + 24 * 3600 * 1000);
+    }).slice(0, 24);
+
+    // Show every 3 hours
+    const shown = next24.filter((_, i) => i % 3 === 0);
+    grid.style.gridTemplateColumns = `repeat(${shown.length}, 1fr)`;
+    grid.innerHTML = shown.map(key => {
+      const time = new Date(key);
+      const temp = median(a.allHTemp[key]);
+      const prob = median(a.allHProb[key]);
+      const wind = a.allHWind[key]?.length ? median(a.allHWind[key]) : null;
+      return `
+        <div class="forecast-day">
+          <div class="fc-day-name">${time.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuching' })}</div>
+          <div class="fc-temps">${temp.toFixed(1)}°C</div>
+          <div class="fc-rain">🌧 ${Math.round(prob)}%</div>
+          ${wind != null ? `<div class="fc-rain" style="color:var(--text-dim)">💨 ${wind.toFixed(0)}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function setForecastView(view) {
+  forecastView = view;
+  document.getElementById('btn7d').className = view === '7d' ? 'active' : '';
+  document.getElementById('btn24h').className = view === '24h' ? 'active' : '';
+  if (cachedAnalysis) renderForecast(cachedAnalysis);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Radar Toggle
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// Radar Point Detection (RainViewer tile → pixel → rain intensity)
+// ═══════════════════════════════════════════════════════════════
+async function fetchRadarAtFarm() {
+  // Fetch latest RainViewer frame and read the pixel at farm coordinates
+  try {
+    const mapRes = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const mapData = await mapRes.json();
+    const past = mapData.radar?.past || [];
+    if (!past.length) return { raining: false, intensity: 0, source: 'radar', time: null };
+    const latest = past[past.length - 1];
+
+    // Fetch coordinate-based tile at zoom 7 (good balance of coverage and precision)
+    const tileUrl = `https://tilecache.rainviewer.com${latest.path}/256/7/${CONFIG.center.lat}/${CONFIG.center.lon}/6/1_1.png`;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        // Sample center pixel (128,128) and a small area around it
+        const samples = [[128,128],[124,124],[132,132],[128,120],[128,136]];
+        let maxAlpha = 0;
+        let maxR = 0, maxG = 0, maxB = 0;
+        for (const [x, y] of samples) {
+          const px = ctx.getImageData(x, y, 1, 1).data;
+          if (px[3] > maxAlpha) {
+            maxAlpha = px[3];
+            maxR = px[0]; maxG = px[1]; maxB = px[2];
+          }
+        }
+        // Alpha > 0 means precipitation detected
+        // Estimate intensity from alpha and color:
+        //   dBZ < 0: transparent (no rain)
+        //   dBZ 0-20: light (cyan/blue tones)
+        //   dBZ 20-40: moderate (green/yellow)
+        //   dBZ 40+: heavy (orange/red)
+        let intensity = 0; // 0=none, 1=light, 2=moderate, 3=heavy
+        if (maxAlpha > 10) {
+          intensity = 1; // light
+          if (maxR > 200 && maxG > 200) intensity = 2; // yellow = moderate
+          if (maxR > 200 && maxG < 100) intensity = 3; // red = heavy
+        }
+        resolve({
+          raining: maxAlpha > 10,
+          intensity,
+          intensityLabel: ['None', 'Light', 'Moderate', 'Heavy'][intensity],
+          alpha: maxAlpha,
+          time: new Date(latest.time * 1000),
+        });
+      };
+      img.onerror = () => resolve({ raining: false, intensity: 0, time: null });
+      img.src = tileUrl;
+    });
+  } catch (e) {
+    console.warn('Radar point detection:', e.message);
+    return { raining: false, intensity: 0, time: null };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Radar Map (Leaflet + RainViewer)
+// ═══════════════════════════════════════════════════════════════
+let radarMap, radarLayer, radarFrames = [], radarIdx = 0, radarPlaying = false, radarTimer = null;
+
+function initRadarMap() {
+  radarMap = L.map('radarMap', {
+    center: [CONFIG.center.lat, CONFIG.center.lon],
+    zoom: 7,
+    zoomControl: true,
+    attributionControl: false,
+    minZoom: 5,
+    maxZoom: 10,
+  });
+
+  // Dark map tiles
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 10,
+    subdomains: 'abcd',
+  }).addTo(radarMap);
+
+  // Farm marker
+  const farmIcon = L.divIcon({
+    html: '<div style="width:12px;height:12px;background:var(--amber);border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(245,158,11,0.6);"></div>',
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+    className: '',
+  });
+  L.marker([CONFIG.center.lat, CONFIG.center.lon], { icon: farmIcon })
+    .addTo(radarMap)
+    .bindTooltip('TG Farm', { permanent: true, direction: 'right', offset: [8, 0],
+      className: 'farm-tooltip' });
+
+  loadRadarFrames();
+}
+
+async function loadRadarFrames() {
+  try {
+    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+    const data = await res.json();
+    radarFrames = [...(data.radar?.past || []), ...(data.radar?.nowcast || [])];
+    const slider = document.getElementById('radarSlider');
+    slider.max = radarFrames.length - 1;
+    slider.value = radarFrames.length - 1;
+    radarIdx = radarFrames.length - 1;
+    setRadarFrame(radarIdx);
+  } catch (e) {
+    console.warn('RainViewer:', e.message);
+  }
+}
+
+function setRadarFrame(idx) {
+  radarIdx = idx;
+  if (!radarFrames.length || !radarMap) return;
+  const frame = radarFrames[idx];
+
+  if (radarLayer) radarMap.removeLayer(radarLayer);
+  radarLayer = L.tileLayer(
+    `https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/6/1_1.png`,
+    { opacity: 0.7, maxZoom: 10 }
+  ).addTo(radarMap);
+
+  document.getElementById('radarSlider').value = idx;
+
+  // Show timestamp
+  const d = new Date(frame.time * 1000);
+  const isPast = idx < radarFrames.length - (radarFrames.filter(f => f.time > Date.now() / 1000).length || 0);
+  const prefix = frame.time > Date.now() / 1000 ? 'Forecast' : 'Radar';
+  document.getElementById('radarTimeLabel').textContent =
+    `${prefix} · ${d.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuching' })}`;
+}
+
+function toggleRadarPlay() {
+  radarPlaying = !radarPlaying;
+  const btn = document.getElementById('radarPlayBtn');
+  if (radarPlaying) {
+    btn.textContent = 'Pause';
+    btn.classList.add('active');
+    radarTimer = setInterval(() => {
+      radarIdx = (radarIdx + 1) % radarFrames.length;
+      setRadarFrame(radarIdx);
+    }, 700);
+  } else {
+    btn.textContent = 'Play';
+    btn.classList.remove('active');
+    clearInterval(radarTimer);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MetMalaysia Rendering
+// ═══════════════════════════════════════════════════════════════
+function metWeatherIcon(text) {
+  if (!text) return '—';
+  const t = text.toLowerCase();
+  if (t.includes('thunderstorm')) return '⛈️';
+  if (t.includes('heavy rain')) return '🌧️';
+  if (t.includes('rain')) return '🌦️';
+  if (t.includes('cloudy')) return '☁️';
+  if (t.includes('haze')) return '🌫️';
+  if (t.includes('fair')) return '🌤️';
+  return '🌥️';
+}
+
+function renderMetMalaysia(metData) {
+  if (!metData?.results) return;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kuching' });
+  let todayResults = metData.results.filter(r => r.date?.startsWith(today));
+  // If no results for today, fall back to earliest available date
+  if (!todayResults.length && metData.results.length) {
+    const earliest = metData.results[0].date?.split('T')[0];
+    if (earliest) todayResults = metData.results.filter(r => r.date?.startsWith(earliest));
+  }
+
+  let morning = null, afternoon = null, night = null, sigWeather = null, maxT = null, minT = null;
+  todayResults.forEach(r => {
+    if (r.datatype === 'FGM' && r.value) morning = r.value;
+    if (r.datatype === 'FGA' && r.value) afternoon = r.value;
+    if (r.datatype === 'FGN' && r.value) night = r.value;
+    if (r.datatype === 'FSIGW' && r.value) sigWeather = r.value;
+    if (r.datatype === 'FMAXT' && r.value) maxT = parseFloat(r.value);
+    if (r.datatype === 'FMINT' && r.value) minT = parseFloat(r.value);
+  });
+
+  // Date display — show actual forecast date (may be tomorrow if today's expired)
+  const forecastDate = todayResults[0]?.date ? new Date(todayResults[0].date) : new Date();
+  document.getElementById('metForecastDate').textContent = forecastDate.toLocaleDateString('en-MY', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kuching'
+  });
+
+  // Temps
+  if (maxT != null) document.getElementById('metHiTemp').textContent = maxT.toFixed(0) + '°C';
+  if (minT != null) document.getElementById('metLoTemp').textContent = minT.toFixed(0) + '°C';
+
+  if (morning) {
+    document.getElementById('metMornIcon').textContent = metWeatherIcon(morning);
+    document.getElementById('metMornText').textContent = morning;
+  }
+  if (afternoon) {
+    document.getElementById('metAftnIcon').textContent = metWeatherIcon(afternoon);
+    document.getElementById('metAftnText').textContent = afternoon;
+  }
+  if (night) {
+    document.getElementById('metNightIcon').textContent = metWeatherIcon(night);
+    document.getElementById('metNightText').textContent = night;
+  }
+
+  // Show FSIGW as warning banner
+  if (sigWeather) {
+    const banner = document.getElementById('metWarningBanner');
+    const textEl = document.getElementById('metWarningText');
+    banner.classList.add('active');
+    textEl.textContent = `MetMalaysia: ${sigWeather}`;
+    // Blink if rain/storm keywords detected
+    const sw = sigWeather.toLowerCase();
+    if (sw.includes('rain') || sw.includes('hujan') || sw.includes('thunderstorm') || sw.includes('ribut') || sw.includes('storm')) {
+      banner.classList.add('blink');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 24h History Chart (Canvas)
+// ═══════════════════════════════════════════════════════════════
+function renderHistory(data) {
+  const canvas = document.getElementById('historyCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  if (!data || data.length < 2) {
+    ctx.fillStyle = '#5a6a7a';
+    ctx.font = '14px IBM Plex Sans';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for station history data…', W / 2, H / 2);
+    return;
+  }
+
+  const pad = { top: 20, right: 20, bottom: 30, left: 45 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  // Extract series
+  const times = data.map(d => new Date(d.ts));
+  const temps = data.map(d => d.temp_c);
+  const hums = data.map(d => d.humidity);
+  const winds = data.map(d => d.wind_speed_kmh);
+  const rains = data.map(d => d.rain_rate_mm);
+
+  const tMin = times[0].getTime(), tMax = times[times.length - 1].getTime();
+  const tRange = tMax - tMin || 1;
+
+  function drawLine(arr, color, yMin, yMax) {
+    const range = yMax - yMin || 1;
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    let started = false;
+    arr.forEach((v, i) => {
+      if (v == null) return;
+      const x = pad.left + ((times[i].getTime() - tMin) / tRange) * cW;
+      const y = pad.top + cH - ((v - yMin) / range) * cH;
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  // Background
+  ctx.fillStyle = '#1a2332';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#1e2d3d';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (cH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+  }
+
+  // Time labels
+  ctx.fillStyle = '#5a6a7a';
+  ctx.font = '11px IBM Plex Sans';
+  ctx.textAlign = 'center';
+  const labelCount = Math.min(8, data.length);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = Math.floor(i * (data.length - 1) / (labelCount - 1));
+    const x = pad.left + ((times[idx].getTime() - tMin) / tRange) * cW;
+    ctx.fillText(times[idx].toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuching' }), x, H - 8);
+  }
+
+  // Y-axis label
+  ctx.save();
+  ctx.fillStyle = '#5a6a7a';
+  ctx.font = '10px IBM Plex Sans';
+  ctx.textAlign = 'center';
+  ctx.translate(12, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Temp °C / Hum % / Wind km/h', 0, 0);
+  ctx.restore();
+
+  // Draw series
+  const allVals = [...clean(temps), ...clean(hums), ...clean(winds)];
+  const yMin = Math.min(...allVals) - 2;
+  const yMax = Math.max(...allVals) + 2;
+
+  drawLine(temps, '#ef4444', yMin, yMax);
+  drawLine(hums, '#06b6d4', yMin, yMax);
+  drawLine(winds, '#3b82f6', yMin, yMax);
+
+  // Rain as bars (separate scale)
+  const rainMax = Math.max(...clean(rains), 1);
+  rains.forEach((v, i) => {
+    if (v == null || v <= 0) return;
+    const x = pad.left + ((times[i].getTime() - tMin) / tRange) * cW;
+    const barH = (v / rainMax) * cH * 0.3;
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.5)';
+    ctx.fillRect(x - 2, pad.top + cH - barH, 4, barH);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main Init
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  const overlay = document.getElementById('loadingOverlay');
+  const statusEl = document.getElementById('loadStatus');
+
+  try {
+    // Fetch all data in parallel
+    statusEl.textContent = 'Fetching weather models…';
+    const [results, davisRaw, metData, history, radarPoint] = await Promise.all([
+      fetchAllModels(s => statusEl.textContent = `Models: ${s}`),
+      fetchDavis(),
+      fetchMetMalaysia(),
+      fetchHistory24h(),
+      fetchRadarAtFarm(),
+    ]);
+
+    statusEl.textContent = 'Processing data…';
+    const analysis = analyze(results);
+    const davis = parseDavis(davisRaw);
+
+    // Render everything
+    render(analysis, davis, radarPoint);
+    renderMetMalaysia(metData);
+    renderHistory(history);
+    if (!radarMap) initRadarMap();
+    else loadRadarFrames();
+
+    document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString('en-MY', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kuching'
+    });
+
+    overlay.classList.add('done');
+    setTimeout(() => overlay.style.display = 'none', 600);
+
+  } catch (e) {
+    console.error('Init error:', e);
+    statusEl.textContent = 'Error loading data. Retrying in 30s…';
+    setTimeout(init, 30000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Start (only if already authenticated this session)
+// ═══════════════════════════════════════════════════════════════
+if (tvAuthed) {
+  init();
+  setInterval(init, CONFIG.refreshInterval);
+}
+
+// Handle history chart resize
+window.addEventListener('resize', () => {
+  if (cachedAnalysis) {
+    fetchHistory24h().then(renderHistory);
+  }
+});
+</script>
+</body>
+</html>

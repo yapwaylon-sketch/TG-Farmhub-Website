@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="https://tgfarmhub.com/assets/logo.png">
+<title>TG Agro Fruits — Nanas Growth Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CSS Variables & Reset
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #09090b;
+  --bg-subtle: #0c0a1a;
+  --surface: #18181b;
+  --surface-2: #27272a;
+  --border: rgba(63, 63, 70, 0.4);
+  --border-light: rgba(82, 82, 91, 0.6);
+  --text: #fafafa;
+  --text-dim: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #818cf8;
+  --accent-solid: #6366f1;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font: 'IBM Plex Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  background-image: linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.6;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Loading Overlay
+   ═══════════════════════════════════════════════════════════════ */
+#loadingOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+#loadingOverlay.done { opacity: 0; filter: blur(8px); pointer-events: none; }
+.loader-ring {
+  width: 44px; height: 44px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text {
+  margin-top: 20px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Layout
+   ═══════════════════════════════════════════════════════════════ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Header — styled as card (matches Weather dashboard) */
+.header-row {
+  padding: 12px 16px 0;
+  flex-shrink: 0;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.header-logo { height: 64px; }
+.header-text { flex: 1; }
+.header-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.header-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  margin-top: 4px;
+}
+
+/* Content area */
+.content-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 16px 24px;
+}
+
+/* Status page (fades in/out) */
+.status-page {
+  position: absolute;
+  inset: 0;
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+.status-page.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Status subheader */
+.status-subheader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--border);
+  flex-shrink: 0;
+}
+.status-subheader .badge {
+  font-size: 1.1rem !important;
+  padding: 6px 20px !important;
+  letter-spacing: 0.02em;
+}
+.status-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.status-page-num {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  margin-left: auto;
+}
+
+/* Table */
+.growth-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.growth-table thead th {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 14px;
+  text-align: left;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-light);
+}
+.growth-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.growth-table thead th.sortable:hover {
+  color: var(--text);
+}
+.growth-table tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+.growth-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.03);
+}
+.growth-table tbody tr:nth-child(odd) {
+  background: rgba(0,0,0,0.15);
+}
+.growth-table tbody tr:last-child {
+  border-bottom: none;
+}
+.growth-table tbody td {
+  padding: 7px 14px;
+  vertical-align: middle;
+}
+.td-block {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.td-status { white-space: nowrap; }
+.td-age {
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.td-variety {
+  font-size: 0.77rem;
+  color: var(--text-dim);
+}
+.th-qty, .td-qty {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 24px !important;
+}
+.td-qty {
+  font-size: 0.84rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--text-dim);
+}
+.td-countdown {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--amber);
+  white-space: nowrap;
+}
+.td-induced, .td-harvest {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.td-date {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Variety summary cards */
+.variety-cards {
+  display: flex;
+  gap: 10px;
+  margin-left: 8px;
+}
+.variety-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.variety-card-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.variety-card-qty {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-growing { background: rgba(74,124,63,0.2); color: #6ECB63; }
+.badge-induced { background: rgba(100,149,237,0.2); color: #6495ED; }
+.badge-harvesting { background: rgba(255,140,40,0.2); color: #FF8C28; }
+.badge-suckers { background: rgba(186,135,89,0.2); color: #C4956A; }
+.badge-to-replant { background: rgba(232,96,96,0.15); color: #E86060; }
+.badge-to-induce { background: rgba(232,160,32,0.2); color: #E8A020; }
+.badge-default { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+
+/* Page dots */
+.page-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+.page-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: background 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
+}
+.page-dot:hover {
+  background: var(--border-light);
+  transform: scale(1.2);
+}
+.page-dot.active {
+  background: var(--accent-solid);
+  border-color: var(--accent);
+  transform: scale(1.3);
+}
+
+/* Pause button */
+.pause-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.pause-btn:hover { background: var(--surface); color: var(--text); }
+.pause-btn.paused { color: var(--amber); border-color: var(--amber); }
+.pause-btn svg { width: 14px; height: 14px; }
+
+/* Fullscreen toggle */
+.fs-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 6px 10px;
+  line-height: 1;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.fs-btn:hover { background: var(--border-light); color: var(--text); }
+.fs-btn svg { width: 20px; height: 20px; display: block; }
+
+/* No data state */
+.no-data {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4K TV Optimization
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 2560px) {
+  html { font-size: 18px; }
+  .header-row { padding: 14px 20px 0; }
+  .header-logo { height: 80px; }
+  .header-title { font-size: 1.4rem; }
+  .content-area, .status-page { padding: 20px 28px; }
+  .td-block { font-size: 1.25rem; }
+  .td-age { font-size: 1rem; }
+  .td-qty { font-size: 0.95rem; }
+  .td-variety { font-size: 0.85rem; }
+  .td-date { font-size: 0.8rem; }
+  .badge { font-size: 0.75rem; padding: 5px 14px; }
+  .status-subheader .badge { font-size: 1.2rem !important; padding: 8px 24px !important; }
+}
+@media (min-width: 3200px) {
+  html { font-size: 20px; }
+}
+@media (min-width: 3840px) {
+  html { font-size: 22px; }
+  .header-logo { height: 90px; }
+  .header-title { font-size: 1.5rem; }
+  .td-block { font-size: 1.4rem; }
+  .td-age { font-size: 1.1rem; }
+  .td-qty { font-size: 1.05rem; }
+  .td-variety { font-size: 0.9rem; }
+  .td-date { font-size: 0.85rem; }
+  .badge { font-size: 0.85rem; padding: 6px 16px; }
+  .status-subheader .badge { font-size: 1.4rem !important; padding: 10px 28px !important; }
+  .growth-table tbody td { padding: 8px 16px; }
+}
+
+/* Password Gate */
+#pwGate {
+  position: fixed; inset: 0; z-index: 10001;
+  background: var(--bg);
+  background-image: linear-gradient(135deg, var(--bg) 0%, var(--bg-subtle) 50%, var(--bg) 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-family: var(--font);
+}
+#pwGate img { width: 96px; height: 96px; border-radius: 16px; margin-bottom: 24px; }
+#pwGate h1 { color: var(--text); font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; }
+#pwGate .gate-sub { color: var(--text-muted); font-size: 1rem; margin-bottom: 32px; }
+#pwGate input {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 24px;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-family: var(--font);
+  width: 320px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#pwGate input:focus { border-color: var(--green); }
+#pwGate button {
+  margin-top: 16px;
+  background: var(--green);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 48px;
+  color: #09090b;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+}
+#pwGate button:hover { opacity: 0.9; }
+#pwGate .gate-error {
+  color: var(--red);
+  font-size: 0.9rem;
+  margin-top: 12px;
+  min-height: 20px;
+}
+</style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="pwGate">
+  <img src="https://tgfarmhub.com/assets/logo.png" alt="TG">
+  <h1>Nanas Growth Dashboard</h1>
+  <div class="gate-sub">Enter password to continue</div>
+  <input type="password" id="pwInput" placeholder="Password" autocomplete="off" autofocus>
+  <div class="gate-error" id="pwError"></div>
+  <button onclick="checkPassword()">Unlock</button>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loadStatus">Connecting to growth data…</div>
+</div>
+
+<!-- App -->
+<div class="app">
+  <!-- Header (card style, matches Weather dashboard) -->
+  <div class="header-row">
+    <header class="app-header">
+      <img src="https://tgfarmhub.com/assets/logo.png" alt="TG Agro Fruits" class="header-logo">
+      <div class="header-text">
+        <div class="header-title">Nanas Growth Dashboard</div>
+        <div class="header-meta">
+          <span id="clockDisplay"></span>
+          <span id="lastUpdate"></span>
+        </div>
+      </div>
+      <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Toggle fullscreen">
+        <svg id="fsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path id="fsExpand" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+          <path id="fsShrink" d="M4 14h3a2 2 0 012 2v3m6-9h3a2 2 0 002-2V5m-9 0v3a2 2 0 01-2 2H4m16 4v3a2 2 0 01-2 2h-3" style="display:none"/>
+        </svg>
+      </button>
+    </header>
+  </div>
+
+  <!-- Rotating Content -->
+  <div class="content-area" id="contentArea"></div>
+
+  <!-- Page Dots + Pause -->
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 0;flex-shrink:0;">
+    <div class="page-dots" id="pageDots" style="padding:0;"></div>
+    <button class="pause-btn" id="pauseBtn" title="Pause/Resume rotation">
+      <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><polygon points="6,4 20,12 6,20"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// PASSWORD GATE — session-based, re-prompts on browser restart
+// ═══════════════════════════════════════════════════════════════
+const TV_PASSWORD = "tgtukau892312";
+const SESSION_KEY = "tg_tv_auth";
+
+function checkPassword() {
+  const input = document.getElementById("pwInput");
+  const error = document.getElementById("pwError");
+  if (input.value === TV_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    document.getElementById("pwGate").style.display = "none";
+    document.getElementById("loadingOverlay").style.display = "flex";
+    init();
+  } else {
+    error.textContent = "Incorrect password";
+    input.value = "";
+    input.focus();
+  }
+}
+
+document.getElementById("pwInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") checkPassword();
+});
+
+const tvAuthed = sessionStorage.getItem(SESSION_KEY) === "1";
+if (tvAuthed) {
+  document.getElementById("pwGate").style.display = "none";
+} else {
+  document.getElementById("loadingOverlay").style.display = "none";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://qwlagcriiyoflseduvvc.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA";
+const HEADERS = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
+
+async function sbGet(table, select, params) {
+  let url = SUPABASE_URL + "/rest/v1/" + table + "?select=" + encodeURIComponent(select);
+  if (params) url += "&" + params;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error("Failed to load " + table);
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let statuses = [], growthRecords = [];
+let pages = [];       // array of { statusName, badgeClass, rows, pageNum, totalPages }
+let currentPage = 0;
+let rotateTimer = null;
+let maxRowsCache = 10;
+let paused = false;
+
+function getPageDuration(pageIdx) {
+  const pg = pages[pageIdx];
+  if (!pg) return 20000;
+  const ratio = pg.rows.length / maxRowsCache;
+  return Math.max(8000, Math.round(ratio * 20000));
+}
+
+function scheduleNextPage() {
+  if (rotateTimer) clearTimeout(rotateTimer);
+  if (paused) return;
+  if (pages.length > 1) {
+    rotateTimer = setTimeout(() => { nextPage(); scheduleNextPage(); }, getPageDuration(currentPage));
+  }
+}
+
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById("pauseBtn");
+  const pauseIcon = document.getElementById("pauseIcon");
+  const playIcon = document.getElementById("playIcon");
+  if (paused) {
+    if (rotateTimer) clearTimeout(rotateTimer);
+    btn.classList.add("paused");
+    pauseIcon.style.display = "none";
+    playIcon.style.display = "block";
+  } else {
+    btn.classList.remove("paused");
+    pauseIcon.style.display = "block";
+    playIcon.style.display = "none";
+    scheduleNextPage();
+  }
+}
+
+// Per-status sort defaults
+const DEFAULT_SORT = {
+  'growing':    { field: 'date_planted', dir: 'asc' },
+  'to induce':  { field: 'date_planted', dir: 'asc' },
+  'induced':    { field: 'date_induced_start', dir: 'asc' },
+  'harvesting': { field: 'date_induced_start', dir: 'asc' },
+  'suckers':    { field: 'date_planted', dir: 'asc' },
+  'to replant': { field: 'block_name', dir: 'asc' }
+};
+// User overrides per status (set when clicking a column header)
+const sortOverrides = {};
+
+function getSort(statusName) {
+  const key = statusName ? statusName.toLowerCase() : '';
+  if (sortOverrides[key]) return sortOverrides[key];
+  return DEFAULT_SORT[key] || { field: 'block_name', dir: 'asc' };
+}
+
+function currentPageStatus() {
+  return pages[currentPage] ? pages[currentPage].statusName : '';
+}
+
+function sortIcon(field, statusName) {
+  const s = getSort(statusName || currentPageStatus());
+  if (s.field !== field) return '';
+  return s.dir === 'asc' ? ' &#9650;' : ' &#9660;';
+}
+
+function doSort(field) {
+  const statusName = currentPageStatus();
+  const key = statusName.toLowerCase();
+  const cur = getSort(statusName);
+  if (cur.field === field) {
+    sortOverrides[key] = { field: field, dir: cur.dir === 'asc' ? 'desc' : 'asc' };
+  } else {
+    sortOverrides[key] = { field: field, dir: 'asc' };
+  }
+  const curPageNum = pages[currentPage] ? pages[currentPage].pageNum : 1;
+  buildPages();
+  renderPages();
+  let targetIdx = 0;
+  const match = pages.findIndex(p => p.statusName === statusName && p.pageNum === curPageNum);
+  if (match >= 0) targetIdx = match;
+  showPage(targetIdx);
+}
+
+function sortRowsForStatus(rows, statusName) {
+  const s = getSort(statusName);
+  return rows.slice().sort((a, b) => {
+    let va = a[s.field], vb = b[s.field];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    let cmp;
+    if (typeof va === 'string') { cmp = naturalCompare(va, vb); }
+    else { cmp = va < vb ? -1 : (va > vb ? 1 : 0); }
+    return s.dir === 'asc' ? cmp : -cmp;
+  });
+}
+
+// Status lifecycle order
+const STATUS_ORDER = [
+  'growing', 'to induce', 'induced', 'harvesting', 'suckers', 'to replant'
+];
+
+// ═══════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════
+async function loadData() {
+  const [s, gr] = await Promise.all([
+    sbGet("crop_statuses", "*", "order=sort_order"),
+    sbGet("growth_records_view", "block_crop_id,target_induce_date,target_harvest_start,target_harvest_end,date_induced_start,date_induced_end,days_after_induce,days_to_harvest,block_crops(date_planted,quantity,status_id,pnd_blocks(block_name),crop_varieties(name,crops(name)))")
+  ]);
+  statuses = s || [];
+  growthRecords = gr || [];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  const isFs = !!document.fullscreenElement;
+  document.getElementById('fsExpand').style.display = isFs ? 'none' : '';
+  document.getElementById('fsShrink').style.display = isFs ? '' : 'none';
+});
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function getStatusName(id) {
+  const s = statuses.find(x => x.id === id);
+  return s ? s.name : "—";
+}
+
+function statusBadgeClass(name) {
+  const map = {
+    'growing': 'badge-growing', 'induced': 'badge-induced',
+    'harvesting': 'badge-harvesting',
+    'suckers': 'badge-suckers', 'to replant': 'badge-to-replant',
+    'to induce': 'badge-to-induce'
+  };
+  return map[(name || '').toLowerCase()] || 'badge-default';
+}
+
+function ageFromPlanted(dp) {
+  if (!dp) return "—";
+  const planted = new Date(dp), today = new Date();
+  let y = today.getFullYear() - planted.getFullYear();
+  let m = today.getMonth() - planted.getMonth();
+  let d = today.getDate() - planted.getDate();
+  if (d < 0) { m--; d += new Date(today.getFullYear(), today.getMonth(), 0).getDate(); }
+  if (m < 0) { y--; m += 12; }
+  if (y < 0) return "—";
+  let parts = [];
+  if (y > 0) parts.push(y + "y");
+  if (m > 0) parts.push(m + "m");
+  parts.push(d + "d");
+  return parts.join(" ");
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+  const yy = dt.getFullYear();
+  return dd + ' ' + mm + ' ' + yy;
+}
+
+function formatDateShort(d) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const yy = String(dt.getFullYear()).slice(-2);
+  return dd + '/' + mm + '/' + yy;
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((new Date(dateStr) - today) / 86400000);
+}
+
+function naturalCompare(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD PAGES
+// ═══════════════════════════════════════════════════════════════
+function buildPages() {
+  // Build all rows from growth_records (single source of truth)
+  const allRows = [];
+  growthRecords.forEach(gr => {
+    const bc = gr.block_crops;
+    if (!bc) return;
+    const blockName = bc.pnd_blocks ? bc.pnd_blocks.block_name : "?";
+    const varName = bc.crop_varieties ? bc.crop_varieties.name : "?";
+    const statusName = getStatusName(bc.status_id);
+    const isGrowing = statusName.toLowerCase() === 'growing';
+    const isInduced = statusName.toLowerCase() === 'induced';
+
+    // Induced date range
+    const inducedStart = formatDateShort(gr.date_induced_start);
+    const inducedEnd = formatDateShort(gr.date_induced_end);
+    const inducedStr = (!gr.date_induced_start) ? '—' : (inducedStart === inducedEnd ? inducedStart : inducedStart + '-' + inducedEnd);
+
+    // Harvest window — read directly from DB
+    const harvestStart = formatDateShort(gr.target_harvest_start);
+    const harvestEnd = formatDateShort(gr.target_harvest_end);
+    const harvestStr = (!gr.target_harvest_start) ? '—' : (harvestStart === harvestEnd ? harvestStart : harvestStart + '-' + harvestEnd);
+
+    // Days to induce countdown
+    const daysToInduce = daysUntil(gr.target_induce_date);
+    const induceTargetFmt = formatDateShort(gr.target_induce_date);
+
+    // age_days for numeric sorting
+    const ageDays = bc.date_planted ? Math.floor((new Date() - new Date(bc.date_planted)) / 86400000) : null;
+
+    allRows.push({
+      block_name: blockName,
+      status_name: statusName,
+      status_id: bc.status_id,
+      age: ageFromPlanted(bc.date_planted),
+      age_days: ageDays,
+      variety: varName,
+      quantity: bc.quantity || 0,
+      date_planted: bc.date_planted,
+      date_planted_fmt: bc.date_planted ? formatDate(bc.date_planted) : "—",
+      date_induced_start: gr.date_induced_start,
+      induced_fmt: inducedStr,
+      target_harvest_start: gr.target_harvest_start,
+      harvest_window_fmt: harvestStr,
+      days_to_induce: daysToInduce,
+      target_induce_date: gr.target_induce_date,
+      induce_target_fmt: induceTargetFmt,
+      days_after_induce: gr.days_after_induce != null ? gr.days_after_induce : null,
+      days_to_harvest: gr.days_to_harvest != null ? gr.days_to_harvest : null
+    });
+  });
+
+  // Group by status
+  const grouped = {};
+  allRows.forEach(r => {
+    const key = r.status_name;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+
+  // Sort each group by its own sort config
+  Object.keys(grouped).forEach(k => {
+    grouped[k] = sortRowsForStatus(grouped[k], k);
+  });
+
+  // Order statuses by lifecycle, then any unknowns
+  const orderedStatuses = [];
+  STATUS_ORDER.forEach(s => {
+    const match = Object.keys(grouped).find(k => k.toLowerCase() === s);
+    if (match) orderedStatuses.push(match);
+  });
+  Object.keys(grouped).forEach(k => {
+    if (!orderedStatuses.includes(k)) orderedStatuses.push(k);
+  });
+
+  // Calculate max rows per page based on available height
+  const maxRows = calcMaxRows();
+
+  // Build pages
+  pages = [];
+  orderedStatuses.forEach(statusName => {
+    const rows = grouped[statusName];
+    if (!rows || rows.length === 0) return;
+    // Aggregate quantity by variety for the entire status group
+    const varietyTotals = {};
+    rows.forEach(r => {
+      const v = r.variety || '?';
+      varietyTotals[v] = (varietyTotals[v] || 0) + (r.quantity || 0);
+    });
+
+    const totalPages = Math.ceil(rows.length / maxRows);
+    for (let p = 0; p < totalPages; p++) {
+      const slice = rows.slice(p * maxRows, (p + 1) * maxRows);
+      pages.push({
+        statusName: statusName,
+        badgeClass: statusBadgeClass(statusName),
+        isGrowing: statusName.toLowerCase() === 'growing',
+        isInduced: statusName.toLowerCase() === 'induced',
+        isHarvesting: statusName.toLowerCase() === 'harvesting',
+        rows: slice,
+        totalCount: rows.length,
+        pageNum: p + 1,
+        totalPages: totalPages,
+        varietyTotals: varietyTotals
+      });
+    }
+  });
+}
+
+function calcMaxRows() {
+  // Render a hidden probe to measure actual row height
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;left:-9999px;top:0;width:100%;';
+  probe.innerHTML =
+    '<div class="status-subheader" style="margin-bottom:12px;padding-bottom:10px;">' +
+      '<span class="badge badge-growing" style="font-size:1.4rem;padding:8px 24px;">Probe</span>' +
+      '<span class="status-count">1 block</span>' +
+    '</div>' +
+    '<table class="growth-table"><thead><tr><th>B</th><th>V</th><th>Q</th><th>D</th><th>A</th></tr></thead>' +
+    '<tbody><tr><td class="td-block">X</td><td class="td-variety">X</td><td class="td-qty">1</td><td class="td-date">01 Jan 2025</td><td class="td-age">1M</td></tr>' +
+    '<tr><td class="td-block">X</td><td class="td-variety">X</td><td class="td-qty">1</td><td class="td-date">01 Jan 2025</td><td class="td-age">1M</td></tr></tbody></table>';
+  document.body.appendChild(probe);
+
+  const headerRow = document.querySelector('.header-row');
+  const headerH = headerRow ? headerRow.offsetHeight : 55;
+  const dotsH = 30;
+  const padding = 32; // status-page top+bottom padding
+  const subheaderH = probe.querySelector('.status-subheader').offsetHeight + 12;
+  const table = probe.querySelector('.growth-table');
+  const theadH = table.querySelector('thead').offsetHeight;
+  const trows = table.querySelectorAll('tbody tr');
+  const rowH = (trows[1].offsetTop - trows[0].offsetTop) || 30;
+
+  document.body.removeChild(probe);
+
+  const available = window.innerHeight - headerH - dotsH - padding - subheaderH - theadH;
+  maxRowsCache = Math.max(5, Math.floor(available / rowH));
+  return maxRowsCache;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderPages() {
+  const container = document.getElementById("contentArea");
+  const dotsEl = document.getElementById("pageDots");
+
+  if (pages.length === 0) {
+    container.innerHTML = '<div class="no-data">No growth data available</div>';
+    dotsEl.innerHTML = '';
+    return;
+  }
+
+  // Build all page elements
+  container.innerHTML = pages.map((pg, i) => {
+    const pageLabel = pg.totalPages > 1
+      ? ' (' + pg.pageNum + '/' + pg.totalPages + ')'
+      : '';
+    const countLabel = pg.totalCount + ' block' + (pg.totalCount !== 1 ? 's' : '');
+
+    // Build variety summary cards
+    const varietyCardsHtml = Object.keys(pg.varietyTotals).sort().map(v =>
+      '<div class="variety-card">' +
+        '<span class="variety-card-name">' + esc(v) + '</span>' +
+        '<span class="variety-card-qty">' + pg.varietyTotals[v].toLocaleString() + ' plants</span>' +
+      '</div>'
+    ).join('');
+
+    return '<div class="status-page' + (i === currentPage ? ' active' : '') + '" id="page-' + i + '">' +
+      '<div class="status-subheader">' +
+        '<span class="badge ' + pg.badgeClass + '" style="font-size:1.4rem;padding:8px 24px;">' + esc(pg.statusName) + '</span>' +
+        '<span class="status-count">' + countLabel + '</span>' +
+        '<div class="variety-cards">' + varietyCardsHtml + '</div>' +
+        (pg.totalPages > 1 ? '<span class="status-page-num">Page ' + pg.pageNum + ' of ' + pg.totalPages + '</span>' : '') +
+      '</div>' +
+      '<table class="growth-table">' +
+        '<thead><tr>' +
+          '<th class="sortable" onclick="doSort(\'block_name\')">Block' + sortIcon('block_name', pg.statusName) + '</th>' +
+          '<th class="sortable" onclick="doSort(\'variety\')">Variety' + sortIcon('variety', pg.statusName) + '</th>' +
+          '<th class="sortable th-qty" onclick="doSort(\'quantity\')">Quantity' + sortIcon('quantity', pg.statusName) + '</th>' +
+          '<th class="sortable" onclick="doSort(\'date_planted\')">Date Planted' + sortIcon('date_planted', pg.statusName) + '</th>' +
+          '<th class="sortable" onclick="doSort(\'age_days\')">Age' + sortIcon('age_days', pg.statusName) + '</th>' +
+          (pg.isGrowing ? '<th class="sortable" onclick="doSort(\'days_to_induce\')">Days to Induce' + sortIcon('days_to_induce', pg.statusName) + '</th><th class="sortable" onclick="doSort(\'target_induce_date\')">Target Date' + sortIcon('target_induce_date', pg.statusName) + '</th>' : '') +
+          (pg.isInduced ? '<th class="sortable" onclick="doSort(\'date_induced_start\')">Induced' + sortIcon('date_induced_start', pg.statusName) + '</th><th class="sortable" onclick="doSort(\'days_after_induce\')">Days After Induce' + sortIcon('days_after_induce', pg.statusName) + '</th><th class="sortable" onclick="doSort(\'days_to_harvest\')">Days to Harvest' + sortIcon('days_to_harvest', pg.statusName) + '</th><th class="sortable" onclick="doSort(\'target_harvest_start\')">Expected Harvest' + sortIcon('target_harvest_start', pg.statusName) + '</th>' : '') +
+          (pg.isHarvesting ? '<th class="sortable" onclick="doSort(\'date_induced_start\')">Induced' + sortIcon('date_induced_start', pg.statusName) + '</th><th class="sortable" onclick="doSort(\'target_harvest_start\')">Harvest Window' + sortIcon('target_harvest_start', pg.statusName) + '</th>' : '') +
+        '</tr></thead>' +
+        '<tbody>' +
+          pg.rows.map(r =>
+            '<tr>' +
+              '<td class="td-block">' + esc(r.block_name) + '</td>' +
+              '<td class="td-variety">' + esc(r.variety) + '</td>' +
+              '<td class="td-qty">' + (r.quantity > 0 ? r.quantity.toLocaleString() : '—') + '</td>' +
+              '<td class="td-date">' + esc(r.date_planted_fmt) + '</td>' +
+              '<td class="td-age">' + esc(r.age) + '</td>' +
+              (pg.isGrowing ? '<td class="td-countdown">' + (r.days_to_induce !== null ? r.days_to_induce + 'd' : '—') + '</td><td class="td-date">' + esc(r.induce_target_fmt) + '</td>' : '') +
+              (pg.isInduced ? '<td class="td-induced">' + esc(r.induced_fmt || '—') + '</td><td class="td-countdown">' + (r.days_after_induce !== null ? r.days_after_induce + 'd' : '—') + '</td><td class="td-countdown">' + (r.days_to_harvest !== null ? r.days_to_harvest + 'd' : '—') + '</td><td class="td-harvest">' + esc(r.harvest_window_fmt || '—') + '</td>' : '') +
+              (pg.isHarvesting ? '<td class="td-induced">' + esc(r.induced_fmt || '—') + '</td><td class="td-harvest">' + esc(r.harvest_window_fmt || '—') + '</td>' : '') +
+            '</tr>'
+          ).join('') +
+        '</tbody>' +
+      '</table>' +
+    '</div>';
+  }).join('');
+
+  // Dots (clickable)
+  dotsEl.innerHTML = pages.map((_, i) =>
+    '<div class="page-dot' + (i === currentPage ? ' active' : '') + '" data-page="' + i + '"></div>'
+  ).join('');
+  dotsEl.querySelectorAll('.page-dot').forEach(dot => {
+    dot.addEventListener('click', function() {
+      const idx = parseInt(this.getAttribute('data-page'));
+      if (idx === currentPage) return;
+      showPage(idx);
+      // Reset auto-rotation timer on manual click
+      scheduleNextPage();
+    });
+  });
+}
+
+function showPage(idx) {
+  // Fade out current
+  const cur = document.getElementById("page-" + currentPage);
+  if (cur) cur.classList.remove("active");
+
+  currentPage = idx % pages.length;
+
+  // Fade in next (slight delay for transition)
+  setTimeout(() => {
+    const next = document.getElementById("page-" + currentPage);
+    if (next) next.classList.add("active");
+
+    // Update dots
+    document.querySelectorAll(".page-dot").forEach((d, i) => {
+      d.classList.toggle("active", i === currentPage);
+    });
+  }, 50);
+}
+
+function nextPage() {
+  if (pages.length <= 1) return;
+  showPage(currentPage + 1);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  const opts = { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+  document.getElementById("clockDisplay").textContent = now.toLocaleDateString('en-GB', opts);
+}
+
+function updateLastRefresh() {
+  const now = new Date();
+  const hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  document.getElementById("lastUpdate").textContent = "Last refresh: " + hm;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT & REFRESH
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  try {
+    document.getElementById("loadStatus").textContent = "Loading growth data…";
+    await loadData();
+    buildPages();
+    currentPage = 0;
+    renderPages();
+    updateLastRefresh();
+
+    // Hide loading
+    document.getElementById("loadingOverlay").classList.add("done");
+
+    // Start clock
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Pause button
+    document.getElementById("pauseBtn").addEventListener("click", togglePause);
+
+    // Start page rotation (dynamic timing)
+    scheduleNextPage();
+
+    // Data refresh every 5 minutes
+    setInterval(refreshData, 300000);
+
+    // Recalculate on resize/fullscreen change
+    let resizeTimeout;
+    function onResize() {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const prevStatus = pages[currentPage] ? pages[currentPage].statusName + pages[currentPage].pageNum : null;
+        buildPages();
+        if (prevStatus && pages.length > 0) {
+          const match = pages.findIndex(p => p.statusName + p.pageNum === prevStatus);
+          currentPage = match >= 0 ? match : 0;
+        } else {
+          currentPage = 0;
+        }
+        renderPages();
+        scheduleNextPage();
+      }, 300);
+    }
+    window.addEventListener('resize', onResize);
+    document.addEventListener('fullscreenchange', onResize);
+
+  } catch (e) {
+    console.error("Init error:", e);
+    document.getElementById("loadStatus").textContent = "Error loading data. Retrying in 10s…";
+    setTimeout(init, 10000);
+  }
+}
+
+async function refreshData() {
+  try {
+    await loadData();
+    const prevPageStatus = pages[currentPage] ? pages[currentPage].statusName + pages[currentPage].pageNum : null;
+    buildPages();
+
+    // Try to stay on the same status page after refresh
+    if (prevPageStatus && pages.length > 0) {
+      const match = pages.findIndex(p => p.statusName + p.pageNum === prevPageStatus);
+      currentPage = match >= 0 ? match : 0;
+    } else {
+      currentPage = 0;
+    }
+
+    renderPages();
+    updateLastRefresh();
+
+    // Restart rotation timer
+    scheduleNextPage();
+  } catch (e) {
+    console.error("Refresh error:", e);
+  }
+}
+
+// Go (only if already authenticated this session)
+if (tvAuthed) init();
+</script>
+</body>
+</html>
