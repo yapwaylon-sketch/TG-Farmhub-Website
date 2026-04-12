@@ -975,6 +975,14 @@
         <div id="so-wiz-cust-badge" class="so-wiz-cust-badge" style="display:none;"></div>
       </div>
 
+      <!-- Branch (shown when customer has branches) -->
+      <div class="so-wiz-section" id="so-wiz-branch-section" style="display:none;">
+        <div class="so-wiz-label">DELIVER TO</div>
+        <select id="so-wiz-branch" class="so-wiz-input">
+          <option value="">— No branch selected —</option>
+        </select>
+      </div>
+
       <!-- Walk-in -->
       <div class="so-wiz-separator">— or —</div>
       <button type="button" class="so-wiz-walkin-btn" id="so-wiz-walkin-btn" onclick="soWizToggleWalkIn()">Walk-in Customer</button>
@@ -8271,9 +8279,13 @@ function soWizInit() {
   soWizSetToggle('so-wiz-doctype', document.getElementById('so-doc-type').value);
   soWizSetToggle('so-wiz-channel', document.getElementById('so-channel').value);
 
-  // If editing with a customer, show badge
+  // If editing with a customer, show badge + branches
   if (soSelectedCustomer) {
     soWizShowCustBadge(soSelectedCustomer);
+    soWizUpdateBranches(soSelectedCustomer.id);
+    // Pre-select branch if set on desktop form
+    var desktopBranch = document.getElementById('so-branch').value;
+    if (desktopBranch) document.getElementById('so-wiz-branch').value = desktopBranch;
   }
 
   // If walk-in was set (editing a walk-in order)
@@ -8374,6 +8386,9 @@ function soWizSyncStep1() {
   document.getElementById('so-fulfillment').value = soWizGetToggleVal('so-wiz-fulfillment');
   document.getElementById('so-doc-type').value = soWizGetToggleVal('so-wiz-doctype');
   document.getElementById('so-channel').value = soWizGetToggleVal('so-wiz-channel');
+  // Branch
+  var wizBranch = document.getElementById('so-wiz-branch');
+  document.getElementById('so-branch').value = wizBranch ? wizBranch.value : '';
 }
 
 function soWizSyncAll() {
@@ -8437,6 +8452,25 @@ function soWizSelectCust(customerId) {
   document.getElementById('so-wiz-cust-search').value = '';
   // Sync doc type toggle (soSelectCustomer may have changed it)
   soWizSetToggle('so-wiz-doctype', document.getElementById('so-doc-type').value);
+  // Show branches if customer has any
+  soWizUpdateBranches(customerId);
+}
+
+function soWizUpdateBranches(customerId) {
+  var branchSection = document.getElementById('so-wiz-branch-section');
+  var branchSelect = document.getElementById('so-wiz-branch');
+  var custBranches = getCustomerBranches(customerId);
+  if (custBranches.length > 0) {
+    var html = '<option value="">— No branch selected —</option>';
+    custBranches.forEach(function(b) {
+      html += '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>';
+    });
+    branchSelect.innerHTML = html;
+    branchSection.style.display = '';
+  } else {
+    branchSection.style.display = 'none';
+    branchSelect.innerHTML = '<option value="">— No branch selected —</option>';
+  }
 }
 
 function soWizShowCustBadge(cust) {
@@ -8454,6 +8488,7 @@ function soWizClearCust() {
   document.getElementById('so-wiz-cust-search').style.display = '';
   document.getElementById('so-wiz-cust-search').value = '';
   document.getElementById('so-wiz-walkin-btn').classList.remove('active');
+  document.getElementById('so-wiz-branch-section').style.display = 'none';
 }
 
 // ── Walk-in toggle (wizard) ──
@@ -8771,6 +8806,11 @@ function soWizRenderReview() {
   html += '<div class="so-wiz-review-head"><span class="so-wiz-review-label">Customer</span><span class="so-wiz-review-edit" onclick="soWizStep=1;soWizShowStep();">Edit</span></div>';
   html += '<div class="so-wiz-review-value" style="font-weight:700;font-size:14px;">' + esc(custName) + '</div>';
   if (custPhone) html += '<div style="font-size:11px;color:var(--text-muted);">' + esc(custPhone) + ' \u00b7 ' + custTerms + '</div>';
+  var wizBranchVal = document.getElementById('so-wiz-branch') ? document.getElementById('so-wiz-branch').value : '';
+  if (wizBranchVal) {
+    var br = getBranch(wizBranchVal);
+    if (br) html += '<div style="font-size:11px;color:var(--gold);margin-top:2px;">Deliver to: ' + esc(br.name) + '</div>';
+  }
   html += '</div>';
 
   // Delivery
