@@ -8625,7 +8625,10 @@ function soWizSelectProduct(productId) {
   panel.innerHTML = html;
   panel.style.display = 'block';
 
-  setTimeout(function() { var q = document.getElementById('so-wiz-qty'); if (q) q.focus(); }, 100);
+  setTimeout(function() {
+    var q = document.getElementById('so-wiz-qty');
+    if (q) { q.focus(); q.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }, 150);
 }
 
 function soWizQtyChange() {
