@@ -8508,23 +8508,251 @@ document.addEventListener('click', function(e) {
 });
 
 // ���─ Placeholder stubs for Phase 4 (item picker) and Phase 5 (review) ──
+// ═══════════════════════════════════════════════════════════════
+// MOBILE WIZARD — Step 2: Variety-based item picker
+// ═══════════════════════════════════════════════════════════════
+
 function soWizRenderPicker() {
-  // Phase 4 will implement this
-  var picker = document.getElementById('so-wiz-picker');
-  if (!picker) return;
-  if (picker.innerHTML) return; // already rendered
-  picker.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Item picker loading...</div>';
+  var tabsEl = document.getElementById('so-wiz-vtabs');
+  var gridEl = document.getElementById('so-wiz-pgrid');
+  if (!tabsEl || !gridEl) return;
+
+  // Group active products by variety
+  var grouped = {};
+  salesProducts.filter(function(p) { return p.is_active !== false; }).forEach(function(p) {
+    var vid = p.variety_id || 'other';
+    if (!grouped[vid]) grouped[vid] = [];
+    grouped[vid].push(p);
+  });
+
+  // Build tabs: varieties first, then "Other"
+  var tabs = [];
+  varieties.forEach(function(v) {
+    if (grouped[v.id]) tabs.push({ id: v.id, name: v.name });
+  });
+  if (grouped['other']) tabs.push({ id: 'other', name: 'Other' });
+
+  if (!tabs.length) {
+    tabsEl.innerHTML = '';
+    gridEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No active products</div>';
+    return;
+  }
+
+  // Default to first tab
+  if (!soWizSelectedVariety || !grouped[soWizSelectedVariety]) {
+    soWizSelectedVariety = tabs[0].id;
+  }
+
+  // Render tabs
+  var th = '';
+  tabs.forEach(function(t) {
+    var cls = String(t.id) === String(soWizSelectedVariety) ? ' active' : '';
+    th += '<div class="so-wiz-variety-tab' + cls + '" onclick="soWizSelectVariety(\'' + esc(String(t.id)) + '\')">' + esc(t.name) + '</div>';
+  });
+  tabsEl.innerHTML = th;
+
+  soWizRenderProductGrid();
+}
+
+function soWizSelectVariety(vid) {
+  soWizSelectedVariety = vid;
+  soWizSelectedProduct = null;
+  document.getElementById('so-wiz-qty-panel').style.display = 'none';
+  document.querySelectorAll('.so-wiz-variety-tab').forEach(function(t) { t.classList.remove('active'); });
+  // Find and activate clicked tab
+  var tabs = document.querySelectorAll('.so-wiz-variety-tab');
+  tabs.forEach(function(t) {
+    var v = varieties.find(function(x) { return String(x.id) === vid; });
+    var tabName = v ? v.name : 'Other';
+    if (t.textContent === tabName) t.classList.add('active');
+  });
+  soWizRenderProductGrid();
+}
+
+function soWizRenderProductGrid() {
+  var gridEl = document.getElementById('so-wiz-pgrid');
+  var products = salesProducts.filter(function(p) {
+    if (p.is_active === false) return false;
+    var vid = p.variety_id || 'other';
+    return String(vid) === String(soWizSelectedVariety);
+  });
+
+  var gh = '';
+  products.forEach(function(p) {
+    var sel = soWizSelectedProduct === p.id ? ' selected' : '';
+    var priceLabel = formatRM(p.default_price || 0) + '/' + (p.unit || 'kg');
+    gh += '<div class="so-wiz-product-card' + sel + '" onclick="soWizSelectProduct(\'' + esc(p.id) + '\')">';
+    gh += '<div class="so-wiz-product-name">' + esc(p.name) + '</div>';
+    gh += '<div class="so-wiz-product-price">' + priceLabel + '</div>';
+    gh += '</div>';
+  });
+  if (!products.length) {
+    gh = '<div style="grid-column:1/-1;padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">No products in this category</div>';
+  }
+  gridEl.innerHTML = gh;
+}
+
+function soWizSelectProduct(productId) {
+  var p = salesProducts.find(function(x) { return x.id === productId; });
+  if (!p) return;
+  soWizSelectedProduct = productId;
+
+  // Highlight selected card
+  document.querySelectorAll('.so-wiz-product-card').forEach(function(c) { c.classList.remove('selected'); });
+  var products = salesProducts.filter(function(x) {
+    if (x.is_active === false) return false;
+    return String(x.variety_id || 'other') === String(soWizSelectedVariety);
+  });
+  var cards = document.querySelectorAll('.so-wiz-product-card');
+  for (var i = 0; i < products.length; i++) {
+    if (products[i].id === productId && cards[i]) cards[i].classList.add('selected');
+  }
+
+  // Show qty panel
+  var panel = document.getElementById('so-wiz-qty-panel');
+  var unit = p.unit || 'kg';
+  var price = p.default_price || 0;
+  var html = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">';
+  html += '<span style="font-weight:700;font-size:13px;color:var(--text);">' + esc(p.name) + '</span>';
+  html += '<span class="so-wiz-price-display" id="so-wiz-price-display" data-default="' + price + '" onclick="soWizEditPrice()">' + formatRM(price) + '/' + esc(unit) + '</span>';
+  html += '</div>';
+  html += '<div class="so-wiz-qty-row">';
+  html += '<input type="number" class="so-wiz-qty-input" id="so-wiz-qty" step="' + (unit === 'kg' ? '0.1' : '1') + '" min="0" placeholder="Qty" inputmode="decimal" oninput="soWizQtyChange()">';
+  html += '<span class="so-wiz-qty-unit">' + esc(unit) + '</span>';
+  html += '<button class="so-wiz-add-btn" id="so-wiz-add-btn" onclick="soWizAddItem()">Add</button>';
+  html += '</div>';
+  html += '<input type="number" id="so-wiz-price-input" step="0.01" min="0" style="display:none;padding:10px;font-size:14px;font-weight:600;border:2px solid var(--gold);border-radius:8px;width:100%;box-sizing:border-box;margin-top:6px;" oninput="soWizQtyChange()">';
+  panel.innerHTML = html;
+  panel.style.display = 'block';
+
+  setTimeout(function() { var q = document.getElementById('so-wiz-qty'); if (q) q.focus(); }, 100);
+}
+
+function soWizQtyChange() {
+  var qty = parseFloat(document.getElementById('so-wiz-qty').value) || 0;
+  var priceInput = document.getElementById('so-wiz-price-input');
+  var priceDisplay = document.getElementById('so-wiz-price-display');
+  var price = (priceInput && priceInput.style.display !== 'none')
+    ? (parseFloat(priceInput.value) || 0)
+    : parseFloat(priceDisplay.getAttribute('data-default') || 0);
+  var total = qty * price;
+  var btn = document.getElementById('so-wiz-add-btn');
+  if (btn) btn.textContent = total > 0 ? 'Add ' + formatRM(total) : 'Add';
+}
+
+function soWizEditPrice() {
+  var display = document.getElementById('so-wiz-price-display');
+  var input = document.getElementById('so-wiz-price-input');
+  var defaultPrice = parseFloat(display.getAttribute('data-default') || 0);
+  confirmAction('Change Price', 'Change price from ' + formatRM(defaultPrice) + '?', function() {
+    input.value = defaultPrice.toFixed(2);
+    input.style.display = '';
+    display.style.display = 'none';
+    input.focus();
+  });
+}
+
+function soWizAddItem() {
+  var p = salesProducts.find(function(x) { return x.id === soWizSelectedProduct; });
+  if (!p) return;
+  var qty = parseFloat(document.getElementById('so-wiz-qty').value) || 0;
+  if (qty <= 0) { notify('Enter a quantity', 'warning'); return; }
+  var priceInput = document.getElementById('so-wiz-price-input');
+  var priceDisplay = document.getElementById('so-wiz-price-display');
+  var unitPrice = (priceInput && priceInput.style.display !== 'none')
+    ? (parseFloat(priceInput.value) || 0)
+    : parseFloat(priceDisplay.getAttribute('data-default') || 0);
+
+  soItems.push({
+    id: Date.now() + Math.random(),
+    productId: p.id,
+    quantity: String(qty),
+    unitPrice: String(unitPrice),
+    unit: p.unit || 'kg',
+    indexMin: '',
+    indexMax: '',
+    lineTotal: qty * unitPrice,
+    orderInPcs: false,
+    orderPcs: ''
+  });
+
+  soWizSelectedProduct = null;
+  document.getElementById('so-wiz-qty-panel').style.display = 'none';
+  soWizRenderProductGrid();
+  soWizRenderItemsList();
+  soWizUpdateSubtotal();
+}
+
+function soWizRemoveItem(itemId) {
+  soItems = soItems.filter(function(i) { return i.id !== itemId; });
+  soWizRenderItemsList();
+  soWizUpdateSubtotal();
 }
 
 function soWizRenderItemsList() {
-  // Phase 4 will implement this
   var list = document.getElementById('so-wiz-items-list');
   if (!list) return;
-  if (!soItems.length || !soItems[0].productId) {
-    list.innerHTML = '';
-    return;
-  }
+  var validItems = soItems.filter(function(i) { return i.productId; });
+  if (!validItems.length) { list.innerHTML = ''; return; }
+
+  var html = '';
+  validItems.forEach(function(item) {
+    var prod = salesProducts.find(function(p) { return p.id === item.productId; });
+    var name = prod ? prod.name : 'Unknown';
+    var variety = '';
+    if (prod && prod.variety_id) {
+      var v = varieties.find(function(x) { return x.id === prod.variety_id; });
+      if (v) variety = v.name + ' ';
+    }
+    var qty = parseFloat(item.quantity) || 0;
+    var price = parseFloat(item.unitPrice) || 0;
+    var total = item.lineTotal || (qty * price);
+    var unit = item.unit || 'kg';
+
+    html += '<div class="so-wiz-item">';
+    html += '<div class="so-wiz-item-info">';
+    html += '<div class="so-wiz-item-name">' + esc(variety) + esc(name) + '</div>';
+    html += '<div class="so-wiz-item-detail">' + qty + ' ' + esc(unit) + ' \u00d7 ' + formatRM(price) + '</div>';
+    if (item.indexMin || item.indexMax) {
+      html += '<div style="font-size:10px;color:var(--gold);">Index ' + (item.indexMin || '?') + '-' + (item.indexMax || '?') + '</div>';
+    } else {
+      html += '<div class="so-wiz-item-index" onclick="soWizToggleIndex(' + item.id + ')">+ Add index</div>';
+    }
+    html += '<div id="so-wiz-idx-' + item.id + '" style="display:' + (item.indexMin || item.indexMax ? 'flex' : 'none') + ';gap:6px;margin-top:4px;">';
+    html += '<input type="number" min="0" max="5" step="1" placeholder="Min" value="' + esc(item.indexMin) + '" style="width:60px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:4px;" onchange="soWizSetIndex(' + item.id + ',\'min\',this.value)">';
+    html += '<span style="font-size:11px;color:var(--text-muted);line-height:28px;">to</span>';
+    html += '<input type="number" min="0" max="5" step="1" placeholder="Max" value="' + esc(item.indexMax) + '" style="width:60px;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:4px;" onchange="soWizSetIndex(' + item.id + ',\'max\',this.value)">';
+    html += '</div>';
+    html += '</div>';
+    html += '<span class="so-wiz-item-total">' + formatRM(total) + '</span>';
+    html += '<button class="so-wiz-item-remove" onclick="soWizRemoveItem(' + item.id + ')">\u00d7</button>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
 }
+
+function soWizToggleIndex(itemId) {
+  var el = document.getElementById('so-wiz-idx-' + itemId);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+function soWizSetIndex(itemId, field, value) {
+  var item = soItems.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  if (field === 'min') item.indexMin = value;
+  if (field === 'max') item.indexMax = value;
+}
+
+function soWizUpdateSubtotal() {
+  var total = 0;
+  soItems.forEach(function(i) { if (i.productId) total += (i.lineTotal || 0); });
+  var el = document.getElementById('so-wiz-subtotal');
+  if (el) el.textContent = formatRM(total);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOBILE WIZARD — Step 3: Review (Phase 5 stub)
+// ═══════════════════════════════════════════════════════════════
 
 function soWizRenderReview() {
   // Phase 5 will implement this
