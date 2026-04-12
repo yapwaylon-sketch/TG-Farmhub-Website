@@ -1283,13 +1283,21 @@
 @media (max-width: 768px) {
   /* Hide desktop form, show wizard */
   #so-modal .so-modal-box { display: none !important; }
+
+  /* Make modal overlay scrollable on mobile instead of centering */
+  #so-modal {
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 !important;
+  }
+
   .so-wizard {
     display: flex;
     flex-direction: column;
     background: var(--bg-card);
     width: 100%;
-    min-height: 100vh;
-    overflow-y: auto;
+    min-height: 100%;
     padding-bottom: 100px;
   }
 
