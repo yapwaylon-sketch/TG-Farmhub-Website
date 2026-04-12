@@ -846,7 +846,7 @@
   <div class="modal-box so-modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title" id="so-modal-title">New Order</div>
-      <button class="modal-close" onclick="salesFormDirty=false;soDraftClear();closeModal('so-modal')">
+      <button class="modal-close" onclick="salesFormDirty=false;closeModal('so-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -953,7 +953,7 @@
 
     <!-- Section E: Actions -->
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="salesFormDirty=false;soDraftClear();closeModal('so-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="salesFormDirty=false;closeModal('so-modal')">Cancel</button>
       <button class="btn btn-primary" id="so-save-btn" onclick="soSaveOrder()">Create Order</button>
     </div>
   </div>
@@ -5543,9 +5543,13 @@ function renderInvoicing() {
   html += '<div id="inv-list-container"></div>';
 
   body.innerHTML = html;
-  // Restore search input value after re-render
+  // Restore search input value and focus after re-render
   var searchInput = document.getElementById('inv-do-search');
-  if (searchInput && _invDoSearchVal) { searchInput.value = _invDoSearchVal; }
+  if (searchInput && _invDoSearchVal) {
+    searchInput.value = _invDoSearchVal;
+    searchInput.focus();
+    searchInput.setSelectionRange(_invDoSearchVal.length, _invDoSearchVal.length);
+  }
   invRenderList();
 }
 
@@ -7988,45 +7992,6 @@ async function soToggleWalkIn() {
   }
 }
 
-// ── Draft auto-save for New Order ──
-var SO_DRAFT_KEY = 'tgfarmhub_order_draft';
-function soDraftSave() {
-  if (soEditOrderId) return; // Don't save drafts for edits
-  try {
-    var draft = {
-      customerId: soSelectedCustomer,
-      isWalkIn: soIsWalkIn,
-      orderDate: document.getElementById('so-order-date').value,
-      deliveryDate: document.getElementById('so-delivery-date').value,
-      deliveryTime: document.getElementById('so-delivery-time').value,
-      fulfillment: document.getElementById('so-fulfillment').value,
-      docType: document.getElementById('so-doc-type').value,
-      channel: document.getElementById('so-channel').value,
-      notes: document.getElementById('so-notes').value,
-      items: soItems,
-      savedAt: Date.now()
-    };
-    localStorage.setItem(SO_DRAFT_KEY, JSON.stringify(draft));
-  } catch(e) {}
-}
-function soDraftLoad() {
-  try {
-    var raw = localStorage.getItem(SO_DRAFT_KEY);
-    if (!raw) return null;
-    var draft = JSON.parse(raw);
-    // Expire drafts older than 24 hours
-    if (Date.now() - (draft.savedAt || 0) > 24 * 60 * 60 * 1000) { soDraftClear(); return null; }
-    return draft;
-  } catch(e) { return null; }
-}
-function soDraftClear() { localStorage.removeItem(SO_DRAFT_KEY); }
-
-// Auto-save draft every 5 seconds while order modal is open
-setInterval(function() {
-  var modal = document.getElementById('so-modal');
-  if (modal && modal.style.display !== 'none' && !soEditOrderId) soDraftSave();
-}, 5000);
-
 function openNewOrderModal(editOrderId) {
   if (!salesCan('createOrder')) { notify('No permission to create/edit orders', 'warning'); return; }
   soEditOrderId = editOrderId || null;
@@ -8115,26 +8080,7 @@ function openNewOrderModal(editOrderId) {
   } else {
     modalTitle.textContent = 'New Order';
     saveBtn.textContent = 'Create Order';
-    // Check for saved draft
-    var draft = soDraftLoad();
-    if (draft) {
-      soSelectedCustomer = draft.customerId || null;
-      if (soSelectedCustomer) soSelectCustomer(soSelectedCustomer);
-      soIsWalkIn = draft.isWalkIn || false;
-      document.getElementById('so-order-date').value = draft.orderDate || todayStr();
-      calUpdateDisplay('so-order-date', draft.orderDate || todayStr());
-      document.getElementById('so-delivery-date').value = draft.deliveryDate || todayStr();
-      calUpdateDisplay('so-delivery-date', draft.deliveryDate || todayStr());
-      document.getElementById('so-delivery-time').value = draft.deliveryTime || '';
-      document.getElementById('so-fulfillment').value = draft.fulfillment || 'delivery';
-      document.getElementById('so-doc-type').value = draft.docType || 'cash_sales';
-      document.getElementById('so-channel').value = draft.channel || 'whatsapp';
-      document.getElementById('so-notes').value = draft.notes || '';
-      if (draft.items && draft.items.length) { soItems = draft.items; } else { soAddItem(); }
-      notify('Draft restored', 'info');
-    } else {
-      soAddItem();
-    }
+    soAddItem();
   }
   soRenderItems();
   var modal = document.getElementById('so-modal');
@@ -8580,7 +8526,6 @@ async function soSaveOrder() {
 
       btnLoading(btn, false, 'Create Order');
       salesFormDirty = false;
-      soDraftClear();
       closeModal('so-modal');
 
       if (soIsWalkIn) {
