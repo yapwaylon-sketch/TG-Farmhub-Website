@@ -497,10 +497,24 @@ function injectCompanySwitcher() {
     '</div>';
 }
 
+// Open modal by ID — shows overlay + traps focus
+function openModal(id) {
+  var el = document.getElementById(id);
+  if (el) {
+    el.style.display = "flex";
+    var box = el.querySelector('.modal-box');
+    if (box) trapFocus(box);
+  }
+}
+
 // Close modal by ID
 function closeModal(id) {
   var el = document.getElementById(id);
-  if (el) el.style.display = "none";
+  if (el) {
+    var box = el.querySelector('.modal-box');
+    if (box) releaseFocus(box);
+    el.style.display = "none";
+  }
   // Clean up calendar popup if open (sales module)
   if (typeof calClose === 'function') calClose();
 }
