@@ -8755,10 +8755,76 @@ function soWizUpdateSubtotal() {
 // ═══════════════════════════════════════════════════════════════
 
 function soWizRenderReview() {
-  // Phase 5 will implement this
   var review = document.getElementById('so-wiz-review');
   if (!review) return;
-  review.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Review loading...</div>';
+
+  var html = '<div class="so-wiz-review-card">';
+
+  // Customer
+  var custName = soIsWalkIn ? 'Walk-in Customer' : (soSelectedCustomer ? soSelectedCustomer.name : '—');
+  var custPhone = soSelectedCustomer && soSelectedCustomer.phone ? soSelectedCustomer.phone : '';
+  var custTerms = soSelectedCustomer && soSelectedCustomer.payment_terms_days > 0 ? 'Credit' : 'Cash';
+  html += '<div class="so-wiz-review-row">';
+  html += '<div class="so-wiz-review-head"><span class="so-wiz-review-label">Customer</span><span class="so-wiz-review-edit" onclick="soWizStep=1;soWizShowStep();">Edit</span></div>';
+  html += '<div class="so-wiz-review-value" style="font-weight:700;font-size:14px;">' + esc(custName) + '</div>';
+  if (custPhone) html += '<div style="font-size:11px;color:var(--text-muted);">' + esc(custPhone) + ' \u00b7 ' + custTerms + '</div>';
+  html += '</div>';
+
+  // Delivery
+  var dDate = document.getElementById('so-delivery-date').value || todayStr();
+  var dTime = document.getElementById('so-wiz-dtime').value || '';
+  var fulfillment = soWizGetToggleVal('so-wiz-fulfillment');
+  var fulfillLabel = fulfillment === 'collection' ? 'Collection' : 'Delivery';
+  html += '<div class="so-wiz-review-row">';
+  html += '<div class="so-wiz-review-head"><span class="so-wiz-review-label">Delivery</span><span class="so-wiz-review-edit" onclick="soWizStep=1;soWizShowStep();">Edit</span></div>';
+  html += '<div class="so-wiz-review-value">' + fmtDateNice(dDate);
+  if (dTime) html += ' \u00b7 ' + fmtTime12(dTime);
+  html += ' \u00b7 ' + fulfillLabel + '</div>';
+  html += '</div>';
+
+  // Doc type + channel badges
+  var docType = soWizGetToggleVal('so-wiz-doctype');
+  var channel = soWizGetToggleVal('so-wiz-channel');
+  var docLabel = docType === 'delivery_order' ? 'Delivery Order' : 'Cash Sales';
+  var chanLabel = channel === 'whatsapp' ? 'WhatsApp' : (channel === 'phone' ? 'Phone' : 'Walk-in');
+  html += '<div class="so-wiz-review-row">';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+  html += '<span style="background:rgba(212,175,55,0.15);color:var(--gold);padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700;">' + docLabel + '</span>';
+  html += '<span style="background:rgba(107,76,138,0.1);color:#6B4C8A;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700;">' + chanLabel + '</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // Items
+  var validItems = soItems.filter(function(i) { return i.productId; });
+  html += '<div class="so-wiz-review-row">';
+  html += '<div class="so-wiz-review-head"><span class="so-wiz-review-label">Items (' + validItems.length + ')</span><span class="so-wiz-review-edit" onclick="soWizStep=2;soWizShowStep();">Edit</span></div>';
+  var grandTotal = 0;
+  validItems.forEach(function(item) {
+    var prod = salesProducts.find(function(p) { return p.id === item.productId; });
+    var name = prod ? prod.name : 'Unknown';
+    var variety = '';
+    if (prod && prod.variety_id) {
+      var v = varieties.find(function(x) { return x.id === prod.variety_id; });
+      if (v) variety = v.name + ' ';
+    }
+    var qty = parseFloat(item.quantity) || 0;
+    var price = parseFloat(item.unitPrice) || 0;
+    var total = item.lineTotal || (qty * price);
+    grandTotal += total;
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">';
+    html += '<span style="color:var(--text);font-size:13px;">' + esc(variety) + esc(name) + ' — ' + qty + (item.unit || 'kg') + '</span>';
+    html += '<span style="font-weight:700;color:var(--text);">' + formatRM(total) + '</span>';
+    html += '</div>';
+  });
+  html += '<div class="so-wiz-review-total">' + formatRM(grandTotal) + '</div>';
+  html += '</div>';
+
+  html += '</div>';
+  review.innerHTML = html;
+
+  // Pre-fill notes from desktop form if any
+  var notesEl = document.getElementById('so-wiz-notes');
+  if (notesEl && !notesEl.value) notesEl.value = document.getElementById('so-notes').value || '';
 }
 
 function soSearchCustomers() {
