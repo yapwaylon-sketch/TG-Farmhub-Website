@@ -957,6 +957,102 @@
       <button class="btn btn-primary" id="so-save-btn" onclick="soSaveOrder()">Create Order</button>
     </div>
   </div>
+
+  <!-- ═══ MOBILE WIZARD (hidden on desktop) ═══ -->
+  <div class="so-wizard" onclick="event.stopPropagation()">
+    <!-- Progress bar -->
+    <div class="so-wiz-progress"><div class="so-wiz-progress-fill" id="so-wiz-pfill" style="width:33%;"></div></div>
+
+    <!-- Step 1: Customer & Delivery -->
+    <div class="so-wiz-step" id="so-wiz-step1">
+      <div class="so-wiz-title" id="so-wiz-title">New Order</div>
+
+      <!-- Customer search -->
+      <div class="so-wiz-section" id="so-wiz-cust-section" style="position:relative;">
+        <div class="so-wiz-label">CUSTOMER</div>
+        <input type="text" id="so-wiz-cust-search" placeholder="Search customer name or phone..." class="so-wiz-input" oninput="soWizSearchCust()" onfocus="soWizSearchCust()" autocomplete="off">
+        <div id="so-wiz-cust-results" class="so-wiz-dropdown" style="display:none;"></div>
+        <div id="so-wiz-cust-badge" class="so-wiz-cust-badge" style="display:none;"></div>
+      </div>
+
+      <!-- Walk-in -->
+      <div class="so-wiz-separator">— or —</div>
+      <button type="button" class="so-wiz-walkin-btn" id="so-wiz-walkin-btn" onclick="soWizToggleWalkIn()">Walk-in Customer</button>
+
+      <!-- Delivery date + time -->
+      <div class="so-wiz-row">
+        <div class="so-wiz-field" style="flex:1;">
+          <div class="so-wiz-label">DELIVERY DATE</div>
+          <div class="so-wiz-date-btn" id="so-wiz-ddate-display" onclick="calOpen('so-delivery-date', document.getElementById('so-wiz-ddate-display'))">Today</div>
+        </div>
+        <div class="so-wiz-field" style="flex:0.7;">
+          <div class="so-wiz-label">TIME</div>
+          <input type="time" id="so-wiz-dtime" class="so-wiz-input" style="padding:11px 8px;">
+        </div>
+      </div>
+
+      <!-- Fulfillment toggle -->
+      <div class="so-wiz-section">
+        <div class="so-wiz-label">FULFILLMENT</div>
+        <div class="so-wiz-toggle" id="so-wiz-fulfillment">
+          <button type="button" class="so-wiz-toggle-btn active" data-val="delivery" onclick="soWizToggle(this)">Delivery</button>
+          <button type="button" class="so-wiz-toggle-btn" data-val="collection" onclick="soWizToggle(this)">Collection</button>
+        </div>
+      </div>
+
+      <!-- Doc type toggle -->
+      <div class="so-wiz-section">
+        <div class="so-wiz-label">DOC TYPE</div>
+        <div class="so-wiz-toggle" id="so-wiz-doctype">
+          <button type="button" class="so-wiz-toggle-btn active" data-val="cash_sales" onclick="soWizToggle(this)">Cash Sales</button>
+          <button type="button" class="so-wiz-toggle-btn" data-val="delivery_order" onclick="soWizToggle(this)">Delivery Order</button>
+        </div>
+      </div>
+
+      <!-- Channel toggle -->
+      <div class="so-wiz-section">
+        <div class="so-wiz-label">CHANNEL</div>
+        <div class="so-wiz-toggle" id="so-wiz-channel">
+          <button type="button" class="so-wiz-toggle-btn active" data-val="whatsapp" onclick="soWizToggle(this)">WhatsApp</button>
+          <button type="button" class="so-wiz-toggle-btn" data-val="phone" onclick="soWizToggle(this)">Phone</button>
+          <button type="button" class="so-wiz-toggle-btn" data-val="walkin" onclick="soWizToggle(this)">Walk-in</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Items -->
+    <div class="so-wiz-step" id="so-wiz-step2" style="display:none;">
+      <div id="so-wiz-items-list"></div>
+      <div class="so-wiz-picker" id="so-wiz-picker">
+        <div class="so-wiz-variety-tabs" id="so-wiz-vtabs"></div>
+        <div class="so-wiz-product-grid" id="so-wiz-pgrid"></div>
+        <div id="so-wiz-qty-panel" style="display:none;"></div>
+      </div>
+      <div style="text-align:right;padding:8px 0;">
+        <span style="font-size:11px;color:var(--text-muted);">Subtotal: </span>
+        <span style="font-weight:700;color:var(--gold);font-size:15px;" id="so-wiz-subtotal">RM 0.00</span>
+      </div>
+    </div>
+
+    <!-- Step 3: Review -->
+    <div class="so-wiz-step" id="so-wiz-step3" style="display:none;">
+      <div id="so-wiz-review"></div>
+      <div class="so-wiz-section">
+        <div class="so-wiz-label">NOTES (OPTIONAL)</div>
+        <textarea id="so-wiz-notes" class="so-wiz-input" rows="2" placeholder="Tap to add delivery notes..."></textarea>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">
+        <span>Order date:</span>
+        <span id="so-wiz-odate-display" style="font-weight:600;color:var(--text);cursor:pointer;text-decoration:underline;" onclick="calOpen('so-order-date', this)">Today</span>
+      </div>
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="so-wiz-bottom">
+      <button type="button" class="btn btn-outline so-wiz-back-btn" id="so-wiz-back" onclick="soWizBack()">&larr; Back</button>
+      <button type="button" class="btn so-wiz-next-btn" id="so-wiz-next" onclick="soWizNext()">Next: Add Items &rarr;</button>
+    </div>
+  </div>
 </div>
 
 <!-- PAYMENT MODAL -->

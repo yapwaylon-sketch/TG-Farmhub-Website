@@ -1276,6 +1276,111 @@
 }
 
 /* ============================================================
+   MOBILE WIZARD — Order creation/edit (hidden on desktop)
+   ============================================================ */
+.so-wizard { display: none; }
+
+@media (max-width: 768px) {
+  /* Hide desktop form, show wizard */
+  #so-modal .so-modal-box { display: none !important; }
+  .so-wizard {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card);
+    width: 100%;
+    min-height: 100vh;
+    overflow-y: auto;
+    padding-bottom: 80px;
+  }
+
+  /* Progress bar */
+  .so-wiz-progress { height: 3px; background: var(--border); flex-shrink: 0; }
+  .so-wiz-progress-fill { height: 100%; background: var(--gold); transition: width 0.3s; }
+
+  /* Steps */
+  .so-wiz-step { padding: 16px 14px; flex: 1; }
+  .so-wiz-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 16px; font-family: 'Playfair Display', serif; }
+  .so-wiz-label { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .so-wiz-input { width: 100%; padding: 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); font-family: inherit; box-sizing: border-box; }
+  .so-wiz-input:focus { border-color: var(--gold); outline: none; }
+  .so-wiz-section { margin-bottom: 16px; }
+  .so-wiz-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .so-wiz-field { display: flex; flex-direction: column; }
+
+  /* Toggle buttons */
+  .so-wiz-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .so-wiz-toggle-btn { flex: 1; text-align: center; padding: 12px 4px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--bg-card); border: none; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
+  .so-wiz-toggle-btn.active { background: var(--gold); color: #fff; font-weight: 700; }
+
+  /* Walk-in */
+  .so-wiz-separator { text-align: center; font-size: 11px; color: var(--text-muted); margin: 8px 0; }
+  .so-wiz-walkin-btn { width: 100%; padding: 14px; font-size: 14px; font-weight: 600; border: 2px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text); cursor: pointer; font-family: inherit; margin-bottom: 16px; transition: all 0.15s; }
+  .so-wiz-walkin-btn.active { border-color: var(--gold); background: var(--gold); color: #fff; }
+
+  /* Customer badge */
+  .so-wiz-cust-badge { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+
+  /* Customer dropdown */
+  .so-wiz-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: var(--bg-card); border: 1px solid var(--border); border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .so-wiz-cust-item { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+  .so-wiz-cust-item:active { background: rgba(212,175,55,0.1); }
+  .so-wiz-cust-name { font-weight: 600; color: var(--text); }
+  .so-wiz-cust-phone { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+
+  /* Date display button */
+  .so-wiz-date-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; }
+
+  /* ---- Step 2: Variety picker ---- */
+  .so-wiz-picker { background: var(--bg-card); border: 2px solid var(--gold); border-radius: 10px; overflow: hidden; margin-top: 12px; }
+  .so-wiz-variety-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .so-wiz-variety-tab { flex: 1; text-align: center; padding: 12px 8px; font-weight: 600; font-size: 13px; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .so-wiz-variety-tab.active { color: var(--gold); border-bottom-color: var(--gold); background: rgba(212,175,55,0.06); font-weight: 700; }
+  .so-wiz-product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; }
+  .so-wiz-product-card { background: #FAF6EF; border: 1px solid var(--border); border-radius: 8px; padding: 12px 8px; text-align: center; cursor: pointer; transition: border-color 0.15s; }
+  .so-wiz-product-card:active { background: rgba(212,175,55,0.08); }
+  .so-wiz-product-card.selected { border: 2px solid var(--gold); background: rgba(212,175,55,0.06); }
+  .so-wiz-product-name { font-weight: 700; font-size: 12px; color: var(--text); }
+  .so-wiz-product-price { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Qty panel */
+  .so-wiz-qty-panel { padding: 10px; border-top: 1px solid var(--border); }
+  .so-wiz-qty-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .so-wiz-qty-input { flex: 1; padding: 14px; font-size: 18px; font-weight: 700; text-align: center; border: 2px solid var(--gold); border-radius: 8px; background: #fff; color: var(--text); font-family: inherit; box-sizing: border-box; }
+  .so-wiz-qty-input:focus { outline: none; border-color: var(--gold); }
+  .so-wiz-qty-unit { font-size: 14px; color: var(--text-muted); font-weight: 600; min-width: 24px; }
+  .so-wiz-add-btn { background: var(--gold); color: #fff; padding: 14px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; border: none; cursor: pointer; white-space: nowrap; font-family: inherit; min-height: 48px; }
+  .so-wiz-add-btn:active { opacity: 0.8; }
+  .so-wiz-price-display { font-size: 11px; color: var(--text-muted); cursor: pointer; text-decoration: underline dotted; }
+
+  /* Added items list */
+  .so-wiz-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+  .so-wiz-item-info { flex: 1; }
+  .so-wiz-item-name { font-weight: 600; color: var(--text); font-size: 13px; }
+  .so-wiz-item-detail { font-size: 11px; color: var(--text-muted); }
+  .so-wiz-item-total { font-weight: 700; color: var(--gold); font-size: 13px; margin-right: 8px; }
+  .so-wiz-item-remove { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; cursor: pointer; background: none; flex-shrink: 0; }
+  .so-wiz-item-remove:active { background: rgba(220,53,69,0.1); color: #dc3545; }
+  .so-wiz-item-index { font-size: 10px; color: var(--gold); cursor: pointer; margin-top: 2px; }
+
+  /* ---- Step 3: Review ---- */
+  .so-wiz-review-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+  .so-wiz-review-row { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .so-wiz-review-row:last-child { border-bottom: none; }
+  .so-wiz-review-head { display: flex; justify-content: space-between; align-items: center; }
+  .so-wiz-review-label { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+  .so-wiz-review-edit { font-size: 11px; color: var(--gold); font-weight: 600; cursor: pointer; }
+  .so-wiz-review-value { color: var(--text); font-size: 13px; margin-top: 2px; }
+  .so-wiz-review-total { text-align: right; font-weight: 700; color: var(--gold); font-size: 16px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+  /* Bottom nav */
+  .so-wiz-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 2px solid var(--gold); padding: 10px 14px; display: flex; gap: 8px; z-index: 200; }
+  .so-wiz-back-btn { flex: 0 0 auto; min-width: 80px; min-height: 48px; }
+  .so-wiz-next-btn { flex: 1; background: var(--gold); color: #fff; font-weight: 700; font-size: 14px; min-height: 48px; border: none; border-radius: 8px; font-family: inherit; cursor: pointer; }
+  .so-wiz-next-btn:active { opacity: 0.8; }
+  .so-wiz-next-btn.green { background: #4A7C3F; }
+}
+
+/* ============================================================
    REPORTS
    ============================================================ */
 .report-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
