@@ -2659,6 +2659,29 @@ function soRenderDetail() {
     html += '</div>';
   }
 
+  // Mobile sticky action bar — next-step button fixed at bottom (canOrder/canDeliver already declared above)
+  var mobileAction = null;
+  if (o.status === 'pending' && canOrder) {
+    mobileAction = { label: 'Start Preparing \u2192', color: '#3A7AC8', fn: 'soShowPrepModal(\'' + esc(o.id) + '\')' };
+  } else if (o.status === 'preparing' && canOrder) {
+    mobileAction = { label: 'Mark Prepared \u2192', color: '#E8A020', fn: 'soMarkPrepared(\'' + esc(o.id) + '\')' };
+  } else if (o.status === 'prepared' && canDeliver) {
+    if (o.fulfillment === 'delivery') {
+      mobileAction = { label: 'Assign Driver & Deliver \u2192', color: '#4A7C3F', fn: 'soAssignDriver(\'' + esc(o.id) + '\')' };
+    } else {
+      mobileAction = { label: 'Mark Collected \u2192', color: '#4A7C3F', fn: 'soMarkCollected(\'' + esc(o.id) + '\')' };
+    }
+  } else if (o.status === 'delivering' && canDeliver) {
+    mobileAction = { label: 'Mark Delivered \u2192', color: '#8C5AD2', fn: 'soMarkDelivered(\'' + esc(o.id) + '\')' };
+  } else if (o.status === 'completed') {
+    mobileAction = { label: 'View Document', color: '#D4AF37', fn: 'soGenerateDoc(\'' + esc(o.id) + '\')' };
+  }
+  if (mobileAction) {
+    html += '<div class="so-mobile-action-bar">';
+    html += '<button class="btn" style="background:' + mobileAction.color + ';color:#fff;border:none;" onclick="' + mobileAction.fn + '">' + mobileAction.label + '</button>';
+    html += '</div>';
+  }
+
   body.innerHTML = html;
 }
 

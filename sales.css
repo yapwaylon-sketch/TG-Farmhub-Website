@@ -1240,6 +1240,41 @@
   }
 }
 
+/* Mobile sticky action bar — hidden on desktop */
+.so-mobile-action-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .so-mobile-action-bar {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    padding: 10px 14px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+    z-index: 200;
+    border-top: 2px solid var(--border);
+  }
+
+  .so-mobile-action-bar .btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 8px;
+    justify-content: center;
+    letter-spacing: 0.3px;
+  }
+
+  /* Pad detail content so bar doesn't overlap last section */
+  #orders-body {
+    padding-bottom: 70px;
+  }
+}
+
 /* ============================================================
    REPORTS
    ============================================================ */
