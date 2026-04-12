@@ -1352,7 +1352,9 @@
 
   /* Qty panel */
   .so-wiz-qty-panel { padding: 10px; border-top: 1px solid var(--border); }
-  .so-wiz-qty-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .so-wiz-qty-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .so-wiz-qty-row .so-wiz-qty-input { flex: 1; min-width: 80px; }
+  .so-wiz-qty-row .so-wiz-add-btn { width: 100%; text-align: center; }
   .so-wiz-qty-input { flex: 1; padding: 14px; font-size: 18px; font-weight: 700; text-align: center; border: 2px solid var(--gold); border-radius: 8px; background: #fff; color: var(--text); font-family: inherit; box-sizing: border-box; }
   .so-wiz-qty-input:focus { outline: none; border-color: var(--gold); }
   .so-wiz-qty-unit { font-size: 14px; color: var(--text-muted); font-weight: 600; min-width: 24px; }

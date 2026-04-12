@@ -8647,15 +8647,23 @@ function soWizSelectProduct(productId) {
   var panel = document.getElementById('so-wiz-qty-panel');
   var unit = p.unit || 'kg';
   var price = p.default_price || 0;
-  var html = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">';
+  var canPcs = (unit === 'kg');
+  var html = '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;">';
   html += '<span style="font-weight:700;font-size:13px;color:var(--text);">' + esc(p.name) + '</span>';
   html += '<span class="so-wiz-price-display" id="so-wiz-price-display" data-default="' + price + '" onclick="soWizEditPrice()">' + formatRM(price) + '/' + esc(unit) + '</span>';
   html += '</div>';
-  html += '<div class="so-wiz-qty-row">';
-  html += '<input type="number" class="so-wiz-qty-input" id="so-wiz-qty" step="' + (unit === 'kg' ? '0.1' : '1') + '" min="0" placeholder="Qty" inputmode="decimal" oninput="soWizQtyChange()">';
-  html += '<span class="so-wiz-qty-unit">' + esc(unit) + '</span>';
-  html += '<button class="so-wiz-add-btn" id="so-wiz-add-btn" onclick="soWizAddItem()">Add</button>';
+  // Pcs/Kg toggle for kg products
+  if (canPcs) {
+    html += '<div class="so-wiz-toggle" style="margin-bottom:8px;max-width:200px;" id="so-wiz-unit-toggle">';
+    html += '<button type="button" class="so-wiz-toggle-btn active" data-val="kg" onclick="soWizToggleUnit(this)">By kg</button>';
+    html += '<button type="button" class="so-wiz-toggle-btn" data-val="pcs" onclick="soWizToggleUnit(this)">By pcs</button>';
+    html += '</div>';
+  }
+  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">';
+  html += '<input type="number" class="so-wiz-qty-input" id="so-wiz-qty" step="' + (unit === 'kg' ? '0.1' : '1') + '" min="0" placeholder="Qty" inputmode="decimal" oninput="soWizQtyChange()" style="flex:1;">';
+  html += '<span class="so-wiz-qty-unit" id="so-wiz-qty-unit" style="min-width:24px;">' + esc(unit) + '</span>';
   html += '</div>';
+  html += '<button class="so-wiz-add-btn" id="so-wiz-add-btn" onclick="soWizAddItem()">Add</button>';
   html += '<input type="number" id="so-wiz-price-input" step="0.01" min="0" style="display:none;padding:10px;font-size:14px;font-weight:600;border:2px solid var(--gold);border-radius:8px;width:100%;box-sizing:border-box;margin-top:6px;" oninput="soWizQtyChange()">';
   panel.innerHTML = html;
   panel.style.display = 'block';
@@ -8673,9 +8681,14 @@ function soWizQtyChange() {
   var price = (priceInput && priceInput.style.display !== 'none')
     ? (parseFloat(priceInput.value) || 0)
     : parseFloat(priceDisplay.getAttribute('data-default') || 0);
-  var total = qty * price;
   var btn = document.getElementById('so-wiz-add-btn');
-  if (btn) btn.textContent = total > 0 ? 'Add ' + formatRM(total) : 'Add';
+  if (!btn) return;
+  if (soWizPcsMode) {
+    btn.textContent = qty > 0 ? 'Add ' + Math.round(qty) + ' pcs (weigh later)' : 'Add';
+  } else {
+    var total = qty * price;
+    btn.textContent = total > 0 ? 'Add ' + formatRM(total) : 'Add';
+  }
 }
 
 function soWizEditPrice() {
@@ -8690,6 +8703,25 @@ function soWizEditPrice() {
   });
 }
 
+var soWizPcsMode = false;
+
+function soWizToggleUnit(btn) {
+  var parent = btn.parentElement;
+  parent.querySelectorAll('.so-wiz-toggle-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  soWizPcsMode = btn.getAttribute('data-val') === 'pcs';
+  var unitEl = document.getElementById('so-wiz-qty-unit');
+  var qtyEl = document.getElementById('so-wiz-qty');
+  if (soWizPcsMode) {
+    if (unitEl) unitEl.textContent = 'pcs';
+    if (qtyEl) { qtyEl.step = '1'; qtyEl.inputMode = 'numeric'; qtyEl.value = ''; qtyEl.placeholder = 'Pcs'; }
+  } else {
+    if (unitEl) unitEl.textContent = 'kg';
+    if (qtyEl) { qtyEl.step = '0.1'; qtyEl.inputMode = 'decimal'; qtyEl.value = ''; qtyEl.placeholder = 'Qty'; }
+  }
+  soWizQtyChange();
+}
+
 function soWizAddItem() {
   var p = salesProducts.find(function(x) { return x.id === soWizSelectedProduct; });
   if (!p) return;
@@ -8701,20 +8733,22 @@ function soWizAddItem() {
     ? (parseFloat(priceInput.value) || 0)
     : parseFloat(priceDisplay.getAttribute('data-default') || 0);
 
+  var isPcs = soWizPcsMode && (p.unit === 'kg');
   soItems.push({
     id: Date.now() + Math.random(),
     productId: p.id,
-    quantity: String(qty),
+    quantity: isPcs ? '0' : String(qty),
     unitPrice: String(unitPrice),
     unit: p.unit || 'kg',
     indexMin: '',
     indexMax: '',
-    lineTotal: qty * unitPrice,
-    orderInPcs: false,
-    orderPcs: ''
+    lineTotal: isPcs ? 0 : (qty * unitPrice),
+    orderInPcs: isPcs,
+    orderPcs: isPcs ? String(Math.round(qty)) : ''
   });
 
   soWizSelectedProduct = null;
+  soWizPcsMode = false;
   document.getElementById('so-wiz-qty-panel').style.display = 'none';
   soWizRenderProductGrid();
   soWizRenderItemsList();
@@ -8746,11 +8780,15 @@ function soWizRenderItemsList() {
     var price = parseFloat(item.unitPrice) || 0;
     var total = item.lineTotal || (qty * price);
     var unit = item.unit || 'kg';
+    var isPcs = item.orderInPcs;
+    var detailText = isPcs
+      ? item.orderPcs + ' pcs' + (qty > 0 ? ' (' + qty + 'kg)' : '') + ' \u00d7 ' + formatRM(price) + '/kg'
+      : qty + ' ' + unit + ' \u00d7 ' + formatRM(price);
 
     html += '<div class="so-wiz-item">';
     html += '<div class="so-wiz-item-info">';
     html += '<div class="so-wiz-item-name">' + esc(variety) + esc(name) + '</div>';
-    html += '<div class="so-wiz-item-detail">' + qty + ' ' + esc(unit) + ' \u00d7 ' + formatRM(price) + '</div>';
+    html += '<div class="so-wiz-item-detail">' + detailText + '</div>';
     if (item.indexMin || item.indexMax) {
       html += '<div style="font-size:10px;color:var(--gold);">Index ' + (item.indexMin || '?') + '-' + (item.indexMax || '?') + '</div>';
     } else {
