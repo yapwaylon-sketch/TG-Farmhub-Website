@@ -827,7 +827,10 @@ function tickRefreshLabel() {
   const el = document.getElementById("refreshInfo");
   if (!el) return;
   const secs = Math.max(0, Math.floor((Date.now() - lastRefreshAt) / 1000));
-  el.textContent = 'UPDATED ' + secs + 'S AGO · AUTO-REFRESH 60S';
+  const stale = secs > 120; // 2 minutes
+  el.textContent = (stale ? '⚠ STALE DATA · ' : '') + 'UPDATED ' + secs + 'S AGO · AUTO-REFRESH 60S';
+  el.style.color = stale ? '#FF5722' : '';
+  el.style.fontWeight = stale ? '700' : '';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -888,6 +891,7 @@ async function refreshData() {
     scheduleNextPage();
   } catch (e) {
     console.error("Refresh error:", e);
+    // Don't update lastRefreshAt — staleness indicator will trigger naturally
   }
 }
 

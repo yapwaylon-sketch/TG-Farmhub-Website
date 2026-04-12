@@ -135,6 +135,9 @@
     </div>
     <div class="header-actions" id="products-header-actions"></div>
   </div>
+  <div style="margin-bottom:12px;">
+    <input type="text" id="sp-search" placeholder="Search products..." oninput="renderProducts()" style="width:100%;max-width:320px;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,var(--bg-card));color:var(--text);font-family:inherit;">
+  </div>
   <div class="page-body" id="products-body"></div>
 </div>
 
@@ -843,7 +846,7 @@
   <div class="modal-box so-modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
       <div class="modal-title" id="so-modal-title">New Order</div>
-      <button class="modal-close" onclick="salesFormDirty=false;closeModal('so-modal')">
+      <button class="modal-close" onclick="salesFormDirty=false;soDraftClear();closeModal('so-modal')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -950,7 +953,7 @@
 
     <!-- Section E: Actions -->
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="salesFormDirty=false;closeModal('so-modal')">Cancel</button>
+      <button class="btn btn-outline" onclick="salesFormDirty=false;soDraftClear();closeModal('so-modal')">Cancel</button>
       <button class="btn btn-primary" id="so-save-btn" onclick="soSaveOrder()">Create Order</button>
     </div>
   </div>
@@ -1297,7 +1300,6 @@ window.addEventListener('beforeunload', function(e) {
     });
   }
 
-  document.getElementById("tg-loading").style.display = "none";
   injectUserBadge(currentUser);
   injectCompanySwitcher();
   startInactivityTimer();
@@ -1313,6 +1315,7 @@ window.addEventListener('beforeunload', function(e) {
   if (!salesCan('createOrder'))     document.getElementById('btn-bottom-new-order').style.display = 'none';
 
   await loadAllData();
+  document.getElementById("tg-loading").style.display = "none";
   renderCurrentTab();
 })();
 
@@ -1336,6 +1339,7 @@ function switchTab(tab, skipHistory) {
   var nav = document.getElementById('nav-' + tab);
   if (nav) nav.classList.add('active');
   if (!skipHistory) history.pushState({ tab: tab }, '', '#' + tab);
+  window.scrollTo(0, 0);
   renderCurrentTab();
 }
 
@@ -4481,9 +4485,24 @@ function renderProducts() {
     return;
   }
 
+  // Filter by search
+  var searchTerm = (document.getElementById('sp-search') ? document.getElementById('sp-search').value : '').toLowerCase().trim();
+  var filtered = salesProducts;
+  if (searchTerm) {
+    filtered = salesProducts.filter(function(p) {
+      return (p.name || '').toLowerCase().indexOf(searchTerm) >= 0
+        || (p.name_bm || '').toLowerCase().indexOf(searchTerm) >= 0
+        || (p.category || '').toLowerCase().indexOf(searchTerm) >= 0;
+    });
+  }
+  if (!filtered.length) {
+    body.innerHTML = '<div class="empty-state">No products match "' + esc(searchTerm) + '"</div>';
+    return;
+  }
+
   // Group by variety
   var grouped = {};
-  salesProducts.forEach(function(p) {
+  filtered.forEach(function(p) {
     var vid = p.variety_id || 'none';
     if (!grouped[vid]) grouped[vid] = [];
     grouped[vid].push(p);
@@ -5381,7 +5400,11 @@ function amountInWords(amount) {
   return result;
 }
 
+var _invDoSearchVal = '';
 function renderInvoicing() {
+  // Preserve search input across re-renders
+  var existingSearch = document.getElementById('inv-do-search');
+  if (existingSearch) _invDoSearchVal = existingSearch.value;
   var body = document.getElementById('page-invoicing').querySelector('.page-body');
   var html = '';
 
@@ -5389,10 +5412,22 @@ function renderInvoicing() {
   html += '<div style="margin-bottom:32px;">';
   html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Uninvoiced Delivery Orders</div>';
   html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Select DOs to batch into an invoice</div>';
+  html += '<input type="text" id="inv-do-search" placeholder="Search by customer or DO number..." oninput="renderInvoicing()" style="width:100%;max-width:320px;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,var(--bg-card));color:var(--text);font-family:inherit;margin-bottom:12px;">';
 
   var uninvoicedDOs = orders.filter(function(o) {
     return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
   });
+
+  // Filter by search term
+  var invSearchTerm = _invDoSearchVal.toLowerCase().trim();
+  if (invSearchTerm) {
+    uninvoicedDOs = uninvoicedDOs.filter(function(o) {
+      var cust = customers.find(function(c) { return c.id === o.customer_id; });
+      var custName = cust ? cust.name.toLowerCase() : '';
+      var docNum = (o.doc_number || '').toLowerCase();
+      return custName.indexOf(invSearchTerm) >= 0 || docNum.indexOf(invSearchTerm) >= 0;
+    });
+  }
 
   // Group by customer
   var byCustomer = {};
@@ -5508,6 +5543,9 @@ function renderInvoicing() {
   html += '<div id="inv-list-container"></div>';
 
   body.innerHTML = html;
+  // Restore search input value after re-render
+  var searchInput = document.getElementById('inv-do-search');
+  if (searchInput && _invDoSearchVal) { searchInput.value = _invDoSearchVal; }
   invRenderList();
 }
 
@@ -7950,6 +7988,45 @@ async function soToggleWalkIn() {
   }
 }
 
+// ── Draft auto-save for New Order ──
+var SO_DRAFT_KEY = 'tgfarmhub_order_draft';
+function soDraftSave() {
+  if (soEditOrderId) return; // Don't save drafts for edits
+  try {
+    var draft = {
+      customerId: soSelectedCustomer,
+      isWalkIn: soIsWalkIn,
+      orderDate: document.getElementById('so-order-date').value,
+      deliveryDate: document.getElementById('so-delivery-date').value,
+      deliveryTime: document.getElementById('so-delivery-time').value,
+      fulfillment: document.getElementById('so-fulfillment').value,
+      docType: document.getElementById('so-doc-type').value,
+      channel: document.getElementById('so-channel').value,
+      notes: document.getElementById('so-notes').value,
+      items: soItems,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(SO_DRAFT_KEY, JSON.stringify(draft));
+  } catch(e) {}
+}
+function soDraftLoad() {
+  try {
+    var raw = localStorage.getItem(SO_DRAFT_KEY);
+    if (!raw) return null;
+    var draft = JSON.parse(raw);
+    // Expire drafts older than 24 hours
+    if (Date.now() - (draft.savedAt || 0) > 24 * 60 * 60 * 1000) { soDraftClear(); return null; }
+    return draft;
+  } catch(e) { return null; }
+}
+function soDraftClear() { localStorage.removeItem(SO_DRAFT_KEY); }
+
+// Auto-save draft every 5 seconds while order modal is open
+setInterval(function() {
+  var modal = document.getElementById('so-modal');
+  if (modal && modal.style.display !== 'none' && !soEditOrderId) soDraftSave();
+}, 5000);
+
 function openNewOrderModal(editOrderId) {
   if (!salesCan('createOrder')) { notify('No permission to create/edit orders', 'warning'); return; }
   soEditOrderId = editOrderId || null;
@@ -8038,7 +8115,26 @@ function openNewOrderModal(editOrderId) {
   } else {
     modalTitle.textContent = 'New Order';
     saveBtn.textContent = 'Create Order';
-    soAddItem();
+    // Check for saved draft
+    var draft = soDraftLoad();
+    if (draft) {
+      soSelectedCustomer = draft.customerId || null;
+      if (soSelectedCustomer) soSelectCustomer(soSelectedCustomer);
+      soIsWalkIn = draft.isWalkIn || false;
+      document.getElementById('so-order-date').value = draft.orderDate || todayStr();
+      calUpdateDisplay('so-order-date', draft.orderDate || todayStr());
+      document.getElementById('so-delivery-date').value = draft.deliveryDate || todayStr();
+      calUpdateDisplay('so-delivery-date', draft.deliveryDate || todayStr());
+      document.getElementById('so-delivery-time').value = draft.deliveryTime || '';
+      document.getElementById('so-fulfillment').value = draft.fulfillment || 'delivery';
+      document.getElementById('so-doc-type').value = draft.docType || 'cash_sales';
+      document.getElementById('so-channel').value = draft.channel || 'whatsapp';
+      document.getElementById('so-notes').value = draft.notes || '';
+      if (draft.items && draft.items.length) { soItems = draft.items; } else { soAddItem(); }
+      notify('Draft restored', 'info');
+    } else {
+      soAddItem();
+    }
   }
   soRenderItems();
   var modal = document.getElementById('so-modal');
@@ -8484,6 +8580,7 @@ async function soSaveOrder() {
 
       btnLoading(btn, false, 'Create Order');
       salesFormDirty = false;
+      soDraftClear();
       closeModal('so-modal');
 
       if (soIsWalkIn) {
@@ -8960,6 +9057,15 @@ async function soDeletePhoto(orderId, stage, index) {
     soRenderDetail();
   });
 }
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var docModal = document.getElementById('so-doc-modal');
+    if (docModal && docModal.style.display !== 'none') { closeDocModal(); return; }
+    var shareModal = document.getElementById('so-doc-share-modal');
+    if (shareModal && shareModal.style.display !== 'none') { closeModal('so-doc-share-modal'); return; }
+  }
+});
 
 function closeDocModal() {
   var modal = document.getElementById('so-doc-modal');
