@@ -841,16 +841,17 @@ async function delCommitAll() {
       if (localItem) { localItem.quantity = it.quantity; localItem.line_total = it.line_total; }
     }
 
-    // 2. Recalculate grand total from items
-    var newGrand = 0;
-    pending.items.forEach(function(it) { newGrand += it.line_total; });
+    // 2. Recalculate subtotal and grand total from items
+    var newSubtotal = 0;
+    pending.items.forEach(function(it) { newSubtotal += it.line_total; });
     var returnsTotal = parseFloat(o.returns_total) || 0;
-    newGrand = newGrand - returnsTotal;
+    var newGrand = newSubtotal - returnsTotal;
 
     // 3. Build order update
     var orderUpdate = {
       status: 'completed',
       completed_at: new Date().toISOString(),
+      subtotal: newSubtotal,
       grand_total: newGrand
     };
     if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;

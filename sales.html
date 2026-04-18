@@ -2550,9 +2550,9 @@ function soRenderDetail() {
   });
   html += '</tbody></table></div>';
 
-  // Totals
+  // Totals — always compute from items (grand_total in DB can be stale)
   var returnsTotal = parseFloat(o.returns_total) || 0;
-  var grandTotal = parseFloat(o.grand_total) || 0;
+  var grandTotal = subtotal - returnsTotal;
   html += '<div class="so-detail-totals">';
   html += '<div class="so-detail-total-row"><span>Subtotal</span><span>' + formatRM(subtotal) + '</span></div>';
   if (returnsTotal > 0) {
@@ -3125,7 +3125,7 @@ async function soPrepCommitAll() {
     var returnsTotal = o ? (parseFloat(o.returns_total) || 0) : 0;
     var newGrand = grandTotal - returnsTotal;
 
-    var orderUpdate = { status: 'prepared', grand_total: newGrand };
+    var orderUpdate = { status: 'prepared', subtotal: grandTotal, grand_total: newGrand };
     if (pending.photoUrl) orderUpdate.prep_photo_url = pending.photoUrl;
 
     var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
@@ -3134,6 +3134,7 @@ async function soPrepCommitAll() {
     // Update local
     if (o) {
       o.status = 'prepared';
+      o.subtotal = grandTotal;
       o.grand_total = newGrand;
       if (pending.photoUrl) o.prep_photo_url = pending.photoUrl;
     }
@@ -9220,6 +9221,9 @@ async function soSaveOrder() {
   btnLoading(btn, true);
 
   try {
+    // Recalculate all item lineTotals before save — prevents stale values
+    // when user only changed non-item fields (date, notes, driver)
+    soCalcTotals();
     var subtotalVal = soItems.reduce(function(sum, i) { return sum + i.lineTotal; }, 0);
     var docType = document.getElementById('so-doc-type').value;
 
@@ -10775,7 +10779,8 @@ async function retSaveReturn() {
     var o = orders.find(function(x) { return x.id === orderId; });
     if (o) {
       var totalReturns = returns.filter(function(r) { return r.order_id === orderId; }).reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
-      var subtotal = parseFloat(o.subtotal) || 0;
+      // Compute subtotal from items (not o.subtotal which can be stale)
+      var subtotal = orderItems.filter(function(i) { return i.order_id === orderId; }).reduce(function(s, i) { return s + (parseFloat(i.line_total) || 0); }, 0);
       var newGrandTotal = subtotal - totalReturns;
       if (newGrandTotal < 0) newGrandTotal = 0;
 
