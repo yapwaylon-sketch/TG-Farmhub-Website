@@ -3131,12 +3131,23 @@ async function soPrepCommitAll() {
     }
 
     // 2. Update order: status + grand_total + photo
-    // Authoritatively sum line_total from DB — local grandTotal is a fallback only.
+    // Authoritative: read subtotal from DB after the item UPDATEs above. Never trust in-memory pending sum.
     var o = orders.find(function(x) { return x.id === orderId; });
-    var returnsTotal = o ? (parseFloat(o.return_total) || parseFloat(o.return_total) || 0) : 0;
+    var returnsTotal = o ? (parseFloat(o.return_total) || 0) : 0;
     var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
-    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
-    if (dbSubtotal > 0) grandTotal = dbSubtotal;
+    if (freshItems === null) {
+      notify('Network error verifying totals — retry Mark Prepared', 'error');
+      soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return;
+    }
+    if (!freshItems.length) {
+      notify('Order has no items — cannot mark prepared', 'error');
+      soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return;
+    }
+    grandTotal = freshItems.reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (grandTotal === 0) {
+      notify('All items have zero value — check quantities and retry', 'error');
+      soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return;
+    }
     var newGrand = Math.max(0, grandTotal - returnsTotal);
 
     var orderUpdate = { status: 'prepared', subtotal: grandTotal, grand_total: newGrand };
@@ -3633,12 +3644,23 @@ async function soDeliveryCommitAll() {
     }
 
     // 3. Update order: status + totals + photo + completed_at
-    // Authoritatively sum line_total from DB — newSubtotal is a fallback only.
+    // Authoritative: read subtotal from DB after the item UPDATEs above. Never trust in-memory pending sum.
     var o = orders.find(function(x) { return x.id === orderId; });
-    var returnsTotal = o ? (parseFloat(o.return_total) || parseFloat(o.return_total) || 0) : 0;
+    var returnsTotal = o ? (parseFloat(o.return_total) || 0) : 0;
     var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
-    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
-    if (dbSubtotal > 0) newSubtotal = dbSubtotal;
+    if (freshItems === null) {
+      notify('Network error verifying totals — retry Mark Delivered', 'error');
+      soDeliveryPending = null; return;
+    }
+    if (!freshItems.length) {
+      notify('Order has no items — cannot mark delivered', 'error');
+      soDeliveryPending = null; return;
+    }
+    newSubtotal = freshItems.reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (newSubtotal === 0) {
+      notify('All items have zero value — check quantities and retry', 'error');
+      soDeliveryPending = null; return;
+    }
     var newGrand = Math.max(0, newSubtotal - returnsTotal);
     var orderUpdate = {
       status: 'completed',

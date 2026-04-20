@@ -850,14 +850,22 @@ async function delCommitAll() {
       if (localItem) { localItem.quantity = it.quantity; localItem.line_total = it.line_total; }
     }
 
-    // 2. Recalculate subtotal and grand total — authoritatively from DB after the item updates above.
-    // pending.items is a fallback only (in case DB read fails).
-    var newSubtotal = 0;
-    pending.items.forEach(function(it) { newSubtotal += it.line_total; });
+    // 2. Recalculate subtotal and grand total — authoritative from DB after the item UPDATEs above.
     var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
-    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
-    if (dbSubtotal > 0) newSubtotal = dbSubtotal;
-    var returnsTotal = parseFloat(o.return_total) || parseFloat(o.return_total) || 0;
+    if (freshItems === null) {
+      notify('Network error verifying totals — retry Mark Delivered', 'error');
+      delPending = null; return;
+    }
+    if (!freshItems.length) {
+      notify('Order has no items — cannot mark delivered', 'error');
+      delPending = null; return;
+    }
+    var newSubtotal = freshItems.reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (newSubtotal === 0) {
+      notify('All items have zero value — check quantities and retry', 'error');
+      delPending = null; return;
+    }
+    var returnsTotal = parseFloat(o.return_total) || 0;
     var newGrand = Math.max(0, newSubtotal - returnsTotal);
 
     // 3. Build order update
