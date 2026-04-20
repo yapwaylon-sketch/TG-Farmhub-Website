@@ -133,7 +133,7 @@
 
 <!-- LO MODAL -->
 <div class="modal-overlay" id="lo-modal" style="display:none;">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:720px;">
     <div class="modal-header">
       <h3 id="lo-modal-title">Add Local Order</h3>
       <button class="modal-close" onclick="closeLoModal()">&times;</button>
@@ -665,13 +665,14 @@ function renderDashboard() {
       var fillCls = pct >= 50 ? 'td-card-green' : 'td-card-gold';
 
       html += '<div class="td-contract-card ' + fillCls + '" onclick="switchTender(\'' + t.id + '\')" title="Switch to this tender">' +
-        '<div class="td-cc-head">' + esc(t.tender_no) + ' — ' + esc(t.variety) + (isCurrent ? ' <span class="td-cc-current">●</span>' : '') + '</div>' +
-        '<div class="td-cc-bignum">' + fmtNum(deliveredQty) + ' <span class="td-cc-of">/ ' + fmtNum(t.total_qty || 0) + '</span></div>' +
+        '<div class="td-cc-head">' + esc(t.tender_no) + '</div>' +
+        '<div class="td-cc-subhead">' + esc(t.variety) + (isCurrent ? '<span class="td-cc-current" title="Currently viewing"></span>' : '') + '</div>' +
+        '<div class="td-cc-bignum">' + fmtNum(deliveredQty) + '<span class="td-cc-of"> / ' + fmtNum(t.total_qty || 0) + '</span></div>' +
         '<div class="td-cc-line"><span>Remaining</span><strong>' + fmtNum(remaining) + '</strong></div>' +
-        '<div class="td-cc-line"><span>Total Value</span><strong>' + fmtRM(totalValue) + '</strong></div>' +
+        '<div class="td-cc-line"><span>Contract value</span><strong>' + fmtRM(totalValue) + '</strong></div>' +
         '<div class="td-cc-line"><span>Billed</span><strong>' + fmtRM(billed) + '</strong></div>' +
         '<div class="td-cc-line"><span>Paid</span><strong>' + fmtRM(paidAmt) + '</strong></div>' +
-        (isCurrent ? '<div class="td-cc-hint td-cc-hint-current">Currently viewing</div>' : '<div class="td-cc-hint">Click to switch</div>') +
+        (isCurrent ? '' : '<div class="td-cc-hint">Switch →</div>') +
         '</div>';
     });
   }
@@ -717,18 +718,18 @@ function renderDashboard() {
       html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">No pending deliveries.</div>';
     } else {
       html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
-        '<th>LO #</th><th>Variety</th><th>Farmer</th><th>Location</th><th>Deadline</th><th style="text-align:right;">Qty</th><th>Status</th>' +
+        '<th>LO</th><th>Variety</th><th>Farmer</th><th>Location</th><th>Deadline</th><th style="text-align:right;">Qty</th><th>Status</th>' +
         '</tr></thead><tbody>';
       pending.forEach(function(lo) {
         var d = daysUntil(lo.lo_expiry);
-        var dateCls = (d !== null && d < 0) ? 'style="color:#EF4444;font-weight:600;"' : (d !== null && d <= 14) ? 'style="color:#D4AF37;font-weight:600;"' : '';
+        var dateCls = (d !== null && d < 0) ? 'style="color:#EF4444;font-weight:700;white-space:nowrap;"' : (d !== null && d <= 14) ? 'style="color:#D4AF37;font-weight:700;white-space:nowrap;"' : 'style="white-space:nowrap;"';
         html += '<tr onclick="navigateTo(\'los\')" style="cursor:pointer;">' +
-          '<td><strong>' + esc(lo.lo_number || '—') + '</strong></td>' +
+          '<td style="white-space:nowrap;"><strong>' + esc(lo.lo_number || '—') + '</strong></td>' +
           '<td>' + esc(currentTender.variety) + '</td>' +
           '<td>' + esc(lo.recipient_name || '—') + '</td>' +
           '<td>' + esc(lo.area || '—') + '</td>' +
           '<td ' + dateCls + '>' + fmtDate(lo.lo_expiry) + '</td>' +
-          '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td>' +
+          '<td style="text-align:right;white-space:nowrap;">' + fmtNum(lo.qty) + '</td>' +
           '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td>' +
           '</tr>';
       });
@@ -752,24 +753,24 @@ function renderDashboard() {
     html += '<div style="font-size:12px;color:var(--text-muted);margin:0 0 8px;">Total owed: <strong style="color:#EF4444;">' + fmtRM(totalOwed) + '</strong> across ' + unpaid.length + ' purchase' + (unpaid.length===1?'':'s') + '</div>';
     var shown = unpaid.slice(0, 10);
     html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
-      '<th>Purchase Date</th><th>Supplier</th><th>LO #</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Total</th><th>Receipt</th><th></th>' +
+      '<th>Date</th><th>Supplier</th><th>LO</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Total</th><th>Receipt</th><th style="width:1px;"></th>' +
       '</tr></thead><tbody>';
     shown.forEach(function(p) {
       var sup = supplierById(p.supplier_id);
       var lo = los.find(function(l) { return l.id === p.lo_id; });
       html += '<tr>' +
-        '<td>' + fmtDate(p.purchase_date) + '</td>' +
+        '<td style="white-space:nowrap;">' + fmtDate(p.purchase_date) + '</td>' +
         '<td><strong>' + esc(sup ? sup.name : p.supplier_id) + '</strong></td>' +
-        '<td>' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
-        '<td style="text-align:right;">' + fmtNum(p.qty) + '</td>' +
-        '<td style="text-align:right;color:#EF4444;font-weight:600;">' + fmtRM(p.total_cost) + '</td>' +
+        '<td style="white-space:nowrap;">' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' + fmtNum(p.qty) + '</td>' +
+        '<td style="text-align:right;color:#EF4444;font-weight:700;white-space:nowrap;">' + fmtRM(p.total_cost) + '</td>' +
         '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
-        '<td><button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
+        '<td style="white-space:nowrap;"><button class="btn btn-primary btn-sm" style="font-size:11px;padding:5px 12px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
         '</tr>';
     });
     html += '</tbody></table></div>';
     if (unpaid.length > 10) {
-      html += '<div style="text-align:right;margin-top:6px;"><a href="#suppliers" onclick="navigateTo(\'suppliers\');return false;" style="font-size:11px;color:#6B4C8A;">View all ' + unpaid.length + ' payables →</a></div>';
+      html += '<div style="text-align:right;margin-top:10px;"><a href="#suppliers" onclick="navigateTo(\'suppliers\');return false;" style="font-size:11px;color:var(--green-light);font-weight:600;">View all ' + unpaid.length + ' payables →</a></div>';
     }
   }
   html += '</div>';
@@ -949,23 +950,27 @@ function renderLoPurchasesSection(loId) {
   var mgn = rev - purchasedCost;
   var mgnPct = rev ? Math.round(mgn / rev * 100) : 0;
 
-  var html = '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
-    '<h4 style="margin:0;font-size:13px;font-weight:700;">Supplier Purchases</h4>' +
+  var html = '<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px;">';
+  html += '<div class="td-lo-purchases-head">' +
+    '<h4>Supplier Purchases</h4>' +
     '<button type="button" class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openPurchaseModal(null,\'' + loId + '\')">+ Add Purchase</button>' +
     '</div>';
 
-  // Summary + margin preview
-  html += '<div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:10px;">' +
-    '<div style="margin-bottom:6px;"><strong>' + fmtNum(purchasedQty) + '</strong> of <strong>' + fmtNum(loQty) + '</strong> pcs purchased from suppliers' +
-    (remainder > 0 ? ' · remainder <strong>' + fmtNum(remainder) + '</strong> pcs (own-nursery)' : (remainder < 0 ? ' · <span style="color:#EF4444;font-weight:600;">⚠ ' + fmtNum(-remainder) + ' pcs OVER</span>' : '')) +
+  // Summary + margin preview — proper styled block
+  var mgnCls = mgn >= 0 ? 'pos' : 'neg';
+  html += '<div class="td-margin-preview">' +
+    '<div class="td-margin-preview-summary">' +
+      '<strong>' + fmtNum(purchasedQty) + '</strong> of <strong>' + fmtNum(loQty) + '</strong> pcs purchased from suppliers' +
+      (remainder > 0 ? ' · remainder <strong>' + fmtNum(remainder) + '</strong> pcs from own-nursery'
+        : (remainder < 0 ? ' · <span class="td-warn-chip">⚠ ' + fmtNum(-remainder) + ' pcs over</span>'
+          : '')) +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:6px;border-top:1px dashed var(--border);">' +
-    '<div><div style="font-size:10px;color:var(--text-muted);">Revenue</div><strong>' + fmtRM(rev) + '</strong></div>' +
-    '<div><div style="font-size:10px;color:var(--text-muted);">− Supplier Cost</div><strong style="color:#EF4444;">' + fmtRM(purchasedCost) + '</strong></div>' +
-    '<div><div style="font-size:10px;color:var(--text-muted);">= Margin' + (rows.length ? ' (' + mgnPct + '%)' : '') + '</div><strong style="color:' + (mgn >= 0 ? '#22A05C' : '#EF4444') + ';">' + fmtRM(mgn) + '</strong></div>' +
+    '<div class="td-margin-preview-grid">' +
+      '<div><div class="td-mp-label">Revenue</div><div class="td-mp-value pos">' + fmtRM(rev) + '</div></div>' +
+      '<div><div class="td-mp-label">− Supplier cost</div><div class="td-mp-value cost">' + fmtRM(purchasedCost) + '</div></div>' +
+      '<div><div class="td-mp-label">= Margin' + (rows.length ? ' (' + mgnPct + '%)' : '') + '</div><div class="td-mp-value ' + mgnCls + '">' + fmtRM(mgn) + '</div></div>' +
     '</div>' +
-    '</div>';
+  '</div>';
 
   // Purchases table
   if (!rows.length) {
@@ -1138,7 +1143,7 @@ function renderSuppliers() {
     html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">No suppliers yet. Add one to start tracking purchases.</div>';
   } else {
     html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
-      '<th>Name</th><th>Contact</th><th style="text-align:right;">Total Bought (pcs)</th><th style="text-align:right;">Total Cost (RM)</th><th style="text-align:right;">Outstanding (RM)</th><th style="text-align:right;">LOs</th><th>Last Purchase</th><th>Status</th><th></th>' +
+      '<th>Supplier</th><th>Contact</th><th style="text-align:right;">Bought</th><th style="text-align:right;">Spent</th><th style="text-align:right;">Owed</th><th style="text-align:right;">LOs</th><th>Last buy</th><th>Status</th><th style="width:1px;"></th>' +
       '</tr></thead><tbody>';
     suppliers.forEach(function(s) {
       var myPurchases = supplierPurchases.filter(function(p) { return p.supplier_id === s.id; });
@@ -1179,20 +1184,20 @@ function renderSuppliers() {
   } else {
     html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Total owed: <strong style="color:#EF4444;">' + fmtRM(totalOwed) + '</strong> across ' + unpaid.length + ' purchase' + (unpaid.length===1?'':'s') + '</div>';
     html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
-      '<th>Purchase Date</th><th>Supplier</th><th>LO #</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:right;">Total</th><th>Receipt</th><th></th>' +
+      '<th>Date</th><th>Supplier</th><th>LO</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:right;">Total</th><th>Receipt</th><th style="width:1px;"></th>' +
       '</tr></thead><tbody>';
     unpaid.forEach(function(p) {
       var sup = supplierById(p.supplier_id);
       var lo = los.find(function(l) { return l.id === p.lo_id; });
       html += '<tr>' +
-        '<td>' + fmtDate(p.purchase_date) + '</td>' +
+        '<td style="white-space:nowrap;">' + fmtDate(p.purchase_date) + '</td>' +
         '<td><strong>' + esc(sup ? sup.name : p.supplier_id) + '</strong></td>' +
-        '<td>' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
-        '<td style="text-align:right;">' + fmtNum(p.qty) + '</td>' +
-        '<td style="text-align:right;">' + fmtRM(p.unit_cost) + '</td>' +
-        '<td style="text-align:right;color:#EF4444;font-weight:600;">' + fmtRM(p.total_cost) + '</td>' +
-        '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '" style="font-size:10px;">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
-        '<td><button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
+        '<td style="white-space:nowrap;">' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' + fmtNum(p.qty) + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' + fmtRM(p.unit_cost) + '</td>' +
+        '<td style="text-align:right;color:#EF4444;font-weight:700;white-space:nowrap;">' + fmtRM(p.total_cost) + '</td>' +
+        '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
+        '<td style="white-space:nowrap;"><button class="btn btn-primary btn-sm" style="font-size:11px;padding:5px 12px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
         '</tr>';
     });
     html += '</tbody></table></div>';
@@ -1780,22 +1785,23 @@ function renderMarginReport() {
     '<button class="btn btn-outline btn-sm" style="font-size:11px;margin-left:auto;" onclick="exportMarginCsv()">Export CSV</button>' +
     '</div>';
 
-  // Summary cards
-  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">' +
-    '<div style="background:linear-gradient(135deg,#22A05C 0%,#1B7D47 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
-      '<div style="font-size:11px;opacity:0.85;">Total Revenue</div>' +
-      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(revenue) + '</div>' +
-      '<div style="font-size:11px;opacity:0.85;">' + revLos.length + ' local orders</div>' +
+  // Summary cards (flat, colored-accent border — matches rest of app)
+  var marginCls = margin >= 0 ? 'pos' : 'neg';
+  html += '<div class="td-summary-cards">' +
+    '<div class="td-summary-card revenue">' +
+      '<div class="td-summary-label">Total Revenue</div>' +
+      '<div class="td-summary-value pos">' + fmtRM(revenue) + '</div>' +
+      '<div class="td-summary-sub">' + revLos.length + ' local order' + (revLos.length===1?'':'s') + '</div>' +
     '</div>' +
-    '<div style="background:linear-gradient(135deg,#C25B1E 0%,#8F4316 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
-      '<div style="font-size:11px;opacity:0.85;">Supplier Cost</div>' +
-      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(cost) + '</div>' +
-      '<div style="font-size:11px;opacity:0.85;">' + costPurs.length + ' purchase' + (costPurs.length===1?'':'s') + '</div>' +
+    '<div class="td-summary-card cost">' +
+      '<div class="td-summary-label">Supplier Cost</div>' +
+      '<div class="td-summary-value cost">' + fmtRM(cost) + '</div>' +
+      '<div class="td-summary-sub">' + costPurs.length + ' purchase' + (costPurs.length===1?'':'s') + '</div>' +
     '</div>' +
-    '<div style="background:linear-gradient(135deg,#1B7D47 0%,#0F5A31 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
-      '<div style="font-size:11px;opacity:0.85;">Net Margin</div>' +
-      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(margin) + '</div>' +
-      '<div style="font-size:11px;opacity:0.85;">' + mPct + '% of revenue</div>' +
+    '<div class="td-summary-card margin">' +
+      '<div class="td-summary-label">Net Margin</div>' +
+      '<div class="td-summary-value ' + marginCls + '">' + fmtRM(margin) + '</div>' +
+      '<div class="td-summary-sub">' + mPct + '% of revenue</div>' +
     '</div>' +
     '</div>';
 
@@ -1984,24 +1990,26 @@ async function renderUpload() {
 
   var html = '';
   html += '<div class="td-section-header"><h2>Upload Local Order PDF</h2></div>';
-  html += '<div class="td-section" style="max-width:780px;">';
+  html += '<div class="td-section" style="max-width:820px;">';
   html += '<div id="upl-step-1">' +
-    '<label class="td-upload-drop" style="display:block;border:2px dashed #D4AF37;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:var(--bg-card);">' +
+    '<label class="td-upload-drop">' +
       '<input id="upl-file" type="file" accept=".pdf" style="display:none;" onchange="handleUploadFile(this)">' +
-      '<div style="font-size:40px;margin-bottom:8px;">📄</div>' +
-      '<div style="font-weight:700;font-size:14px;color:var(--text);">Click to select PDF or drag and drop here</div>' +
-      '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">MPOB Pesanan Tempatan format — auto-extracts data</div>' +
+      '<div class="td-upload-drop-icon">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+      '</div>' +
+      '<div class="td-upload-drop-title">Drop PDF here or click to browse</div>' +
+      '<div class="td-upload-drop-sub">MPOB Pesanan Tempatan format — fields auto-extracted by AI</div>' +
     '</label>' +
-    '<div style="margin-top:14px;display:flex;gap:12px;align-items:center;">' +
-      '<label style="font-size:12px;color:var(--text-muted);">Assign to tender</label>' +
-      '<select id="upl-tender" class="form-control" style="max-width:320px;">' +
+    '<div style="margin-top:18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+      '<label style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Assign to</label>' +
+      '<select id="upl-tender" class="form-control" style="max-width:340px;flex:1;">' +
         tenders.filter(function(t){return t.status==='active';}).map(function(t) {
           var sel = (t.id === currentTender.id) ? ' selected' : '';
           return '<option value="' + t.id + '"' + sel + '>' + esc(t.tender_no) + ' — ' + esc(t.variety) + '</option>';
         }).join('') +
       '</select>' +
-      '<label style="font-size:12px;color:var(--text-muted);">Batch</label>' +
-      '<input id="upl-batch" type="number" min="1" value="' + nextBatch + '" class="form-control" style="max-width:80px;">' +
+      '<label style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Batch</label>' +
+      '<input id="upl-batch" type="number" min="1" value="' + nextBatch + '" class="form-control" style="max-width:90px;">' +
     '</div>' +
     '</div>';
 
