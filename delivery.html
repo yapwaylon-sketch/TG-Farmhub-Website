@@ -645,10 +645,19 @@ function renderCompletedCard(o) {
 var delPending = null; // { orderId, items: [], photoUrl, payment: null }
 
 // Step 1: Show qty confirmation modal
-function markDelivered(orderId) {
+async function markDelivered(orderId) {
   var o = orders.find(function(x) { return x.id === orderId; });
   if (!o) return;
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
+  // Guard: if local cache is empty, re-fetch from DB. Prevents blind-confirm → subtotal=0.
+  if (!items.length) {
+    var fresh = await sbQuery(sb.from('sales_order_items').select('*').eq('order_id', orderId));
+    if (fresh && fresh.length) {
+      fresh.forEach(function(f) { if (!orderItems.find(function(x) { return x.id === f.id; })) orderItems.push(f); });
+      items = orderItems.filter(function(i) { return i.order_id === orderId; });
+    }
+  }
+  if (!items.length) { notify('No items found — cannot mark delivered', 'error'); return; }
 
   delPending = { orderId: orderId, items: [], photoUrl: null, payment: null };
 
@@ -841,11 +850,15 @@ async function delCommitAll() {
       if (localItem) { localItem.quantity = it.quantity; localItem.line_total = it.line_total; }
     }
 
-    // 2. Recalculate subtotal and grand total from items
+    // 2. Recalculate subtotal and grand total — authoritatively from DB after the item updates above.
+    // pending.items is a fallback only (in case DB read fails).
     var newSubtotal = 0;
     pending.items.forEach(function(it) { newSubtotal += it.line_total; });
-    var returnsTotal = parseFloat(o.returns_total) || 0;
-    var newGrand = newSubtotal - returnsTotal;
+    var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
+    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (dbSubtotal > 0) newSubtotal = dbSubtotal;
+    var returnsTotal = parseFloat(o.return_total) || parseFloat(o.return_total) || 0;
+    var newGrand = Math.max(0, newSubtotal - returnsTotal);
 
     // 3. Build order update
     var orderUpdate = {
@@ -979,7 +992,7 @@ function showDoc(orderId) {
   html += '</tbody></table>';
 
   // Totals
-  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var returnsTotal = parseFloat(o.return_total) || 0;
   var grandTotal = parseFloat(o.grand_total) || 0;
   html += '<div class="doc-totals">';
   html += '<div>Subtotal: <strong>RM ' + subtotal.toFixed(2) + '</strong></div>';

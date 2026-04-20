@@ -2551,7 +2551,7 @@ function soRenderDetail() {
   html += '</tbody></table></div>';
 
   // Totals — always compute from items (grand_total in DB can be stale)
-  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var returnsTotal = parseFloat(o.return_total) || 0;
   var grandTotal = subtotal - returnsTotal;
   html += '<div class="so-detail-totals">';
   html += '<div class="so-detail-total-row"><span>Subtotal</span><span>' + formatRM(subtotal) + '</span></div>';
@@ -2965,6 +2965,16 @@ async function soMarkPrepared(orderId) {
   document.getElementById('so-prepqty-confirm').textContent = 'Confirm & Continue';
 
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
+  // Guard: if local items cache is empty, re-fetch from DB before opening the modal.
+  // Without this, the modal renders with no inputs and a blind Confirm would later write subtotal=0.
+  if (!items.length) {
+    var fresh = await sbQuery(sb.from('sales_order_items').select('*').eq('order_id', orderId));
+    if (fresh && fresh.length) {
+      fresh.forEach(function(f) { if (!orderItems.find(function(x) { return x.id === f.id; })) orderItems.push(f); });
+      items = orderItems.filter(function(i) { return i.order_id === orderId; });
+    }
+  }
+  if (!items.length) { notify('No items found for this order — cannot mark prepared', 'error'); soPrepPending = null; return; }
 
   var html = '<div class="table-wrap"><table class="data-table" style="margin:0;">';
   html += '<thead><tr><th>Product</th><th style="text-align:right;">Ordered</th><th style="text-align:right;width:100px;">Prepared</th><th style="text-align:right;width:100px;">Weight (kg)</th><th style="text-align:right;">Price</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
@@ -3121,9 +3131,13 @@ async function soPrepCommitAll() {
     }
 
     // 2. Update order: status + grand_total + photo
+    // Authoritatively sum line_total from DB — local grandTotal is a fallback only.
     var o = orders.find(function(x) { return x.id === orderId; });
-    var returnsTotal = o ? (parseFloat(o.returns_total) || 0) : 0;
-    var newGrand = grandTotal - returnsTotal;
+    var returnsTotal = o ? (parseFloat(o.return_total) || parseFloat(o.return_total) || 0) : 0;
+    var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
+    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (dbSubtotal > 0) grandTotal = dbSubtotal;
+    var newGrand = Math.max(0, grandTotal - returnsTotal);
 
     var orderUpdate = { status: 'prepared', subtotal: grandTotal, grand_total: newGrand };
     if (pending.photoUrl) orderUpdate.prep_photo_url = pending.photoUrl;
@@ -3348,6 +3362,15 @@ async function soMarkDelivered(orderId) {
   soDeliveryPending = { orderId: orderId, items: [], photoUrl: null, payment: null };
   soDeliveryQtyOrderId = orderId;
   var items = orderItems.filter(function(i) { return i.order_id === orderId; });
+  // Guard: if local items cache is empty, re-fetch from DB. Prevents blind-confirm → subtotal=0.
+  if (!items.length) {
+    var fresh = await sbQuery(sb.from('sales_order_items').select('*').eq('order_id', orderId));
+    if (fresh && fresh.length) {
+      fresh.forEach(function(f) { if (!orderItems.find(function(x) { return x.id === f.id; })) orderItems.push(f); });
+      items = orderItems.filter(function(i) { return i.order_id === orderId; });
+    }
+  }
+  if (!items.length) { notify('No items found for this order — cannot mark delivered', 'error'); soDeliveryPending = null; return; }
 
   var html = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Adjust quantities if items were damaged or short. Changes update the order total.</div>';
   html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
@@ -3445,7 +3468,7 @@ function soShowPayDecision() {
   // Calculate pending balance using in-memory qty adjustments
   var newSubtotal = 0;
   soDeliveryPending.items.forEach(function(it) { newSubtotal += it.lineTotal; });
-  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var returnsTotal = parseFloat(o.return_total) || 0;
   var pendingGrand = Math.max(0, newSubtotal - returnsTotal);
   var currentPaid = parseFloat(o.amount_paid) || 0;
   var pendingBalance = pendingGrand - currentPaid;
@@ -3610,8 +3633,12 @@ async function soDeliveryCommitAll() {
     }
 
     // 3. Update order: status + totals + photo + completed_at
+    // Authoritatively sum line_total from DB — newSubtotal is a fallback only.
     var o = orders.find(function(x) { return x.id === orderId; });
-    var returnsTotal = o ? (parseFloat(o.returns_total) || 0) : 0;
+    var returnsTotal = o ? (parseFloat(o.return_total) || parseFloat(o.return_total) || 0) : 0;
+    var freshItems = await sbQuery(sb.from('sales_order_items').select('line_total').eq('order_id', orderId));
+    var dbSubtotal = (freshItems || []).reduce(function(s, r) { return s + (parseFloat(r.line_total) || 0); }, 0);
+    if (dbSubtotal > 0) newSubtotal = dbSubtotal;
     var newGrand = Math.max(0, newSubtotal - returnsTotal);
     var orderUpdate = {
       status: 'completed',
@@ -7721,7 +7748,7 @@ function rptGenerate() {
       var items = getOrderItems(o.id);
       items.forEach(function(it) { byCustomer[cid].qty += parseFloat(it.quantity) || 0; });
       byCustomer[cid].revenue += parseFloat(o.subtotal) || 0;
-      byCustomer[cid].returns += parseFloat(o.returns_total) || 0;
+      byCustomer[cid].returns += parseFloat(o.return_total) || 0;
     });
 
     cols = ['Customer', 'Orders', 'Total Qty', 'Total Revenue (RM)', 'Returns (RM)', 'Net Revenue (RM)'];
@@ -7942,7 +7969,7 @@ function rptGenerate() {
       }).join(', ');
       var total = parseFloat(o.grand_total) || 0;
       var paid = parseFloat(o.amount_paid) || 0;
-      var ret = parseFloat(o.returns_total) || 0;
+      var ret = parseFloat(o.return_total) || 0;
       var balance = total - paid;
       tTotal += total;
       tPaid += paid;
@@ -9356,9 +9383,9 @@ async function soSaveOrder() {
         var localOrder = orders.find(function(x) { return x.id === orderId; });
         if (localOrder) {
           localOrder.grand_total = newGrand;
-          localOrder.returns_total = dnTotal;
+          localOrder.return_total = dnTotal;
         }
-        await sbQuery(sb.from('sales_orders').update({ grand_total: newGrand, returns_total: dnTotal }).eq('id', orderId).select());
+        await sbQuery(sb.from('sales_orders').update({ grand_total: newGrand, return_total: dnTotal }).eq('id', orderId).select());
         soAppliedDebitNotes = [];
       }
 
@@ -9474,7 +9501,7 @@ function soGenerateDoc(orderId) {
   html += '<hr class="doc-divider">';
 
   // Totals
-  var returnsTotal = parseFloat(o.returns_total) || 0;
+  var returnsTotal = parseFloat(o.return_total) || 0;
   var grandTotal = parseFloat(o.grand_total) || 0;
   html += '<div class="doc-totals">';
   html += '<div>Subtotal: <strong>RM ' + subtotal.toFixed(2) + '</strong></div>';
@@ -9632,7 +9659,7 @@ function soGenerateDocA4(orderId) {
     html += '</tbody></table>';
 
     // Totals
-    var returnsTotal = parseFloat(o.returns_total) || 0;
+    var returnsTotal = parseFloat(o.return_total) || 0;
     var grandTotal = parseFloat(o.grand_total) || 0;
     html += '<div class="a4-totals">';
     html += '<div>Subtotal: <strong>RM ' + subtotal.toFixed(2) + '</strong></div>';
@@ -10775,7 +10802,7 @@ async function retSaveReturn() {
     // Add to local returns array
     returns.unshift(result[0] || retData);
 
-    // Recalculate order returns_total and grand_total
+    // Recalculate order return_total and grand_total
     var o = orders.find(function(x) { return x.id === orderId; });
     if (o) {
       var totalReturns = returns.filter(function(r) { return r.order_id === orderId; }).reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
@@ -10784,10 +10811,10 @@ async function retSaveReturn() {
       var newGrandTotal = subtotal - totalReturns;
       if (newGrandTotal < 0) newGrandTotal = 0;
 
-      o.returns_total = totalReturns;
+      o.return_total = totalReturns;
       o.grand_total = newGrandTotal;
 
-      await sbQuery(sb.from('sales_orders').update({ returns_total: totalReturns, grand_total: newGrandTotal }).eq('id', orderId).select());
+      await sbQuery(sb.from('sales_orders').update({ return_total: totalReturns, grand_total: newGrandTotal }).eq('id', orderId).select());
 
       // If resolution is deduct, recalculate payment status (grand_total changed)
       if (resolution === 'deduct') {
