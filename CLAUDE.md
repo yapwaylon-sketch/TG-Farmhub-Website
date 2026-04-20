@@ -395,18 +395,29 @@ Printable/shareable document — office address header, items table, deposit/bal
 
 ## Tender Monitoring Module — Architecture
 
-### Tables (3 + 1 config)
+### Tables (5 + 1 config)
 | Table | Purpose |
 |-------|---------|
 | `tenders` | Master tender records — tender_no, variety, dates, qty, price, value, bond, status |
 | `tender_los` | Local Orders — per-LO tracking with status workflow, delivery/invoice/payment fields |
 | `tender_documents` | File attachments per tender or LO — SST, contracts, bonds, submissions |
+| `tender_suppliers` | Standalone planter directory (added 2026-04-20). Not linked to any other customer/supplier table — duplicate intentionally. |
+| `tender_supplier_purchases` | Per-LO supplier purchases (added 2026-04-20). FK to `tender_suppliers` + `tender_los`. Two status fields: `receipt_status` (supplier→us: pending/received) + `payment_status` (us→supplier: pending/paid). |
 | `app_config` | Key-value config store — holds Anthropic API key for AI import |
 
 ### LO Status Workflow
 `pending` → `preparing` → `delivering` → `delivered` → `invoiced` → `paid`
 
 Each transition prompts for relevant fields: delivering/delivered→DO number+date, invoiced→invoice no+date, paid→amount+ref+bank.
+
+### Supplier Purchase Model (v2, 2026-04-20)
+- One LO can have multiple supplier purchase rows (from different planters).
+- Any LO qty NOT covered by supplier rows is implied own-nursery (no cost tracking for now — skipped per user decision).
+- **Margin = Revenue − External Supplier Cost.** Own-nursery supply contributes to revenue but has zero recorded cost, so margin is inflated for purely in-house LOs. Add internal costing later if needed.
+- **LO deletion blocked** if purchases exist (FK protection + UI message).
+- **Supplier deletion blocked** if any purchase references them (forces archival via Inactive status).
+- **Paid purchases cannot be deleted** (audit protection).
+- **Over-purchase warning** (not block) if supplier rows exceed LO qty.
 
 ### Hub Category Banners (TG Agribusiness)
 Modules grouped under 3 banners via `MODULE_CATEGORIES` in index.html:
@@ -415,10 +426,22 @@ Modules grouped under 3 banners via `MODULE_CATEGORIES` in index.html:
 - **Projects Monitoring**: Tender
 
 ### AI LO PDF Import
-Upload LO PDF → pdf.js (CDN 3.11.174) renders pages to canvas → base64 JPEG → Claude API (Sonnet, vision) extracts fields (lo_number, dates, recipient, area, officer, qty) → editable preview table → batch save. API key stored in `app_config` table, loaded automatically on modal open. Requires `anthropic-dangerous-direct-browser-access` header for browser CORS.
+Upload LO PDF → pdf.js (CDN 3.11.174) renders pages to canvas → base64 JPEG → Claude API (Sonnet, vision) extracts fields (lo_number, dates, recipient, area, officer, qty) → editable preview table → batch save. API key stored in `app_config` table, loaded automatically. Requires `anthropic-dangerous-direct-browser-access` header for browser CORS. Lives in its own `Upload LO` sidebar tab (was a modal behind a button pre-2026-04-20).
 
-### Sidebar Tabs (4)
-Local Orders, Documents, Dashboard, Reports
+### Sidebar Tabs (6)
+Dashboard · Local Orders · Suppliers · Documents · Reports · Upload LO
+
+### Dashboard Layout (v2, 2026-04-20)
+1. **Contract Progress Cards** — one card per active tender, side-by-side (orange/gold if <50% delivered, green if ≥50%). Shows delivered/total, remaining, total value, billed, paid. Click a non-current card to switch tender. Replaces the previous 8-metric stat grid.
+2. **Expiry Alerts** — overdue + expiring within 14 days. Unchanged from v1.
+3. **Pending Deliveries** — top 10 LOs sorted by `lo_expiry ASC` across statuses pending/preparing/delivering.
+4. **Outstanding Payables (oldest first)** — top 10 unpaid supplier purchases with Mark Paid button. "View all" link to Suppliers tab when > 10.
+
+### Reports (4)
+- Tender Summary
+- Batch Completion
+- Payment Status
+- **Margin Report** (added 2026-04-20) — date range filter, Group By (Month/Contract/Supplier). Accrual basis: revenue = delivered/invoiced/paid LOs × unit price, cost = supplier purchases in range. Supplier group prorates revenue by supplier's share of LO qty. CSV export.
 
 ### ID Prefixes (company code AB-)
 | Entity | Prefix | Example |
@@ -426,6 +449,8 @@ Local Orders, Documents, Dashboard, Reports
 | Tender | TD | AB-TD001 |
 | Local Order | LO | AB-LO001 |
 | Document | TF | AB-TF001 |
+| Supplier | TS | AB-TS001 |
+| Supplier Purchase | TP | AB-TP001 |
 
 ### Supabase Storage
 Bucket: `tender-documents` (public). Path: `{tender_id}/{timestamp}.{ext}`
@@ -543,6 +568,7 @@ Everything lives in one repo, one Netlify site, one Supabase project, one domain
 - [x] **Sales atomic delivery flow** (2026-04-12): Refactored Mark Delivered into atomic commit — qty adjustment, delivery photo, payment decision (Pay Later/Receive Payment with YES/NO confirm), collect payment modal all save to memory, single DB commit at end. Mark Prepared also refactored to atomic (qty + photo + status in one commit). Photo upload mandatory for both prep and delivery (Skip button removed). Worker assignment mandatory for Start Preparing. Fixed shared prepqty modal handler leak between delivery and prep flows. Bank transfer slip upload added to delivery payment modal.
 - [x] **Consolidation — one repo, one site, one DB** (2026-04-12): Merged Nanas Growth TV (`display-growth.html`) and Weather Monitoring (`weather/` + `netlify/functions/`) into main repo. Migrated weather DB tables (`station_readings` + `model_snapshots`, ~109K rows) from separate Supabase project into production. Deleted 2 Netlify sites (nanasgrowth, tgweather), archived 2 GitHub repos, removed 2 Cloudflare DNS records. Supabase upgraded to Pro ($25/month) for daily backups + PITR. Deploy now uses Netlify CLI (supports functions).
 - [x] **Sales grand_total desync — bulletproofed** (2026-04-20): AF-CS047 (RM 175 delivery) was recorded as RM 0 in the field. Root cause: when `orderItems` local cache was empty at Mark Delivered (page loaded before order moved into `delivering`), the qty modal rendered with no inputs, blind Confirm → `pending.items=[]` → `newGrand=0` → balance check skipped payment decision entirely → committed subtotal=0/grand_total=0 while items stayed correct. Three layers of fix: (1) **Frontend entry guards** (commits 7b0aba7, 618da68) — `soMarkPrepared`/`soMarkDelivered` in sales.html + `markDelivered` in delivery.html now refetch items from DB if local cache empty; abort with error if still empty. (2) **Fail-closed commits** — `soPrepCommitAll`/`soDeliveryCommitAll`/`delCommitAll` read `SUM(line_total)` from DB after item UPDATEs; abort on DB error, no items, or zero-value items. Never trust in-memory pending sum. (3) **DB triggers** (commit 2563293, `supabase/orders_totals_trigger.sql`) — `items_sync_order_totals` on `sales_order_items` recomputes parent order totals on any item change; `orders_enforce_totals` BEFORE UPDATE on `sales_orders` overwrites any subtotal/grand_total the frontend writes with `SUM(line_total)` when items exist. Tested adversarially: direct SQL `UPDATE sales_orders SET subtotal=0, grand_total=0` silently corrected back. Also renamed misspelled column reads `returns_total`→`return_total` across sales.html+delivery.html (DB column is singular; plural writes were silently failing, so returns were never being subtracted — latent bug, no orders affected yet). Data repair: AF-CS047 subtotal 0→175, grand_total 0→175. Full audit: 0 mismatches remaining.
+- [x] **Tender module v2 — supplier-side tracking + margin** (2026-04-20): Brother's comparable app had supplier purchase tracking + margin reporting that we were missing. Added 2 new tables (`tender_suppliers`, `tender_supplier_purchases`) via `supabase/tender_v2_suppliers_migration.sql` — fully standalone, no FKs to sales_customers/seedling_* (user requested data isolation from rest of app). New Suppliers sidebar tab with directory (live-computed stats per supplier: total bought, outstanding, LOs supplied, last purchase) + Outstanding Payables section with Mark Paid flow. Purchase section inside LO edit modal: + Add Purchase button, margin preview block (Revenue − Cost = Margin with %), table of attached supplier rows. Margin column added to Local Orders table (shows `—` for LOs with no purchases = implicit own-nursery). Dashboard fully redesigned: replaced 8-stat grid with side-by-side Contract Progress Cards (one per active tender, orange if <50% / green if ≥50%, click to switch tender), kept Expiry Alerts, added Pending Deliveries top-10 table and Outstanding Payables top-10 with Mark Paid. Margin Report as 4th report: date-range filter, Group By Month/Contract/Supplier, 3 summary cards (Revenue/Cost/Margin), breakdown table with supplier-prorated revenue attribution, CSV export. Upload LO moved from modal-behind-button to its own sidebar tab (6 tabs now). Two status fields on purchases (`receipt_status` supplier→us, `payment_status` us→supplier — independent). LO deletion blocked if purchases exist. Supplier deletion blocked if purchases reference them (forces Inactive archival). Paid purchases cannot be deleted (audit protection). Over-purchase warning (not block) if supplier qty > LO qty. Own-nursery supply: user chose option D (zero internal cost for now, track later if needed) — so margin is inflated for fully in-house LOs, which is OK for v1. ID prefixes: TS (supplier), TP (purchase). Design process: used brainstorming skill (7 approved sections) but skipped the spec doc per user preference and went straight to build.
 
 ## Audit Results (2026-04-10 — all P1/P2 fixed, 3 low-priority P3 remaining)
 Full-site audit covering hub (index.html), sales, inventory, workers, spraytracker, growthtracker, delivery, display-sales, display-spray. Focus: usability + database linking.

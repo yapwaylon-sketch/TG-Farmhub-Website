@@ -49,6 +49,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       <span class="nav-label">Local Orders</span>
     </div>
+    <div class="nav-item" data-page="suppliers" onclick="navigateTo('suppliers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-label">Suppliers</span>
+    </div>
     <div class="nav-item" data-page="documents" onclick="navigateTo('documents')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       <span class="nav-label">Documents</span>
@@ -56,6 +60,10 @@
     <div class="nav-item" data-page="reports" onclick="navigateTo('reports')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       <span class="nav-label">Reports</span>
+    </div>
+    <div class="nav-item" data-page="upload" onclick="navigateTo('upload')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span class="nav-label">Upload LO</span>
     </div>
   </nav>
   <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
@@ -78,8 +86,10 @@
 <main class="main-content" id="main-content" role="main">
   <div id="page-dashboard" class="page active"></div>
   <div id="page-los" class="page"></div>
+  <div id="page-suppliers" class="page"></div>
   <div id="page-documents" class="page"></div>
   <div id="page-reports" class="page"></div>
+  <div id="page-upload" class="page"></div>
 </main>
 </div>
 
@@ -146,6 +156,7 @@
         <div class="form-group"><label>Officer Phone</label><input id="lo-phone" class="form-control" placeholder="e.g. 017-8517534"></div>
       </div>
       <div class="form-group"><label>Remarks</label><textarea id="lo-remarks" class="form-control" rows="2"></textarea></div>
+      <div id="lo-purchases-wrap"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeLoModal()">Cancel</button>
@@ -203,38 +214,97 @@
   </div>
 </div>
 
-<!-- IMPORT LO MODAL -->
-<div class="modal-overlay" id="import-modal" style="display:none;">
-  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:640px;">
+<!-- SUPPLIER MODAL -->
+<div class="modal-overlay" id="sup-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:480px;">
     <div class="modal-header">
-      <h3>Import LO from PDF</h3>
-      <button class="modal-close" onclick="closeImportModal()">&times;</button>
+      <h3 id="sup-modal-title">Add Supplier</h3>
+      <button class="modal-close" onclick="closeSupModal()">&times;</button>
     </div>
     <div class="modal-body">
-      <div id="import-step-1">
-        <input id="import-api-key" type="hidden" value="">
-        <div class="form-group">
-          <label>LO PDF File *</label>
-          <input id="import-file" type="file" class="form-control" accept=".pdf">
-        </div>
-        <div class="form-group">
-          <label>Batch No</label>
-          <input id="import-batch" type="number" min="1" class="form-control" value="1">
-        </div>
-        <button class="btn btn-primary" id="import-extract-btn" onclick="extractFromPDF()" style="width:100%;">Extract with AI</button>
-      </div>
-      <div id="import-step-2" style="display:none;">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Review the extracted data below, then save.</div>
-        <div id="import-preview"></div>
-      </div>
-      <div id="import-progress" style="display:none;text-align:center;padding:20px;">
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;">Processing PDF...</div>
-        <div id="import-progress-text" style="font-size:12px;color:var(--text-muted);">Rendering pages...</div>
-      </div>
+      <div class="form-group"><label>Name *</label><input id="sup-name" class="form-control" placeholder="e.g. Ning Planters"></div>
+      <div class="form-group"><label>Contact Phone</label><input id="sup-phone" class="form-control" placeholder="e.g. 0128055215"></div>
+      <div class="form-group"><label>Address</label><textarea id="sup-address" class="form-control" rows="2"></textarea></div>
+      <div class="form-group"><label>Status</label><select id="sup-status" class="form-control"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+      <div class="form-group"><label>Notes</label><textarea id="sup-notes" class="form-control" rows="2"></textarea></div>
     </div>
-    <div class="modal-footer" id="import-footer">
-      <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
-      <button class="btn btn-primary" id="import-save-btn" onclick="saveImportedLOs()" style="display:none;">Save All LOs</button>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeSupModal()">Cancel</button>
+      <span id="sup-delete-area"></span>
+      <button class="btn btn-primary" id="sup-save-btn" onclick="saveSupplier()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PURCHASE MODAL (add/edit a supplier purchase for an LO) -->
+<div class="modal-overlay" id="pur-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:520px;">
+    <div class="modal-header">
+      <h3 id="pur-modal-title">Add Supplier Purchase</h3>
+      <button class="modal-close" onclick="closePurModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="pur-lo-context" style="font-size:12px;color:var(--text-muted);padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:12px;"></div>
+      <div class="form-group"><label>Supplier *</label>
+        <div style="display:flex;gap:6px;">
+          <select id="pur-supplier" class="form-control" style="flex:1;"></select>
+          <button type="button" class="btn btn-outline btn-sm" onclick="openSupModalInline()" style="font-size:11px;white-space:nowrap;">+ New</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Qty *</label><input id="pur-qty" type="number" min="1" class="form-control" placeholder="0"></div>
+        <div class="form-group"><label>Unit Cost (RM) *</label><input id="pur-unit-cost" type="number" step="0.01" min="0" class="form-control" placeholder="0.00"></div>
+        <div class="form-group"><label>Total Cost (RM)</label><input id="pur-total-cost" class="form-control" readonly style="background:var(--bg);"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Purchase Date *</label><input id="pur-date" type="date" class="form-control"></div>
+        <div class="form-group"><label>Receipt Status</label>
+          <select id="pur-receipt" class="form-control">
+            <option value="pending">Pending</option>
+            <option value="received">Received</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="pur-received-wrap" style="display:none;"><label>Received Date</label><input id="pur-received-date" type="date" class="form-control"></div>
+      <div class="form-group"><label>Remarks</label><textarea id="pur-remarks" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closePurModal()">Cancel</button>
+      <span id="pur-delete-area"></span>
+      <button class="btn btn-primary" id="pur-save-btn" onclick="savePurchase()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MARK PAID MODAL -->
+<div class="modal-overlay" id="paid-modal" style="display:none;">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:460px;">
+    <div class="modal-header">
+      <h3>Mark Paid</h3>
+      <button class="modal-close" onclick="closePaidModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="paid-context" style="font-size:12px;color:var(--text-muted);padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:12px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Amount (RM) *</label><input id="paid-amount" type="number" step="0.01" min="0" class="form-control"></div>
+        <div class="form-group"><label>Payment Date *</label><input id="paid-date" type="date" class="form-control"></div>
+      </div>
+      <div class="form-group"><label>Method</label>
+        <select id="paid-method" class="form-control">
+          <option value="bank">Bank Transfer</option>
+          <option value="cash">Cash</option>
+          <option value="cheque">Cheque</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Reference / Slip No</label><input id="paid-ref" class="form-control"></div>
+        <div class="form-group"><label>Bank</label><input id="paid-bank" class="form-control" placeholder="e.g. Public Bank"></div>
+      </div>
+      <div class="form-group"><label>Remarks</label><textarea id="paid-remarks" class="form-control" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closePaidModal()">Cancel</button>
+      <button class="btn btn-primary" id="paid-save-btn" onclick="saveMarkPaid()">Confirm Payment</button>
     </div>
   </div>
 </div>
@@ -248,14 +318,21 @@ var tenders = [];
 var currentTender = null;
 var los = [];
 var documents = [];
+var suppliers = [];
+var supplierPurchases = [];
 var currentTab = 'dashboard';
 var editingTenderId = null;
 var editingLoId = null;
+var editingSupId = null;
+var editingPurId = null;
+var purLoContext = null;       // LO id when adding/editing a purchase
+var paidPurId = null;          // purchase id being Mark Paid'd
 var statusChangeLoId = null;
 var statusChangeTarget = null;
 var loStatusFilter = 'all';
 var loSearch = '';
 var currentReport = 'summary';
+var marginFilters = { from: '', to: '', groupBy: 'month', tenderId: 'all' };
 
 var LO_STATUSES = ['pending','preparing','delivering','delivered','invoiced','paid'];
 var LO_STATUS_LABELS = {
@@ -317,8 +394,12 @@ var DOC_TYPE_LABELS = {
 // ============================================================
 async function loadAllData() {
   var companyId = getCompanyId();
-  var res = await sbQuery(sb.from('tenders').select('*').eq('company_id', companyId).order('created_at', { ascending: false }));
-  tenders = res || [];
+  var res = await Promise.all([
+    sbQuery(sb.from('tenders').select('*').eq('company_id', companyId).order('created_at', { ascending: false })),
+    sbQuery(sb.from('tender_suppliers').select('*').eq('company_id', companyId).order('name'))
+  ]);
+  tenders = res[0] || [];
+  suppliers = res[1] || [];
   if (tenders.length && !currentTender) {
     var active = tenders.find(function(t) { return t.status === 'active'; });
     currentTender = active || tenders[0];
@@ -328,18 +409,46 @@ async function loadAllData() {
   } else {
     los = [];
     documents = [];
+    supplierPurchases = [];
   }
+  // Always load purchases across all LOs in this tender for dashboard outstanding payables
+  await loadPurchasesForCurrentTender();
 }
 
 async function loadTenderData() {
-  if (!currentTender) { los = []; documents = []; return; }
+  if (!currentTender) { los = []; documents = []; supplierPurchases = []; return; }
   var res = await Promise.all([
     sbQuery(sb.from('tender_los').select('*').eq('tender_id', currentTender.id).order('batch_no').order('seq_no')),
     sbQuery(sb.from('tender_documents').select('*').eq('tender_id', currentTender.id).order('uploaded_at', { ascending: false }))
   ]);
   los = res[0] || [];
   documents = res[1] || [];
+  await loadPurchasesForCurrentTender();
 }
+
+async function loadPurchasesForCurrentTender() {
+  if (!los.length) { supplierPurchases = []; return; }
+  var loIds = los.map(function(lo) { return lo.id; });
+  var res = await sbQuery(
+    sb.from('tender_supplier_purchases').select('*').in('lo_id', loIds).order('purchase_date', { ascending: true })
+  );
+  supplierPurchases = res || [];
+}
+
+// Helpers for aggregating purchases
+function purchasesForLo(loId) {
+  return supplierPurchases.filter(function(p) { return p.lo_id === loId; });
+}
+function loCost(loId) {
+  return purchasesForLo(loId).reduce(function(s, p) { return s + Number(p.total_cost || 0); }, 0);
+}
+function loRevenue(lo) {
+  var t = (currentTender && lo.tender_id === currentTender.id) ? currentTender : tenders.find(function(x) { return x.id === lo.tender_id; });
+  if (!t) return 0;
+  return Number(lo.qty || 0) * Number(t.unit_price || 0);
+}
+function loMargin(lo) { return loRevenue(lo) - loCost(lo.id); }
+function supplierById(id) { return suppliers.find(function(s) { return s.id === id; }); }
 
 async function syncAll() {
   var icon = document.getElementById('sync-icon');
@@ -370,8 +479,10 @@ function navigateTo(page) {
 function renderCurrentTab() {
   if (currentTab === 'dashboard') renderDashboard();
   else if (currentTab === 'los') renderLOs();
+  else if (currentTab === 'suppliers') renderSuppliers();
   else if (currentTab === 'documents') renderDocuments();
   else if (currentTab === 'reports') renderReports();
+  else if (currentTab === 'upload') renderUpload();
 }
 
 // ============================================================
@@ -527,104 +638,143 @@ function calcTenderValue() {
 // ============================================================
 function renderDashboard() {
   var page = document.getElementById('page-dashboard');
-  if (!currentTender) {
+  var activeTenders = tenders.filter(function(t) { return t.status === 'active'; });
+
+  if (!tenders.length) {
     page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3><p>Add a tender to get started.</p><button class="btn btn-primary" onclick="openTdModal()">+ Add Tender</button></div>';
     return;
   }
-  var t = currentTender;
-  var totalQty = t.total_qty || 0;
-  var deliveredQty = los.filter(loIsCompleted).reduce(function(s, lo) { return s + (lo.qty || 0); }, 0);
-  var remaining = totalQty - deliveredQty;
-  var pct = totalQty ? Math.round(deliveredQty / totalQty * 100) : 0;
-  var totalValue = parseFloat(t.total_value) || 0;
-  var invoicedQty = los.filter(function(lo) { return lo.status === 'invoiced' || lo.status === 'paid'; }).reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
-  var invoicedVal = invoicedQty * (parseFloat(t.unit_price)||0);
-  var paidAmt = los.filter(function(lo) { return lo.status === 'paid'; }).reduce(function(s,lo) { return s + (parseFloat(lo.payment_amount)||0); }, 0);
-  var outstanding = invoicedVal - paidAmt;
-
-  // Expiry alerts
-  var now = new Date(); now.setHours(0,0,0,0);
-  var overdue = [];
-  var expiring = [];
-  los.forEach(function(lo) {
-    if (loIsCompleted(lo)) return;
-    var d = daysUntil(lo.lo_expiry);
-    if (d !== null && d < 0) overdue.push(lo);
-    else if (d !== null && d <= 14) expiring.push(lo);
-  });
 
   var html = '';
-  // Tender info banner
-  html += '<div class="td-info-banner">' +
-    '<div class="td-info-item"><div class="td-info-label">Tender No</div><div class="td-info-value">' + esc(t.tender_no) + '</div></div>' +
-    '<div class="td-info-item"><div class="td-info-label">Variety</div><div class="td-info-value">' + esc(t.variety) + '</div></div>' +
-    '<div class="td-info-item"><div class="td-info-label">Period</div><div class="td-info-value">' + fmtDate(t.start_date) + ' — ' + fmtDate(t.end_date) + '</div></div>' +
-    '<div class="td-info-item"><div class="td-info-label">Status</div><div class="td-info-value"><span class="lo-badge tender-badge-' + t.status + '">' + t.status + '</span></div></div>' +
-    '<div style="margin-left:auto;"><button class="btn btn-outline btn-sm" onclick="openTdModal(\'' + t.id + '\')" style="font-size:11px;">Edit Tender</button></div>' +
-    '</div>';
 
-  // Metric cards
-  html += '<div class="td-metrics">';
-  html += metricCard('Total Qty', fmtNum(totalQty), 'suckers');
-  html += metricCard('Delivered', fmtNum(deliveredQty), pct + '% complete',
-    '<div class="td-progress-bar"><div class="td-progress-fill td-progress-green" style="width:' + pct + '%"></div></div>');
-  html += metricCard('Remaining', fmtNum(remaining), 'suckers left');
-  html += metricCard('LOs Total', los.length + '', los.filter(function(lo){return lo.status==='paid';}).length + ' paid');
-  html += metricCard('Contract Value', fmtRM(totalValue), '');
-  html += metricCard('Invoiced', fmtRM(invoicedVal), fmtNum(invoicedQty) + ' suckers');
-  html += metricCard('Paid', fmtRM(paidAmt), '');
-  html += metricCard('Outstanding', fmtRM(outstanding > 0 ? outstanding : 0), outstanding > 0 ? 'unpaid' : 'all clear', '', outstanding > 0 ? 'color:#EF4444;' : 'color:#22C55E;');
-  html += '</div>';
+  // --- SECTION 1: Contract Progress Cards (one per active tender) ---
+  html += '<div class="td-contract-cards">';
+  if (!activeTenders.length) {
+    html += '<div style="padding:20px;color:var(--text-muted);font-size:13px;">No active tenders. All tenders are completed or expired.</div>';
+  } else {
+    activeTenders.forEach(function(t) {
+      var isCurrent = currentTender && currentTender.id === t.id;
+      var tLos = isCurrent ? los : [];
+      var deliveredQty = tLos.filter(loIsCompleted).reduce(function(s, lo) { return s + (lo.qty || 0); }, 0);
+      var pct = t.total_qty ? Math.round(deliveredQty / t.total_qty * 100) : 0;
+      var remaining = (t.total_qty || 0) - deliveredQty;
+      var billedQty = tLos.filter(function(lo) { return lo.status === 'invoiced' || lo.status === 'paid'; }).reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
+      var billed = billedQty * (parseFloat(t.unit_price) || 0);
+      var paidAmt = tLos.filter(function(lo) { return lo.status === 'paid'; }).reduce(function(s,lo) { return s + (parseFloat(lo.payment_amount)||0); }, 0);
+      var totalValue = parseFloat(t.total_value) || 0;
+      var fillCls = pct >= 50 ? 'td-card-green' : 'td-card-gold';
 
-  // Expiry alerts
-  if (overdue.length || expiring.length) {
-    html += '<div class="td-alerts"><h3>Expiry Alerts</h3>';
-    overdue.forEach(function(lo) {
-      html += '<div class="td-alert-card td-alert-overdue" onclick="navigateTo(\'los\')">' +
-        '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expired ' + fmtDate(lo.lo_expiry) + ' (' + Math.abs(daysUntil(lo.lo_expiry)) + ' days ago)</span></div>' +
-        '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
-    });
-    expiring.forEach(function(lo) {
-      html += '<div class="td-alert-card td-alert-expiring" onclick="navigateTo(\'los\')">' +
-        '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expires ' + fmtDate(lo.lo_expiry) + ' (' + daysUntil(lo.lo_expiry) + ' days left)</span></div>' +
-        '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
-    });
-    html += '</div>';
-  }
-
-  // Batch progress
-  var batches = {};
-  los.forEach(function(lo) {
-    var b = lo.batch_no || 0;
-    if (!batches[b]) batches[b] = { total: 0, completed: 0, qty: 0, qtyDone: 0 };
-    batches[b].total++;
-    batches[b].qty += lo.qty || 0;
-    if (loIsCompleted(lo)) { batches[b].completed++; batches[b].qtyDone += lo.qty || 0; }
-  });
-  var batchKeys = Object.keys(batches).sort(function(a,b) { return a-b; });
-  if (batchKeys.length) {
-    html += '<div class="td-batch-section"><h3 style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Batch Progress</h3>';
-    batchKeys.forEach(function(b) {
-      var info = batches[b];
-      var bpct = info.total ? Math.round(info.completed / info.total * 100) : 0;
-      html += '<div class="td-batch-row">' +
-        '<div class="td-batch-label">Batch ' + b + '</div>' +
-        '<div class="td-batch-bar"><div class="td-batch-bar-fill td-progress-green" style="width:' + bpct + '%"></div></div>' +
-        '<div class="td-batch-stats">' + info.completed + '/' + info.total + ' LOs · ' + fmtNum(info.qtyDone) + '</div>' +
+      html += '<div class="td-contract-card ' + fillCls + '" onclick="switchTender(\'' + t.id + '\')" title="Switch to this tender">' +
+        '<div class="td-cc-head">' + esc(t.tender_no) + ' — ' + esc(t.variety) + (isCurrent ? ' <span class="td-cc-current">●</span>' : '') + '</div>' +
+        '<div class="td-cc-bignum">' + fmtNum(deliveredQty) + ' <span class="td-cc-of">/ ' + fmtNum(t.total_qty || 0) + '</span></div>' +
+        '<div class="td-cc-line"><span>Remaining</span><strong>' + fmtNum(remaining) + '</strong></div>' +
+        '<div class="td-cc-line"><span>Total Value</span><strong>' + fmtRM(totalValue) + '</strong></div>' +
+        '<div class="td-cc-line"><span>Billed</span><strong>' + fmtRM(billed) + '</strong></div>' +
+        '<div class="td-cc-line"><span>Paid</span><strong>' + fmtRM(paidAmt) + '</strong></div>' +
+        (isCurrent ? '<div class="td-cc-hint td-cc-hint-current">Currently viewing</div>' : '<div class="td-cc-hint">Click to switch</div>') +
         '</div>';
     });
+  }
+  html += '</div>';
+
+  // --- SECTION 2: Expiry Alerts (current tender only) ---
+  if (currentTender) {
+    var overdue = [];
+    var expiring = [];
+    los.forEach(function(lo) {
+      if (loIsCompleted(lo)) return;
+      var d = daysUntil(lo.lo_expiry);
+      if (d !== null && d < 0) overdue.push(lo);
+      else if (d !== null && d <= 14) expiring.push(lo);
+    });
+    if (overdue.length || expiring.length) {
+      html += '<div class="td-alerts"><h3>Expiry Alerts</h3>';
+      overdue.forEach(function(lo) {
+        html += '<div class="td-alert-card td-alert-overdue" onclick="navigateTo(\'los\')">' +
+          '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expired ' + fmtDate(lo.lo_expiry) + ' (' + Math.abs(daysUntil(lo.lo_expiry)) + ' days ago)</span></div>' +
+          '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
+      });
+      expiring.forEach(function(lo) {
+        html += '<div class="td-alert-card td-alert-expiring" onclick="navigateTo(\'los\')">' +
+          '<div><strong>' + esc(lo.lo_number || '—') + '</strong> — ' + esc(lo.recipient_name || '') + '<br><span style="font-size:11px;color:var(--text-muted);">Expires ' + fmtDate(lo.lo_expiry) + ' (' + daysUntil(lo.lo_expiry) + ' days left)</span></div>' +
+          '<span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  // --- SECTION 3: Pending Deliveries (current tender, top 10 by deadline) ---
+  if (currentTender) {
+    var pending = los.filter(function(lo) {
+      return ['pending','preparing','delivering'].indexOf(lo.status) >= 0;
+    }).sort(function(a,b) {
+      var ax = a.lo_expiry || '9999-12-31';
+      var bx = b.lo_expiry || '9999-12-31';
+      return ax < bx ? -1 : ax > bx ? 1 : 0;
+    }).slice(0, 10);
+    html += '<div class="td-section"><h3>Pending Deliveries <span style="font-weight:400;font-size:12px;color:var(--text-muted);margin-left:6px;">(sorted by deadline)</span></h3>';
+    if (!pending.length) {
+      html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">No pending deliveries.</div>';
+    } else {
+      html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
+        '<th>LO #</th><th>Variety</th><th>Farmer</th><th>Location</th><th>Deadline</th><th style="text-align:right;">Qty</th><th>Status</th>' +
+        '</tr></thead><tbody>';
+      pending.forEach(function(lo) {
+        var d = daysUntil(lo.lo_expiry);
+        var dateCls = (d !== null && d < 0) ? 'style="color:#EF4444;font-weight:600;"' : (d !== null && d <= 14) ? 'style="color:#D4AF37;font-weight:600;"' : '';
+        html += '<tr onclick="navigateTo(\'los\')" style="cursor:pointer;">' +
+          '<td><strong>' + esc(lo.lo_number || '—') + '</strong></td>' +
+          '<td>' + esc(currentTender.variety) + '</td>' +
+          '<td>' + esc(lo.recipient_name || '—') + '</td>' +
+          '<td>' + esc(lo.area || '—') + '</td>' +
+          '<td ' + dateCls + '>' + fmtDate(lo.lo_expiry) + '</td>' +
+          '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td>' +
+          '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td>' +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
     html += '</div>';
   }
 
-  page.innerHTML = html;
-}
+  // --- SECTION 4: Outstanding Payables (oldest first, top 10) ---
+  var unpaid = supplierPurchases.filter(function(p) { return p.payment_status === 'pending'; })
+    .sort(function(a,b) {
+      var ax = a.purchase_date || '9999-12-31';
+      var bx = b.purchase_date || '9999-12-31';
+      return ax < bx ? -1 : ax > bx ? 1 : 0;
+    });
+  var totalOwed = unpaid.reduce(function(s, p) { return s + Number(p.total_cost || 0); }, 0);
+  html += '<div class="td-section"><h3>Outstanding Payables <span style="font-weight:400;font-size:12px;color:var(--text-muted);margin-left:6px;">(oldest first)</span></h3>';
+  if (!unpaid.length) {
+    html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">No outstanding supplier payables.</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--text-muted);margin:0 0 8px;">Total owed: <strong style="color:#EF4444;">' + fmtRM(totalOwed) + '</strong> across ' + unpaid.length + ' purchase' + (unpaid.length===1?'':'s') + '</div>';
+    var shown = unpaid.slice(0, 10);
+    html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
+      '<th>Purchase Date</th><th>Supplier</th><th>LO #</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Total</th><th>Receipt</th><th></th>' +
+      '</tr></thead><tbody>';
+    shown.forEach(function(p) {
+      var sup = supplierById(p.supplier_id);
+      var lo = los.find(function(l) { return l.id === p.lo_id; });
+      html += '<tr>' +
+        '<td>' + fmtDate(p.purchase_date) + '</td>' +
+        '<td><strong>' + esc(sup ? sup.name : p.supplier_id) + '</strong></td>' +
+        '<td>' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
+        '<td style="text-align:right;">' + fmtNum(p.qty) + '</td>' +
+        '<td style="text-align:right;color:#EF4444;font-weight:600;">' + fmtRM(p.total_cost) + '</td>' +
+        '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
+        '<td><button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    if (unpaid.length > 10) {
+      html += '<div style="text-align:right;margin-top:6px;"><a href="#suppliers" onclick="navigateTo(\'suppliers\');return false;" style="font-size:11px;color:#6B4C8A;">View all ' + unpaid.length + ' payables →</a></div>';
+    }
+  }
+  html += '</div>';
 
-function metricCard(label, value, sub, extra, style) {
-  return '<div class="td-metric-card">' +
-    '<div class="td-metric-label">' + label + '</div>' +
-    '<div class="td-metric-value"' + (style ? ' style="' + style + '"' : '') + '>' + value + '</div>' +
-    (sub ? '<div class="td-metric-sub">' + sub + '</div>' : '') +
-    (extra || '') + '</div>';
+  page.innerHTML = html;
 }
 
 // ============================================================
@@ -640,7 +790,7 @@ function renderLOs() {
   // Header
   html += '<div class="td-section-header"><h2>Local Orders</h2><div style="display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button class="btn btn-primary btn-sm" onclick="openLoModal()" style="font-size:12px;">+ Add LO</button>' +
-    '<button class="btn btn-outline btn-sm" onclick="openImportModal()" style="font-size:12px;">Import LO (PDF)</button>' +
+    '<button class="btn btn-outline btn-sm" onclick="navigateTo(\'upload\')" style="font-size:12px;">Upload LO PDF →</button>' +
     '</div></div>';
 
   // Filters
@@ -684,14 +834,14 @@ function renderLOs() {
 
   html += '<div class="lo-table-wrap"><table class="lo-table"><thead><tr>' +
     '<th>#</th><th>LO No</th><th>LO Date</th><th>Expiry</th><th>Recipient</th><th>Area</th><th>Officer</th>' +
-    '<th>Qty</th><th>DO No</th><th>Delivery</th><th>Invoice</th><th>Payment</th><th>Status</th><th></th>' +
+    '<th>Qty</th><th>Margin</th><th>DO No</th><th>Delivery</th><th>Invoice</th><th>Payment</th><th>Status</th><th></th>' +
     '</tr></thead><tbody>';
 
   batchKeys.forEach(function(b) {
     var batchLos = batchGroups[b];
     var batchQty = batchLos.reduce(function(s,lo) { return s + (lo.qty||0); }, 0);
     var batchDone = batchLos.filter(loIsCompleted).length;
-    html += '<tr class="lo-batch-header"><td colspan="14">Batch ' + b +
+    html += '<tr class="lo-batch-header"><td colspan="15">Batch ' + b +
       ' <span style="font-weight:400;font-size:11px;color:var(--text-muted);margin-left:8px;">' +
       batchDone + '/' + batchLos.length + ' completed · ' + fmtNum(batchQty) + ' suckers</span></td></tr>';
 
@@ -703,6 +853,14 @@ function renderLOs() {
         else if (days <= 14) rowClass = ' lo-row-expiring';
       }
       var nextStatus = getNextStatus(lo.status);
+      var rev = loRevenue(lo);
+      var cost = loCost(lo.id);
+      var mgn = rev - cost;
+      var mgnPct = rev ? Math.round(mgn / rev * 100) : 0;
+      var hasPurchases = purchasesForLo(lo.id).length > 0;
+      var mgnHtml = hasPurchases
+        ? '<span style="font-weight:600;color:' + (mgn >= 0 ? '#22A05C' : '#EF4444') + ';">' + fmtRM(mgn) + '</span><br><span style="font-size:10px;color:var(--text-muted);">' + mgnPct + '%</span>'
+        : '<span style="color:var(--text-muted);">—</span>';
       html += '<tr class="' + rowClass + '">' +
         '<td>' + lo.seq_no + '</td>' +
         '<td><strong>' + esc(lo.lo_number || '—') + '</strong></td>' +
@@ -712,6 +870,7 @@ function renderLOs() {
         '<td style="font-size:11px;">' + esc(lo.area || '—') + '</td>' +
         '<td style="font-size:11px;">' + esc(lo.officer_name || '—') + (lo.officer_phone ? '<br>' + esc(lo.officer_phone) : '') + '</td>' +
         '<td style="text-align:right;font-weight:600;">' + fmtNum(lo.qty) + '</td>' +
+        '<td style="text-align:right;font-size:11px;">' + mgnHtml + '</td>' +
         '<td>' + esc(lo.do_number || '—') + '</td>' +
         '<td>' + fmtDate(lo.delivery_date) + '</td>' +
         '<td>' + esc(lo.invoice_no || '—') + (lo.invoice_date ? '<br><span style="font-size:10px;">' + fmtDate(lo.invoice_date) + '</span>' : '') + '</td>' +
@@ -767,7 +926,73 @@ function openLoModal(id) {
     document.getElementById('lo-seq').value = seqInBatch + 1;
     document.getElementById('lo-delete-area').innerHTML = '';
   }
+  renderLoPurchasesSection(id);
   document.getElementById('lo-modal').style.display = 'flex';
+}
+
+// Renders the supplier purchases block at the bottom of the LO modal.
+// Only active for existing LOs (can't attach purchases before the LO has an id).
+function renderLoPurchasesSection(loId) {
+  var wrap = document.getElementById('lo-purchases-wrap');
+  if (!loId) {
+    wrap.innerHTML = '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:6px;font-size:11px;color:var(--text-muted);">Save the LO first — then reopen to attach supplier purchases.</div>';
+    return;
+  }
+  var lo = los.find(function(x) { return x.id === loId; });
+  if (!lo) { wrap.innerHTML = ''; return; }
+  var rows = purchasesForLo(loId);
+  var purchasedQty = rows.reduce(function(s,p) { return s + Number(p.qty || 0); }, 0);
+  var purchasedCost = rows.reduce(function(s,p) { return s + Number(p.total_cost || 0); }, 0);
+  var loQty = Number(lo.qty || 0);
+  var remainder = loQty - purchasedQty;
+  var rev = loRevenue(lo);
+  var mgn = rev - purchasedCost;
+  var mgnPct = rev ? Math.round(mgn / rev * 100) : 0;
+
+  var html = '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+    '<h4 style="margin:0;font-size:13px;font-weight:700;">Supplier Purchases</h4>' +
+    '<button type="button" class="btn btn-outline btn-sm" style="font-size:11px;" onclick="openPurchaseModal(null,\'' + loId + '\')">+ Add Purchase</button>' +
+    '</div>';
+
+  // Summary + margin preview
+  html += '<div style="background:var(--bg);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:10px;">' +
+    '<div style="margin-bottom:6px;"><strong>' + fmtNum(purchasedQty) + '</strong> of <strong>' + fmtNum(loQty) + '</strong> pcs purchased from suppliers' +
+    (remainder > 0 ? ' · remainder <strong>' + fmtNum(remainder) + '</strong> pcs (own-nursery)' : (remainder < 0 ? ' · <span style="color:#EF4444;font-weight:600;">⚠ ' + fmtNum(-remainder) + ' pcs OVER</span>' : '')) +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:6px;border-top:1px dashed var(--border);">' +
+    '<div><div style="font-size:10px;color:var(--text-muted);">Revenue</div><strong>' + fmtRM(rev) + '</strong></div>' +
+    '<div><div style="font-size:10px;color:var(--text-muted);">− Supplier Cost</div><strong style="color:#EF4444;">' + fmtRM(purchasedCost) + '</strong></div>' +
+    '<div><div style="font-size:10px;color:var(--text-muted);">= Margin' + (rows.length ? ' (' + mgnPct + '%)' : '') + '</div><strong style="color:' + (mgn >= 0 ? '#22A05C' : '#EF4444') + ';">' + fmtRM(mgn) + '</strong></div>' +
+    '</div>' +
+    '</div>';
+
+  // Purchases table
+  if (!rows.length) {
+    html += '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:12px;background:var(--bg);border-radius:6px;">No supplier purchases yet. All ' + fmtNum(loQty) + ' pcs are implied own-nursery.</div>';
+  } else {
+    html += '<div class="td-simple-table-wrap"><table class="td-simple-table" style="font-size:11px;"><thead><tr>' +
+      '<th>Supplier</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:right;">Total</th><th>Date</th><th>Receipt</th><th>Paid</th><th></th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(function(p) {
+      var sup = supplierById(p.supplier_id);
+      html += '<tr>' +
+        '<td><strong>' + esc(sup ? sup.name : p.supplier_id) + '</strong></td>' +
+        '<td style="text-align:right;">' + fmtNum(p.qty) + '</td>' +
+        '<td style="text-align:right;">' + fmtRM(p.unit_cost) + '</td>' +
+        '<td style="text-align:right;font-weight:600;">' + fmtRM(p.total_cost) + '</td>' +
+        '<td>' + fmtDate(p.purchase_date) + '</td>' +
+        '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '" style="font-size:9px;padding:2px 6px;">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
+        '<td><span class="lo-badge ' + (p.payment_status === 'paid' ? 'lo-badge-paid' : 'lo-badge-pending') + '" style="font-size:9px;padding:2px 6px;">' + (p.payment_status === 'paid' ? 'Paid' : 'Unpaid') + '</span></td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="lo-action-btn" onclick="openPurchaseModal(\'' + p.id + '\',\'' + loId + '\')" title="Edit">Edit</button> ' +
+          (p.payment_status !== 'paid' ? '<button class="lo-action-btn" onclick="deletePurchase(\'' + p.id + '\')" title="Delete">×</button>' : '') +
+        '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
 }
 
 function closeLoModal() { document.getElementById('lo-modal').style.display = 'none'; editingLoId = null; }
@@ -810,6 +1035,11 @@ async function saveLO() {
 }
 
 async function deleteLO(id) {
+  var n = purchasesForLo(id).length;
+  if (n > 0) {
+    notify('Cannot delete: LO has ' + n + ' supplier purchase' + (n===1?'':'s') + '. Remove the purchases first.', 'error');
+    return;
+  }
   confirmAction('Delete this Local Order?', 'This cannot be undone.', async function() {
     await sbQuery(sb.from('tender_los').delete().eq('id', id).select());
     closeLoModal();
@@ -891,6 +1121,381 @@ async function saveStatusChange() {
     renderCurrentTab();
     notify('Status updated to ' + LO_STATUS_LABELS[statusChangeTarget], 'success');
   } catch(e) { notify('Error updating status', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+// ============================================================
+// SUPPLIERS TAB + CRUD
+// ============================================================
+function renderSuppliers() {
+  var page = document.getElementById('page-suppliers');
+  var html = '<div class="td-section-header"><h2>Suppliers</h2>' +
+    '<button class="btn btn-primary btn-sm" onclick="openSupModal()" style="font-size:12px;">+ New Supplier</button></div>';
+
+  // --- Directory ---
+  html += '<div class="td-section"><h3>Suppliers Directory</h3>';
+  if (!suppliers.length) {
+    html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">No suppliers yet. Add one to start tracking purchases.</div>';
+  } else {
+    html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
+      '<th>Name</th><th>Contact</th><th style="text-align:right;">Total Bought (pcs)</th><th style="text-align:right;">Total Cost (RM)</th><th style="text-align:right;">Outstanding (RM)</th><th style="text-align:right;">LOs</th><th>Last Purchase</th><th>Status</th><th></th>' +
+      '</tr></thead><tbody>';
+    suppliers.forEach(function(s) {
+      var myPurchases = supplierPurchases.filter(function(p) { return p.supplier_id === s.id; });
+      var totalPcs = myPurchases.reduce(function(x,p) { return x + Number(p.qty||0); }, 0);
+      var totalCost = myPurchases.reduce(function(x,p) { return x + Number(p.total_cost||0); }, 0);
+      var outstanding = myPurchases.filter(function(p) { return p.payment_status === 'pending'; }).reduce(function(x,p) { return x + Number(p.total_cost||0); }, 0);
+      var distinctLos = {}; myPurchases.forEach(function(p) { distinctLos[p.lo_id] = true; });
+      var lastDate = myPurchases.reduce(function(m,p) { return (!m || p.purchase_date > m) ? p.purchase_date : m; }, null);
+      html += '<tr>' +
+        '<td><strong>' + esc(s.name) + '</strong></td>' +
+        '<td>' + esc(s.contact_phone || '—') + '</td>' +
+        '<td style="text-align:right;">' + fmtNum(totalPcs) + '</td>' +
+        '<td style="text-align:right;">' + fmtRM(totalCost) + '</td>' +
+        '<td style="text-align:right;' + (outstanding > 0 ? 'color:#EF4444;font-weight:600;' : '') + '">' + fmtRM(outstanding) + '</td>' +
+        '<td style="text-align:right;">' + Object.keys(distinctLos).length + '</td>' +
+        '<td>' + (lastDate ? fmtDate(lastDate) : '—') + '</td>' +
+        '<td><span class="lo-badge ' + (s.status === 'active' ? 'lo-badge-paid' : 'lo-badge-pending') + '" style="font-size:10px;">' + (s.status === 'active' ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="lo-action-btn" onclick="openSupModal(\'' + s.id + '\')">Edit</button> ' +
+          '<button class="lo-action-btn" onclick="deleteSupplier(\'' + s.id + '\')" title="Delete">×</button>' +
+        '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  // --- Outstanding payables (across current tender scope) ---
+  var unpaid = supplierPurchases.filter(function(p) { return p.payment_status === 'pending'; })
+    .sort(function(a,b) {
+      var ax = a.purchase_date || '9999-12-31';
+      var bx = b.purchase_date || '9999-12-31';
+      return ax < bx ? -1 : ax > bx ? 1 : 0;
+    });
+  var totalOwed = unpaid.reduce(function(s,p) { return s + Number(p.total_cost||0); }, 0);
+  html += '<div class="td-section"><h3>Outstanding Payables <span style="font-weight:400;font-size:12px;color:var(--text-muted);margin-left:6px;">(oldest first)</span></h3>';
+  if (!unpaid.length) {
+    html += '<div style="padding:16px;color:var(--text-muted);font-size:13px;">Nothing outstanding. All suppliers paid.</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Total owed: <strong style="color:#EF4444;">' + fmtRM(totalOwed) + '</strong> across ' + unpaid.length + ' purchase' + (unpaid.length===1?'':'s') + '</div>';
+    html += '<div class="td-simple-table-wrap"><table class="td-simple-table"><thead><tr>' +
+      '<th>Purchase Date</th><th>Supplier</th><th>LO #</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit</th><th style="text-align:right;">Total</th><th>Receipt</th><th></th>' +
+      '</tr></thead><tbody>';
+    unpaid.forEach(function(p) {
+      var sup = supplierById(p.supplier_id);
+      var lo = los.find(function(l) { return l.id === p.lo_id; });
+      html += '<tr>' +
+        '<td>' + fmtDate(p.purchase_date) + '</td>' +
+        '<td><strong>' + esc(sup ? sup.name : p.supplier_id) + '</strong></td>' +
+        '<td>' + esc(lo ? lo.lo_number : p.lo_id) + '</td>' +
+        '<td style="text-align:right;">' + fmtNum(p.qty) + '</td>' +
+        '<td style="text-align:right;">' + fmtRM(p.unit_cost) + '</td>' +
+        '<td style="text-align:right;color:#EF4444;font-weight:600;">' + fmtRM(p.total_cost) + '</td>' +
+        '<td><span class="lo-badge ' + (p.receipt_status === 'received' ? 'lo-badge-paid' : 'lo-badge-pending') + '" style="font-size:10px;">' + (p.receipt_status === 'received' ? 'Received' : 'Pending') + '</span></td>' +
+        '<td><button class="btn btn-primary btn-sm" style="font-size:11px;padding:4px 10px;" onclick="openMarkPaid(\'' + p.id + '\')">Mark Paid</button></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  page.innerHTML = html;
+}
+
+function openSupModal(id) {
+  editingSupId = id || null;
+  document.getElementById('sup-modal-title').textContent = id ? 'Edit Supplier' : 'Add Supplier';
+  if (id) {
+    var s = suppliers.find(function(x) { return x.id === id; });
+    if (!s) return;
+    document.getElementById('sup-name').value = s.name || '';
+    document.getElementById('sup-phone').value = s.contact_phone || '';
+    document.getElementById('sup-address').value = s.address || '';
+    document.getElementById('sup-status').value = s.status || 'active';
+    document.getElementById('sup-notes').value = s.notes || '';
+    document.getElementById('sup-delete-area').innerHTML = '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);font-size:11px;" onclick="deleteSupplier(\'' + id + '\')">Delete</button>';
+  } else {
+    ['sup-name','sup-phone','sup-address','sup-notes'].forEach(function(f) { document.getElementById(f).value = ''; });
+    document.getElementById('sup-status').value = 'active';
+    document.getElementById('sup-delete-area').innerHTML = '';
+  }
+  document.getElementById('sup-modal').style.display = 'flex';
+}
+
+// Called from inside Purchase modal to create a supplier without losing context
+function openSupModalInline() {
+  // Cache state so we can restore purchase modal fields on return
+  editingSupId = null;
+  document.getElementById('sup-modal-title').textContent = 'Add Supplier';
+  ['sup-name','sup-phone','sup-address','sup-notes'].forEach(function(f) { document.getElementById(f).value = ''; });
+  document.getElementById('sup-status').value = 'active';
+  document.getElementById('sup-delete-area').innerHTML = '';
+  document.getElementById('sup-modal').style.display = 'flex';
+}
+
+function closeSupModal() { document.getElementById('sup-modal').style.display = 'none'; editingSupId = null; }
+
+async function saveSupplier() {
+  var name = document.getElementById('sup-name').value.trim();
+  if (!name) { notify('Name is required', 'error'); return; }
+  var data = {
+    name: name,
+    contact_phone: document.getElementById('sup-phone').value.trim() || null,
+    address: document.getElementById('sup-address').value.trim() || null,
+    status: document.getElementById('sup-status').value,
+    notes: document.getElementById('sup-notes').value.trim() || null,
+    company_id: getCompanyId()
+  };
+  var btn = document.getElementById('sup-save-btn');
+  btnLoading(btn, true);
+  try {
+    var newId;
+    if (editingSupId) {
+      await sbQuery(sb.from('tender_suppliers').update(data).eq('id', editingSupId).select());
+      newId = editingSupId;
+    } else {
+      data.id = await dbNextId('TS');
+      newId = data.id;
+      await sbQuery(sb.from('tender_suppliers').insert(data).select());
+    }
+    closeSupModal();
+    // Reload suppliers
+    var res = await sbQuery(sb.from('tender_suppliers').select('*').eq('company_id', getCompanyId()).order('name'));
+    suppliers = res || [];
+    // If purchase modal is still open, refresh its supplier dropdown and preselect newly added
+    var purModal = document.getElementById('pur-modal');
+    if (purModal && purModal.style.display === 'flex') {
+      populatePurchaseSupplierSelect(newId);
+    } else {
+      renderCurrentTab();
+    }
+    notify(editingSupId ? 'Supplier updated' : 'Supplier added', 'success');
+  } catch(e) { console.error(e); notify('Error saving supplier', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+async function deleteSupplier(id) {
+  var n = supplierPurchases.filter(function(p) { return p.supplier_id === id; }).length;
+  if (n > 0) {
+    notify('Cannot delete: supplier has ' + n + ' purchase' + (n===1?'':'s') + ' on record. Set status to Inactive instead.', 'error');
+    return;
+  }
+  confirmAction('Delete supplier?', 'This cannot be undone.', async function() {
+    await sbQuery(sb.from('tender_suppliers').delete().eq('id', id).select());
+    closeSupModal();
+    var res = await sbQuery(sb.from('tender_suppliers').select('*').eq('company_id', getCompanyId()).order('name'));
+    suppliers = res || [];
+    renderCurrentTab();
+    notify('Supplier deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// PURCHASE CRUD (always attached to an LO)
+// ============================================================
+function populatePurchaseSupplierSelect(preselectId) {
+  var sel = document.getElementById('pur-supplier');
+  var active = suppliers.filter(function(s) { return s.status === 'active'; });
+  if (!active.length) {
+    sel.innerHTML = '<option value="">— No active suppliers — click + New</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">— Select supplier —</option>' +
+    active.map(function(s) { return '<option value="' + s.id + '">' + esc(s.name) + '</option>'; }).join('');
+  if (preselectId) sel.value = preselectId;
+}
+
+function openPurchaseModal(purId, loId) {
+  editingPurId = purId || null;
+  purLoContext = loId;
+  var lo = los.find(function(x) { return x.id === loId; });
+  if (!lo) { notify('LO not found', 'error'); return; }
+  document.getElementById('pur-modal-title').textContent = purId ? 'Edit Supplier Purchase' : 'Add Supplier Purchase';
+  document.getElementById('pur-lo-context').innerHTML =
+    'For <strong>' + esc(lo.lo_number || lo.id) + '</strong> — ' + esc(lo.recipient_name || '') + ' · Qty <strong>' + fmtNum(lo.qty) + '</strong>';
+
+  populatePurchaseSupplierSelect();
+
+  if (purId) {
+    var p = supplierPurchases.find(function(x) { return x.id === purId; });
+    if (!p) return;
+    document.getElementById('pur-supplier').value = p.supplier_id || '';
+    document.getElementById('pur-qty').value = p.qty || '';
+    document.getElementById('pur-unit-cost').value = p.unit_cost || '';
+    document.getElementById('pur-total-cost').value = p.total_cost ? Number(p.total_cost).toFixed(2) : '';
+    document.getElementById('pur-date').value = p.purchase_date || '';
+    document.getElementById('pur-receipt').value = p.receipt_status || 'pending';
+    document.getElementById('pur-received-date').value = p.received_date || '';
+    document.getElementById('pur-remarks').value = p.remarks || '';
+    togglePurReceivedField();
+    var deleteBtn = (p.payment_status === 'paid')
+      ? '<span style="font-size:10px;color:var(--text-muted);align-self:center;">Paid — cannot delete</span>'
+      : '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);font-size:11px;" onclick="deletePurchase(\'' + purId + '\')">Delete</button>';
+    document.getElementById('pur-delete-area').innerHTML = deleteBtn;
+  } else {
+    document.getElementById('pur-supplier').value = '';
+    document.getElementById('pur-qty').value = '';
+    document.getElementById('pur-unit-cost').value = '';
+    document.getElementById('pur-total-cost').value = '';
+    document.getElementById('pur-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('pur-receipt').value = 'pending';
+    document.getElementById('pur-received-date').value = '';
+    document.getElementById('pur-remarks').value = '';
+    togglePurReceivedField();
+    document.getElementById('pur-delete-area').innerHTML = '';
+  }
+  document.getElementById('pur-modal').style.display = 'flex';
+}
+
+function closePurModal() { document.getElementById('pur-modal').style.display = 'none'; editingPurId = null; purLoContext = null; }
+
+function togglePurReceivedField() {
+  var st = document.getElementById('pur-receipt').value;
+  document.getElementById('pur-received-wrap').style.display = st === 'received' ? '' : 'none';
+  if (st === 'received' && !document.getElementById('pur-received-date').value) {
+    document.getElementById('pur-received-date').value = new Date().toISOString().slice(0,10);
+  }
+}
+
+function calcPurTotal() {
+  var q = parseFloat(document.getElementById('pur-qty').value) || 0;
+  var u = parseFloat(document.getElementById('pur-unit-cost').value) || 0;
+  document.getElementById('pur-total-cost').value = q && u ? (q * u).toFixed(2) : '';
+}
+
+// Attach listeners on first DOM ready
+document.getElementById('pur-qty').addEventListener('input', calcPurTotal);
+document.getElementById('pur-unit-cost').addEventListener('input', calcPurTotal);
+document.getElementById('pur-receipt').addEventListener('change', togglePurReceivedField);
+
+async function savePurchase() {
+  var supId = document.getElementById('pur-supplier').value;
+  var qty = parseInt(document.getElementById('pur-qty').value) || 0;
+  var unit = parseFloat(document.getElementById('pur-unit-cost').value) || 0;
+  var date = document.getElementById('pur-date').value;
+  if (!supId) { notify('Supplier is required', 'error'); return; }
+  if (qty <= 0) { notify('Qty must be > 0', 'error'); return; }
+  if (unit < 0) { notify('Unit cost must be ≥ 0', 'error'); return; }
+  if (!date) { notify('Purchase date is required', 'error'); return; }
+  if (!purLoContext) { notify('LO context missing', 'error'); return; }
+
+  var receiptSt = document.getElementById('pur-receipt').value;
+  var data = {
+    supplier_id: supId,
+    lo_id: purLoContext,
+    qty: qty,
+    unit_cost: unit,
+    total_cost: qty * unit,
+    purchase_date: date,
+    receipt_status: receiptSt,
+    received_date: receiptSt === 'received' ? (document.getElementById('pur-received-date').value || null) : null,
+    remarks: document.getElementById('pur-remarks').value.trim() || null,
+    company_id: getCompanyId()
+  };
+
+  // Warn (not block) if purchased qty > LO qty
+  var lo = los.find(function(x) { return x.id === purLoContext; });
+  if (lo) {
+    var others = supplierPurchases.filter(function(p) { return p.lo_id === purLoContext && p.id !== editingPurId; });
+    var othersQty = others.reduce(function(s,p) { return s + Number(p.qty||0); }, 0);
+    if (othersQty + qty > (lo.qty || 0)) {
+      var over = othersQty + qty - (lo.qty || 0);
+      if (!confirm('Total supplier purchases for this LO (' + fmtNum(othersQty + qty) + ') exceed the LO qty (' + fmtNum(lo.qty) + ') by ' + fmtNum(over) + '. Save anyway?')) return;
+    }
+  }
+
+  var btn = document.getElementById('pur-save-btn');
+  btnLoading(btn, true);
+  try {
+    if (editingPurId) {
+      await sbQuery(sb.from('tender_supplier_purchases').update(data).eq('id', editingPurId).select());
+    } else {
+      data.id = await dbNextId('TP');
+      await sbQuery(sb.from('tender_supplier_purchases').insert(data).select());
+    }
+    closePurModal();
+    await loadPurchasesForCurrentTender();
+    // Refresh the LO modal purchases section if it's still open, and the active page
+    var loModal = document.getElementById('lo-modal');
+    if (loModal && loModal.style.display === 'flex' && editingLoId) {
+      renderLoPurchasesSection(editingLoId);
+    }
+    renderCurrentTab();
+    notify(editingPurId ? 'Purchase updated' : 'Purchase added', 'success');
+  } catch(e) { console.error(e); notify('Error saving purchase', 'error'); }
+  finally { btnLoading(btn, false); }
+}
+
+async function deletePurchase(id) {
+  var p = supplierPurchases.find(function(x) { return x.id === id; });
+  if (!p) return;
+  if (p.payment_status === 'paid') {
+    notify('Cannot delete a paid purchase. Payment must be undone first via DB.', 'error');
+    return;
+  }
+  confirmAction('Delete this supplier purchase?', 'This cannot be undone.', async function() {
+    await sbQuery(sb.from('tender_supplier_purchases').delete().eq('id', id).select());
+    closePurModal();
+    await loadPurchasesForCurrentTender();
+    var loModal = document.getElementById('lo-modal');
+    if (loModal && loModal.style.display === 'flex' && editingLoId) {
+      renderLoPurchasesSection(editingLoId);
+    }
+    renderCurrentTab();
+    notify('Purchase deleted', 'success');
+  }, true);
+}
+
+// ============================================================
+// MARK PAID
+// ============================================================
+function openMarkPaid(purId) {
+  paidPurId = purId;
+  var p = supplierPurchases.find(function(x) { return x.id === purId; });
+  if (!p) return;
+  var sup = supplierById(p.supplier_id);
+  var lo = los.find(function(x) { return x.id === p.lo_id; });
+  document.getElementById('paid-context').innerHTML =
+    '<strong>' + esc(sup ? sup.name : '') + '</strong> — LO ' + esc(lo ? lo.lo_number : p.lo_id) +
+    '<br>Purchase of <strong>' + fmtNum(p.qty) + '</strong> pcs @ ' + fmtRM(p.unit_cost) + ' = <strong>' + fmtRM(p.total_cost) + '</strong>';
+  document.getElementById('paid-amount').value = Number(p.total_cost).toFixed(2);
+  document.getElementById('paid-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('paid-method').value = 'bank';
+  document.getElementById('paid-ref').value = '';
+  document.getElementById('paid-bank').value = '';
+  document.getElementById('paid-remarks').value = '';
+  document.getElementById('paid-modal').style.display = 'flex';
+}
+
+function closePaidModal() { document.getElementById('paid-modal').style.display = 'none'; paidPurId = null; }
+
+async function saveMarkPaid() {
+  if (!paidPurId) return;
+  var amount = parseFloat(document.getElementById('paid-amount').value) || 0;
+  var date = document.getElementById('paid-date').value;
+  if (amount <= 0) { notify('Amount must be > 0', 'error'); return; }
+  if (!date) { notify('Payment date is required', 'error'); return; }
+  var method = document.getElementById('paid-method').value;
+  var ref = document.getElementById('paid-ref').value.trim();
+  var bank = document.getElementById('paid-bank').value.trim();
+  var remarks = document.getElementById('paid-remarks').value.trim();
+  var data = {
+    payment_status: 'paid',
+    payment_date: date,
+    payment_amount: amount,
+    payment_ref: (method === 'cash' ? 'CASH' : (ref || null)),
+    payment_bank: bank || null
+  };
+  if (remarks) data.remarks = (supplierPurchases.find(function(x){return x.id===paidPurId;}).remarks || '') + (remarks ? ' | Paid: ' + remarks : '');
+  var btn = document.getElementById('paid-save-btn');
+  btnLoading(btn, true);
+  try {
+    await sbQuery(sb.from('tender_supplier_purchases').update(data).eq('id', paidPurId).select());
+    closePaidModal();
+    await loadPurchasesForCurrentTender();
+    renderCurrentTab();
+    notify('Payment recorded', 'success');
+  } catch(e) { console.error(e); notify('Error recording payment', 'error'); }
   finally { btnLoading(btn, false); }
 }
 
@@ -1014,8 +1619,8 @@ function renderReports() {
     '<button class="btn btn-outline btn-sm" onclick="window.print()" style="font-size:11px;">Print</button></div>';
 
   html += '<div class="td-report-selector">';
-  ['summary','batch','payment'].forEach(function(r) {
-    var labels = { summary: 'Tender Summary', batch: 'Batch Completion', payment: 'Payment Status' };
+  ['summary','batch','payment','margin'].forEach(function(r) {
+    var labels = { summary: 'Tender Summary', batch: 'Batch Completion', payment: 'Payment Status', margin: 'Margin Report' };
     html += '<button class="td-report-btn' + (currentReport===r?' active':'') + '" onclick="currentReport=\'' + r + '\';renderReports();">' + labels[r] + '</button>';
   });
   html += '</div>';
@@ -1024,6 +1629,7 @@ function renderReports() {
   if (currentReport === 'summary') html += renderSummaryReport();
   else if (currentReport === 'batch') html += renderBatchReport();
   else if (currentReport === 'payment') html += renderPaymentReport();
+  else if (currentReport === 'margin') html += renderMarginReport();
   html += '</div>';
 
   page.innerHTML = html;
@@ -1118,53 +1724,331 @@ function renderPaymentReport() {
 }
 
 // ============================================================
-// AI LO IMPORT
+// MARGIN REPORT
+// ============================================================
+// Accrual basis:
+//   Revenue = sum over LOs in date range (delivered/invoiced/paid) of (qty × tender.unit_price)
+//   Cost    = sum over purchases in date range of total_cost
+// Grouped by month / contract / supplier.
+// IMPORTANT: we only have LOs loaded for the *current* tender in memory.
+// For cross-tender margin, we'd need to load everything up front. For now, filter by currentTender.
+function renderMarginReport() {
+  if (!currentTender) return '<p style="color:var(--text-muted);">Select a tender to see margin.</p>';
+
+  var unitPrice = parseFloat(currentTender.unit_price) || 0;
+  var from = marginFilters.from || '';
+  var to = marginFilters.to || '';
+  var groupBy = marginFilters.groupBy || 'month';
+
+  function inRange(dateStr) {
+    if (!dateStr) return false;
+    if (from && dateStr < from) return false;
+    if (to && dateStr > to) return false;
+    return true;
+  }
+
+  // Revenue LOs: delivered/invoiced/paid with delivery_date in range.
+  // If delivery_date missing, fall back to lo_date (otherwise LO can't appear).
+  var revLos = los.filter(function(lo) {
+    if (['delivered','invoiced','paid'].indexOf(lo.status) < 0) return false;
+    var d = lo.delivery_date || lo.lo_date;
+    return !d || (!from && !to) || inRange(d);
+  });
+
+  // Cost purchases: purchase_date in range
+  var costPurs = supplierPurchases.filter(function(p) {
+    return (!from && !to) || inRange(p.purchase_date);
+  });
+
+  var revenue = revLos.reduce(function(s,lo) { return s + Number(lo.qty||0) * unitPrice; }, 0);
+  var cost = costPurs.reduce(function(s,p) { return s + Number(p.total_cost||0); }, 0);
+  var margin = revenue - cost;
+  var mPct = revenue ? Math.round(margin / revenue * 1000) / 10 : 0;
+
+  var html = '<h3 style="margin:0 0 12px;">Margin Report — ' + esc(currentTender.tender_no) + '</h3>';
+
+  // Filters row
+  html += '<div class="td-filter-bar" style="background:var(--bg);padding:10px;border-radius:8px;margin-bottom:14px;">' +
+    '<label style="font-size:11px;color:var(--text-muted);">From <input type="date" value="' + esc(from) + '" onchange="marginFilters.from=this.value;renderReports();" style="font-size:12px;padding:4px 8px;"></label>' +
+    '<label style="font-size:11px;color:var(--text-muted);">To <input type="date" value="' + esc(to) + '" onchange="marginFilters.to=this.value;renderReports();" style="font-size:12px;padding:4px 8px;"></label>' +
+    '<label style="font-size:11px;color:var(--text-muted);">Group by ' +
+      '<select onchange="marginFilters.groupBy=this.value;renderReports();" style="font-size:12px;padding:4px 8px;">' +
+        ['month','contract','supplier'].map(function(g) {
+          return '<option value="' + g + '"' + (groupBy===g?' selected':'') + '>' + g.charAt(0).toUpperCase()+g.slice(1) + '</option>';
+        }).join('') +
+      '</select></label>' +
+    '<button class="btn btn-outline btn-sm" style="font-size:11px;margin-left:auto;" onclick="exportMarginCsv()">Export CSV</button>' +
+    '</div>';
+
+  // Summary cards
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">' +
+    '<div style="background:linear-gradient(135deg,#22A05C 0%,#1B7D47 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
+      '<div style="font-size:11px;opacity:0.85;">Total Revenue</div>' +
+      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(revenue) + '</div>' +
+      '<div style="font-size:11px;opacity:0.85;">' + revLos.length + ' local orders</div>' +
+    '</div>' +
+    '<div style="background:linear-gradient(135deg,#C25B1E 0%,#8F4316 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
+      '<div style="font-size:11px;opacity:0.85;">Supplier Cost</div>' +
+      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(cost) + '</div>' +
+      '<div style="font-size:11px;opacity:0.85;">' + costPurs.length + ' purchase' + (costPurs.length===1?'':'s') + '</div>' +
+    '</div>' +
+    '<div style="background:linear-gradient(135deg,#1B7D47 0%,#0F5A31 100%);color:#fff;border-radius:10px;padding:14px 16px;">' +
+      '<div style="font-size:11px;opacity:0.85;">Net Margin</div>' +
+      '<div style="font-size:22px;font-weight:800;margin:4px 0 2px;">' + fmtRM(margin) + '</div>' +
+      '<div style="font-size:11px;opacity:0.85;">' + mPct + '% of revenue</div>' +
+    '</div>' +
+    '</div>';
+
+  // Breakdown by group
+  var rows = [];  // array of {key, loCount, revenue, cost, margin}
+  if (groupBy === 'month') {
+    var byMonth = {};
+    revLos.forEach(function(lo) {
+      var d = lo.delivery_date || lo.lo_date || '';
+      var key = d.slice(0,7); if (!key) key = 'No date';
+      if (!byMonth[key]) byMonth[key] = { key: key, loCount: 0, revenue: 0, cost: 0 };
+      byMonth[key].loCount++;
+      byMonth[key].revenue += Number(lo.qty||0) * unitPrice;
+    });
+    costPurs.forEach(function(p) {
+      var d = p.purchase_date || ''; var key = d.slice(0,7); if (!key) key = 'No date';
+      if (!byMonth[key]) byMonth[key] = { key: key, loCount: 0, revenue: 0, cost: 0 };
+      byMonth[key].cost += Number(p.total_cost||0);
+    });
+    rows = Object.values(byMonth).sort(function(a,b) { return a.key < b.key ? -1 : 1; });
+    rows.forEach(function(r) { r.margin = r.revenue - r.cost; r.label = r.key === 'No date' ? 'No date' : new Date(r.key + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); });
+  } else if (groupBy === 'contract') {
+    // Only current tender is loaded → one row.
+    rows = [{ label: currentTender.tender_no + ' — ' + currentTender.variety, loCount: revLos.length, revenue: revenue, cost: cost, margin: margin }];
+  } else if (groupBy === 'supplier') {
+    // Supplier rows — revenue is PRORATED by supplier share of LO qty
+    var bySup = {};
+    costPurs.forEach(function(p) {
+      if (!bySup[p.supplier_id]) bySup[p.supplier_id] = { key: p.supplier_id, loSet: {}, qty: 0, cost: 0, revShare: 0 };
+      bySup[p.supplier_id].loSet[p.lo_id] = true;
+      bySup[p.supplier_id].qty += Number(p.qty || 0);
+      bySup[p.supplier_id].cost += Number(p.total_cost || 0);
+    });
+    // Prorate revenue per LO to the supplier who contributed
+    Object.values(bySup).forEach(function(row) {
+      Object.keys(row.loSet).forEach(function(loId) {
+        var lo = los.find(function(x) { return x.id === loId; });
+        if (!lo) return;
+        if (['delivered','invoiced','paid'].indexOf(lo.status) < 0) return;  // only revenue-counted LOs
+        // How much did this supplier contribute to this LO?
+        var myQ = costPurs.filter(function(p) { return p.lo_id === loId && p.supplier_id === row.key; }).reduce(function(s,p) { return s + Number(p.qty||0); }, 0);
+        var loRev = Number(lo.qty||0) * unitPrice;
+        var share = lo.qty > 0 ? (myQ / lo.qty) : 0;
+        row.revShare += loRev * share;
+      });
+    });
+    rows = Object.values(bySup).map(function(r) {
+      var sup = supplierById(r.key);
+      return {
+        label: sup ? sup.name : r.key,
+        loCount: Object.keys(r.loSet).length,
+        qty: r.qty,
+        revenue: r.revShare,
+        cost: r.cost,
+        margin: r.revShare - r.cost
+      };
+    }).sort(function(a,b) { return b.cost - a.cost; });
+  }
+
+  // Breakdown table
+  if (!rows.length) {
+    html += '<p style="color:var(--text-muted);padding:20px;text-align:center;">No data in the selected range.</p>';
+    return html;
+  }
+
+  var groupHeader = groupBy === 'month' ? 'Month' : (groupBy === 'contract' ? 'Contract' : 'Supplier');
+  html += '<table><thead><tr>' +
+    '<th>' + groupHeader + '</th>' +
+    (groupBy === 'supplier' ? '<th style="text-align:right;">Qty</th>' : '') +
+    '<th style="text-align:right;">' + (groupBy === 'supplier' ? 'LOs' : '# LOs') + '</th>' +
+    '<th style="text-align:right;">Revenue (RM)</th>' +
+    '<th style="text-align:right;">Supplier Cost (RM)</th>' +
+    '<th style="text-align:right;">Margin (RM)</th>' +
+    '<th style="text-align:right;">Margin %</th>' +
+    '</tr></thead><tbody>';
+  var tRev = 0, tCost = 0, tMargin = 0, tLos = 0, tQty = 0;
+  rows.forEach(function(r) {
+    tRev += r.revenue; tCost += r.cost; tMargin += r.margin; tLos += r.loCount; tQty += (r.qty||0);
+    var pct = r.revenue ? Math.round(r.margin / r.revenue * 1000) / 10 : 0;
+    html += '<tr>' +
+      '<td><strong>' + esc(r.label) + '</strong></td>' +
+      (groupBy === 'supplier' ? '<td style="text-align:right;">' + fmtNum(r.qty) + '</td>' : '') +
+      '<td style="text-align:right;">' + r.loCount + '</td>' +
+      '<td style="text-align:right;">' + fmtRM(r.revenue) + '</td>' +
+      '<td style="text-align:right;color:#C25B1E;">' + fmtRM(r.cost) + '</td>' +
+      '<td style="text-align:right;color:' + (r.margin >= 0 ? '#22A05C' : '#EF4444') + ';font-weight:600;">' + fmtRM(r.margin) + '</td>' +
+      '<td style="text-align:right;">' + pct + '%</td>' +
+      '</tr>';
+  });
+  var totPct = tRev ? Math.round(tMargin / tRev * 1000) / 10 : 0;
+  html += '<tr style="font-weight:700;background:var(--bg);">' +
+    '<td>TOTAL</td>' +
+    (groupBy === 'supplier' ? '<td style="text-align:right;">' + fmtNum(tQty) + '</td>' : '') +
+    '<td style="text-align:right;">' + tLos + '</td>' +
+    '<td style="text-align:right;">' + fmtRM(tRev) + '</td>' +
+    '<td style="text-align:right;color:#C25B1E;">' + fmtRM(tCost) + '</td>' +
+    '<td style="text-align:right;color:' + (tMargin >= 0 ? '#22A05C' : '#EF4444') + ';">' + fmtRM(tMargin) + '</td>' +
+    '<td style="text-align:right;">' + totPct + '%</td>' +
+    '</tr>';
+  html += '</tbody></table>';
+
+  return html;
+}
+
+function exportMarginCsv() {
+  // Simple CSV: re-derive the same rows
+  if (!currentTender) return;
+  var unitPrice = parseFloat(currentTender.unit_price) || 0;
+  var from = marginFilters.from, to = marginFilters.to, groupBy = marginFilters.groupBy;
+  function inRange(d) { if (!d) return false; if (from && d < from) return false; if (to && d > to) return false; return true; }
+
+  var revLos = los.filter(function(lo) {
+    if (['delivered','invoiced','paid'].indexOf(lo.status) < 0) return false;
+    var d = lo.delivery_date || lo.lo_date;
+    return !d || (!from && !to) || inRange(d);
+  });
+  var costPurs = supplierPurchases.filter(function(p) { return (!from && !to) || inRange(p.purchase_date); });
+
+  var lines = ['Tender,' + currentTender.tender_no + ' — ' + currentTender.variety];
+  lines.push('Date range,' + (from||'(any)') + ' to ' + (to||'(any)'));
+  lines.push('Unit price,' + unitPrice);
+  lines.push('');
+
+  if (groupBy === 'month') {
+    var byMonth = {};
+    revLos.forEach(function(lo) { var k = (lo.delivery_date||lo.lo_date||'').slice(0,7) || 'No date'; if (!byMonth[k]) byMonth[k]={loCount:0,revenue:0,cost:0}; byMonth[k].loCount++; byMonth[k].revenue += Number(lo.qty||0)*unitPrice; });
+    costPurs.forEach(function(p) { var k = (p.purchase_date||'').slice(0,7) || 'No date'; if (!byMonth[k]) byMonth[k]={loCount:0,revenue:0,cost:0}; byMonth[k].cost += Number(p.total_cost||0); });
+    lines.push('Month,# LOs,Revenue,Supplier Cost,Margin,Margin %');
+    Object.keys(byMonth).sort().forEach(function(k) {
+      var r = byMonth[k]; var m = r.revenue - r.cost; var pct = r.revenue ? (m/r.revenue*100).toFixed(1) : '0';
+      lines.push([k, r.loCount, r.revenue.toFixed(2), r.cost.toFixed(2), m.toFixed(2), pct + '%'].join(','));
+    });
+  } else if (groupBy === 'supplier') {
+    var bySup = {};
+    costPurs.forEach(function(p) {
+      if (!bySup[p.supplier_id]) bySup[p.supplier_id] = { loSet:{}, qty:0, cost:0, revShare:0 };
+      bySup[p.supplier_id].loSet[p.lo_id]=true;
+      bySup[p.supplier_id].qty += Number(p.qty||0);
+      bySup[p.supplier_id].cost += Number(p.total_cost||0);
+    });
+    Object.keys(bySup).forEach(function(sid) {
+      var row = bySup[sid];
+      Object.keys(row.loSet).forEach(function(loId) {
+        var lo = los.find(function(x) { return x.id === loId; });
+        if (!lo || ['delivered','invoiced','paid'].indexOf(lo.status) < 0) return;
+        var myQ = costPurs.filter(function(p) { return p.lo_id === loId && p.supplier_id === sid; }).reduce(function(s,p) { return s + Number(p.qty||0); }, 0);
+        var loRev = Number(lo.qty||0) * unitPrice;
+        row.revShare += loRev * (lo.qty > 0 ? (myQ / lo.qty) : 0);
+      });
+    });
+    lines.push('Supplier,Qty,LOs,Revenue (prorated),Cost,Margin,Margin %');
+    Object.keys(bySup).forEach(function(sid) {
+      var r = bySup[sid]; var sup = supplierById(sid); var m = r.revShare - r.cost; var pct = r.revShare ? (m/r.revShare*100).toFixed(1) : '0';
+      lines.push(['"' + (sup?sup.name:sid).replace(/"/g,'""') + '"', r.qty, Object.keys(r.loSet).length, r.revShare.toFixed(2), r.cost.toFixed(2), m.toFixed(2), pct + '%'].join(','));
+    });
+  } else {
+    var rev = revLos.reduce(function(s,lo) { return s + Number(lo.qty||0)*unitPrice; }, 0);
+    var cost = costPurs.reduce(function(s,p) { return s + Number(p.total_cost||0); }, 0);
+    lines.push('Contract,# LOs,Revenue,Cost,Margin,Margin %');
+    var m = rev - cost; var pct = rev ? (m/rev*100).toFixed(1) : '0';
+    lines.push([currentTender.tender_no + ' — ' + currentTender.variety, revLos.length, rev.toFixed(2), cost.toFixed(2), m.toFixed(2), pct + '%'].join(','));
+  }
+  var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'margin-report-' + currentTender.tender_no.replace(/[^A-Za-z0-9]/g,'_') + '-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  notify('CSV downloaded', 'success');
+}
+
+// ============================================================
+// UPLOAD LO TAB (was a modal — now a dedicated tab)
 // ============================================================
 var importedLOs = [];
 
-async function openImportModal() {
-  // Load API key from database
+async function renderUpload() {
+  var page = document.getElementById('page-upload');
+  if (!currentTender) {
+    page.innerHTML = '<div class="no-tender-state"><h3>No Tender Selected</h3><p>Select a tender in the sidebar before uploading LOs.</p></div>';
+    return;
+  }
+  var maxBatch = los.reduce(function(m, lo) { return Math.max(m, lo.batch_no || 0); }, 0);
+  var nextBatch = maxBatch + 1;
+
+  var html = '';
+  html += '<div class="td-section-header"><h2>Upload Local Order PDF</h2></div>';
+  html += '<div class="td-section" style="max-width:780px;">';
+  html += '<div id="upl-step-1">' +
+    '<label class="td-upload-drop" style="display:block;border:2px dashed #D4AF37;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:var(--bg-card);">' +
+      '<input id="upl-file" type="file" accept=".pdf" style="display:none;" onchange="handleUploadFile(this)">' +
+      '<div style="font-size:40px;margin-bottom:8px;">📄</div>' +
+      '<div style="font-weight:700;font-size:14px;color:var(--text);">Click to select PDF or drag and drop here</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">MPOB Pesanan Tempatan format — auto-extracts data</div>' +
+    '</label>' +
+    '<div style="margin-top:14px;display:flex;gap:12px;align-items:center;">' +
+      '<label style="font-size:12px;color:var(--text-muted);">Assign to tender</label>' +
+      '<select id="upl-tender" class="form-control" style="max-width:320px;">' +
+        tenders.filter(function(t){return t.status==='active';}).map(function(t) {
+          var sel = (t.id === currentTender.id) ? ' selected' : '';
+          return '<option value="' + t.id + '"' + sel + '>' + esc(t.tender_no) + ' — ' + esc(t.variety) + '</option>';
+        }).join('') +
+      '</select>' +
+      '<label style="font-size:12px;color:var(--text-muted);">Batch</label>' +
+      '<input id="upl-batch" type="number" min="1" value="' + nextBatch + '" class="form-control" style="max-width:80px;">' +
+    '</div>' +
+    '</div>';
+
+  html += '<div id="upl-progress" style="display:none;text-align:center;padding:30px;">' +
+    '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;">Processing PDF...</div>' +
+    '<div id="upl-progress-text" style="font-size:12px;color:var(--text-muted);">Rendering pages...</div>' +
+    '</div>';
+
+  html += '<div id="upl-step-2" style="display:none;">' +
+    '<div style="font-size:13px;font-weight:600;color:var(--text);margin:14px 0 8px;">Review extracted LOs — edit any field before saving:</div>' +
+    '<div id="upl-preview"></div>' +
+    '<div style="margin-top:14px;display:flex;gap:8px;">' +
+      '<button class="btn btn-primary" onclick="saveImportedLOs()" id="upl-save-btn">Save All LOs</button>' +
+      '<button class="btn btn-outline" onclick="resetUpload()">Clear</button>' +
+    '</div>' +
+    '</div>';
+
+  html += '</div>';
+  page.innerHTML = html;
+}
+
+function resetUpload() {
+  importedLOs = [];
+  renderUpload();
+}
+
+async function handleUploadFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  // Load API key
   var keyRow = await sbQuery(sb.from('app_config').select('value').eq('key', 'anthropic_api_key').single());
   var savedKey = (keyRow && keyRow.value) || localStorage.getItem('tg_anthropic_key') || '';
   if (!savedKey) { notify('No API key configured. Contact admin.', 'error'); return; }
-  document.getElementById('import-api-key').value = savedKey;
-  document.getElementById('import-file').value = '';
-  var maxBatch = los.reduce(function(m, lo) { return Math.max(m, lo.batch_no || 0); }, 0);
-  document.getElementById('import-batch').value = maxBatch + 1;
-  document.getElementById('import-step-1').style.display = '';
-  document.getElementById('import-step-2').style.display = 'none';
-  document.getElementById('import-progress').style.display = 'none';
-  document.getElementById('import-save-btn').style.display = 'none';
-  importedLOs = [];
-  document.getElementById('import-modal').style.display = 'flex';
-}
 
-function closeImportModal() { document.getElementById('import-modal').style.display = 'none'; }
+  var batchNo = parseInt(document.getElementById('upl-batch').value) || 1;
+  var selectedTender = document.getElementById('upl-tender').value;
 
-async function extractFromPDF() {
-  var apiKey = document.getElementById('import-api-key').value.trim();
-  if (!apiKey) { notify('No API key configured. Contact admin.', 'error'); return; }
-
-  var fileInput = document.getElementById('import-file');
-  var file = fileInput.files[0];
-  if (!file) { notify('Please select a PDF file', 'error'); return; }
-
-  var batchNo = parseInt(document.getElementById('import-batch').value) || 1;
-
-  // Show progress
-  document.getElementById('import-step-1').style.display = 'none';
-  document.getElementById('import-progress').style.display = '';
-  document.getElementById('import-progress-text').textContent = 'Reading PDF...';
+  document.getElementById('upl-step-1').style.display = 'none';
+  document.getElementById('upl-progress').style.display = '';
+  document.getElementById('upl-progress-text').textContent = 'Reading PDF...';
 
   try {
-    // Read file as array buffer
     var arrayBuffer = await file.arrayBuffer();
-
-    // Render PDF pages to images using pdf.js
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     var numPages = pdf.numPages;
-    document.getElementById('import-progress-text').textContent = 'Rendering ' + numPages + ' page(s)...';
+    document.getElementById('upl-progress-text').textContent = 'Rendering ' + numPages + ' page(s)...';
 
     var images = [];
     for (var i = 1; i <= Math.min(numPages, 5); i++) {
@@ -1177,18 +2061,14 @@ async function extractFromPDF() {
       var ctx = canvas.getContext('2d');
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
       var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      images.push(dataUrl.split(',')[1]); // base64 only
+      images.push(dataUrl.split(',')[1]);
     }
 
-    document.getElementById('import-progress-text').textContent = 'Sending to Claude for extraction...';
+    document.getElementById('upl-progress-text').textContent = 'Sending to Claude for extraction...';
 
-    // Build Claude API request
     var content = [];
-    images.forEach(function(img, idx) {
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/jpeg', data: img }
-      });
+    images.forEach(function(img) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img } });
     });
     content.push({
       type: 'text',
@@ -1210,7 +2090,7 @@ async function extractFromPDF() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
+        'x-api-key': savedKey,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
@@ -1228,70 +2108,67 @@ async function extractFromPDF() {
 
     var result = await response.json();
     var text = result.content[0].text.trim();
-
-    // Parse JSON from response (handle potential markdown wrapping)
     if (text.startsWith('```')) {
       text = text.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
     }
     var extracted = JSON.parse(text);
     if (!Array.isArray(extracted)) extracted = [extracted];
 
-    // Assign batch and seq numbers
     var existingInBatch = los.filter(function(lo) { return lo.batch_no === batchNo; }).length;
     extracted.forEach(function(lo, idx) {
       lo.batch_no = batchNo;
       lo.seq_no = existingInBatch + idx + 1;
       lo.qty = parseInt(lo.qty) || 0;
+      lo._tender_id = selectedTender;
     });
     importedLOs = extracted;
 
-    // Show preview
-    document.getElementById('import-progress').style.display = 'none';
-    document.getElementById('import-step-2').style.display = '';
-    document.getElementById('import-save-btn').style.display = '';
+    document.getElementById('upl-progress').style.display = 'none';
+    document.getElementById('upl-step-2').style.display = '';
     renderImportPreview();
-
   } catch(e) {
     console.error('Import error:', e);
-    document.getElementById('import-progress').style.display = 'none';
-    document.getElementById('import-step-1').style.display = '';
+    document.getElementById('upl-progress').style.display = 'none';
+    document.getElementById('upl-step-1').style.display = '';
     notify('Import failed: ' + e.message, 'error');
   }
 }
 
 function renderImportPreview() {
   var html = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;">' + importedLOs.length + ' LO(s) extracted</div>';
-  html += '<div style="overflow-x:auto;"><table class="lo-table" style="min-width:700px;"><thead><tr>' +
-    '<th>Batch</th><th>#</th><th>LO No</th><th>LO Date</th><th>Expiry</th><th>Recipient</th><th>Area</th><th>Officer</th><th>Qty</th>' +
+  html += '<div style="overflow-x:auto;"><table class="lo-table" style="min-width:800px;"><thead><tr>' +
+    '<th>Batch</th><th>#</th><th>LO No</th><th>LO Date</th><th>Expiry</th><th>Recipient</th><th>Area</th><th>Officer</th><th>Phone</th><th>Qty</th>' +
     '</tr></thead><tbody>';
   importedLOs.forEach(function(lo, idx) {
     html += '<tr>' +
-      '<td><input type="number" value="' + lo.batch_no + '" style="width:50px;" onchange="importedLOs[' + idx + '].batch_no=parseInt(this.value)||1"></td>' +
+      '<td><input type="number" value="' + lo.batch_no + '" style="width:60px;" onchange="importedLOs[' + idx + '].batch_no=parseInt(this.value)||1"></td>' +
       '<td>' + lo.seq_no + '</td>' +
-      '<td><input value="' + esc(lo.lo_number||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].lo_number=this.value"></td>' +
+      '<td><input value="' + esc(lo.lo_number||'') + '" style="width:110px;" onchange="importedLOs[' + idx + '].lo_number=this.value"></td>' +
       '<td><input type="date" value="' + (lo.lo_date||'') + '" onchange="importedLOs[' + idx + '].lo_date=this.value"></td>' +
       '<td><input type="date" value="' + (lo.lo_expiry||'') + '" onchange="importedLOs[' + idx + '].lo_expiry=this.value"></td>' +
       '<td><input value="' + esc(lo.recipient_name||'') + '" style="width:140px;" onchange="importedLOs[' + idx + '].recipient_name=this.value"></td>' +
-      '<td><input value="' + esc(lo.area||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].area=this.value"></td>' +
-      '<td><input value="' + esc(lo.officer_name||'') + '" style="width:100px;" onchange="importedLOs[' + idx + '].officer_name=this.value"></td>' +
-      '<td><input type="number" value="' + (lo.qty||0) + '" style="width:70px;" onchange="importedLOs[' + idx + '].qty=parseInt(this.value)||0"></td>' +
+      '<td><input value="' + esc(lo.area||'') + '" style="width:110px;" onchange="importedLOs[' + idx + '].area=this.value"></td>' +
+      '<td><input value="' + esc(lo.officer_name||'') + '" style="width:110px;" onchange="importedLOs[' + idx + '].officer_name=this.value"></td>' +
+      '<td><input value="' + esc(lo.officer_phone||'') + '" style="width:110px;" onchange="importedLOs[' + idx + '].officer_phone=this.value"></td>' +
+      '<td><input type="number" value="' + (lo.qty||0) + '" style="width:80px;" onchange="importedLOs[' + idx + '].qty=parseInt(this.value)||0"></td>' +
       '</tr>';
   });
   html += '</tbody></table></div>';
-  document.getElementById('import-preview').innerHTML = html;
+  document.getElementById('upl-preview').innerHTML = html;
 }
 
 async function saveImportedLOs() {
   if (!importedLOs.length) return;
-  var btn = document.getElementById('import-save-btn');
+  var btn = document.getElementById('upl-save-btn');
   btnLoading(btn, true);
   try {
     var companyId = getCompanyId();
+    var selectedTender = document.getElementById('upl-tender').value || currentTender.id;
     for (var i = 0; i < importedLOs.length; i++) {
       var lo = importedLOs[i];
       var data = {
         id: await dbNextId('LO'),
-        tender_id: currentTender.id,
+        tender_id: lo._tender_id || selectedTender,
         batch_no: lo.batch_no || 1,
         seq_no: lo.seq_no || (i + 1),
         lo_number: lo.lo_number || null,
@@ -1306,11 +2183,12 @@ async function saveImportedLOs() {
       };
       await sbQuery(sb.from('tender_los').insert(data).select());
     }
-    closeImportModal();
+    var count = importedLOs.length;
+    importedLOs = [];
     await loadTenderData();
-    renderCurrentTab();
-    notify(importedLOs.length + ' LO(s) imported', 'success');
-  } catch(e) { notify('Error saving imported LOs: ' + e.message, 'error'); }
+    renderUpload();
+    notify(count + ' LO(s) imported', 'success');
+  } catch(e) { console.error(e); notify('Error saving imported LOs: ' + e.message, 'error'); }
   finally { btnLoading(btn, false); }
 }
 
@@ -1319,7 +2197,7 @@ async function saveImportedLOs() {
 // ============================================================
 (function() {
   var hash = location.hash.replace('#','');
-  if (['dashboard','los','documents','reports'].indexOf(hash) >= 0) {
+  if (['dashboard','los','suppliers','documents','reports','upload'].indexOf(hash) >= 0) {
     navigateTo(hash);
   }
 })();

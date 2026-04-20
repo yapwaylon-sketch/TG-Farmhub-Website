@@ -438,6 +438,121 @@
   outline: none;
 }
 
+/* --- Contract Progress Cards (dashboard) --- */
+.td-contract-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.td-contract-card {
+  background: linear-gradient(135deg, #C25B1E 0%, #8F4316 100%);
+  color: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  position: relative;
+}
+.td-contract-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+.td-contract-card.td-card-green {
+  background: linear-gradient(135deg, #22A05C 0%, #1B7D47 100%);
+}
+.td-contract-card.td-card-gold {
+  background: linear-gradient(135deg, #C25B1E 0%, #8F4316 100%);
+}
+.td-cc-head {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  opacity: 0.95;
+}
+.td-cc-current {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  vertical-align: middle;
+  margin-left: 4px;
+  font-size: 0;
+}
+.td-cc-bignum {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.td-cc-of { font-size: 14px; font-weight: 500; opacity: 0.7; }
+.td-cc-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  padding: 3px 0;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+.td-cc-line span { opacity: 0.8; }
+.td-cc-line strong { font-weight: 700; }
+.td-cc-hint {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 8px;
+  text-align: right;
+  font-style: italic;
+}
+.td-cc-hint-current { opacity: 1; font-weight: 600; }
+
+/* --- Dashboard section wrappers --- */
+.td-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.td-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* --- Simple table (dashboard tables, supplier tables) --- */
+.td-simple-table-wrap { overflow-x: auto; }
+.td-simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.td-simple-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.td-simple-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+.td-simple-table tbody tr:hover { background: rgba(0,0,0,0.02); }
+
+/* --- Upload drop zone --- */
+.td-upload-drop {
+  transition: all 0.15s;
+}
+.td-upload-drop:hover { background: rgba(212,175,55,0.06) !important; border-color: #C25B1E !important; }
+
 /* --- Print --- */
 @media print {
   .sidebar, .td-filter-bar, .td-section-header button,
@@ -455,6 +570,8 @@
   .td-info-banner { flex-direction: column; gap: 10px; }
   .td-filter-bar { flex-direction: column; align-items: stretch; }
   .td-filter-bar input { max-width: 100%; }
+  .td-contract-cards { grid-template-columns: 1fr; }
+  .td-cc-bignum { font-size: 24px; }
 }
 
 @media (min-width: 1024px) {
