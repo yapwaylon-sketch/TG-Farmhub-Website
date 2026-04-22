@@ -598,12 +598,6 @@ async function doLogin() {
   currentUser = user;
   storeSession(user);
 
-  // Generate session token for multi-device detection
-  var token = Date.now().toString(36) + Math.random().toString(36).substr(2);
-  localStorage.setItem("tgfarmhub_session_token", token);
-  await sbQuery(sb.from("users").update({ session_token: token }).eq("id", user.id).select());
-  startSessionCheck();
-
   // Check if force PIN update needed
   if (user.forcePinUpdate) {
     openForcePinUpdate();
@@ -1260,7 +1254,6 @@ async function init() {
       } else {
         showHub();
         startInactivityTimer();
-        startSessionCheck();
       }
     } else {
       var tgl = document.getElementById("tg-loading"); if (tgl) tgl.remove();

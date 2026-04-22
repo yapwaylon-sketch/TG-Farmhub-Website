@@ -349,10 +349,6 @@ function doLogin() {
   currentUser = user;
   localStorage.setItem('tgfarmhub_delivery_user', JSON.stringify({ id: user.id, username: user.username, displayName: user.displayName || user.username }));
   localStorage.setItem('tgfarmhub_delivery_last_user', user.username);
-  // Write session token for multi-device detection
-  var token = Date.now() + '-' + Math.random().toString(36).slice(2);
-  currentUser.session_token = token;
-  sbQuery(sb.from('users').update({ session_token: token }).eq('id', user.id).select());
   showApp();
 }
 
@@ -374,7 +370,6 @@ function doLogout() {
   currentUser = null;
   localStorage.removeItem('tgfarmhub_delivery_user');
   if (refreshTimer) clearInterval(refreshTimer);
-  if (sessionCheckTimer) clearInterval(sessionCheckTimer);
   if (inactivityTimer) clearTimeout(inactivityTimer);
   document.getElementById('app-main').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
@@ -384,7 +379,6 @@ function doLogout() {
   document.getElementById('login-pin').value = '';
 }
 
-var sessionCheckTimer = null;
 var inactivityTimer = null;
 var INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 60 minutes
 
@@ -395,16 +389,6 @@ function showApp() {
   // Auto-refresh every 30 seconds
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshData, 30000);
-  // Multi-device session check every 30 seconds
-  if (sessionCheckTimer) clearInterval(sessionCheckTimer);
-  sessionCheckTimer = setInterval(async function() {
-    if (!currentUser) return;
-    var data = await sbQuery(sb.from('users').select('session_token').eq('id', currentUser.id));
-    if (data && data[0] && data[0].session_token && data[0].session_token !== currentUser.session_token) {
-      notify('Logged in from another device', 'warning');
-      doLogout();
-    }
-  }, 30000);
   // Inactivity timeout
   resetInactivityTimer();
   ['touchstart', 'click', 'keydown', 'scroll'].forEach(function(evt) {

@@ -1407,7 +1407,6 @@ window.addEventListener('beforeunload', function(e) {
   injectUserBadge(currentUser);
   injectCompanySwitcher();
   startInactivityTimer();
-  startSessionCheck();
 
   // Gate sidebar tabs and buttons by permission
   if (!salesCan('payments'))        document.getElementById('nav-payments').style.display = 'none';

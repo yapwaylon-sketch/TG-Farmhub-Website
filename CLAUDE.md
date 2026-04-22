@@ -37,8 +37,8 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
   - Workers/supervisors use PIN only (no Google option)
   - Auto-login on 6th PIN digit (no click needed), last username remembered
   - Sessions persist in localStorage (survives tabs/browser close)
-  - Multi-device detection: login elsewhere auto-logs out previous session (token checked every 30s)
-  - Inactivity timeout: 60 minutes
+  - **Multi-device detection REMOVED (2026-04-22)** — same user can now be logged in on PC + phone + delivery page simultaneously. Previously the single `users.session_token` column plus a 30s poll would kick whichever device wasn't the "latest to login." Kept spuriously kicking active sessions (unknown triggers). `users.session_token` column left in DB as an orphan, not written or read.
+  - Inactivity timeout: 60 minutes (still the only auto-logout mechanism)
 - **Theme**: Warm **light theme** — cream background (`#FAF6EF`), white cards, deep purple text (`#2A1A3E`), gold accent (`#D4AF37`), purple secondary accent (`#6B4C8A`). Font: 'Plus Jakarta Sans'. **Note:** CSS variable names are stale — `--green` actually holds gold `#D4AF37`, `--green-light` holds purple `#6B4C8A`. Use the hex values, not the variable names as semantic hints. This is a change from the previous dark theme; some older docs/notes in this file may still reference the dark palette.
 
 ## Key Files

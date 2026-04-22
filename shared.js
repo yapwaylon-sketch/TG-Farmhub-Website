@@ -37,32 +37,10 @@ function clearInactivityTimer() {
 // Default logout — modules can override
 function doLogout() {
   clearInactivityTimer();
-  if (window._sessionCheckInterval) clearInterval(window._sessionCheckInterval);
   localStorage.removeItem("tgfarmhub_user");
-  localStorage.removeItem("tgfarmhub_session_token");
   window.location.href = "index.html";
 }
 
-// Multi-device session check (shared across modules)
-function startSessionCheck() {
-  if (window._sessionCheckInterval) clearInterval(window._sessionCheckInterval);
-  window._sessionCheckInterval = setInterval(async function() {
-    var stored = localStorage.getItem("tgfarmhub_user");
-    if (!stored) return;
-    var user;
-    try { user = JSON.parse(stored); } catch(e) { return; }
-    var localToken = localStorage.getItem("tgfarmhub_session_token");
-    if (!localToken || !user.id) return;
-    try {
-      var result = await sbQuery(sb.from("users").select("session_token").eq("id", user.id));
-      if (result && result[0] && result[0].session_token !== localToken) {
-        clearInterval(window._sessionCheckInterval);
-        notify("Logged out — another device signed in", "warning");
-        setTimeout(doLogout, 2000);
-      }
-    } catch(e) {}
-  }, 30000);
-}
 
 // ============================================================
 // Utilities
