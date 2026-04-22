@@ -145,6 +145,8 @@
   padding: 6px 14px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .status-banner-label {
   font-size: 13px;
@@ -152,6 +154,30 @@
   color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* NEW badge on unseen order cards */
+.sales-new-badge {
+  display: inline-block;
+  background: #dc3545;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+  animation: salesNewPulse 2s ease-in-out infinite;
+}
+
+@keyframes salesNewPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.sales-card.sales-card-new {
+  box-shadow: 0 0 0 2px rgba(220,53,69,0.45), 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .sales-card-customer {
@@ -619,6 +645,52 @@
   min-width: 140px;
 }
 
+/* Filters toggle pill — hidden on desktop, shown on mobile */
+.filters-toggle-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin-bottom: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.filters-toggle-btn:hover {
+  border-color: var(--gold);
+}
+
+.filters-toggle-btn .ftb-icon {
+  font-size: 14px;
+}
+
+.filters-toggle-btn .ftb-badge {
+  background: var(--gold);
+  color: #000;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.filters-toggle-btn .ftb-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.sales-filters.expanded ~ * .filters-toggle-btn .ftb-arrow,
+.filters-toggle-btn.open .ftb-arrow {
+  transform: rotate(180deg);
+}
+
 /* ============================================================
    STATUS TIMELINE
    ============================================================ */
@@ -803,6 +875,25 @@
   .sales-filters input[type="date"] {
     min-width: 100%;
   }
+
+  /* Mobile: show toggle pill, hide filters by default. .expanded overrides to show. */
+  .filters-toggle-btn { display: inline-flex; }
+  .sales-filters.auto,
+  .sales-filters.collapsed { display: none; }
+  .sales-filters.expanded { display: flex; }
+
+  /* Dashboard: force 2-col grid on mobile so all 7 cards are compact + scannable */
+  .sales-dash-stats {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+  }
+  .sales-dash-stats .summary-card {
+    min-width: 0 !important;
+    padding: 10px !important;
+  }
+  .sales-dash-stats .summary-card .sc-label { font-size: 10px; }
+  .sales-dash-stats .summary-card .sc-value { font-size: 16px !important; }
 
   .status-timeline {
     padding: 6px 0;

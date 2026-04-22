@@ -1387,6 +1387,8 @@ var soEditOrderId = null;
 // Unsaved data protection
 var salesFormDirty = false;
 window.addEventListener('beforeunload', function(e) {
+  // Mark Orders as "seen up to now" if we're leaving while on the Orders tab
+  if (currentTab === 'orders') { try { soLeaveOrders(); } catch(err) {} }
   if (salesFormDirty) { e.preventDefault(); e.returnValue = ''; }
 });
 
@@ -1431,6 +1433,9 @@ function switchTab(tab, skipHistory) {
   if (tab === 'products' && !salesCan('manageProducts')) { notify('No access to Products', 'warning'); return; }
   if (tab === 'drivers' && !salesCan('delivery')) { notify('No access to Drivers', 'warning'); return; }
   if (tab === 'reports' && !salesCan('export')) { notify('No access to Reports', 'warning'); return; }
+  // "NEW order" bookkeeping: mark seen when leaving Orders, capture snapshot when entering
+  if (currentTab === 'orders' && tab !== 'orders') soLeaveOrders();
+  if (tab === 'orders' && currentTab !== 'orders') soEnterOrders();
   // Reset detail views when switching tabs
   soDetailOrderId = null;
   scDetailCustomerId = null;
@@ -1775,7 +1780,7 @@ function renderDashboard() {
 
   // --- Row 1: Financial summary (compact) — admin/payments only ---
   if (salesCan('payments')) {
-    html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
+    html += '<div class="sales-dash-stats" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">';
     html += '<div class="summary-card" style="flex:1;min-width:90px;cursor:pointer;" onclick="switchTab(\'payments\')">';
     html += '<div class="sc-label">Unpaid CS</div>';
     html += '<div class="sc-value" style="font-size:18px;color:var(--gold);">' + formatRM(unpaidCS) + '</div>';
@@ -2014,6 +2019,53 @@ var soFilterDateFrom = '';
 var soFilterDateTo = '';
 var soFilterCustomer = '';
 var soFilterSort = 'newest';
+var soFiltersOpen = null; // null = auto (CSS-controlled by viewport); true/false = user override
+
+// "Last seen" cutoff for NEW badge on order cards. Captured once on entry to
+// Orders tab and frozen during the visit so NEW badges don't disappear on re-render.
+// Email-inbox model: marks everything "seen up to now" when you leave the tab.
+var soSalesLastSeenSnapshot = null;
+
+function soEnterOrders() {
+  soSalesLastSeenSnapshot = (currentUser && currentUser.sales_last_seen_at) ? currentUser.sales_last_seen_at : null;
+}
+
+function soLeaveOrders() {
+  if (!currentUser || !currentUser.id) return;
+  var nowIso = new Date().toISOString();
+  currentUser.sales_last_seen_at = nowIso;
+  try { localStorage.setItem('tgfarmhub_user', JSON.stringify(currentUser)); } catch(e) {}
+  // Fire-and-forget DB write — non-blocking, no UX impact if it fails
+  try { sbQuery(sb.from('users').update({ sales_last_seen_at: nowIso }).eq('id', currentUser.id).select()); } catch(e) {}
+}
+
+function soIsOrderNew(o) {
+  if (!o || !o.created_at) return false;
+  if (!soSalesLastSeenSnapshot) return true;
+  return o.created_at > soSalesLastSeenSnapshot;
+}
+
+function soCountActiveFilters() {
+  var n = 0;
+  if (soFilterStatus) n++;
+  if (soFilterDocType) n++;
+  if (soFilterPayment) n++;
+  if (soFilterDateFrom) n++;
+  if (soFilterDateTo) n++;
+  if (soFilterCustomer) n++;
+  if (soFilterSort && soFilterSort !== 'newest') n++;
+  return n;
+}
+
+function soToggleFilters() {
+  // If never toggled, decide based on current visibility
+  if (soFiltersOpen === null) {
+    var isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    soFiltersOpen = !isMobile; // currently hidden on mobile -> open; currently shown on desktop -> close
+  }
+  soFiltersOpen = !soFiltersOpen;
+  renderOrders();
+}
 
 function soPaymentLabel(ps) {
   var labels = { unpaid: 'Unpaid', partial: 'Partial', paid: 'Paid' };
@@ -2049,8 +2101,18 @@ function renderOrders() {
 
   var body = document.getElementById('orders-body');
 
-  // Filter bar
-  var fHtml = '<div class="sales-filters">';
+  // Filter bar (collapsible on mobile)
+  var activeFilterCount = soCountActiveFilters();
+  var filtersCollapsed = (typeof soFiltersOpen === 'undefined' || soFiltersOpen === null) ? null : !soFiltersOpen;
+  // Default: collapsed on mobile (null -> auto via CSS); explicit open/close once user toggles
+  var collapseClass = filtersCollapsed === true ? ' collapsed' : (filtersCollapsed === false ? ' expanded' : ' auto');
+
+  var fHtml = '<button type="button" class="filters-toggle-btn" onclick="soToggleFilters()">';
+  fHtml += '<span class="ftb-icon">🔍</span> Filters';
+  if (activeFilterCount > 0) fHtml += ' <span class="ftb-badge">' + activeFilterCount + '</span>';
+  fHtml += ' <span class="ftb-arrow">▾</span></button>';
+
+  fHtml += '<div class="sales-filters' + collapseClass + '">';
   fHtml += '<select onchange="soFilterStatus=this.value;renderOrderCards()" style="min-width:120px;">';
   fHtml += '<option value=""' + (soFilterStatus === '' ? ' selected' : '') + '>All Status</option>';
   ['pending','preparing','prepared','delivering','completed','cancelled'].forEach(function(s) {
@@ -2100,8 +2162,11 @@ function soRenderCard(o, status, color, label) {
   var dLabel = docTypeLabel(o.doc_type);
   var dBadge = docTypeBadgeClass(o.doc_type);
 
-  var h = '<div class="sales-card sales-card-status-' + esc(status) + '" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
-  h += '<div class="sales-card-status-banner" style="background:' + color + ';"><span class="status-banner-label">' + label + '</span></div>';
+  var isNew = soIsOrderNew(o);
+  var h = '<div class="sales-card sales-card-status-' + esc(status) + (isNew ? ' sales-card-new' : '') + '" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
+  h += '<div class="sales-card-status-banner" style="background:' + color + ';"><span class="status-banner-label">' + label + '</span>';
+  if (isNew) h += '<span class="sales-new-badge">NEW</span>';
+  h += '</div>';
   var orderBranch = o.branch_id ? getBranch(o.branch_id) : null;
   h += '<div class="sales-card-customer">' + esc(custName) + '</div>';
   if (orderBranch) {

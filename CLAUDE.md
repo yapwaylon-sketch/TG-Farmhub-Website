@@ -592,3 +592,8 @@ Full report: `AUDIT-2026-03-22.md` — 12 issues found, 0 critical, all resolved
 | Mobile | Good | Responsive breakpoints at 768px/400px |
 | Dead code | Very good | No unused imports or orphaned code |
 | Sub-projects | Good | Isolated, no conflicts |
+
+## Sales Mobile UX + NEW-Order Badge (2026-04-22)
+- **Orders filters** now collapsible on mobile (≤768px). Pill-style "🔍 Filters (N)" toggle button. Default collapsed. Desktop unchanged — filter bar still visible inline. State var: `soFiltersOpen` (null = auto by viewport, true/false = user override). Helper: `soCountActiveFilters()` returns badge count. Styles: `.filters-toggle-btn` + `.sales-filters.collapsed/.expanded/.auto` in sales.css.
+- **Dashboard cards on mobile** forced to 2-col grid via `.sales-dash-stats` class on the financial row wrapper (was inline flex-wrap). Cards shrink padding (10px), labels to 10px, values to 16px on mobile so all 7 cards fit scannably in 2×3+1 layout without scrolling past them.
+- **NEW order badge** (email-inbox model): new `users.sales_last_seen_at TIMESTAMPTZ` column. Snapshot captured on Orders tab entry (`soEnterOrders`), frozen during the visit so re-renders don't clear badges. On tab exit (or `beforeunload`), `soLeaveOrders` writes `now()` to DB + localStorage.currentUser. Order cards with `created_at > snapshot` get red pulsing `NEW` badge on the status banner + red outer glow on the card. Per-user (each user has their own cutoff). First-time users (null cutoff) see NEW on everything once, then it normalizes. `mapUserFromDb` in index.html updated to include the new field so it flows through login → localStorage → sales.html.

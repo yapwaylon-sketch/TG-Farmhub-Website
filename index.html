@@ -479,7 +479,8 @@ function mapUserFromDb(row) {
     pinHash: row.pin_hash || "", forcePinUpdate: row.force_pin_update || false,
     displayName: row.display_name, role: row.role,
     email: row.email || null,
-    permissions: row.permissions || {}
+    permissions: row.permissions || {},
+    sales_last_seen_at: row.sales_last_seen_at || null
   };
 }
 
