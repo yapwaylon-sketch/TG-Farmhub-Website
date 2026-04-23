@@ -8380,6 +8380,7 @@ function openNewOrderModal(editOrderId) {
     existingItems.forEach(function(item) {
       var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
       var isPcsOrdered = item.order_pcs != null;
+      var hasWeighedPcs = isPcsOrdered && (parseFloat(item.actual_weight_kg) > 0 || parseFloat(item.quantity) > 0);
       soItems.push({
         id: Date.now() + Math.random(),
         productId: item.product_id || '',
@@ -8391,7 +8392,16 @@ function openNewOrderModal(editOrderId) {
         lineTotal: parseFloat(item.line_total) || 0,
         existingItemId: item.id, // track for update
         orderInPcs: isPcsOrdered,
-        orderPcs: isPcsOrdered ? String(item.order_pcs) : ''
+        orderPcs: isPcsOrdered ? String(item.order_pcs) : '',
+        // Baseline for preserving weighed pcs data across non-item edits.
+        // We only preserve when productId + orderPcs are UNCHANGED from this baseline;
+        // any change to those means the user is intentionally modifying the item,
+        // fall through to the reset-to-zero path so Mark Prepared re-weighs.
+        existingProductId: item.product_id || '',
+        existingOrderPcs: item.order_pcs != null ? String(item.order_pcs) : '',
+        existingQuantity: parseFloat(item.quantity) || 0,
+        existingWeightKg: item.actual_weight_kg != null ? parseFloat(item.actual_weight_kg) : null,
+        wasWeighed: hasWeighedPcs
       });
     });
     if (!soItems.length) soAddItem();
@@ -9316,8 +9326,18 @@ function soCalcTotals() {
   var pendingPcs = 0;
   soItems.forEach(function(item) {
     if (item.orderInPcs) {
-      item.lineTotal = 0;
-      if (parseInt(item.orderPcs, 10) > 0) pendingPcs++;
+      // Preserve weighed quantity from a prior Mark Prepared as long as the user
+      // hasn't changed productId or pcs count. line_total recomputes off current
+      // unit_price so price edits still flow through.
+      var hasBaseline = item.wasWeighed
+        && item.productId === item.existingProductId
+        && String(parseInt(item.orderPcs, 10) || 0) === String(parseInt(item.existingOrderPcs, 10) || 0);
+      if (hasBaseline) {
+        item.lineTotal = (parseFloat(item.existingQuantity) || 0) * (parseFloat(item.unitPrice) || 0);
+      } else {
+        item.lineTotal = 0;
+        if (parseInt(item.orderPcs, 10) > 0) pendingPcs++;
+      }
     } else {
       item.lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
     }
@@ -9399,17 +9419,24 @@ async function soSaveOrder() {
         var item = validItems[vi];
         var itemId = await dbNextId('SI');
         var isPcs = !!item.orderInPcs;
+        // Preserve weighed data on pcs items when productId + orderPcs are unchanged.
+        // Price changes still flow through via recomputation below.
+        var hasBaseline = isPcs && item.wasWeighed
+          && item.productId === item.existingProductId
+          && String(parseInt(item.orderPcs, 10) || 0) === String(parseInt(item.existingOrderPcs, 10) || 0);
+        var priceNum = parseFloat(item.unitPrice) || 0;
+        var keptQty = hasBaseline ? (parseFloat(item.existingQuantity) || 0) : 0;
         newItemsArray.push({
           id: itemId,
           order_id: soEditOrderId,
           product_id: item.productId,
-          quantity: isPcs ? 0 : parseFloat(item.quantity),
-          unit_price: parseFloat(item.unitPrice) || 0,
-          line_total: isPcs ? 0 : item.lineTotal,
+          quantity: hasBaseline ? keptQty : (isPcs ? 0 : parseFloat(item.quantity)),
+          unit_price: priceNum,
+          line_total: hasBaseline ? (keptQty * priceNum) : (isPcs ? 0 : item.lineTotal),
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
           index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
           order_pcs: isPcs ? parseInt(item.orderPcs, 10) : null,
-          actual_weight_kg: null,
+          actual_weight_kg: hasBaseline ? item.existingWeightKg : null,
           company_id: getCompanyId()
         });
       }
