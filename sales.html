@@ -3763,29 +3763,49 @@ async function soDeliveryCommitAll() {
       soDeliveryPending = null; return;
     }
     var newGrand = Math.max(0, newSubtotal - returnsTotal);
+
+    // Compute the final payment status using the current payments array (which already
+    // contains the payment just inserted above, if any). Do NOT mutate `o` yet — we
+    // only apply local state after the DB write confirms, so a failed final update
+    // doesn't leave the UI claiming completed/paid while the DB says otherwise.
+    var totalPaidFinal = payments
+      .filter(function(p) { return p.order_id === orderId; })
+      .reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
+    var paymentStatusFinal = 'unpaid';
+    if (newGrand > 0 && totalPaidFinal >= newGrand) paymentStatusFinal = 'paid';
+    else if (totalPaidFinal > 0) paymentStatusFinal = 'partial';
+
+    var completedNow = new Date().toISOString();
     var orderUpdate = {
       status: 'completed',
-      completed_at: new Date().toISOString(),
+      completed_at: completedNow,
       subtotal: newSubtotal,
-      grand_total: newGrand
+      grand_total: newGrand,
+      amount_paid: totalPaidFinal,
+      payment_status: paymentStatusFinal
     };
     if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
 
-    // Update payment status on order
+    var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
+    if (orderResult === null) {
+      // Items + payment (if any) are already persisted. The order status flip failed.
+      // Don't mutate local state, don't print the document — make the user refresh
+      // so the UI reconciles with the DB instead of silently diverging.
+      soDeliveryPending = null;
+      notify('Items and payment saved, but order status update failed — refresh the page and retry Mark Delivered', 'error');
+      return;
+    }
+
+    // DB confirmed — commit local state
     if (o) {
       o.subtotal = newSubtotal;
       o.grand_total = newGrand;
       o.status = 'completed';
-      o.completed_at = orderUpdate.completed_at;
+      o.completed_at = completedNow;
+      o.amount_paid = totalPaidFinal;
+      o.payment_status = paymentStatusFinal;
       if (pending.photoUrl) o.delivery_photo_url = pending.photoUrl;
     }
-    recalcPaymentStatus(orderId);
-    if (o) {
-      orderUpdate.amount_paid = o.amount_paid;
-      orderUpdate.payment_status = o.payment_status;
-    }
-
-    await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
 
     var payMsg = pending.payment ? ' — Payment of ' + formatRM(pending.payment.amount) + ' collected' : '';
     notify('Order delivered' + payMsg, 'success');
