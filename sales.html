@@ -2076,6 +2076,41 @@ function soItemsCount(orderId) {
   return orderItems.filter(function(i) { return i.order_id === orderId; }).length;
 }
 
+// Returns 'overdue'|'today'|'tomorrow'|'later'|'none'|'neutral'
+// 'neutral' = completed/cancelled (past tense, no urgency). 'none' = active but no date set.
+function soDeliveryBucket(o) {
+  if (o.status === 'completed' || o.status === 'cancelled') return 'neutral';
+  if (!o.delivery_date) return 'none';
+  var today = new Date(); today.setHours(0,0,0,0);
+  var dd = new Date(o.delivery_date + 'T00:00:00');
+  var diff = Math.round((dd - today) / 86400000);
+  if (diff < 0) return 'overdue';
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'tomorrow';
+  return 'later';
+}
+
+// Renders the delivery band HTML for an order card. Returns '' to hide the band (walk-ins).
+function soFormatDeliveryBand(o) {
+  if (o.fulfillment === 'walkin') return '';
+  var bucket = soDeliveryBucket(o);
+  var isCollection = o.fulfillment === 'collection';
+  var icon = isCollection ? '🏬' : '🚚';
+  var label = isCollection ? 'COLLECTION' : 'DELIVERY';
+  var content;
+  if (bucket === 'none') {
+    content = icon + ' ' + label + ' · No delivery date set';
+  } else {
+    var dt = new Date(o.delivery_date + 'T00:00:00');
+    var dow = dt.toLocaleDateString('en-GB', { weekday: 'short' });
+    var ds = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    content = icon + ' ' + label + ' · ' + dow + ', ' + ds;
+    if (o.delivery_time) content += ' · ' + fmtTime12(o.delivery_time);
+    if (bucket === 'overdue') content += ' · <strong>OVERDUE</strong>';
+  }
+  return '<div class="sales-card-delivery-band sales-card-delivery-band--' + bucket + '">' + content + '</div>';
+}
+
 function soHasActiveFilters() {
   return soFilterStatus || soFilterDocType || soFilterPayment || soFilterDateFrom || soFilterDateTo || soFilterCustomer || soFilterSort !== 'newest';
 }
@@ -2177,16 +2212,18 @@ function soRenderCard(o, status, color, label) {
     h += '<div style="padding:0 14px 2px;font-size:11px;color:var(--green-light);">Assigned: ' + esc(aw ? aw.name : '\u2014') + '</div>';
   }
   h += '<div class="sales-card-info-row">';
+  h += '<div style="display:flex;flex-direction:column;min-width:0;gap:1px;">';
   h += '<span class="sales-card-doc">' + esc(o.doc_number || o.id) + '</span>';
-  h += '<div style="display:flex;gap:4px;">';
+  if (o.order_date) h += '<span style="font-size:10px;color:var(--text-muted);font-weight:500;">ordered ' + esc(fmtDate(o.order_date)) + '</span>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:4px;flex-shrink:0;">';
   h += '<span class="badge ' + dBadge + '">' + dLabel + '</span>';
   h += '<span class="badge badge-' + esc(o.payment_status || 'unpaid') + '">' + soPaymentLabel(o.payment_status) + '</span>';
   h += '</div></div>';
-  h += '<div class="sales-card-bottom"><div class="sales-card-meta">';
-  h += '<span>' + esc(o.order_date || '\u2014') + '</span>';
-  if (o.delivery_date) h += '<span>Del: ' + esc(o.delivery_date) + (o.delivery_time ? ' ' + fmtTime12(o.delivery_time) : '') + '</span>';
+  h += soFormatDeliveryBand(o);
   var hasPendingPcs = orderItems.filter(function(i) { return i.order_id === o.id; }).some(function(i) { return i.order_pcs != null && !i.actual_weight_kg; });
-  h += '</div><div class="sales-card-total">' + (hasPendingPcs && total === 0 ? '<span style="font-size:10px;color:var(--text-muted);">Pending weight</span>' : formatRM(total)) + '</div></div>';
+  h += '<div class="sales-card-bottom" style="justify-content:flex-end;">';
+  h += '<div class="sales-card-total">' + (hasPendingPcs && total === 0 ? '<span style="font-size:10px;color:var(--text-muted);">Pending weight</span>' : formatRM(total)) + '</div></div>';
 
   // Cancel reason (if cancelled)
   if (o.status === 'cancelled' && o.cancel_reason) {
