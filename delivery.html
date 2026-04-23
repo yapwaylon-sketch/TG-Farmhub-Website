@@ -861,7 +861,9 @@ async function delCommitAll() {
     };
     if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
 
-    // 4. Insert payment if collected
+    // 4. Insert payment if collected — abort with clear error if this fails.
+    //    Drivers are on mobile/cell networks; we must never flip the order to paid
+    //    without a matching payment row (silent cash-missing bug in the books).
     if (pending.payment) {
       var payData = {
         id: pending.payment.id,
@@ -872,7 +874,12 @@ async function delCommitAll() {
         created_by: currentUser ? currentUser.id : null,
         company_id: 'tg_agro_fruits'
       };
-      await sbQuery(sb.from('sales_payments').insert(payData).select());
+      var payResult = await sbQuery(sb.from('sales_payments').insert(payData).select());
+      if (payResult === null) {
+        notify('Payment save failed — order NOT completed, please retry', 'error');
+        delPending = null;
+        return;
+      }
 
       var totalPaid = (parseFloat(o.amount_paid) || 0) + pending.payment.amount;
       orderUpdate.amount_paid = totalPaid;
@@ -881,7 +888,11 @@ async function delCommitAll() {
 
     // 5. Commit order status
     var result = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
-    if (!result) { notify('Failed to update order', 'error'); return; }
+    if (result === null) {
+      notify('Items and payment saved, but order status update failed — refresh and retry', 'error');
+      delPending = null;
+      return;
+    }
 
     // 6. Update local state
     Object.assign(o, orderUpdate);
