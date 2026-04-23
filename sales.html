@@ -3829,18 +3829,14 @@ async function soWalkInConfirm() {
   btnLoading(btn, true);
 
   try {
-    // 1. Upload photo if provided
+    // 1. Upload photo if provided (non-blocking for completion; throws on fatal error)
     if (photoInput.files && photoInput.files[0]) {
       await soProcessPhotoFile(photoInput.files[0], orderId, 'prep_photo');
     }
 
-    // 2. Set status directly to completed
-    var completedNow = new Date().toISOString();
-    await sbQuery(sb.from('sales_orders').update({ status: 'completed', completed_at: completedNow }).eq('id', orderId).select());
-    var localOrder = orders.find(function(x) { return x.id === orderId; });
-    if (localOrder) { localOrder.status = 'completed'; localOrder.completed_at = completedNow; }
-
-    // 3. Record full payment
+    // 2. Insert payment FIRST — order stays untouched if this fails.
+    //    Walk-ins are cash-in-hand; we must never flip the order to completed/paid
+    //    without a matching payment row (silent cash-missing bug).
     var paymentId = await dbNextId('SY');
     var payData = {
       id: paymentId,
@@ -3854,11 +3850,33 @@ async function soWalkInConfirm() {
       company_id: getCompanyId()
     };
     var payResult = await sbQuery(sb.from('sales_payments').insert(payData).select());
-    if (payResult) payments.unshift(payResult[0] || payData);
+    if (payResult === null) {
+      btnLoading(btn, false, 'Complete & Print Receipt');
+      notify('Payment save failed — order NOT completed, please retry', 'error');
+      return;
+    }
 
-    // 4. Update payment status to paid
-    await sbQuery(sb.from('sales_orders').update({ amount_paid: total, payment_status: 'paid' }).eq('id', orderId).select());
-    if (localOrder) { localOrder.amount_paid = total; localOrder.payment_status = 'paid'; }
+    // 3. Single atomic order update — status + completed_at + amount_paid + payment_status
+    var completedNow = new Date().toISOString();
+    var orderUpdate = {
+      status: 'completed',
+      completed_at: completedNow,
+      amount_paid: total,
+      payment_status: 'paid'
+    };
+    var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
+    if (orderResult === null) {
+      // Payment row is already persisted — tell the user to refresh so the paid state
+      // can be reconciled, rather than silently diverging.
+      btnLoading(btn, false, 'Complete & Print Receipt');
+      notify('Payment recorded but order status update failed — refresh the page and retry', 'error');
+      return;
+    }
+
+    // 4. Commit local state only after both DB writes confirmed
+    payments.unshift(payResult[0] || payData);
+    var localOrder = orders.find(function(x) { return x.id === orderId; });
+    if (localOrder) Object.assign(localOrder, orderUpdate);
 
     btnLoading(btn, false, 'Complete & Print Receipt');
     closeModal('so-walkin-modal');
