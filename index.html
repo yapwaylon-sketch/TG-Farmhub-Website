@@ -923,14 +923,23 @@ async function loadCompanyOverview() {
   if (!container) return;
 
   var [ordersAF, workersAB, jobsAB] = await Promise.all([
-    sbQuery(sb.from('sales_orders').select('id,grand_total,payment_status').eq('company_id', 'tg_agro_fruits')),
+    // Excludes cancelled orders. Revenue counts all non-cancelled; Outstanding is
+    // completed-only (matches Customer Detail page convention) so pipeline orders
+    // (pending/preparing/prepared/delivering) don't inflate AR.
+    sbQuery(sb.from('sales_orders').select('id,status,grand_total,amount_paid,payment_status').eq('company_id', 'tg_agro_fruits').neq('status', 'cancelled')),
     sbQuery(sb.from('workers').select('id').eq('company_id', 'tg_agribusiness').eq('active', true)),
     sbQuery(sb.from('pnd_jobs').select('id').eq('company_id', 'tg_agribusiness').eq('status', 'active'))
   ]);
 
   var afOrders = ordersAF || [];
   var afRevenue = afOrders.reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
-  var afOutstanding = afOrders.filter(function(o) { return o.payment_status !== 'paid'; }).reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
+  var afOutstanding = afOrders
+    .filter(function(o) { return o.status === 'completed' && o.payment_status !== 'paid'; })
+    .reduce(function(sum, o) {
+      var grand = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      return sum + Math.max(0, grand - paid);
+    }, 0);
 
   container.innerHTML =
     '<div style="background:var(--bg-card);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
