@@ -85,7 +85,9 @@
       <div class="hub-welcome" id="hub-welcome">Welcome back</div>
       <div class="hub-welcome-sub">Select a module to get started</div>
       <div class="module-grid" id="module-grid"></div>
-      <div class="company-overview" id="company-overview" style="margin-top:24px;">
+      <!-- Admin-only: display flipped to 'block' by initApp() if role==='admin'. Hidden-by-default
+           so staff/supervisors never see the heading even during page load. -->
+      <div class="company-overview" id="company-overview" style="margin-top:24px;display:none;">
         <h3 style="color:var(--text-muted);font-size:14px;margin-bottom:12px;">Company Overview</h3>
         <div id="company-overview-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
       </div>
@@ -752,11 +754,11 @@ function showHub() {
   showHubPage("modules");
   renderModuleCards();
   if (currentUser.role === "admin") {
+    document.getElementById('company-overview').style.display = 'block';
     loadCompanyOverview();
     renderUsers();
-  } else {
-    document.getElementById('company-overview').style.display = 'none';
   }
+  // Non-admins: container stays display:none (set in HTML) — no heading, no queries, no data.
 }
 
 async function showHubPage(page) {
