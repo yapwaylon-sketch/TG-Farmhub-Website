@@ -9451,6 +9451,20 @@ async function soSaveOrder() {
         branch_id: document.getElementById('so-branch').value || null
       };
 
+      // Pre-flight lock check: verify nobody else edited this order since the modal opened.
+      // We can't use sbUpdateWithLock on the final UPDATE because the items_sync_order_totals
+      // trigger will have bumped updated_at from our own item writes by then.
+      if (soEditLockTime) {
+        var preflight = await sbQuery(sb.from('sales_orders').select('updated_at').eq('id', soEditOrderId).limit(1));
+        if (preflight === null) { btnLoading(btn, false, 'Save Changes'); return; }
+        var currentUpdatedAt = (preflight && preflight[0]) ? preflight[0].updated_at : null;
+        if (currentUpdatedAt !== soEditLockTime) {
+          notify('This record was modified by another user. Please reload and try again.', 'warning', 6000);
+          btnLoading(btn, false, 'Save Changes');
+          return;
+        }
+      }
+
       // Build all new items first (generate IDs + data)
       var newItemsArray = [];
       for (var vi = 0; vi < validItems.length; vi++) {
@@ -9486,21 +9500,27 @@ async function soSaveOrder() {
       // Delete old items only after new ones are safely in
       await sbQuery(sb.from('sales_order_items').delete().eq('order_id', soEditOrderId).not('id', 'in', '(' + newItemsArray.map(function(i) { return i.id; }).join(',') + ')').select());
 
-      // Update order with optimistic lock
-      var result = await sbUpdateWithLock('sales_orders', soEditOrderId, updateData, soEditLockTime);
+      // Update order fields. Lock is handled by the pre-flight check above — don't use
+      // sbUpdateWithLock here because our own item-sync trigger has already bumped updated_at.
+      var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', soEditOrderId).select());
       if (result === null) { btnLoading(btn, false, 'Save Changes'); return; }
 
-      // Update local arrays
+      // Update local arrays. Use the row the DB returned (has the fresh updated_at + trigger-
+      // recomputed subtotal/grand_total), so subsequent edits see the current state.
       orderItems = orderItems.filter(function(i) { return i.order_id !== soEditOrderId; });
       (itemsResult || []).forEach(function(i) { orderItems.push(i); });
       var idx = orders.findIndex(function(x) { return x.id === soEditOrderId; });
-      if (idx >= 0) Object.assign(orders[idx], updateData);
+      if (idx >= 0) {
+        var freshOrder = (result && result[0]) ? result[0] : null;
+        if (freshOrder) Object.assign(orders[idx], freshOrder);
+        else Object.assign(orders[idx], updateData);
+      }
 
       btnLoading(btn, false, 'Save Changes');
       salesFormDirty = false;
       closeModal('so-modal');
       notify('Order updated');
-      soRenderDetail();
+      renderOrders(); // auto-routes to soRenderDetail if detail view is active
     } else {
       // CREATE new order
       var orderId = await dbNextId('SO');
