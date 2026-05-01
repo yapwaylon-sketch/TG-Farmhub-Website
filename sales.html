@@ -6071,7 +6071,32 @@ function renderInvoicesView(body) {
   // Quick-filter chips
   html += renderInvoicesChips(view.fullList);
 
-  // (More Filters drawer is added in Task 10 \u2014 placeholder slot here.)
+  // More filters toggle + drawer
+  html += '<button class="inv-filter-toggle" onclick="invToggleMoreFilters()">';
+  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
+  html += 'More filters' + (invMoreFiltersOpen ? ' \u25b4' : ' \u25be');
+  html += '</button>';
+
+  if (invMoreFiltersOpen) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:end;">';
+
+    var custIdsSeen = {};
+    invoices.forEach(function(i) { if (i.customer_id) custIdsSeen[i.customer_id] = true; });
+    html += '<div class="form-field" style="margin:0;"><label>Customer</label><select onchange="invFilterCustomer=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));">';
+    html += '<option value=""' + (invFilterCustomer === '' ? ' selected' : '') + '>All customers</option>';
+    Object.keys(custIdsSeen).forEach(function(cid) {
+      var cc = customers.find(function(x) { return x.id === cid; });
+      var cname = cc ? cc.name : cid;
+      html += '<option value="' + esc(cid) + '"' + (invFilterCustomer === cid ? ' selected' : '') + '>' + esc(cname) + '</option>';
+    });
+    html += '</select></div>';
+
+    if (invPeriodPreset === 'custom') {
+      html += '<div class="form-field" style="margin:0;"><label>From</label><input type="date" value="' + esc(invCustomDateFrom) + '" onchange="invCustomDateFrom=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));"></div>';
+      html += '<div class="form-field" style="margin:0;"><label>To</label><input type="date" value="' + esc(invCustomDateTo) + '" onchange="invCustomDateTo=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));"></div>';
+    }
+    html += '</div>';
+  }
 
   // Table
   html += '<div class="inv-table">';
@@ -6791,6 +6816,11 @@ var invFilterCustomer = '';
 var invPage = 1;
 var invPageSize = 25;
 var invExpandedId = null;
+var invMoreFiltersOpen = false;
+function invToggleMoreFilters() {
+  invMoreFiltersOpen = !invMoreFiltersOpen;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
 
 // Legacy aliases — invRenderList still references these. Removed in Task 12.
 var invFilterStatus = '';
