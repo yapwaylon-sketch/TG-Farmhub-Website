@@ -4,6 +4,30 @@
    ============================================================ */
 
 /* ============================================================
+   CUSTOMERS TABLE — grouped header (OUTSTANDING band)
+   Solid gold parent band with deep-plum text (~8:1 contrast).
+   Children get a faint gold tint so the 3 columns visually belong
+   to the parent group.
+   ============================================================ */
+.sc-table th.th-group-parent {
+  background: var(--gold);
+  color: var(--text);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 7px 16px;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+.sc-table th.th-group-child {
+  background: rgba(212, 175, 55, 0.10);
+  color: var(--text);
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ============================================================
    STATUS GROUPS
    ============================================================ */
 .so-status-group {

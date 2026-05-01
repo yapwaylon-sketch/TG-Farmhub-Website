@@ -4036,13 +4036,13 @@ function renderCustomerCards() {
   html += '<th rowspan="2" style="white-space:nowrap;">Phone</th>';
   html += '<th rowspan="2" style="white-space:nowrap;">Type</th>';
   html += '<th rowspan="2" style="white-space:nowrap;">Terms</th>';
-  html += '<th colspan="3" style="text-align:center;background:rgba(212,175,55,0.12);color:var(--gold);font-size:11px;letter-spacing:1.5px;font-weight:800;">OUTSTANDING (RM)</th>';
+  html += '<th colspan="3" class="th-group-parent">OUTSTANDING (RM)</th>';
   html += '<th rowspan="2" style="white-space:nowrap;">Actions</th>';
   html += '</tr>';
   html += '<tr>';
-  html += '<th style="white-space:nowrap;text-align:right;">Cash Sales</th>';
-  html += '<th style="white-space:nowrap;text-align:right;">DO Unbilled</th>';
-  html += '<th style="white-space:nowrap;text-align:right;">Invoices</th>';
+  html += '<th class="th-group-child">Cash Sales</th>';
+  html += '<th class="th-group-child">DO Unbilled</th>';
+  html += '<th class="th-group-child">Invoices</th>';
   html += '</tr>';
   html += '</thead><tbody>';
 
