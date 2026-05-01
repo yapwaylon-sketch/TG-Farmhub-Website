@@ -9,8 +9,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/css/intlTelInput.min.css">
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInput.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/utils.js"></script>
+<!-- v23 utils.js is an ES module — script-tag loading silently does
+     nothing. Use the combined "WithUtils" bundle so window.intlTelInput.utils
+     is populated and validation/formatting actually work. -->
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInputWithUtils.min.js"></script>
 <link rel="stylesheet" href="shared.css">
 <link rel="stylesheet" href="sales.css">
 <script src="shared.js"></script>
@@ -4164,20 +4166,23 @@ function scSetItiNumber(iti, value) {
   }
 }
 
-// Read a phone field for save: prefer normalized E.164, fall back to raw
-// input. Never blocks save — even if the library can't parse, the
-// transaction goes through with whatever the user typed.
-function scReadPhone(iti, fallbackElId) {
+// Read a phone field for save. Validates against the selected country
+// when the iti utils bundle is loaded; falls open (saves the raw value)
+// if utils never loaded, so a CDN outage can't lock users out of adding
+// customers. Returns { value, error } — caller checks error before save.
+function scReadPhone(iti, fallbackElId, fieldLabel) {
   var input = (iti && iti.telInput) || document.getElementById(fallbackElId);
   var raw = input ? (input.value || '').trim() : '';
-  if (!raw) return '';
-  if (iti) {
-    try {
-      var e164 = iti.getNumber() || '';
-      if (e164) return e164;
-    } catch (e) {}
+  if (!raw) return { value: '', error: null };
+  var utilsLoaded = !!(window.intlTelInput && window.intlTelInput.utils);
+  if (iti && utilsLoaded) {
+    if (!iti.isValidNumber()) {
+      return { value: '', error: 'Please enter a valid ' + fieldLabel + ' for the selected country' };
+    }
+    return { value: iti.getNumber() || raw, error: null };
   }
-  return raw;
+  // utils unavailable — accept as typed
+  return { value: raw, error: null };
 }
 
 function scOpenModal(editId) {
@@ -4255,11 +4260,9 @@ async function scSaveCustomer() {
   if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sc-edit-id').value;
   var name = document.getElementById('sc-name').value.trim();
-  // Phones: try to normalize to E.164 via the iti instance. If the lib
-  // doesn't recognize the input (incomplete utils, fringe number), fall
-  // back to the raw typed value rather than blocking the save — the
-  // worst case is one phone in legacy format, not a stuck form.
-  var phone = scReadPhone(scPhoneIti, 'sc-phone');
+  var phoneRead = scReadPhone(scPhoneIti, 'sc-phone', 'phone number');
+  if (phoneRead.error) { notify(phoneRead.error, 'warning'); return; }
+  var phone = phoneRead.value;
   var contactPerson = document.getElementById('sc-contact-person').value.trim();
   var address = document.getElementById('sc-address').value.trim();
   var type = document.getElementById('sc-type').value;
@@ -4271,7 +4274,9 @@ async function scSaveCustomer() {
   var notes = document.getElementById('sc-notes').value.trim();
   var registrationName = document.getElementById('sc-registration-name').value.trim();
   var email = document.getElementById('sc-email').value.trim();
-  var secondaryPhone = scReadPhone(scPhone2Iti, 'sc-secondary-phone');
+  var secondaryPhoneRead = scReadPhone(scPhone2Iti, 'sc-secondary-phone', 'secondary phone');
+  if (secondaryPhoneRead.error) { notify(secondaryPhoneRead.error, 'warning'); return; }
+  var secondaryPhone = secondaryPhoneRead.value;
   var creditLimit = document.getElementById('sc-credit-limit').value;
   var currency = document.getElementById('sc-currency').value;
 
