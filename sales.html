@@ -4030,7 +4030,7 @@ function renderCustomerCards() {
 
   var html = '<div class="table-wrap"><table class="data-table sc-table">';
   html += '<thead><tr>';
-  html += '<th>#</th><th>Customer</th><th>Contact Person</th><th>Phone</th><th>Type</th><th>Terms</th><th>Return Rate</th><th>Actions</th>';
+  html += '<th>#</th><th>Customer</th><th>Contact Person</th><th>Phone</th><th>Type</th><th>Terms</th><th style="text-align:right;">Owing</th><th>Return Rate</th><th>Actions</th>';
   html += '</tr></thead><tbody>';
 
   filtered.forEach(function(c, idx) {
@@ -4049,6 +4049,11 @@ function renderCustomerCards() {
     html += '<td>' + esc(c.phone || '\u2014') + '</td>';
     html += '<td><span class="badge badge-outline">' + scTypeLabel(c.type) + '</span></td>';
     html += '<td><span class="badge badge-' + paymentTermsBadgeClass(c.payment_terms_days) + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></td>';
+    var owing = scCustomerOwing(c.id);
+    var owingHtml = owing > 0
+      ? '<span style="color:var(--gold);font-weight:700;">' + formatRM(owing) + '</span>'
+      : '<span style="color:var(--text-muted);">—</span>';
+    html += '<td style="text-align:right;">' + owingHtml + '</td>';
     html += '<td>' + rrHtml + '</td>';
     html += '<td><div style="display:flex;gap:4px;">';
     if (salesCan('manageCustomers')) {
@@ -4066,6 +4071,29 @@ function renderCustomerCards() {
 function scTypeLabel(type) {
   var labels = { wholesale: 'Wholesale', retail: 'Retail', walkin: 'Walk-in' };
   return labels[type] || type || '\u2014';
+}
+
+// Total RM the customer currently owes \u2014 mirrors the dashboard "Total Owed" formula
+// so DOs that have moved into an invoice aren't double-counted.
+function scCustomerOwing(customerId) {
+  var owing = 0;
+  orders.forEach(function(o) {
+    if (o.customer_id !== customerId || o.status !== 'completed') return;
+    if (o.doc_type === 'delivery_order') {
+      // Uninvoiced DOs only \u2014 invoiced DOs are accounted for via invoices below
+      if (!o.invoice_id) owing += parseFloat(o.grand_total) || 0;
+    } else if (o.payment_status !== 'paid') {
+      // Unpaid / partial CS
+      owing += orderBalance(o);
+    }
+  });
+  invoices.forEach(function(inv) {
+    if (inv.customer_id !== customerId) return;
+    if (inv.status === 'draft' || (inv.status === 'issued' && inv.payment_status !== 'paid')) {
+      owing += invoiceBalance(inv);
+    }
+  });
+  return owing;
 }
 
 function paymentTermsLabel(days) {
