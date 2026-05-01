@@ -5259,6 +5259,61 @@ function renderPayments() {
   body.innerHTML = html;
 }
 
+// DD/MM/YYYY format used in invoice list redesign (2026-05-01).
+// fmtDateNice (shared.js) stays in use elsewhere — different format.
+function fmtDateDM(s) {
+  if (!s) return '';
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yy = d.getFullYear();
+  return dd + '/' + mm + '/' + yy;
+}
+
+// Returns signed integer: + days until due, − days overdue.
+// null for paid/voided/cancelled invoices (caller renders "—").
+function invDueInDays(inv) {
+  if (!inv || !inv.due_date) return null;
+  if (inv.payment_status === 'paid') return null;
+  if (inv.status === 'voided' || inv.status === 'cancelled') return null;
+  var due = new Date(inv.due_date + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due - today) / 86400000);
+}
+
+function invIsPartial(inv) {
+  if (!inv || inv.status !== 'issued') return false;
+  return inv.payment_status === 'partial';
+}
+
+// Returns [startISO, endISO] for a preset code. endISO always = today.
+function invPeriodRange(code) {
+  var today = todayStr();
+  var d = new Date();
+  if (code === 'this-month') {
+    var start = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+    return [start, today];
+  }
+  if (code === 'last-30')  { d.setDate(d.getDate() - 30); return [d.toISOString().slice(0,10), today]; }
+  if (code === 'last-90')  { d.setDate(d.getDate() - 90); return [d.toISOString().slice(0,10), today]; }
+  if (code === 'this-year') { return [d.getFullYear() + '-01-01', today]; }
+  if (code === 'all') return ['', ''];
+  return ['', ''];
+}
+
+function invSearchMatches(inv, term) {
+  if (!term) return true;
+  term = term.toLowerCase().trim();
+  if (!term) return true;
+  if ((inv.id || '').toLowerCase().indexOf(term) >= 0) return true;
+  var c = customers.find(function(x) { return x.id === inv.customer_id; });
+  if (c && (c.name || '').toLowerCase().indexOf(term) >= 0) return true;
+  if ((inv.notes || '').toLowerCase().indexOf(term) >= 0) return true;
+  return false;
+}
+
 function invoiceAgeDays(inv) {
   if (!inv.due_date) return 0;
   var today = new Date(); today.setHours(0,0,0,0);
