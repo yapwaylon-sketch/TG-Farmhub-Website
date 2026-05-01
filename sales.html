@@ -4164,6 +4164,22 @@ function scSetItiNumber(iti, value) {
   }
 }
 
+// Read a phone field for save: prefer normalized E.164, fall back to raw
+// input. Never blocks save — even if the library can't parse, the
+// transaction goes through with whatever the user typed.
+function scReadPhone(iti, fallbackElId) {
+  var input = (iti && iti.telInput) || document.getElementById(fallbackElId);
+  var raw = input ? (input.value || '').trim() : '';
+  if (!raw) return '';
+  if (iti) {
+    try {
+      var e164 = iti.getNumber() || '';
+      if (e164) return e164;
+    } catch (e) {}
+  }
+  return raw;
+}
+
 function scOpenModal(editId) {
   var modal = document.getElementById('sc-modal');
   var title = document.getElementById('sc-modal-title');
@@ -4239,18 +4255,11 @@ async function scSaveCustomer() {
   if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sc-edit-id').value;
   var name = document.getElementById('sc-name').value.trim();
-  // Phones flow through intl-tel-input → E.164 ("+60123456789"). Validate
-  // format before save; let null mean "not provided".
-  var phone = '';
-  if (scPhoneIti) {
-    var rawPhone = (scPhoneIti.telInput || document.getElementById('sc-phone')).value.trim();
-    if (rawPhone) {
-      if (!scPhoneIti.isValidNumber()) { notify('Phone number is not valid for the selected country', 'warning'); return; }
-      phone = scPhoneIti.getNumber();
-    }
-  } else {
-    phone = document.getElementById('sc-phone').value.trim();
-  }
+  // Phones: try to normalize to E.164 via the iti instance. If the lib
+  // doesn't recognize the input (incomplete utils, fringe number), fall
+  // back to the raw typed value rather than blocking the save — the
+  // worst case is one phone in legacy format, not a stuck form.
+  var phone = scReadPhone(scPhoneIti, 'sc-phone');
   var contactPerson = document.getElementById('sc-contact-person').value.trim();
   var address = document.getElementById('sc-address').value.trim();
   var type = document.getElementById('sc-type').value;
@@ -4262,16 +4271,7 @@ async function scSaveCustomer() {
   var notes = document.getElementById('sc-notes').value.trim();
   var registrationName = document.getElementById('sc-registration-name').value.trim();
   var email = document.getElementById('sc-email').value.trim();
-  var secondaryPhone = '';
-  if (scPhone2Iti) {
-    var rawSec = (scPhone2Iti.telInput || document.getElementById('sc-secondary-phone')).value.trim();
-    if (rawSec) {
-      if (!scPhone2Iti.isValidNumber()) { notify('Secondary phone is not valid for the selected country', 'warning'); return; }
-      secondaryPhone = scPhone2Iti.getNumber();
-    }
-  } else {
-    secondaryPhone = document.getElementById('sc-secondary-phone').value.trim();
-  }
+  var secondaryPhone = scReadPhone(scPhone2Iti, 'sc-secondary-phone');
   var creditLimit = document.getElementById('sc-credit-limit').value;
   var currency = document.getElementById('sc-currency').value;
 
