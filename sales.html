@@ -4057,7 +4057,7 @@ function renderCustomerCards() {
     var ow = scCustomerOwingBreakdown(c.id);
     var custCell = '<a href="javascript:void(0)" onclick="scOpenDetail(\'' + esc(c.id) + '\')" style="font-weight:700;color:var(--green-light);text-decoration:none;">' + esc(c.name) + '</a>';
     if (c.contact_person) {
-      custCell += '<span class="sc-contact-inline">· ' + esc(c.contact_person) + '</span>';
+      custCell += '<span class="sc-contact-sub">' + esc(c.contact_person) + '</span>';
     }
 
     html += '<tr' + dimStyle + '>';
