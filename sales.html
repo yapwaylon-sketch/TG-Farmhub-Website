@@ -290,6 +290,14 @@
   </div>
 </div>
 
+<!-- CUSTOMER ROW KEBAB MENU — single shared element, positioned via JS on
+     each open. Lives outside the table so .table-wrap overflow doesn't
+     clip it. Click anywhere else closes it. -->
+<div id="sc-kebab-menu" style="position:fixed;display:none;z-index:1100;" role="menu" aria-label="Customer actions" onclick="event.stopPropagation()">
+  <button class="sc-kebab-item" onclick="scKebabEdit()">Edit</button>
+  <button class="sc-kebab-item" id="sc-kebab-toggle" onclick="scKebabToggle()">Deactivate</button>
+</div>
+
 <!-- CUSTOMER MODAL -->
 <div id="sc-modal" class="modal-overlay" role="dialog" aria-label="Customer" style="display:none;">
   <div class="modal-box" style="max-width:480px;" onclick="event.stopPropagation()">
@@ -4083,9 +4091,7 @@ function renderCustomerCards() {
     html += '<td style="text-align:right;white-space:nowrap;">' + fmtMoneyCell(ow.invOut) + '</td>';
     html += '<td>';
     if (salesCan('manageCustomers')) {
-      var isActive = c.is_active !== false;
-      html += '<button class="btn-tiny" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
-      html += '<button class="btn-tiny' + (isActive ? ' danger' : '') + '" onclick="scToggleActive(\'' + c.id + '\')">' + (isActive ? 'Deactivate' : 'Activate') + '</button>';
+      html += '<button class="sc-kebab" onclick="scOpenKebab(event, \'' + c.id + '\')" aria-label="Actions">⋯</button>';
     }
     html += '</td>';
     html += '</tr>';
@@ -4131,6 +4137,70 @@ function paymentTermsLabel(days) {
 function paymentTermsBadgeClass(days) {
   return (parseInt(days, 10) || 0) > 0 ? 'do' : 'cs';
 }
+
+// ── Customer row kebab menu ──
+// Single shared <div> in the DOM (#sc-kebab-menu); we position it next
+// to whichever ⋯ was clicked. Lives outside the table so .table-wrap
+// overflow doesn't clip it.
+var scKebabCustomerId = null;
+
+function scOpenKebab(event, customerId) {
+  event.stopPropagation();
+  var menu = document.getElementById('sc-kebab-menu');
+  var btn = event.currentTarget;
+  var rect = btn.getBoundingClientRect();
+  scKebabCustomerId = customerId;
+
+  // Update Activate/Deactivate label + danger styling for this row
+  var c = customers.find(function(x) { return x.id === customerId; });
+  var toggleBtn = document.getElementById('sc-kebab-toggle');
+  if (c && toggleBtn) {
+    var isActive = c.is_active !== false;
+    toggleBtn.textContent = isActive ? 'Deactivate' : 'Activate';
+    toggleBtn.className = 'sc-kebab-item' + (isActive ? ' danger' : '');
+  }
+
+  // Reveal first (so we can measure), position, then keep visible.
+  menu.classList.add('is-open');
+  menu.style.visibility = 'hidden';
+  var menuRect = menu.getBoundingClientRect();
+  var top = rect.bottom + 4;
+  var left = rect.right - menuRect.width;
+  // Flip up if it would overflow the viewport bottom
+  if (top + menuRect.height > window.innerHeight - 8) top = rect.top - menuRect.height - 4;
+  // Keep on-screen horizontally
+  if (left < 8) left = 8;
+  if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+  menu.style.visibility = 'visible';
+}
+
+function scCloseKebab() {
+  var menu = document.getElementById('sc-kebab-menu');
+  if (menu) menu.classList.remove('is-open');
+  scKebabCustomerId = null;
+}
+
+function scKebabEdit() {
+  var id = scKebabCustomerId;
+  scCloseKebab();
+  if (id) scOpenModal(id);
+}
+
+function scKebabToggle() {
+  var id = scKebabCustomerId;
+  scCloseKebab();
+  if (id) scToggleActive(id);
+}
+
+// Close on outside click, Escape, or scroll (simple but reliable —
+// re-opening is one click away and the menu stays anchored only when
+// the underlying row hasn't moved).
+document.addEventListener('click', scCloseKebab);
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') scCloseKebab(); });
+window.addEventListener('scroll', scCloseKebab, true);
+window.addEventListener('resize', scCloseKebab);
 
 // intl-tel-input instances for the customer modal — lazy-initialized
 // the first time the modal is opened. Both fields default to Malaysia
@@ -4557,7 +4627,16 @@ function scRenderDetail() {
   html += '<div class="so-detail-section-title">Customer Details</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Name</div><div style="font-weight:700;color:var(--white);font-size:15px;">' + esc(c.name) + '</div></div>';
-  html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Phone</div><div style="color:var(--text);">' + esc(fmtPhone(c.phone)) + '</div></div>';
+  // Phone cell — primary on top, secondary right below in smaller muted text
+  // (was previously rendered far away in the grid via a separate Secondary
+  // Phone cell, which made it look missing).
+  var phoneCell = '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Phone</div>';
+  phoneCell += '<div style="color:var(--text);">' + esc(fmtPhone(c.phone)) + '</div>';
+  if (c.secondary_phone) {
+    phoneCell += '<div style="color:var(--text-muted);font-size:12px;margin-top:1px;">' + esc(fmtPhone(c.secondary_phone)) + ' <span style="font-size:10px;opacity:0.7;">(2nd)</span></div>';
+  }
+  phoneCell += '</div>';
+  html += phoneCell;
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Type</div><div><span class="badge badge-outline">' + scTypeLabel(c.type) + '</span></div></div>';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Payment Terms</div><div><span class="badge badge-' + paymentTermsBadgeClass(c.payment_terms_days) + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></div></div>';
   if (c.contact_person) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Contact Person</div><div style="color:var(--text);">' + esc(c.contact_person) + '</div></div>';
@@ -4572,7 +4651,6 @@ function scRenderDetail() {
   if (c.notes) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Notes</div><div style="color:var(--text);">' + esc(c.notes) + '</div></div>';
   if (c.registration_name) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Registration Name</div><div style="color:var(--text);">' + esc(c.registration_name) + '</div></div>';
   if (c.email) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Email</div><div style="color:var(--text);">' + esc(c.email) + '</div></div>';
-  if (c.secondary_phone) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Secondary Phone</div><div style="color:var(--text);">' + esc(fmtPhone(c.secondary_phone)) + '</div></div>';
   if (c.credit_limit) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Credit Limit</div><div style="color:var(--text);">RM ' + parseFloat(c.credit_limit).toFixed(2) + '</div></div>';
   html += '</div>';
   html += '<div style="margin-top:10px;display:flex;gap:8px;">';
