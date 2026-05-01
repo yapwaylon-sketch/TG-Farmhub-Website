@@ -165,7 +165,15 @@
       <div class="page-subtitle">Invoice management</div>
     </div>
   </div>
-  <div class="page-body"></div>
+  <div class="inv-subtabs" id="inv-subtabs">
+    <button class="inv-subtab active" data-subtab="invoices" onclick="invSwitchSubtab('invoices')">
+      Invoices <span class="inv-subtab-badge" id="inv-tab-invoices-badge">0</span>
+    </button>
+    <button class="inv-subtab" data-subtab="create" onclick="invSwitchSubtab('create')">
+      Create New <span class="inv-subtab-badge" id="inv-tab-create-badge">0</span>
+    </button>
+  </div>
+  <div class="page-body" id="inv-page-body"></div>
 </div>
 
 <!-- PAGE: DRIVERS -->
@@ -5259,6 +5267,61 @@ function renderPayments() {
   body.innerHTML = html;
 }
 
+// DD/MM/YYYY format used in invoice list redesign (2026-05-01).
+// fmtDateNice (shared.js) stays in use elsewhere — different format.
+function fmtDateDM(s) {
+  if (!s) return '';
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yy = d.getFullYear();
+  return dd + '/' + mm + '/' + yy;
+}
+
+// Returns signed integer: + days until due, − days overdue.
+// null for paid/voided/cancelled invoices (caller renders "—").
+function invDueInDays(inv) {
+  if (!inv || !inv.due_date) return null;
+  if (inv.payment_status === 'paid') return null;
+  if (inv.status === 'voided' || inv.status === 'cancelled') return null;
+  var due = new Date(inv.due_date + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due - today) / 86400000);
+}
+
+function invIsPartial(inv) {
+  if (!inv || inv.status !== 'issued') return false;
+  return inv.payment_status === 'partial';
+}
+
+// Returns [startISO, endISO] for a preset code. endISO always = today.
+function invPeriodRange(code) {
+  var today = todayStr();
+  var d = new Date();
+  if (code === 'this-month') {
+    var start = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+    return [start, today];
+  }
+  if (code === 'last-30')  { d.setDate(d.getDate() - 30); return [d.toISOString().slice(0,10), today]; }
+  if (code === 'last-90')  { d.setDate(d.getDate() - 90); return [d.toISOString().slice(0,10), today]; }
+  if (code === 'this-year') { return [d.getFullYear() + '-01-01', today]; }
+  if (code === 'all') return ['', ''];
+  return ['', ''];
+}
+
+function invSearchMatches(inv, term) {
+  if (!term) return true;
+  term = term.toLowerCase().trim();
+  if (!term) return true;
+  if ((inv.id || '').toLowerCase().indexOf(term) >= 0) return true;
+  var c = customers.find(function(x) { return x.id === inv.customer_id; });
+  if (c && (c.name || '').toLowerCase().indexOf(term) >= 0) return true;
+  if ((inv.notes || '').toLowerCase().indexOf(term) >= 0) return true;
+  return false;
+}
+
 function invoiceAgeDays(inv) {
   if (!inv.due_date) return 0;
   var today = new Date(); today.setHours(0,0,0,0);
@@ -5545,7 +5608,7 @@ function renderPaymentsInvoice() {
         var invAgeColor = invoiceAgingColor(inv);
 
         html += '<tr>';
-        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();switchTab(\'invoicing\')" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
+        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();invSubtab=\'invoices\';invSearchTerm=\'' + esc(inv.id) + '\';switchTab(\'invoicing\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
         html += '<td>' + fmtDateShort(inv.invoice_date) + '</td>';
         html += '<td>' + fmtDateShort(inv.due_date) + '</td>';
         html += '<td><span style="color:' + invAgeColor + ';font-weight:600;">' + ageLabel + '</span></td>';
@@ -5941,31 +6004,424 @@ function amountInWords(amount) {
 }
 
 var _invDoSearchVal = '';
+var invDockExpanded = false;
+var invSubtab = 'invoices'; // 'invoices' | 'create'
+
+function invToggleDock() {
+  invDockExpanded = !invDockExpanded;
+  renderInvoicing(); // re-render
+}
+
+function invClearAllSelections() {
+  invSelectedDOs = {};
+  renderInvoicing();
+}
+
+function invDOAgeDays(o) {
+  if (!o || !o.order_date) return null;
+  var d = new Date(o.order_date + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((today - d) / 86400000);
+}
+
+function invDOAgeClass(days) {
+  if (days == null) return 'fresh';
+  if (days > 60) return 'overdue';
+  if (days > 30) return 'old';
+  return 'fresh';
+}
+
+function renderDockBillingSummary(firstCustName) {
+  var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
+  var doNumbers = [];
+  var productAgg = {};
+  selectedIds.forEach(function(id) {
+    var o = orders.find(function(x) { return x.id === id; });
+    if (!o) return;
+    doNumbers.push(o.doc_number || o.id);
+    var items = orderItems.filter(function(i) { return i.order_id === id; });
+    items.forEach(function(item) {
+      var unitPrice = parseFloat(item.unit_price) || 0;
+      var key = item.product_id + '_' + unitPrice.toFixed(2);
+      if (!productAgg[key]) {
+        var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
+        var variety = soGetProductVariety(item.product_id);
+        productAgg[key] = {
+          name: prod ? prod.name : '—',
+          variety: variety !== '—' ? variety : '',
+          unit: prod ? (prod.unit || '') : '',
+          quantity: 0, totalAmount: 0, unitPrice: unitPrice
+        };
+      }
+      productAgg[key].quantity += (item.quantity || 0);
+      productAgg[key].totalAmount += parseFloat(item.line_total) || 0;
+    });
+  });
+  var lines = Object.values(productAgg);
+  var grand = 0;
+  lines.forEach(function(p) { grand += p.totalAmount; });
+
+  var h = '<h4 style="font-size:13px;font-weight:700;margin:0 0 8px;color:var(--text);">Billing summary · ' + esc(firstCustName) + '</h4>';
+  h += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">DOs: ' + doNumbers.join(', ') + '</div>';
+  h += '<table class="data-table" style="margin:0;font-size:12px;">';
+  h += '<thead><tr><th>#</th><th>Product</th><th style="text-align:right;">Qty</th><th>Unit</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
+  lines.forEach(function(p, i) {
+    var desc = (p.variety ? p.variety + ' ' : '') + p.name;
+    h += '<tr><td>' + (i+1) + '</td><td>' + esc(desc) + '</td><td style="text-align:right;">' + p.quantity + '</td><td>' + esc(p.unit) + '</td><td style="text-align:right;">' + formatRM(p.unitPrice) + '</td><td style="text-align:right;font-weight:600;">' + formatRM(p.totalAmount) + '</td></tr>';
+  });
+  h += '</tbody><tfoot><tr><td colspan="5" style="text-align:right;font-weight:800;">Total this invoice</td><td style="text-align:right;font-weight:800;color:var(--gold);">' + formatRM(grand) + '</td></tr></tfoot></table>';
+  return h;
+}
+
+function invSwitchSubtab(name) {
+  invSubtab = name;
+  var btns = document.querySelectorAll('#inv-subtabs .inv-subtab');
+  btns.forEach(function(b) {
+    b.classList.toggle('active', b.dataset.subtab === name);
+  });
+  renderInvoicing();
+}
+
+function invUpdateSubtabBadges() {
+  var invCount = invoices.filter(function(i) {
+    return i.status !== 'draft';
+  }).length;
+  var draft = invoices.find(function(i) { return i.status === 'draft'; });
+  var uninvoiced = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
+  }).length;
+
+  var bInv = document.getElementById('inv-tab-invoices-badge');
+  var bCreate = document.getElementById('inv-tab-create-badge');
+  if (bInv) bInv.textContent = invCount;
+  if (bCreate) {
+    if (draft) {
+      bCreate.textContent = '1 draft';
+      bCreate.classList.add('alert');
+    } else {
+      bCreate.textContent = uninvoiced + ' DOs';
+      bCreate.classList.remove('alert');
+    }
+  }
+}
+
 function renderInvoicing() {
+  var body = document.getElementById('inv-page-body');
+  if (!body) return;
+  invUpdateSubtabBadges();
+  if (invSubtab === 'create') {
+    renderCreateNewView(body);
+  } else {
+    renderInvoicesView(body);
+  }
+}
+
+function renderInvoicesView(body) {
+  var view = invComputeView();
+  var html = '';
+
+  // Stats strip
+  html += renderInvoicesStatsStrip();
+
+  // Period preset row
+  html += '<div class="inv-presets">';
+  html += '<span class="inv-presets-label">Period</span>';
+  ['this-month','last-30','last-90','this-year','all','custom'].forEach(function(code) {
+    var label = ({'this-month':'This month','last-30':'Last 30 days','last-90':'Last 90 days','this-year':'This year','all':'All time','custom':'Custom\u2026'})[code];
+    html += '<button class="inv-preset' + (invPeriodPreset === code ? ' active' : '') + '" onclick="invSetPreset(\'' + code + '\')">' + label + '</button>';
+  });
+  html += '</div>';
+
+  // Search
+  html += '<input type="text" class="inv-search" placeholder="Search invoice number, customer, or reference..." value="' + esc(invSearchTerm) + '" oninput="invSetSearch(this.value)">';
+
+  // Quick-filter chips
+  html += renderInvoicesChips(view.fullList);
+
+  // More filters toggle + drawer
+  html += '<button class="inv-filter-toggle" onclick="invToggleMoreFilters()">';
+  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
+  html += 'More filters' + (invMoreFiltersOpen ? ' \u25b4' : ' \u25be');
+  html += '</button>';
+
+  if (invMoreFiltersOpen) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:end;">';
+
+    var custIdsSeen = {};
+    invoices.forEach(function(i) { if (i.customer_id) custIdsSeen[i.customer_id] = true; });
+    html += '<div class="form-field" style="margin:0;"><label>Customer</label><select onchange="invFilterCustomer=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));">';
+    html += '<option value=""' + (invFilterCustomer === '' ? ' selected' : '') + '>All customers</option>';
+    Object.keys(custIdsSeen).forEach(function(cid) {
+      var cc = customers.find(function(x) { return x.id === cid; });
+      var cname = cc ? cc.name : cid;
+      html += '<option value="' + esc(cid) + '"' + (invFilterCustomer === cid ? ' selected' : '') + '>' + esc(cname) + '</option>';
+    });
+    html += '</select></div>';
+
+    if (invPeriodPreset === 'custom') {
+      html += '<div class="form-field" style="margin:0;"><label>From</label><input type="date" value="' + esc(invCustomDateFrom) + '" onchange="invCustomDateFrom=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));"></div>';
+      html += '<div class="form-field" style="margin:0;"><label>To</label><input type="date" value="' + esc(invCustomDateTo) + '" onchange="invCustomDateTo=this.value;invPage=1;renderInvoicesView(document.getElementById(\'inv-page-body\'));"></div>';
+    }
+    html += '</div>';
+  }
+
+  // Table
+  html += '<div class="inv-table">';
+  html += '<div class="inv-list-header">';
+  html += '<div>Invoice</div><div>Customer</div><div>Issued</div><div>Due</div>';
+  html += '<div class="center">Due in</div><div class="right">Amount</div><div class="right">Balance</div><div></div>';
+  html += '</div>';
+  if (!view.slice.length) {
+    html += '<div class="empty-state" style="padding:30px;">No invoices match your filters.</div>';
+  } else {
+    view.slice.forEach(function(inv) { html += renderInvoiceRow(inv); });
+  }
+  html += '</div>';
+
+  // Pagination
+  html += renderInvoicesPagination(view);
+
+  // Voided toggle
+  var voidedCount = invoices.filter(function(i) {
+    return (i.status === 'voided' || i.status === 'cancelled');
+  }).length;
+  if (voidedCount > 0) {
+    html += '<div class="inv-show-voided"><a onclick="invToggleShowVoided()">';
+    html += (invShowVoided ? 'Hide' : 'Show') + ' ' + voidedCount + ' voided / cancelled invoice' + (voidedCount !== 1 ? 's' : '');
+    html += '</a></div>';
+  }
+
+  body.innerHTML = html;
+
+  // Re-expand row if invExpandedId was set (preserved across re-renders)
+  if (invExpandedId) {
+    var row = document.getElementById('inv-row-' + invExpandedId);
+    if (row) {
+      row.classList.add('expanded');
+      var chev = row.querySelector('.inv-row-chev');
+      if (chev) chev.classList.add('open');
+      invInsertDetail(invExpandedId, row);
+    }
+  }
+}
+
+function invSetPreset(code) {
+  invPeriodPreset = code;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetSearch(term) {
+  invSearchTerm = term;
+  invPage = 1;
+  clearTimeout(window._invSearchTO);
+  window._invSearchTO = setTimeout(function() {
+    var body = document.getElementById('inv-page-body');
+    if (body) renderInvoicesView(body);
+    var input = document.querySelector('.inv-search');
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }, 200);
+}
+
+function invSetStatusFilter(s) {
+  invStatusFilter = s;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invToggleShowVoided() {
+  invShowVoided = !invShowVoided;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetPage(p) {
+  invPage = p;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetPageSize(n) {
+  invPageSize = n;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function renderInvoicesStatsStrip() {
+  var outstanding = 0, outstandingCount = 0;
+  var overdue = 0, overdueCount = 0;
+  var monthTotal = 0, monthCount = 0;
+  var thisMonth = todayStr().substring(0, 7);
+  invoices.forEach(function(inv) {
+    if (inv.status === 'draft' || inv.status === 'cancelled' || inv.status === 'voided') return;
+    var bal = invoiceBalance(inv);
+    if (bal > 0) { outstanding += bal; outstandingCount++; }
+    if (isInvoiceOverdue(inv)) { overdue += bal; overdueCount++; }
+    if ((inv.invoice_date || '').substring(0, 7) === thisMonth) {
+      monthTotal += parseFloat(inv.grand_total) || 0;
+      monthCount++;
+    }
+  });
+  var html = '<div class="inv-stats">';
+  html += '<div class="inv-stat warn"><div class="inv-stat-label">Outstanding</div><div class="inv-stat-value">' + formatRM(outstanding) + '</div><div class="inv-stat-meta">' + outstandingCount + ' invoice' + (outstandingCount !== 1 ? 's' : '') + '</div></div>';
+  html += '<div class="inv-stat danger"><div class="inv-stat-label">Overdue</div><div class="inv-stat-value">' + formatRM(overdue) + '</div><div class="inv-stat-meta">' + overdueCount + ' invoice' + (overdueCount !== 1 ? 's' : '') + '</div></div>';
+  html += '<div class="inv-stat"><div class="inv-stat-label">This Month</div><div class="inv-stat-value">' + formatRM(monthTotal) + '</div><div class="inv-stat-meta">' + monthCount + ' invoice' + (monthCount !== 1 ? 's' : '') + '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderInvoicesChips(fullList) {
+  var counts = { all: fullList.length, outstanding: 0, overdue: 0, paid: 0 };
+  fullList.forEach(function(inv) {
+    var ds = invGetDisplayStatus(inv);
+    if (ds === 'paid') counts.paid++;
+    else if (ds === 'overdue') { counts.overdue++; counts.outstanding++; }
+    else if (ds === 'issued' || ds === 'partial') counts.outstanding++;
+  });
+  var chips = [
+    {code:'all', label:'All', cls:''},
+    {code:'outstanding', label:'Outstanding', cls:''},
+    {code:'overdue', label:'Overdue', cls:'danger'},
+    {code:'paid', label:'Paid', cls:''}
+  ];
+  var html = '<div class="inv-chips">';
+  chips.forEach(function(c) {
+    var active = invStatusFilter === c.code ? ' active' : '';
+    html += '<span class="inv-chip ' + c.cls + active + '" onclick="invSetStatusFilter(\'' + c.code + '\')">';
+    html += c.label + ' <span class="inv-chip-count">' + counts[c.code] + '</span>';
+    html += '</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderInvoiceRow(inv) {
+  var c = customers.find(function(x) { return x.id === inv.customer_id; });
+  var custName = c ? c.name : '\u2014';
+  var bal = invoiceBalance(inv);
+  var partial = invIsPartial(inv);
+  var dueIn = invDueInDays(inv);
+  var voidedClass = (inv.status === 'voided' || inv.status === 'cancelled') ? ' voided' : '';
+  var balanceClass = bal === 0 ? 'zero' : (partial ? 'partial' : '');
+  var dueRedClass = isInvoiceOverdue(inv) ? ' danger' : '';
+
+  var dueInDisplay = '\u2014';
+  var dueInClass = 'muted';
+  if (dueIn !== null) {
+    if (dueIn < 0) { dueInDisplay = '\u2212' + Math.abs(dueIn); dueInClass = 'danger'; }
+    else { dueInDisplay = '+' + dueIn; dueInClass = ''; }
+  }
+
+  var amountStr = formatRM(parseFloat(inv.grand_total) || 0);
+  var balStr = formatRM(bal);
+
+  var html = '<div class="inv-list-row' + voidedClass + '" id="inv-row-' + esc(inv.id) + '" onclick="invToggleInvoice(\'' + esc(inv.id) + '\')">';
+  html += '<button class="inv-row-id" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')">' + esc(inv.id) + '</button>';
+  html += '<div class="inv-row-cust">' + esc(custName) + '</div>';
+  html += '<div class="inv-row-date">' + fmtDateDM(inv.invoice_date) + '</div>';
+  html += '<div class="inv-row-date' + dueRedClass + '">' + fmtDateDM(inv.due_date) + '</div>';
+  html += '<div class="inv-row-duein ' + dueInClass + '">' + dueInDisplay + '</div>';
+  html += '<div class="inv-row-amount">' + amountStr + '</div>';
+  html += '<div class="inv-row-balance ' + balanceClass + '">' + balStr + '</div>';
+  html += '<svg class="inv-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
+  // Mobile-only meta line (CSS shows it only at <=720px)
+  var mobileMeta = '<strong>' + esc(custName) + '</strong>';
+  if (bal === 0) {
+    mobileMeta += ' \u00b7 Settled';
+  } else if (dueIn !== null) {
+    var dateLabel = fmtDateDM(inv.due_date);
+    if (dueIn < 0) mobileMeta += ' \u00b7 Due <span class="late">' + dateLabel + ' (\u2212' + Math.abs(dueIn) + ')</span>';
+    else mobileMeta += ' \u00b7 Due ' + dateLabel + ' (+' + dueIn + ')';
+  }
+  html += '<div class="inv-row-mobile-meta">' + mobileMeta + '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderInvoicesPagination(view) {
+  if (view.total === 0) return '';
+  var startIdx = (invPage - 1) * invPageSize + 1;
+  var endIdx = Math.min(invPage * invPageSize, view.total);
+  var html = '<div class="inv-pagination">';
+  html += '<div class="inv-pagination-info">Showing <strong>' + startIdx + '\u2013' + endIdx + '</strong> of <strong>' + view.total + '</strong> invoices</div>';
+  html += '<div class="inv-pagination-controls">';
+  html += '<button class="inv-page-btn"' + (invPage <= 1 ? ' disabled' : '') + ' onclick="invSetPage(' + (invPage - 1) + ')">\u2190 Prev</button>';
+
+  var pageNums = [];
+  for (var p = 1; p <= view.pages; p++) {
+    if (p === 1 || p === view.pages || Math.abs(p - invPage) <= 1) pageNums.push(p);
+    else if (pageNums[pageNums.length - 1] !== '...') pageNums.push('...');
+  }
+  pageNums.forEach(function(p) {
+    if (p === '...') {
+      html += '<button class="inv-page-btn" disabled>\u2026</button>';
+    } else {
+      html += '<button class="inv-page-btn' + (p === invPage ? ' active' : '') + '" onclick="invSetPage(' + p + ')">' + p + '</button>';
+    }
+  });
+  html += '<button class="inv-page-btn"' + (invPage >= view.pages ? ' disabled' : '') + ' onclick="invSetPage(' + (invPage + 1) + ')">Next \u2192</button>';
+  html += '</div>';
+  html += '<div class="inv-page-size">Rows per page <select onchange="invSetPageSize(parseInt(this.value,10))">';
+  [25, 50, 100].forEach(function(n) {
+    html += '<option value="' + n + '"' + (invPageSize === n ? ' selected' : '') + '>' + n + '</option>';
+  });
+  html += '</select></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderCreateNewView(body) {
   // Preserve search input across re-renders
   var existingSearch = document.getElementById('inv-do-search');
   if (existingSearch) _invDoSearchVal = existingSearch.value;
-  var body = document.getElementById('page-invoicing').querySelector('.page-body');
+
   var html = '';
 
-  // ---- Section A: Uninvoiced Delivery Orders ----
-  html += '<div style="margin-bottom:32px;">';
+  // Pending draft banner \u2014 sits at top when a draft exists
+  var draft = invoices.find(function(i) { return i.status === 'draft'; });
+  if (draft) {
+    var dCust = customers.find(function(x) { return x.id === draft.customer_id; });
+    var dCustName = dCust ? dCust.name : '\u2014';
+    var dDoCount = invoiceOrders.filter(function(io) { return io.invoice_id === draft.id; }).length;
+
+    html += '<div class="inv-draft-banner">';
+    html += '<div class="inv-draft-info">';
+    html += '<span class="inv-draft-tag">Pending approval</span>';
+    html += '<button class="inv-draft-id" onclick="generateInvoiceA4(\'' + esc(draft.id) + '\')">' + esc(draft.id) + '</button>';
+    html += '<span class="inv-draft-meta"><strong>' + esc(dCustName) + '</strong> \u00B7 ' + dDoCount + ' DO' + (dDoCount !== 1 ? 's' : '') + ' \u00B7 Created ' + fmtDateDM(draft.created_at || draft.invoice_date) + ' \u00B7 <strong>' + formatRM(parseFloat(draft.grand_total) || 0) + '</strong></span>';
+    html += '</div>';
+    html += '<div class="inv-draft-actions">';
+    html += '<button class="btn btn-outline btn-sm" onclick="invEditDraft(\'' + esc(draft.id) + '\')">Edit</button>';
+    html += '<button class="btn btn-outline btn-sm" style="border-color:var(--danger);color:var(--danger);" onclick="invCancelInvoice(\'' + esc(draft.id) + '\')">Cancel draft</button>';
+    if (currentUser && currentUser.role === 'admin') {
+      html += '<button class="btn btn-primary btn-sm" onclick="invApproveInvoice(\'' + esc(draft.id) + '\')">Approve & issue</button>';
+    }
+    html += '</div></div>';
+  }
+
+  // Create flow (locked when a draft exists)
+  html += '<div' + (draft ? ' class="inv-locked"' : '') + '>';
+
+  html += '<div style="margin-bottom:16px;">';
   html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Uninvoiced Delivery Orders</div>';
   html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Select DOs to batch into an invoice</div>';
-  html += '<input type="text" id="inv-do-search" placeholder="Search by customer or DO number..." oninput="renderInvoicing()" style="width:100%;max-width:320px;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-input,var(--bg-card));color:var(--text);font-family:inherit;margin-bottom:12px;">';
+  html += '<input type="text" id="inv-do-search" placeholder="Search by customer or DO number..." oninput="renderInvoicing()" style="width:100%;max-width:320px;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-family:inherit;margin-bottom:12px;">';
 
   var uninvoicedDOs = orders.filter(function(o) {
     return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
   });
 
-  // Filter by search term
-  var invSearchTerm = _invDoSearchVal.toLowerCase().trim();
-  if (invSearchTerm) {
+  var invSearchTerm2 = _invDoSearchVal.toLowerCase().trim();
+  if (invSearchTerm2) {
     uninvoicedDOs = uninvoicedDOs.filter(function(o) {
-      var cust = customers.find(function(c) { return c.id === o.customer_id; });
-      var custName = cust ? cust.name.toLowerCase() : '';
+      var cc = customers.find(function(c) { return c.id === o.customer_id; });
+      var custName = cc ? cc.name.toLowerCase() : '';
       var docNum = (o.doc_number || '').toLowerCase();
-      return custName.indexOf(invSearchTerm) >= 0 || docNum.indexOf(invSearchTerm) >= 0;
+      return custName.indexOf(invSearchTerm2) >= 0 || docNum.indexOf(invSearchTerm2) >= 0;
     });
   }
 
@@ -5986,111 +6442,127 @@ function renderInvoicing() {
       var custName = cust ? cust.name : '\u2014';
       var custTotal = 0;
       custOrders.forEach(function(o) { custTotal += parseFloat(o.grand_total) || 0; });
-
-      // Count how many of this customer's DOs are currently selected
       var selectedInGroup = 0;
       custOrders.forEach(function(o) { if (invSelectedDOs[o.id]) selectedInGroup++; });
       var allSelected = selectedInGroup > 0 && selectedInGroup === custOrders.length;
-      // Auto-expand if any DO in this group is selected (preserves selection visibility across re-renders)
       var groupExpanded = selectedInGroup > 0;
+      var rowClass = 'inv-do-cust-row' + (selectedInGroup > 0 ? ' selected-some' : '');
 
-      html += '<div class="inv-customer-group" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">';
-
-      // Customer header (clickable to expand)
-      html += '<div class="inv-cust-header" style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="invToggleCustomer(\'' + esc(custId) + '\')">';
-      html += '<div>';
-      html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(custName) + '</div>';
-      html += '<div style="font-size:12px;color:var(--text-muted);">' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + ' &middot; ' + formatRM(custTotal);
-      if (selectedInGroup > 0) html += ' &middot; <strong style="color:var(--gold);">' + selectedInGroup + ' selected</strong>';
+      html += '<div class="' + rowClass + '" onclick="invToggleCustomer(\'' + esc(custId) + '\')">';
+      html += '<input type="checkbox" id="inv-selall-' + esc(custId) + '"' + (allSelected ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:var(--gold);" onclick="event.stopPropagation();invSelectAllCustomer(\'' + esc(custId) + '\', this.checked)">';
+      html += '<span class="cust-name">' + esc(custName) + '</span>';
+      html += '<span class="inv-do-pill">' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + '</span>';
+      if (selectedInGroup > 0) {
+        html += '<span class="inv-do-selected-badge">' + selectedInGroup + ' selected</span>';
+      }
+      html += '<span class="inv-do-cust-amount">' + formatRM(custTotal) + '</span>';
+      html += '<svg style="width:14px;height:14px;color:var(--text-muted);transition:transform 0.2s;' + (groupExpanded ? 'transform:rotate(180deg);' : '') + '" id="inv-chevron-' + esc(custId) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>';
       html += '</div>';
-      html += '</div>';
-      html += '<div style="display:flex;align-items:center;gap:10px;">';
-      html += '<label style="font-size:12px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:600;" onclick="event.stopPropagation()">';
-      html += '<input type="checkbox" style="width:16px;height:16px;cursor:pointer;" onchange="invSelectAllCustomer(\'' + esc(custId) + '\', this.checked)" id="inv-selall-' + esc(custId) + '"' + (allSelected ? ' checked' : '') + '>';
-      html += ' Select all ' + custOrders.length + ' DO' + (custOrders.length !== 1 ? 's' : '') + '</label>';
-      html += '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;transition:transform 0.2s;' + (groupExpanded ? 'transform:rotate(180deg);' : '') + '" id="inv-chevron-' + esc(custId) + '"><polyline points="6 9 12 15 18 9"/></svg>';
-      html += '</div></div>';
 
-      // Customer DOs (expandable)
-      html += '<div id="inv-dos-' + esc(custId) + '" style="display:' + (groupExpanded ? 'block' : 'none') + ';border-top:1px solid var(--border);padding:8px 16px;">';
+      html += '<div class="inv-do-list" id="inv-dos-' + esc(custId) + '" style="display:' + (groupExpanded ? 'block' : 'none') + ';">';
       custOrders.sort(function(a, b) { return (a.order_date || '').localeCompare(b.order_date || ''); });
       custOrders.forEach(function(o) {
         var checked = invSelectedDOs[o.id] ? ' checked' : '';
-        html += '<label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">';
-        html += '<input type="checkbox" data-order-id="' + esc(o.id) + '" data-customer-id="' + esc(custId) + '" onchange="invToggleDO(\'' + esc(o.id) + '\', \'' + esc(custId) + '\', this.checked)"' + checked + '>';
-        html += '<span style="flex:1;">';
-        html += '<span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span>';
-        html += ' &middot; ' + fmtDateNice(o.order_date);
-        html += '</span>';
-        html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
-        html += '</label>';
+        var age = invDOAgeDays(o);
+        var ageCls = invDOAgeClass(age);
+        html += '<div class="inv-do-row">';
+        html += '<input type="checkbox" data-order-id="' + esc(o.id) + '" data-customer-id="' + esc(custId) + '"' + checked + ' onchange="invToggleDO(\'' + esc(o.id) + '\', \'' + esc(custId) + '\', this.checked)" style="width:16px;height:16px;accent-color:var(--gold);">';
+        html += '<span class="num">' + esc(o.doc_number || o.id) + '</span>';
+        html += '<span class="date">' + fmtDateDM(o.order_date) + '</span>';
+        if (age != null) html += '<span class="inv-do-age ' + ageCls + '">' + age + 'd</span>';
+        html += '<span class="amt">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
+        html += '</div>';
       });
       html += '</div>';
-
-      html += '</div>';
     });
 
-    // Billing summary (live, updates on selection)
+    // Sticky bottom dock \u2014 appears when DOs are selected
     var selectedCount = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; }).length;
-    html += '<div id="inv-billing-summary" style="margin-top:16px;display:' + (selectedCount > 0 ? 'block' : 'none') + ';"></div>';
+    if (selectedCount > 0) {
+      var selCustIds = invSelectedCustomerIds();
+      var multiCust = selCustIds.length > 1;
 
-    // Invoice details (date, terms, notes)
-    html += '<div id="inv-details" style="margin-top:16px;display:' + (selectedCount > 0 ? 'block' : 'none') + ';background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">';
-    html += '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Invoice Details</div>';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
-    html += '<div class="form-field"><label>INVOICE DATE</label><input type="date" id="inv-date" value="' + todayStr() + '" onchange="invUpdateDueDate()" style="width:100%;"></div>';
-    // Auto-detect payment terms from first selected DO's customer
-    var firstSelId = Object.keys(invSelectedDOs).find(function(k) { return invSelectedDOs[k]; });
-    var firstSelOrder = firstSelId ? orders.find(function(o) { return o.id === firstSelId; }) : null;
-    var firstSelCust = firstSelOrder ? customers.find(function(c) { return c.id === firstSelOrder.customer_id; }) : null;
-    var defaultTermsDays = firstSelCust ? (firstSelCust.payment_terms_days || 0) : 30;
-    html += '<div class="form-field"><label>PAYMENT TERMS</label><select id="inv-terms" style="width:100%;" onchange="invUpdateDueDate()">';
-    [0, 7, 14, 30, 60].forEach(function(d) {
-      html += '<option value="' + d + '"' + (d === defaultTermsDays ? ' selected' : '') + '>' + paymentTermsLabel(d) + '</option>';
-    });
-    html += '</select></div>';
-    html += '</div>';
-    // Due date display
-    var dueDate = calcDueDate(todayStr(), defaultTermsDays === 0 ? 'cod' : defaultTermsDays + 'days');
-    html += '<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">Due date: <strong id="inv-due-date" style="color:var(--text);">' + fmtDateNice(dueDate) + '</strong></div>';
-    html += '<div class="form-field" style="margin-top:12px;"><label>NOTES</label><textarea id="inv-notes" rows="2" placeholder="Optional invoice notes" style="width:100%;">' + esc(INV_DEFAULT_NOTES) + '</textarea></div>';
-    html += '</div>';
+      if (multiCust) {
+        var custNames = selCustIds.map(function(cid) {
+          var c2 = customers.find(function(x) { return x.id === cid; });
+          return c2 ? c2.name : cid;
+        }).join(', ');
+        html += '<div class="inv-dock" style="border-color:var(--danger);"><div class="inv-dock-bar" style="background:rgba(220,53,69,0.06);">';
+        html += '<div class="inv-dock-summary"><div class="inv-dock-count" style="color:var(--danger);"><strong style="color:var(--danger);">\u26A0</strong> Selected DOs span multiple customers: ' + esc(custNames) + '</div></div>';
+        html += '<button class="btn btn-outline btn-sm" onclick="invClearAllSelections()">Clear selection</button>';
+        html += '</div></div>';
+      } else {
+        var firstSelId = Object.keys(invSelectedDOs).find(function(k) { return invSelectedDOs[k]; });
+        var firstSelOrder = firstSelId ? orders.find(function(o) { return o.id === firstSelId; }) : null;
+        var firstCust = firstSelOrder ? customers.find(function(c) { return c.id === firstSelOrder.customer_id; }) : null;
+        var firstCustName = firstCust ? firstCust.name : '';
+        var defaultTermsDays = firstCust ? (firstCust.payment_terms_days || 30) : 30;
 
-    // Multi-customer guard
-    var selCustIds = invSelectedCustomerIds();
-    var multiCust = selCustIds.length > 1;
-    if (multiCust) {
-      var custNames = selCustIds.map(function(cid) {
-        var c = customers.find(function(x) { return x.id === cid; });
-        return c ? c.name : cid;
-      }).join(', ');
-      html += '<div style="margin-top:12px;padding:12px 14px;background:rgba(220,53,69,0.08);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-size:13px;">';
-      html += '<strong>\u26A0 Multiple customers selected:</strong> ' + esc(custNames);
-      html += '<div style="font-size:12px;margin-top:4px;color:var(--text-muted);">Invoices must be per-customer. Please select DOs from only one customer at a time.</div>';
-      html += '</div>';
+        var selectedTotal = 0;
+        Object.keys(invSelectedDOs).forEach(function(k) {
+          if (!invSelectedDOs[k]) return;
+          var oo = orders.find(function(x) { return x.id === k; });
+          if (oo) selectedTotal += parseFloat(oo.grand_total) || 0;
+        });
+
+        html += '<div class="inv-dock" id="inv-dock">';
+        html += '<div class="inv-dock-bar">';
+        html += '<div class="inv-dock-summary">';
+        html += '<div class="inv-dock-count"><strong>' + selectedCount + '</strong> DO' + (selectedCount !== 1 ? 's' : '') + ' selected from <strong style="color:var(--purple);">' + esc(firstCustName) + '</strong></div>';
+        html += '<div class="inv-dock-divider"></div>';
+        html += '<div class="inv-dock-total">Total<strong>' + formatRM(selectedTotal) + '</strong></div>';
+        html += '</div>';
+        html += '<button class="inv-dock-toggle" onclick="invToggleDock()">';
+        html += (invDockExpanded ? 'Hide preview' : 'Preview');
+        html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="' + (invDockExpanded ? '6 9 12 15 18 9' : '18 15 12 9 6 15') + '"/></svg>';
+        html += '</button>';
+        html += '<button class="btn btn-primary" id="inv-create-btn" onclick="invCreateDraftInvoice()">Create Draft Invoice</button>';
+        html += '</div>';
+
+        if (invDockExpanded) {
+          html += '<div class="inv-dock-expanded">';
+          html += renderDockBillingSummary(firstCustName);
+          html += '<h4 style="font-size:13px;font-weight:700;margin:14px 0 8px;color:var(--text);">Invoice details</h4>';
+          html += '<div class="inv-dock-fields">';
+          html += '<div class="form-field"><label>Invoice date</label><input type="date" id="inv-date" value="' + todayStr() + '" onchange="invUpdateDueDate()"></div>';
+          html += '<div class="form-field"><label>Payment terms</label><select id="inv-terms" onchange="invUpdateDueDate()">';
+          [0, 7, 14, 30, 60].forEach(function(d) {
+            html += '<option value="' + d + '"' + (d === defaultTermsDays ? ' selected' : '') + '>' + paymentTermsLabel(d) + '</option>';
+          });
+          html += '</select></div>';
+          html += '<div class="form-field"><label>Notes (optional)</label><input type="text" id="inv-notes" placeholder="Optional invoice notes" value="' + esc(INV_DEFAULT_NOTES) + '"></div>';
+          html += '</div>';
+          var dueDate = calcDueDate(todayStr(), defaultTermsDays === 0 ? 'cod' : defaultTermsDays + 'days');
+          html += '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Due ' + fmtDateDM(dueDate) + '</div>';
+          html += '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px;">';
+          html += '<button class="btn btn-outline btn-sm" onclick="invCopySummary()">Copy summary</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="invPrintSummary()">Print summary</button>';
+          html += '</div>';
+          html += '</div>';
+        }
+
+        html += '</div>'; // end inv-dock
+      }
     }
-
-    // Action button
-    var createDisabled = selectedCount === 0 || multiCust;
-    html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">';
-    html += '<button class="btn btn-primary" id="inv-create-btn" onclick="invCreateDraftInvoice()"' + (createDisabled ? ' disabled style="opacity:0.5;cursor:not-allowed;"' : '') + '>';
-    html += 'Create Draft Invoice (' + selectedCount + ' selected)</button>';
-    html += '</div>';
   }
-  html += '</div>';
 
-  // ---- Section B: Invoice List ----
-  html += '<div id="inv-list-container"></div>';
+  html += '</div>'; // end "Uninvoiced Delivery Orders" wrapper
+
+  html += '</div>'; // end inv-locked wrapper
+
+  if (draft) {
+    html += '<div class="inv-locked-note">Approve or cancel the pending draft above before creating another. (Single-draft rule prevents invoice number gaps.)</div>';
+  }
 
   body.innerHTML = html;
-  // Restore search input value and focus after re-render
+
+  // Restore search input value and focus
   var searchInput = document.getElementById('inv-do-search');
   if (searchInput && _invDoSearchVal) {
     searchInput.value = _invDoSearchVal;
     searchInput.focus();
     searchInput.setSelectionRange(_invDoSearchVal.length, _invDoSearchVal.length);
   }
-  invRenderList();
 }
 
 // Invoicing helpers
@@ -6435,11 +6907,56 @@ function invPrintSummary() {
 }
 
 // ── Invoice List ──
+var invStatusFilter = 'all';
+var invPeriodPreset = 'last-90';
+var invCustomDateFrom = '';
+var invCustomDateTo = '';
+var invSearchTerm = '';
+var invShowVoided = false;
 var invFilterCustomer = '';
-var invFilterStatus = '';
-var invFilterDateFrom = '';
-var invFilterDateTo = '';
+var invPage = 1;
+var invPageSize = 25;
 var invExpandedId = null;
+var invMoreFiltersOpen = false;
+function invToggleMoreFilters() {
+  invMoreFiltersOpen = !invMoreFiltersOpen;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invComputeView() {
+  var range = invPeriodRange(invPeriodPreset);
+  var from = (invPeriodPreset === 'custom') ? invCustomDateFrom : range[0];
+  var to   = (invPeriodPreset === 'custom') ? invCustomDateTo   : range[1];
+
+  var list = invoices.filter(function(inv) {
+    if (inv.status === 'draft') return false;
+    if (!invShowVoided && (inv.status === 'voided' || inv.status === 'cancelled')) return false;
+    if (from && (inv.invoice_date || '') < from) return false;
+    if (to   && (inv.invoice_date || '') > to)   return false;
+    if (invFilterCustomer && inv.customer_id !== invFilterCustomer) return false;
+    if (!invSearchMatches(inv, invSearchTerm)) return false;
+    var ds = invGetDisplayStatus(inv);
+    if (invStatusFilter === 'outstanding') {
+      if (ds !== 'issued' && ds !== 'partial' && ds !== 'overdue') return false;
+    } else if (invStatusFilter === 'overdue') {
+      if (ds !== 'overdue') return false;
+    } else if (invStatusFilter === 'paid') {
+      if (ds !== 'paid') return false;
+    }
+    return true;
+  });
+
+  list.sort(function(a, b) {
+    return (b.created_at || b.invoice_date || '').localeCompare(a.created_at || a.invoice_date || '');
+  });
+
+  var total = list.length;
+  var pages = Math.max(1, Math.ceil(total / invPageSize));
+  if (invPage > pages) invPage = pages;
+  var slice = list.slice((invPage - 1) * invPageSize, invPage * invPageSize);
+
+  return { slice: slice, total: total, pages: pages, fullList: list };
+}
 
 function invGetDisplayStatus(inv) {
   if (inv.status === 'cancelled') return 'cancelled';
@@ -6451,256 +6968,169 @@ function invGetDisplayStatus(inv) {
   return 'issued';
 }
 
-function invStatusBadge(status) {
-  var styles = {
-    draft: 'background:#666;color:#fff;',
-    issued: 'background:var(--info);color:#fff;',
-    overdue: 'background:var(--danger);color:#fff;',
-    partial: 'background:var(--gold);color:#000;',
-    paid: 'background:var(--green);color:#fff;',
-    voided: 'background:#8B0000;color:#fff;',
-    cancelled: 'background:var(--border);color:var(--text-muted);'
-  };
-  var labels = { draft:'Draft', issued:'Issued', overdue:'Overdue', partial:'Partial', paid:'Paid', voided:'Voided', cancelled:'Cancelled' };
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;' + (styles[status] || '') + '">' + (labels[status] || status) + '</span>';
-}
-
-function invRenderList() {
-  var container = document.getElementById('inv-list-container');
-  if (!container) return;
-
-  var html = '';
-  html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;margin-top:8px;">Invoices</div>';
-
-  // Filter bar
-  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-  html += '<select onchange="invFilterStatus=this.value;invRenderList()" style="min-width:120px;">';
-  ['', 'draft', 'issued', 'overdue', 'partial', 'paid', 'voided', 'cancelled'].forEach(function(s) {
-    var label = s ? (s.charAt(0).toUpperCase() + s.slice(1)) : 'All Status';
-    html += '<option value="' + s + '"' + (invFilterStatus === s ? ' selected' : '') + '>' + label + '</option>';
-  });
-  html += '</select>';
-
-  // Customer filter
-  var invCustIds = {};
-  invoices.forEach(function(inv) { if (inv.customer_id) invCustIds[inv.customer_id] = true; });
-  html += '<select onchange="invFilterCustomer=this.value;invRenderList()" style="min-width:140px;">';
-  html += '<option value=""' + (invFilterCustomer === '' ? ' selected' : '') + '>All Customers</option>';
-  Object.keys(invCustIds).forEach(function(cid) {
-    var c = customers.find(function(x) { return x.id === cid; });
-    var cname = c ? c.name : cid;
-    html += '<option value="' + esc(cid) + '"' + (invFilterCustomer === cid ? ' selected' : '') + '>' + esc(cname) + '</option>';
-  });
-  html += '</select>';
-
-  html += '<input type="date" value="' + esc(invFilterDateFrom) + '" onchange="invFilterDateFrom=this.value;invRenderList()" placeholder="From" style="min-width:130px;">';
-  html += '<input type="date" value="' + esc(invFilterDateTo) + '" onchange="invFilterDateTo=this.value;invRenderList()" placeholder="To" style="min-width:130px;">';
-  html += '</div>';
-
-  // Apply filters
-  var filtered = invoices.filter(function(inv) {
-    if (invFilterCustomer && inv.customer_id !== invFilterCustomer) return false;
-    if (invFilterStatus) {
-      var ds = invGetDisplayStatus(inv);
-      if (invFilterStatus !== ds) return false;
-    }
-    if (invFilterDateFrom && inv.invoice_date < invFilterDateFrom) return false;
-    if (invFilterDateTo && inv.invoice_date > invFilterDateTo) return false;
-    return true;
-  });
-
-  // Summary cards (exclude cancelled from summaries)
-  var activeInvs = invoices.filter(function(inv) { return inv.status !== 'cancelled' && inv.status !== 'voided'; });
-  var totalOutstanding = 0, overdueCount = 0, overdueTotal = 0, monthCount = 0, monthTotal = 0;
-  var thisMonth = todayStr().substring(0, 7);
-  activeInvs.forEach(function(inv) {
-    if (inv.status === 'issued' && inv.payment_status !== 'paid') totalOutstanding += invoiceBalance(inv);
-    if (isInvoiceOverdue(inv)) { overdueCount++; overdueTotal += invoiceBalance(inv); }
-    if ((inv.invoice_date || '').substring(0, 7) === thisMonth) { monthCount++; monthTotal += parseFloat(inv.grand_total) || 0; }
-  });
-
-  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">';
-  html += '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;">';
-  html += '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Outstanding</div>';
-  html += '<div style="font-size:18px;font-weight:700;color:var(--gold-light);">' + formatRM(totalOutstanding) + '</div></div>';
-  html += '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid ' + (overdueCount > 0 ? 'var(--danger)' : 'var(--border)') + ';border-radius:10px;padding:12px;">';
-  html += '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Overdue</div>';
-  html += '<div style="font-size:18px;font-weight:700;color:' + (overdueCount > 0 ? 'var(--danger)' : 'var(--text)') + ';">' + overdueCount + ' &middot; ' + formatRM(overdueTotal) + '</div></div>';
-  html += '<div style="flex:1;min-width:150px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;">';
-  html += '<div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">This Month</div>';
-  html += '<div style="font-size:18px;font-weight:700;color:var(--text);">' + monthCount + ' &middot; ' + formatRM(monthTotal) + '</div></div>';
-  html += '</div>';
-
-  // Invoice cards (headers only — detail is inserted on click via invToggleInvoice)
-  if (!filtered.length) {
-    html += '<div class="empty-state">' + (invoices.length ? 'No invoices match your filters.' : 'No invoices yet. Create one above.') + '</div>';
-  } else {
-    filtered.sort(function(a, b) { return (b.created_at || b.invoice_date || '').localeCompare(a.created_at || a.invoice_date || ''); });
-
-    filtered.forEach(function(inv) {
-      var c = customers.find(function(x) { return x.id === inv.customer_id; });
-      var custName = c ? c.name : '\u2014';
-      var ds = invGetDisplayStatus(inv);
-      var balance = invoiceBalance(inv);
-      var dimStyle = (inv.status === 'cancelled' || inv.status === 'voided') ? 'opacity:0.5;' : '';
-
-      html += '<div id="inv-card-' + esc(inv.id) + '" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;' + dimStyle + '">';
-
-      // Card header
-      html += '<div style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="invToggleInvoice(\'' + esc(inv.id) + '\')">';
-      html += '<div style="flex:1;">';
-      html += '<div style="font-weight:700;font-size:14px;color:var(--text);">' + esc(inv.id) + ' ' + invStatusBadge(ds) + '</div>';
-      html += '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + esc(custName) + ' &middot; ' + fmtDateNice(inv.invoice_date) + ' &middot; Due ' + fmtDateNice(inv.due_date) + '</div>';
-      if (ds === 'overdue') {
-        var overdueDays = Math.floor((new Date() - new Date(inv.due_date + 'T00:00:00')) / 86400000);
-        html += '<div style="font-size:11px;color:var(--danger);margin-top:2px;">Overdue ' + overdueDays + ' days</div>';
-      }
-      html += '</div>';
-      html += '<div style="text-align:right;">';
-      html += '<div style="font-weight:700;color:var(--text);">' + formatRM(parseFloat(inv.grand_total) || 0) + '</div>';
-      if (balance > 0 && inv.status !== 'cancelled') html += '<div style="font-size:11px;color:var(--gold);">Balance: ' + formatRM(balance) + '</div>';
-      html += '</div>';
-      html += '<svg id="inv-chevron-card-' + esc(inv.id) + '" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="width:16px;height:16px;margin-left:8px;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>';
-      html += '</div>';
-
-      html += '</div>'; // end card (no detail yet)
-    });
-  }
-
-  container.innerHTML = html;
-
-  // Re-expand if a card was expanded before re-render (e.g. after filter change)
-  if (invExpandedId) {
-    var card = document.getElementById('inv-card-' + invExpandedId);
-    if (card) invInsertDetail(invExpandedId, card);
-  }
-}
-
 // Build and insert the detail section for one invoice card
-function invInsertDetail(invoiceId, cardEl) {
+function invInsertDetail(invoiceId, rowEl) {
   var inv = invoices.find(function(i) { return i.id === invoiceId; });
   if (!inv) return;
+  var bal = invoiceBalance(inv);
+  var partial = invIsPartial(inv);
+  var paid = parseFloat(inv.amount_paid) || 0;
+  var grand = parseFloat(inv.grand_total) || 0;
 
-  var html = '<div id="inv-detail-' + esc(invoiceId) + '" style="border-top:1px solid var(--border);padding:16px;">';
+  var paymentTermsLabelStr = (function() {
+    var d = parseInt(inv.payment_terms_days, 10);
+    if (isNaN(d) || d === 0) return 'COD';
+    return 'Net ' + d + ' days';
+  })();
 
-  // Items table
-  var invItems = invoiceItems.filter(function(ii) { return ii.invoice_id === inv.id; });
-  if (invItems.length) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">Items</div>';
-    html += '<div class="table-wrap"><table class="data-table" style="margin:0;"><thead><tr><th>#</th><th>Product</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
-    invItems.forEach(function(ii, idx) {
-      html += '<tr><td>' + (idx + 1) + '</td><td>' + esc(ii.product_name || '\u2014') + '</td>';
-      html += '<td style="text-align:right;">' + (ii.quantity || 0) + '</td>';
-      html += '<td style="text-align:right;">' + formatRM(parseFloat(ii.unit_price) || 0) + '</td>';
-      html += '<td style="text-align:right;font-weight:600;">' + formatRM(parseFloat(ii.line_total) || 0) + '</td></tr>';
-    });
-    html += '</tbody></table></div>';
-  }
+  var html = '<div class="inv-detail" id="inv-detail-' + esc(invoiceId) + '">';
 
-  // Linked DOs
-  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === inv.id; });
+  // Top 3-block grid
+  html += '<div class="inv-detail-grid">';
+
+  // Block 1 — Linked DOs
+  html += '<div class="inv-detail-block"><div class="inv-detail-label">Linked DOs</div><div>';
+  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
   if (linkedOrders.length) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Linked DOs</div>';
-    if (inv.status === 'issued' && linkedOrders.length > 1) {
-      linkedOrders.forEach(function(io) {
-        var o = orders.find(function(x) { return x.id === io.order_id; });
-        var doLabel = o ? (o.doc_number || o.id) : io.order_id;
-        var doDate = o ? fmtDateNice(o.order_date) : '';
-        var doTotal = o ? formatRM(parseFloat(o.grand_total) || 0) : '';
-        html += '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);padding:2px 0;">';
-        html += '<span style="flex:1;">' + esc(doLabel) + (doDate ? ' (' + doDate + ')' : '') + (doTotal ? ' &middot; ' + doTotal : '') + '</span>';
-        html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invUnlinkDO(\'' + esc(inv.id) + '\',\'' + esc(io.order_id) + '\')" style="padding:1px 6px;border-color:var(--danger);color:var(--danger);min-width:auto;font-size:13px;line-height:1;" title="Remove this DO from invoice">&times;</button>';
+    linkedOrders.forEach(function(io) {
+      var o = orders.find(function(x) { return x.id === io.order_id; });
+      var label = o ? (o.doc_number || o.id) : io.order_id;
+      var canUnlink = inv.status === 'issued' && linkedOrders.length > 1;
+      var cls = 'inv-do-chip' + (canUnlink ? ' unlink' : '');
+      var click = canUnlink ? 'event.stopPropagation();invUnlinkDO(\'' + esc(invoiceId) + '\',\'' + esc(io.order_id) + '\')' : 'event.stopPropagation()';
+      html += '<button class="' + cls + '" onclick="' + click + '">' + esc(label) + '</button>';
+    });
+  } else {
+    html += '<span class="inv-empty">None</span>';
+  }
+  html += '</div></div>';
+
+  // Block 2 — Payment terms
+  html += '<div class="inv-detail-block"><div class="inv-detail-label">Payment terms</div>';
+  html += '<div class="inv-detail-value">' + esc(paymentTermsLabelStr) + '</div></div>';
+
+  // Block 3 — Outstanding / Settled big number
+  html += '<div class="inv-detail-block">';
+  if (bal === 0) {
+    var lastPay = invoicePayments.filter(function(p) { return p.invoice_id === invoiceId; })
+                                 .sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); })[0];
+    var lastDate = lastPay ? fmtDateDM(lastPay.payment_date) : '';
+    html += '<div class="inv-detail-label">Settled</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--green);">' + formatRM(grand);
+    if (lastDate) html += '<br><span style="font-size:11px;color:var(--text-muted);font-weight:400;">on ' + lastDate + '</span>';
+    html += '</div>';
+  } else if (partial) {
+    html += '<div class="inv-detail-label">Outstanding</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--danger);font-style:italic;">' + formatRM(bal);
+    html += '<br><span style="font-size:11px;color:var(--green);font-style:normal;">paid ' + formatRM(paid) + ' of ' + formatRM(grand) + '</span></div>';
+  } else {
+    html += '<div class="inv-detail-label">Outstanding</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--danger);">' + formatRM(bal) + '</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // end inv-detail-grid
+
+  // Voided invoices: show void reason + auditor instead of payment list
+  if (inv.status === 'voided') {
+    html += '<div class="inv-detail-block" style="margin-bottom:8px;"><div class="inv-detail-label">Voided</div>';
+    html += '<div class="inv-detail-value">' + fmtDateDM(inv.voided_at) + (inv.voided_by ? ' by ' + esc(inv.voided_by) : '') + '</div>';
+    if (inv.void_reason) html += '<div style="font-size:12px;color:#555;margin-top:4px;">Reason: ' + esc(inv.void_reason) + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Linked DOs were freed for re-invoicing.</div>';
+    html += '</div>';
+  } else {
+    // Payments list
+    var pays = invoicePayments.filter(function(p) { return p.invoice_id === invoiceId; });
+    pays.sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); });
+    html += '<div class="inv-detail-block" style="margin-bottom:8px;">';
+    html += '<div class="inv-detail-label">Payments (' + pays.length + ')</div>';
+    if (pays.length) {
+      html += '<div class="inv-payments">';
+      pays.forEach(function(p) {
+        var methodLabel = p.method === 'bank_transfer' ? 'Bank transfer' : p.method === 'cash' ? 'Cash' : p.method === 'cheque' ? 'Cheque' : (p.method || '');
+        html += '<div class="inv-pay-row">';
+        html += '<div class="inv-pay-date">' + fmtDateDM(p.payment_date) + '</div>';
+        html += '<div class="inv-pay-method">' + esc(methodLabel);
+        var sub = '';
+        if (p.reference) sub += 'Ref: ' + esc(p.reference);
+        if (p.slip_url) sub += (sub ? ' · ' : '') + '<a href="' + esc(p.slip_url) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);">slip ↗</a>';
+        if (sub) html += '<small>' + sub + '</small>';
+        html += '</div>';
+        html += '<div class="inv-pay-amount">' + formatRM(parseFloat(p.amount) || 0) + '</div>';
         html += '</div>';
       });
-    } else {
-      html += '<div style="font-size:12px;color:var(--text-muted);">';
-      var doList = linkedOrders.map(function(io) {
-        var o = orders.find(function(x) { return x.id === io.order_id; });
-        return o ? (o.doc_number || o.id) + ' (' + fmtDateNice(o.order_date) + ')' : io.order_id;
-      });
-      html += doList.join(', ');
       html += '</div>';
+    } else {
+      html += '<div class="inv-empty">No payments recorded yet</div>';
+    }
+    html += '</div>';
+
+    // Credit notes (only when present)
+    var cns = creditNotes.filter(function(cn) { return cn.invoice_id === invoiceId; });
+    if (cns.length) {
+      html += '<div class="inv-detail-block" style="margin-bottom:8px;">';
+      html += '<div class="inv-detail-label">Credit notes (' + cns.length + ')</div>';
+      html += '<div class="inv-payments">';
+      cns.forEach(function(cn) {
+        html += '<div class="inv-pay-row">';
+        html += '<div class="inv-pay-date">' + fmtDateDM(cn.credit_date) + '</div>';
+        html += '<div class="inv-pay-method"><a href="#" onclick="event.preventDefault();event.stopPropagation();generateCreditNoteA4(\'' + esc(cn.id) + '\')" style="color:var(--gold);font-weight:600;">' + esc(cn.id) + '</a>';
+        if (cn.reason) html += '<small>' + esc(cn.reason) + '</small>';
+        html += '</div>';
+        html += '<div class="inv-pay-amount" style="color:var(--gold);">' + formatRM(parseFloat(cn.amount) || 0) + '</div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
     }
   }
 
-  // Payment history
-  var invPays = invoicePayments.filter(function(p) { return p.invoice_id === inv.id; });
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Payments</div>';
-  if (invPays.length) {
-    invPays.sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); });
-    invPays.forEach(function(p) {
-      var methodLabel = p.method === 'bank_transfer' ? 'Bank Transfer' : p.method === 'cash' ? 'Cash' : p.method === 'cheque' ? 'Cheque' : (p.method || '');
-      html += '<div style="font-size:12px;color:var(--text-muted);padding:3px 0;">' + fmtDateNice(p.payment_date) + ' &middot; ' + formatRM(parseFloat(p.amount) || 0) + ' &middot; ' + esc(methodLabel) + (p.reference ? ' (' + esc(p.reference) + ')' : '');
-      if (p.slip_url) html += ' &middot; <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--gold);">View Slip</a>';
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="font-size:12px;color:var(--text-muted);">No payments yet</div>';
-  }
-
-  // Credit notes
-  var invCNs = creditNotes.filter(function(cn) { return cn.invoice_id === inv.id; });
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Credit Notes</div>';
-  if (invCNs.length) {
-    invCNs.forEach(function(cn) {
-      html += '<div style="font-size:12px;color:var(--text-muted);padding:3px 0;">';
-      html += '<a href="#" onclick="event.preventDefault();event.stopPropagation();generateCreditNoteA4(\'' + esc(cn.id) + '\')" style="color:var(--gold);font-weight:600;">' + esc(cn.id) + '</a>';
-      html += ' &middot; ' + fmtDateNice(cn.credit_date) + ' &middot; ' + formatRM(parseFloat(cn.amount) || 0) + (cn.reason ? ' &middot; ' + esc(cn.reason) : '');
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="font-size:12px;color:var(--text-muted);">No credit notes</div>';
-  }
-
-  // Action buttons — per status
-  html += '<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">';
-  if (inv.status === 'draft') {
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invEditDraft(\'' + esc(inv.id) + '\')">Edit Draft</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invAddMoreDOs(\'' + esc(inv.id) + '\')">Add DOs</button>';
-    if (currentUser && currentUser.role === 'admin') html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invApproveInvoice(\'' + esc(inv.id) + '\')">Approve</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invCancelInvoice(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Cancel Draft</button>';
+  // Action bar
+  html += '<div class="inv-actions">';
+  if (inv.status === 'issued' && bal > 0) {
+    html += '<button class="btn btn-primary" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(invoiceId) + '\')">+ Record Payment</button>';
   }
   if (inv.status === 'issued') {
-    if (invoiceBalance(inv) > 0) html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(inv.id) + '\')">Record Payment</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(inv.id) + '\')">Credit Note</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    if (inv.payment_status !== 'paid') html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenVoidModal(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Void Invoice</button>';
+    html += '<button class="btn btn-outline" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(invoiceId) + '\')">Credit Note</button>';
   }
-  if (inv.status === 'voided') {
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    if (inv.void_reason) html += '<span style="font-size:11px;color:var(--text-muted);align-self:center;">Voided: ' + esc(inv.void_reason) + '</span>';
+  if (inv.status === 'issued' && inv.payment_status !== 'paid') {
+    html += '<button class="inv-act-danger right" onclick="event.stopPropagation();invOpenVoidModal(\'' + esc(invoiceId) + '\')">Void invoice</button>';
   }
   html += '</div>';
-  html += '</div>';
+  html += '</div>'; // end inv-detail
 
-  cardEl.insertAdjacentHTML('beforeend', html);
-
-  // Rotate chevron
-  var chevron = document.getElementById('inv-chevron-card-' + invoiceId);
-  if (chevron) chevron.style.transform = 'rotate(180deg)';
+  rowEl.insertAdjacentHTML('afterend', html);
 }
 
 function invToggleInvoice(invoiceId) {
   if (invExpandedId === invoiceId) {
-    // Collapse: remove detail div, reset chevron
     var detail = document.getElementById('inv-detail-' + invoiceId);
     if (detail) detail.remove();
-    var chevron = document.getElementById('inv-chevron-card-' + invoiceId);
-    if (chevron) chevron.style.transform = '';
+    var row = document.getElementById('inv-row-' + invoiceId);
+    if (row) {
+      row.classList.remove('expanded');
+      var chev = row.querySelector('.inv-row-chev');
+      if (chev) chev.classList.remove('open');
+    }
     invExpandedId = null;
   } else {
-    // Collapse previous if any
     if (invExpandedId) {
       var prevDetail = document.getElementById('inv-detail-' + invExpandedId);
       if (prevDetail) prevDetail.remove();
-      var prevChevron = document.getElementById('inv-chevron-card-' + invExpandedId);
-      if (prevChevron) prevChevron.style.transform = '';
+      var prevRow = document.getElementById('inv-row-' + invExpandedId);
+      if (prevRow) {
+        prevRow.classList.remove('expanded');
+        var pc = prevRow.querySelector('.inv-row-chev');
+        if (pc) pc.classList.remove('open');
+      }
     }
-    // Expand clicked
     invExpandedId = invoiceId;
-    var card = document.getElementById('inv-card-' + invoiceId);
-    if (card) invInsertDetail(invoiceId, card);
+    var row2 = document.getElementById('inv-row-' + invoiceId);
+    if (row2) {
+      row2.classList.add('expanded');
+      var chev2 = row2.querySelector('.inv-row-chev');
+      if (chev2) chev2.classList.add('open');
+      invInsertDetail(invoiceId, row2);
+    }
   }
 }
 
@@ -6722,7 +7152,7 @@ async function invApproveInvoice(invoiceId) {
       inv.approved_at = now;
       if (result[0] && result[0].updated_at) inv.updated_at = result[0].updated_at;
       notify('Invoice ' + invoiceId + ' approved and issued', 'success');
-      invRenderList();
+      renderInvoicing();
     } catch(e) {
       notify('Failed to approve: ' + e.message, 'error');
     }
@@ -6804,7 +7234,7 @@ async function invPaySave() {
     btnLoading(btn, false, 'Save Payment');
     closeModal('inv-pay-modal');
     notify('Payment ' + paymentId + ' recorded (' + formatRM(amount) + ')', 'success');
-    invRenderList();
+    renderInvoicing();
   } catch(e) {
     btnLoading(btn, false, 'Save Payment');
     notify('Failed to save payment: ' + e.message, 'error');
@@ -6962,7 +7392,7 @@ async function cnSave() {
     btnLoading(btn, false, 'Save Credit Note');
     closeModal('cn-modal');
     notify('Credit note ' + cnId + ' created (' + formatRM(amount) + ')', 'success');
-    invRenderList();
+    renderInvoicing();
   } catch(e) {
     btnLoading(btn, false, 'Save Credit Note');
     notify('Failed to save credit note: ' + e.message, 'error');
@@ -7785,7 +8215,7 @@ async function invUnlinkDO(invoiceId, orderId) {
         await recalcInvoicePaymentStatus(invoiceId);
 
         notify('DO ' + doLabel + ' removed from ' + invoiceId + (diff > 0 ? '. CN ' + cnId + ' created for ' + formatRM(diff) : ''), 'success');
-        invRenderList();
+        renderInvoicing();
       } catch(e) {
         notify('Failed to unlink DO: ' + e.message, 'error');
       }
