@@ -4083,7 +4083,7 @@ function renderCustomerCards() {
     html += '<td>' + custCell + '</td>';
     var phoneTd = '<td style="white-space:nowrap;">' + esc(fmtPhone(c.phone));
     if (c.secondary_phone) {
-      phoneTd += '<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">' + esc(fmtPhone(c.secondary_phone)) + '</div>';
+      phoneTd += '<div>' + esc(fmtPhone(c.secondary_phone)) + '</div>';
     }
     phoneTd += '</td>';
     html += phoneTd;
