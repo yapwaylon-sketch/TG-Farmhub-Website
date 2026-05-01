@@ -6554,11 +6554,56 @@ function invPrintSummary() {
 }
 
 // ── Invoice List ──
+var invStatusFilter = 'all';
+var invPeriodPreset = 'last-90';
+var invCustomDateFrom = '';
+var invCustomDateTo = '';
+var invSearchTerm = '';
+var invShowVoided = false;
 var invFilterCustomer = '';
+var invPage = 1;
+var invPageSize = 25;
+var invExpandedId = null;
+
+// Legacy aliases — invRenderList still references these. Removed in Task 12.
 var invFilterStatus = '';
 var invFilterDateFrom = '';
 var invFilterDateTo = '';
-var invExpandedId = null;
+
+function invComputeView() {
+  var range = invPeriodRange(invPeriodPreset);
+  var from = (invPeriodPreset === 'custom') ? invCustomDateFrom : range[0];
+  var to   = (invPeriodPreset === 'custom') ? invCustomDateTo   : range[1];
+
+  var list = invoices.filter(function(inv) {
+    if (inv.status === 'draft') return false;
+    if (!invShowVoided && (inv.status === 'voided' || inv.status === 'cancelled')) return false;
+    if (from && (inv.invoice_date || '') < from) return false;
+    if (to   && (inv.invoice_date || '') > to)   return false;
+    if (invFilterCustomer && inv.customer_id !== invFilterCustomer) return false;
+    if (!invSearchMatches(inv, invSearchTerm)) return false;
+    var ds = invGetDisplayStatus(inv);
+    if (invStatusFilter === 'outstanding') {
+      if (ds !== 'issued' && ds !== 'partial' && ds !== 'overdue') return false;
+    } else if (invStatusFilter === 'overdue') {
+      if (ds !== 'overdue') return false;
+    } else if (invStatusFilter === 'paid') {
+      if (ds !== 'paid') return false;
+    }
+    return true;
+  });
+
+  list.sort(function(a, b) {
+    return (b.created_at || b.invoice_date || '').localeCompare(a.created_at || a.invoice_date || '');
+  });
+
+  var total = list.length;
+  var pages = Math.max(1, Math.ceil(total / invPageSize));
+  if (invPage > pages) invPage = pages;
+  var slice = list.slice((invPage - 1) * invPageSize, invPage * invPageSize);
+
+  return { slice: slice, total: total, pages: pages, fullList: list };
+}
 
 function invGetDisplayStatus(inv) {
   if (inv.status === 'cancelled') return 'cancelled';
