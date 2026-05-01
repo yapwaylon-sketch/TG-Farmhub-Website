@@ -4627,13 +4627,16 @@ function scRenderDetail() {
   html += '<div class="so-detail-section-title">Customer Details</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Name</div><div style="font-weight:700;color:var(--white);font-size:15px;">' + esc(c.name) + '</div></div>';
-  // Phone cell — primary on top, secondary right below in smaller muted text
-  // (was previously rendered far away in the grid via a separate Secondary
-  // Phone cell, which made it look missing).
+  // Phone cell — primary on top, secondary directly below with a small
+  // "2ND" label so it's unmistakably present (was previously rendered as
+  // a separate auto-fill grid cell that landed far from primary).
   var phoneCell = '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Phone</div>';
   phoneCell += '<div style="color:var(--text);">' + esc(fmtPhone(c.phone)) + '</div>';
   if (c.secondary_phone) {
-    phoneCell += '<div style="color:var(--text-muted);font-size:12px;margin-top:1px;">' + esc(fmtPhone(c.secondary_phone)) + ' <span style="font-size:10px;opacity:0.7;">(2nd)</span></div>';
+    phoneCell += '<div style="color:var(--text);font-size:13px;margin-top:3px;display:flex;align-items:center;gap:6px;">';
+    phoneCell += '<span style="font-size:9px;font-weight:800;letter-spacing:1px;color:var(--gold);background:rgba(212,175,55,0.15);padding:1px 5px;border-radius:3px;">2ND</span>';
+    phoneCell += esc(fmtPhone(c.secondary_phone));
+    phoneCell += '</div>';
   }
   phoneCell += '</div>';
   html += phoneCell;
