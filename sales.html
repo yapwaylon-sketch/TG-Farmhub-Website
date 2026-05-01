@@ -4081,7 +4081,12 @@ function renderCustomerCards() {
     html += '<tr' + dimStyle + '>';
     html += '<td style="color:var(--text-muted);font-size:12px;">' + (idx + 1) + '</td>';
     html += '<td>' + custCell + '</td>';
-    html += '<td style="white-space:nowrap;">' + esc(fmtPhone(c.phone)) + '</td>';
+    var phoneTd = '<td style="white-space:nowrap;">' + esc(fmtPhone(c.phone));
+    if (c.secondary_phone) {
+      phoneTd += '<div style="font-size:11px;color:var(--text-muted);margin-top:1px;">' + esc(fmtPhone(c.secondary_phone)) + '</div>';
+    }
+    phoneTd += '</td>';
+    html += phoneTd;
     var typeKey = c.type || 'walkin';
     var termsKey = (parseInt(c.payment_terms_days, 10) || 0) > 0 ? 'net' : 'cod';
     html += '<td><span class="sc-tag sc-tag-' + typeKey + '">' + scTypeLabel(c.type) + '</span></td>';
