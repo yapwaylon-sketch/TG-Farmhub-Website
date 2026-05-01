@@ -6998,108 +6998,136 @@ function invRenderList() {
 }
 
 // Build and insert the detail section for one invoice card
-function invInsertDetail(invoiceId, cardEl) {
+function invInsertDetail(invoiceId, rowEl) {
   var inv = invoices.find(function(i) { return i.id === invoiceId; });
   if (!inv) return;
+  var bal = invoiceBalance(inv);
+  var partial = invIsPartial(inv);
+  var paid = parseFloat(inv.amount_paid) || 0;
+  var grand = parseFloat(inv.grand_total) || 0;
 
-  var html = '<div id="inv-detail-' + esc(invoiceId) + '" style="border-top:1px solid var(--border);padding:16px;">';
+  var paymentTermsLabelStr = (function() {
+    var d = parseInt(inv.payment_terms_days, 10);
+    if (isNaN(d) || d === 0) return 'COD';
+    return 'Net ' + d + ' days';
+  })();
 
-  // Items table
-  var invItems = invoiceItems.filter(function(ii) { return ii.invoice_id === inv.id; });
-  if (invItems.length) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">Items</div>';
-    html += '<div class="table-wrap"><table class="data-table" style="margin:0;"><thead><tr><th>#</th><th>Product</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
-    invItems.forEach(function(ii, idx) {
-      html += '<tr><td>' + (idx + 1) + '</td><td>' + esc(ii.product_name || '\u2014') + '</td>';
-      html += '<td style="text-align:right;">' + (ii.quantity || 0) + '</td>';
-      html += '<td style="text-align:right;">' + formatRM(parseFloat(ii.unit_price) || 0) + '</td>';
-      html += '<td style="text-align:right;font-weight:600;">' + formatRM(parseFloat(ii.line_total) || 0) + '</td></tr>';
-    });
-    html += '</tbody></table></div>';
-  }
+  var html = '<div class="inv-detail" id="inv-detail-' + esc(invoiceId) + '">';
 
-  // Linked DOs
-  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === inv.id; });
+  // Top 3-block grid
+  html += '<div class="inv-detail-grid">';
+
+  // Block 1 — Linked DOs
+  html += '<div class="inv-detail-block"><div class="inv-detail-label">Linked DOs</div><div>';
+  var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
   if (linkedOrders.length) {
-    html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Linked DOs</div>';
-    if (inv.status === 'issued' && linkedOrders.length > 1) {
-      linkedOrders.forEach(function(io) {
-        var o = orders.find(function(x) { return x.id === io.order_id; });
-        var doLabel = o ? (o.doc_number || o.id) : io.order_id;
-        var doDate = o ? fmtDateNice(o.order_date) : '';
-        var doTotal = o ? formatRM(parseFloat(o.grand_total) || 0) : '';
-        html += '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);padding:2px 0;">';
-        html += '<span style="flex:1;">' + esc(doLabel) + (doDate ? ' (' + doDate + ')' : '') + (doTotal ? ' &middot; ' + doTotal : '') + '</span>';
-        html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invUnlinkDO(\'' + esc(inv.id) + '\',\'' + esc(io.order_id) + '\')" style="padding:1px 6px;border-color:var(--danger);color:var(--danger);min-width:auto;font-size:13px;line-height:1;" title="Remove this DO from invoice">&times;</button>';
+    linkedOrders.forEach(function(io) {
+      var o = orders.find(function(x) { return x.id === io.order_id; });
+      var label = o ? (o.doc_number || o.id) : io.order_id;
+      var canUnlink = inv.status === 'issued' && linkedOrders.length > 1;
+      var cls = 'inv-do-chip' + (canUnlink ? ' unlink' : '');
+      var click = canUnlink ? 'event.stopPropagation();invUnlinkDO(\'' + esc(invoiceId) + '\',\'' + esc(io.order_id) + '\')' : 'event.stopPropagation()';
+      html += '<button class="' + cls + '" onclick="' + click + '">' + esc(label) + '</button>';
+    });
+  } else {
+    html += '<span class="inv-empty">None</span>';
+  }
+  html += '</div></div>';
+
+  // Block 2 — Payment terms
+  html += '<div class="inv-detail-block"><div class="inv-detail-label">Payment terms</div>';
+  html += '<div class="inv-detail-value">' + esc(paymentTermsLabelStr) + '</div></div>';
+
+  // Block 3 — Outstanding / Settled big number
+  html += '<div class="inv-detail-block">';
+  if (bal === 0) {
+    var lastPay = invoicePayments.filter(function(p) { return p.invoice_id === invoiceId; })
+                                 .sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); })[0];
+    var lastDate = lastPay ? fmtDateDM(lastPay.payment_date) : '';
+    html += '<div class="inv-detail-label">Settled</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--green);">' + formatRM(grand);
+    if (lastDate) html += '<br><span style="font-size:11px;color:var(--text-muted);font-weight:400;">on ' + lastDate + '</span>';
+    html += '</div>';
+  } else if (partial) {
+    html += '<div class="inv-detail-label">Outstanding</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--danger);font-style:italic;">' + formatRM(bal);
+    html += '<br><span style="font-size:11px;color:var(--green);font-style:normal;">paid ' + formatRM(paid) + ' of ' + formatRM(grand) + '</span></div>';
+  } else {
+    html += '<div class="inv-detail-label">Outstanding</div>';
+    html += '<div class="inv-detail-value big" style="color:var(--danger);">' + formatRM(bal) + '</div>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // end inv-detail-grid
+
+  // Voided invoices: show void reason + auditor instead of payment list
+  if (inv.status === 'voided') {
+    html += '<div class="inv-detail-block" style="margin-bottom:8px;"><div class="inv-detail-label">Voided</div>';
+    html += '<div class="inv-detail-value">' + fmtDateDM(inv.voided_at) + (inv.voided_by ? ' by ' + esc(inv.voided_by) : '') + '</div>';
+    if (inv.void_reason) html += '<div style="font-size:12px;color:#555;margin-top:4px;">Reason: ' + esc(inv.void_reason) + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Linked DOs were freed for re-invoicing.</div>';
+    html += '</div>';
+  } else {
+    // Payments list
+    var pays = invoicePayments.filter(function(p) { return p.invoice_id === invoiceId; });
+    pays.sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); });
+    html += '<div class="inv-detail-block" style="margin-bottom:8px;">';
+    html += '<div class="inv-detail-label">Payments (' + pays.length + ')</div>';
+    if (pays.length) {
+      html += '<div class="inv-payments">';
+      pays.forEach(function(p) {
+        var methodLabel = p.method === 'bank_transfer' ? 'Bank transfer' : p.method === 'cash' ? 'Cash' : p.method === 'cheque' ? 'Cheque' : (p.method || '');
+        html += '<div class="inv-pay-row">';
+        html += '<div class="inv-pay-date">' + fmtDateDM(p.payment_date) + '</div>';
+        html += '<div class="inv-pay-method">' + esc(methodLabel);
+        var sub = '';
+        if (p.reference) sub += 'Ref: ' + esc(p.reference);
+        if (p.slip_url) sub += (sub ? ' · ' : '') + '<a href="' + esc(p.slip_url) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);">slip ↗</a>';
+        if (sub) html += '<small>' + sub + '</small>';
+        html += '</div>';
+        html += '<div class="inv-pay-amount">' + formatRM(parseFloat(p.amount) || 0) + '</div>';
         html += '</div>';
       });
-    } else {
-      html += '<div style="font-size:12px;color:var(--text-muted);">';
-      var doList = linkedOrders.map(function(io) {
-        var o = orders.find(function(x) { return x.id === io.order_id; });
-        return o ? (o.doc_number || o.id) + ' (' + fmtDateNice(o.order_date) + ')' : io.order_id;
-      });
-      html += doList.join(', ');
       html += '</div>';
+    } else {
+      html += '<div class="inv-empty">No payments recorded yet</div>';
+    }
+    html += '</div>';
+
+    // Credit notes (only when present)
+    var cns = creditNotes.filter(function(cn) { return cn.invoice_id === invoiceId; });
+    if (cns.length) {
+      html += '<div class="inv-detail-block" style="margin-bottom:8px;">';
+      html += '<div class="inv-detail-label">Credit notes (' + cns.length + ')</div>';
+      html += '<div class="inv-payments">';
+      cns.forEach(function(cn) {
+        html += '<div class="inv-pay-row">';
+        html += '<div class="inv-pay-date">' + fmtDateDM(cn.credit_date) + '</div>';
+        html += '<div class="inv-pay-method"><a href="#" onclick="event.preventDefault();event.stopPropagation();generateCreditNoteA4(\'' + esc(cn.id) + '\')" style="color:var(--gold);font-weight:600;">' + esc(cn.id) + '</a>';
+        if (cn.reason) html += '<small>' + esc(cn.reason) + '</small>';
+        html += '</div>';
+        html += '<div class="inv-pay-amount" style="color:var(--gold);">' + formatRM(parseFloat(cn.amount) || 0) + '</div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
     }
   }
 
-  // Payment history
-  var invPays = invoicePayments.filter(function(p) { return p.invoice_id === inv.id; });
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Payments</div>';
-  if (invPays.length) {
-    invPays.sort(function(a, b) { return (b.payment_date || '').localeCompare(a.payment_date || ''); });
-    invPays.forEach(function(p) {
-      var methodLabel = p.method === 'bank_transfer' ? 'Bank Transfer' : p.method === 'cash' ? 'Cash' : p.method === 'cheque' ? 'Cheque' : (p.method || '');
-      html += '<div style="font-size:12px;color:var(--text-muted);padding:3px 0;">' + fmtDateNice(p.payment_date) + ' &middot; ' + formatRM(parseFloat(p.amount) || 0) + ' &middot; ' + esc(methodLabel) + (p.reference ? ' (' + esc(p.reference) + ')' : '');
-      if (p.slip_url) html += ' &middot; <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--gold);">View Slip</a>';
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="font-size:12px;color:var(--text-muted);">No payments yet</div>';
-  }
-
-  // Credit notes
-  var invCNs = creditNotes.filter(function(cn) { return cn.invoice_id === inv.id; });
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-top:12px;margin-bottom:4px;">Credit Notes</div>';
-  if (invCNs.length) {
-    invCNs.forEach(function(cn) {
-      html += '<div style="font-size:12px;color:var(--text-muted);padding:3px 0;">';
-      html += '<a href="#" onclick="event.preventDefault();event.stopPropagation();generateCreditNoteA4(\'' + esc(cn.id) + '\')" style="color:var(--gold);font-weight:600;">' + esc(cn.id) + '</a>';
-      html += ' &middot; ' + fmtDateNice(cn.credit_date) + ' &middot; ' + formatRM(parseFloat(cn.amount) || 0) + (cn.reason ? ' &middot; ' + esc(cn.reason) : '');
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="font-size:12px;color:var(--text-muted);">No credit notes</div>';
-  }
-
-  // Action buttons — per status
-  html += '<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">';
-  if (inv.status === 'draft') {
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invEditDraft(\'' + esc(inv.id) + '\')">Edit Draft</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invAddMoreDOs(\'' + esc(inv.id) + '\')">Add DOs</button>';
-    if (currentUser && currentUser.role === 'admin') html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invApproveInvoice(\'' + esc(inv.id) + '\')">Approve</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invCancelInvoice(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Cancel Draft</button>';
+  // Action bar
+  html += '<div class="inv-actions">';
+  if (inv.status === 'issued' && bal > 0) {
+    html += '<button class="btn btn-primary" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(invoiceId) + '\')">+ Record Payment</button>';
   }
   if (inv.status === 'issued') {
-    if (invoiceBalance(inv) > 0) html += '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();invOpenPaymentModal(\'' + esc(inv.id) + '\')">Record Payment</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(inv.id) + '\')">Credit Note</button>';
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    if (inv.payment_status !== 'paid') html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();invOpenVoidModal(\'' + esc(inv.id) + '\')" style="border-color:var(--danger);color:var(--danger);">Void Invoice</button>';
+    html += '<button class="btn btn-outline" onclick="event.stopPropagation();invOpenCNModal(\'' + esc(invoiceId) + '\')">Credit Note</button>';
   }
-  if (inv.status === 'voided') {
-    html += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')" style="border-color:var(--gold);color:var(--gold);">Print</button>';
-    if (inv.void_reason) html += '<span style="font-size:11px;color:var(--text-muted);align-self:center;">Voided: ' + esc(inv.void_reason) + '</span>';
+  if (inv.status === 'issued' && inv.payment_status !== 'paid') {
+    html += '<button class="inv-act-danger right" onclick="event.stopPropagation();invOpenVoidModal(\'' + esc(invoiceId) + '\')">Void invoice</button>';
   }
   html += '</div>';
-  html += '</div>';
+  html += '</div>'; // end inv-detail
 
-  cardEl.insertAdjacentHTML('beforeend', html);
-
-  // Rotate chevron
-  var chevron = document.getElementById('inv-chevron-card-' + invoiceId);
-  if (chevron) chevron.style.transform = 'rotate(180deg)';
+  rowEl.insertAdjacentHTML('afterend', html);
 }
 
 function invToggleInvoice(invoiceId) {
