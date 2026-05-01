@@ -5608,7 +5608,7 @@ function renderPaymentsInvoice() {
         var invAgeColor = invoiceAgingColor(inv);
 
         html += '<tr>';
-        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();switchTab(\'invoicing\')" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
+        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();invSubtab=\'invoices\';invSearchTerm=\'' + esc(inv.id) + '\';switchTab(\'invoicing\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
         html += '<td>' + fmtDateShort(inv.invoice_date) + '</td>';
         html += '<td>' + fmtDateShort(inv.due_date) + '</td>';
         html += '<td><span style="color:' + invAgeColor + ';font-weight:600;">' + ageLabel + '</span></td>';
