@@ -82,6 +82,9 @@
 .sc-table .sc-kebab:hover { background: var(--bg-hover); border-color: var(--gold); }
 
 #sc-kebab-menu {
+  position: fixed;
+  display: none;
+  z-index: 1100;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
