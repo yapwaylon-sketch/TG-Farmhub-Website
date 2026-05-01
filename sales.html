@@ -4138,12 +4138,16 @@ var scPhone2Iti = null;
 function scInitPhoneInputs() {
   if (scPhoneIti) return;
   if (typeof window.intlTelInput !== 'function') return; // CDN not loaded
+  // nationalMode: true lets users type their local number with the
+  // leading zero ("012-3456789"), which the library parses correctly
+  // via the selected country's dial code. Do NOT enable separateDialCode
+  // here — it forces nationalMode off and the leading zero then makes
+  // the resulting E.164 too long, failing validation.
   var opts = {
     initialCountry: 'my',
     preferredCountries: ['my', 'sg', 'bn', 'id', 'th'],
     nationalMode: true,
     autoPlaceholder: 'aggressive',
-    separateDialCode: true,
     formatAsYouType: true
   };
   scPhoneIti = window.intlTelInput(document.getElementById('sc-phone'), opts);

@@ -9,8 +9,6 @@
    ============================================================ */
 .form-field .iti { width: 100%; display: block; }
 .iti__country-list { z-index: 1100 !important; max-height: 240px; }
-.iti--separate-dial-code .iti__selected-flag { background: rgba(0,0,0,0.03); }
-.iti--separate-dial-code .iti__selected-dial-code { color: var(--text); font-weight: 600; }
 
 /* ============================================================
    CUSTOMERS TABLE — compact density + grouped OUTSTANDING header
