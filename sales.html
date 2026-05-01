@@ -8,6 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/css/intlTelInput.min.css">
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInput.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/utils.js"></script>
 <link rel="stylesheet" href="shared.css">
 <link rel="stylesheet" href="sales.css">
 <script src="shared.js"></script>
@@ -2591,7 +2594,7 @@ function soRenderDetail() {
       html += '</div>';
     }
   }
-  html += '<div class="so-detail-field"><div class="so-detail-label">Phone</div><div class="so-detail-value">' + esc(cust ? (cust.phone || '\u2014') : '\u2014') + '</div></div>';
+  html += '<div class="so-detail-field"><div class="so-detail-label">Phone</div><div class="so-detail-value">' + esc(fmtPhone(cust ? cust.phone : null)) + '</div></div>';
   if (cust && cust.address) {
     html += '<div class="so-detail-field" style="grid-column:1/-1;"><div class="so-detail-label">Address</div><div class="so-detail-value">' + esc(cust.address) + '</div></div>';
   }
@@ -4011,7 +4014,12 @@ function renderCustomerCards() {
     if (scSearchTerm) {
       var term = scSearchTerm.toLowerCase();
       var nameMatch = (c.name || '').toLowerCase().indexOf(term) >= 0;
-      var phoneMatch = (c.phone || '').toLowerCase().indexOf(term) >= 0;
+      // Phone search is digit-substring on canonical, with leading zeros
+      // stripped from both sides so legacy "012-..." and E.164 "+60 12-..."
+      // both match a typed "12345".
+      var termDigits = phoneDigitsOnly(term).replace(/^0+/, '');
+      var phoneDigits = phoneDigitsOnly(c.phone).replace(/^0+/, '');
+      var phoneMatch = termDigits && phoneDigits.indexOf(termDigits) >= 0;
       if (!nameMatch && !phoneMatch) return false;
     }
     return true;
@@ -4063,7 +4071,7 @@ function renderCustomerCards() {
     html += '<tr' + dimStyle + '>';
     html += '<td style="color:var(--text-muted);font-size:12px;">' + (idx + 1) + '</td>';
     html += '<td>' + custCell + '</td>';
-    html += '<td style="white-space:nowrap;">' + esc(c.phone || '\u2014') + '</td>';
+    html += '<td style="white-space:nowrap;">' + esc(fmtPhone(c.phone)) + '</td>';
     var typeKey = c.type || 'walkin';
     var termsKey = (parseInt(c.payment_terms_days, 10) || 0) > 0 ? 'net' : 'cod';
     html += '<td><span class="sc-tag sc-tag-' + typeKey + '">' + scTypeLabel(c.type) + '</span></td>';
@@ -4122,6 +4130,36 @@ function paymentTermsBadgeClass(days) {
   return (parseInt(days, 10) || 0) > 0 ? 'do' : 'cs';
 }
 
+// intl-tel-input instances for the customer modal — lazy-initialized
+// the first time the modal is opened. Both fields default to Malaysia
+// with neighbour countries pinned at the top of the dropdown.
+var scPhoneIti = null;
+var scPhone2Iti = null;
+function scInitPhoneInputs() {
+  if (scPhoneIti) return;
+  if (typeof window.intlTelInput !== 'function') return; // CDN not loaded
+  var opts = {
+    initialCountry: 'my',
+    preferredCountries: ['my', 'sg', 'bn', 'id', 'th'],
+    nationalMode: true,
+    autoPlaceholder: 'aggressive',
+    separateDialCode: true,
+    formatAsYouType: true
+  };
+  scPhoneIti = window.intlTelInput(document.getElementById('sc-phone'), opts);
+  scPhone2Iti = window.intlTelInput(document.getElementById('sc-secondary-phone'), opts);
+}
+
+// Set a phone value into an iti instance, tolerating legacy local formats
+// like "012-3456789" by falling back to the raw input when setNumber fails.
+function scSetItiNumber(iti, value) {
+  if (!iti) return;
+  try { iti.setNumber(value || ''); } catch (e) {
+    var input = iti.telInput || document.getElementById('sc-phone');
+    if (input) input.value = value || '';
+  }
+}
+
 function scOpenModal(editId) {
   var modal = document.getElementById('sc-modal');
   var title = document.getElementById('sc-modal-title');
@@ -4129,12 +4167,14 @@ function scOpenModal(editId) {
   document.getElementById('sc-edit-id').value = editId || '';
   document.getElementById('sc-dup-warning').style.display = 'none';
 
+  scInitPhoneInputs();
+
   if (editId) {
     title.textContent = 'Edit Customer';
     saveBtn.textContent = 'Save Changes';
     var c = customers.find(function(x) { return x.id === editId; });
     if (c) {
-      document.getElementById('sc-phone').value = c.phone || '';
+      scSetItiNumber(scPhoneIti, c.phone);
       document.getElementById('sc-name').value = c.name || '';
       document.getElementById('sc-contact-person').value = c.contact_person || '';
       document.getElementById('sc-address').value = c.address || '';
@@ -4147,14 +4187,14 @@ function scOpenModal(editId) {
       document.getElementById('sc-notes').value = c.notes || '';
       document.getElementById('sc-registration-name').value = c.registration_name || '';
       document.getElementById('sc-email').value = c.email || '';
-      document.getElementById('sc-secondary-phone').value = c.secondary_phone || '';
+      scSetItiNumber(scPhone2Iti, c.secondary_phone);
       document.getElementById('sc-credit-limit').value = c.credit_limit || '';
       document.getElementById('sc-currency').value = c.currency || 'MYR';
     }
   } else {
     title.textContent = 'Add Customer';
     saveBtn.textContent = 'Add Customer';
-    document.getElementById('sc-phone').value = '';
+    scSetItiNumber(scPhoneIti, '');
     document.getElementById('sc-name').value = '';
     document.getElementById('sc-contact-person').value = '';
     document.getElementById('sc-address').value = '';
@@ -4167,7 +4207,7 @@ function scOpenModal(editId) {
     document.getElementById('sc-notes').value = '';
     document.getElementById('sc-registration-name').value = '';
     document.getElementById('sc-email').value = '';
-    document.getElementById('sc-secondary-phone').value = '';
+    scSetItiNumber(scPhone2Iti, '');
     document.getElementById('sc-credit-limit').value = '';
     document.getElementById('sc-currency').value = 'MYR';
   }
@@ -4177,11 +4217,12 @@ function scOpenModal(editId) {
 }
 
 function scCheckPhone() {
-  var phone = document.getElementById('sc-phone').value.trim();
+  var phone = scPhoneIti && scPhoneIti.getNumber ? scPhoneIti.getNumber() : document.getElementById('sc-phone').value.trim();
   var editId = document.getElementById('sc-edit-id').value;
   var warning = document.getElementById('sc-dup-warning');
   if (!phone) { warning.style.display = 'none'; return; }
-  var match = customers.find(function(c) { return c.phone === phone && c.id !== editId; });
+  var key = phoneCanonical(phone);
+  var match = customers.find(function(c) { return c.id !== editId && phoneCanonical(c.phone) === key; });
   if (match) {
     warning.style.display = 'block';
     warning.textContent = 'Customer "' + match.name + '" already has this phone number.';
@@ -4194,7 +4235,18 @@ async function scSaveCustomer() {
   if (!salesCan('manageCustomers')) { notify('No permission', 'warning'); return; }
   var editId = document.getElementById('sc-edit-id').value;
   var name = document.getElementById('sc-name').value.trim();
-  var phone = document.getElementById('sc-phone').value.trim();
+  // Phones flow through intl-tel-input → E.164 ("+60123456789"). Validate
+  // format before save; let null mean "not provided".
+  var phone = '';
+  if (scPhoneIti) {
+    var rawPhone = (scPhoneIti.telInput || document.getElementById('sc-phone')).value.trim();
+    if (rawPhone) {
+      if (!scPhoneIti.isValidNumber()) { notify('Phone number is not valid for the selected country', 'warning'); return; }
+      phone = scPhoneIti.getNumber();
+    }
+  } else {
+    phone = document.getElementById('sc-phone').value.trim();
+  }
   var contactPerson = document.getElementById('sc-contact-person').value.trim();
   var address = document.getElementById('sc-address').value.trim();
   var type = document.getElementById('sc-type').value;
@@ -4206,15 +4258,26 @@ async function scSaveCustomer() {
   var notes = document.getElementById('sc-notes').value.trim();
   var registrationName = document.getElementById('sc-registration-name').value.trim();
   var email = document.getElementById('sc-email').value.trim();
-  var secondaryPhone = document.getElementById('sc-secondary-phone').value.trim();
+  var secondaryPhone = '';
+  if (scPhone2Iti) {
+    var rawSec = (scPhone2Iti.telInput || document.getElementById('sc-secondary-phone')).value.trim();
+    if (rawSec) {
+      if (!scPhone2Iti.isValidNumber()) { notify('Secondary phone is not valid for the selected country', 'warning'); return; }
+      secondaryPhone = scPhone2Iti.getNumber();
+    }
+  } else {
+    secondaryPhone = document.getElementById('sc-secondary-phone').value.trim();
+  }
   var creditLimit = document.getElementById('sc-credit-limit').value;
   var currency = document.getElementById('sc-currency').value;
 
   if (!name) { notify('Customer name is required', 'warning'); return; }
 
-  // Check phone uniqueness (skip if editing same customer)
+  // Check phone uniqueness (skip if editing same customer). Compare on
+  // digits-only so legacy local formats and E.164 collide as expected.
   if (phone) {
-    var dup = customers.find(function(c) { return c.phone === phone && c.id !== editId; });
+    var key = phoneCanonical(phone);
+    var dup = customers.find(function(c) { return c.id !== editId && phoneCanonical(c.phone) === key; });
     if (dup) { notify('Phone number already belongs to "' + dup.name + '"', 'warning'); return; }
   }
 
@@ -4485,7 +4548,7 @@ function scRenderDetail() {
   html += '<div class="so-detail-section-title">Customer Details</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Name</div><div style="font-weight:700;color:var(--white);font-size:15px;">' + esc(c.name) + '</div></div>';
-  html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Phone</div><div style="color:var(--text);">' + esc(c.phone || '\u2014') + '</div></div>';
+  html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Phone</div><div style="color:var(--text);">' + esc(fmtPhone(c.phone)) + '</div></div>';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Type</div><div><span class="badge badge-outline">' + scTypeLabel(c.type) + '</span></div></div>';
   html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Payment Terms</div><div><span class="badge badge-' + paymentTermsBadgeClass(c.payment_terms_days) + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></div></div>';
   if (c.contact_person) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Contact Person</div><div style="color:var(--text);">' + esc(c.contact_person) + '</div></div>';
@@ -4500,7 +4563,7 @@ function scRenderDetail() {
   if (c.notes) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Notes</div><div style="color:var(--text);">' + esc(c.notes) + '</div></div>';
   if (c.registration_name) html += '<div style="grid-column:1/-1;"><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Registration Name</div><div style="color:var(--text);">' + esc(c.registration_name) + '</div></div>';
   if (c.email) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Email</div><div style="color:var(--text);">' + esc(c.email) + '</div></div>';
-  if (c.secondary_phone) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Secondary Phone</div><div style="color:var(--text);">' + esc(c.secondary_phone) + '</div></div>';
+  if (c.secondary_phone) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Secondary Phone</div><div style="color:var(--text);">' + esc(fmtPhone(c.secondary_phone)) + '</div></div>';
   if (c.credit_limit) html += '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Credit Limit</div><div style="color:var(--text);">RM ' + parseFloat(c.credit_limit).toFixed(2) + '</div></div>';
   html += '</div>';
   html += '<div style="margin-top:10px;display:flex;gap:8px;">';
@@ -6951,7 +7014,7 @@ function generateInvoiceA4(invoiceId) {
   if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
   if (cust && cust.ic_number) html += '<div style="font-size:11px;color:#333;">IC: ' + esc(cust.ic_number) + '</div>';
   if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
-  if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(cust.phone) + '</div>';
+  if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(fmtPhone(cust.phone)) + '</div>';
   html += '</div>';
 
   // Right: Invoice Details
@@ -8676,10 +8739,13 @@ function soWizGetToggleVal(containerId) {
 function soWizSearchCust() {
   var q = document.getElementById('so-wiz-cust-search').value.toLowerCase().trim();
   var results = document.getElementById('so-wiz-cust-results');
+  var qDigits = phoneDigitsOnly(q).replace(/^0+/, '');
   var matches = customers.filter(function(c) {
     if (c.is_active === false) return false;
     if (!q) return true;
-    return c.name.toLowerCase().indexOf(q) >= 0 || (c.phone && c.phone.indexOf(q) >= 0);
+    if (c.name.toLowerCase().indexOf(q) >= 0) return true;
+    if (qDigits && phoneDigitsOnly(c.phone).replace(/^0+/, '').indexOf(qDigits) >= 0) return true;
+    return false;
   });
   if (!matches.length) {
     results.innerHTML = '<div class="so-wiz-cust-item" style="color:var(--text-muted);">No customers found</div>';
@@ -8690,7 +8756,7 @@ function soWizSearchCust() {
   matches.slice(0, 10).forEach(function(c) {
     html += '<div class="so-wiz-cust-item" onclick="soWizSelectCust(\'' + esc(c.id) + '\')">';
     html += '<span class="so-wiz-cust-name">' + esc(c.name) + '</span>';
-    if (c.phone) html += '<span class="so-wiz-cust-phone">' + esc(c.phone) + '</span>';
+    if (c.phone) html += '<span class="so-wiz-cust-phone">' + esc(fmtPhone(c.phone)) + '</span>';
     html += '</div>';
   });
   results.innerHTML = html;
@@ -8730,7 +8796,7 @@ function soWizUpdateBranches(customerId) {
 function soWizShowCustBadge(cust) {
   var badge = document.getElementById('so-wiz-cust-badge');
   badge.innerHTML = '<div><div style="font-weight:700;color:var(--text);font-size:14px;">' + esc(cust.name) + '</div>' +
-    (cust.phone ? '<div style="font-size:11px;color:var(--text-muted);">' + esc(cust.phone) + ' \u00b7 ' + (cust.payment_terms === 'cash' || !cust.payment_terms_days ? 'Cash' : 'Credit') + '</div>' : '') +
+    (cust.phone ? '<div style="font-size:11px;color:var(--text-muted);">' + esc(fmtPhone(cust.phone)) + ' \u00b7 ' + (cust.payment_terms === 'cash' || !cust.payment_terms_days ? 'Cash' : 'Credit') + '</div>' : '') +
     '</div><div style="color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;" onclick="soWizClearCust()">Change</div>';
   badge.style.display = 'flex';
   document.getElementById('so-wiz-cust-search').style.display = 'none';
@@ -9165,10 +9231,13 @@ function soWizRenderReview() {
 function soSearchCustomers() {
   var q = document.getElementById('so-cust-search').value.toLowerCase().trim();
   var results = document.getElementById('so-cust-results');
+  var qDigits = phoneDigitsOnly(q).replace(/^0+/, '');
   var matches = customers.filter(function(c) {
     if (c.is_active === false) return false;
     if (!q) return true;
-    return c.name.toLowerCase().indexOf(q) >= 0 || (c.phone && c.phone.indexOf(q) >= 0);
+    if (c.name.toLowerCase().indexOf(q) >= 0) return true;
+    if (qDigits && phoneDigitsOnly(c.phone).replace(/^0+/, '').indexOf(qDigits) >= 0) return true;
+    return false;
   });
   if (!matches.length) {
     results.innerHTML = '<div class="so-cust-item so-cust-empty">No customers found</div>';
@@ -9179,7 +9248,7 @@ function soSearchCustomers() {
   matches.forEach(function(c) {
     html += '<div class="so-cust-item" onclick="soSelectCustomer(\'' + c.id + '\')">';
     html += '<span class="so-cust-name">' + esc(c.name) + '</span>';
-    html += '<span class="so-cust-phone">' + esc(c.phone || '') + '</span>';
+    html += '<span class="so-cust-phone">' + esc(c.phone ? fmtPhone(c.phone) : '') + '</span>';
     html += '</div>';
   });
   results.innerHTML = html;
@@ -9700,7 +9769,7 @@ function soGenerateDoc(orderId) {
   html += '<div class="doc-info-grid">';
   html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(cust ? cust.name : '\u2014') + '</div>';
   if (cust && cust.phone) {
-    html += '<div class="doc-info-label">Phone:</div><div class="doc-info-value">' + esc(cust.phone) + '</div>';
+    html += '<div class="doc-info-label">Phone:</div><div class="doc-info-value">' + esc(fmtPhone(cust.phone)) + '</div>';
   }
   if (cust && cust.address) {
     html += '<div class="doc-info-label">Address:</div><div class="doc-info-value">' + esc(cust.address) + '</div>';
@@ -9845,7 +9914,7 @@ function soGenerateDocA4(orderId) {
     if (cust && cust.tin) html += '<div style="font-size:11px;color:#333;">TIN: ' + esc(cust.tin) + '</div>';
     if (cust && cust.ic_number) html += '<div style="font-size:11px;color:#333;">IC: ' + esc(cust.ic_number) + '</div>';
     if (cust && cust.address) html += '<div style="font-size:11px;color:#333;margin-top:4px;white-space:pre-line;">' + esc(cust.address) + '</div>';
-    if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(cust.phone) + '</div>';
+    if (cust && cust.phone) html += '<div style="font-size:11px;color:#333;">Tel: ' + esc(fmtPhone(cust.phone)) + '</div>';
     html += '</div>';
 
     // Right: Ship To + Order Details
@@ -10683,7 +10752,7 @@ function soGenerateStatementConfirm() {
   html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value" style="font-weight:700;">' + esc(cust.name) + '</div>';
   html += '<div class="a4-info-label">Date:</div><div class="a4-info-value">' + fmtDate(todayStr()) + '</div>';
   if (cust.phone) {
-    html += '<div class="a4-info-label">Phone:</div><div class="a4-info-value">' + esc(cust.phone) + '</div>';
+    html += '<div class="a4-info-label">Phone:</div><div class="a4-info-value">' + esc(fmtPhone(cust.phone)) + '</div>';
   } else {
     html += '<div class="a4-info-label"></div><div class="a4-info-value"></div>';
   }

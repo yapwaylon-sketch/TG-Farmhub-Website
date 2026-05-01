@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInput.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/utils.js"></script>
 <script src="shared.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
@@ -561,7 +563,7 @@ function renderDeliveryCard(o) {
   if (cust && cust.phone) {
     html += '<a href="tel:' + esc(cust.phone) + '">';
     html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>';
-    html += esc(cust.phone);
+    html += esc(fmtPhone(cust.phone));
     html += '</a>';
   }
   html += '</div>';
@@ -950,7 +952,7 @@ function showDoc(orderId) {
   html += '<div class="doc-info-grid">';
   html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(cust ? cust.name : '\u2014') + '</div>';
   if (cust && cust.phone) {
-    html += '<div class="doc-info-label">Phone:</div><div class="doc-info-value">' + esc(cust.phone) + '</div>';
+    html += '<div class="doc-info-label">Phone:</div><div class="doc-info-value">' + esc(fmtPhone(cust.phone)) + '</div>';
   }
   if (cust && cust.address) {
     html += '<div class="doc-info-label">Address:</div><div class="doc-info-value">' + esc(cust.address) + '</div>';

@@ -543,6 +543,44 @@ function formatRM(val) {
   return "RM " + (val || 0).toLocaleString("en-MY", { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+// Phone display formatter — E.164 ("+60123456789") → "+60 12-345 6789".
+// Falls back to as-is on pages where intl-tel-input utils aren't loaded
+// (so non-sales modules render legacy phones unchanged).
+function fmtPhone(p) {
+  if (!p) return "—";
+  try {
+    var iti = window.intlTelInput;
+    var utils = iti && iti.utils;
+    if (utils && utils.formatNumber && utils.numberFormat) {
+      var out = utils.formatNumber(p, "MY", utils.numberFormat.INTERNATIONAL);
+      if (out) return out;
+    }
+  } catch (e) {}
+  return p;
+}
+
+// Strip everything except digits — used for forgiving substring search
+// across mixed legacy formats and E.164.
+function phoneDigitsOnly(p) {
+  return (p || "").replace(/\D/g, "");
+}
+
+// Canonicalize a phone to E.164 ("+60123456789") for equality checks
+// (e.g. duplicate detection across legacy local "012-3456789" and E.164).
+// Falls back to digits-only minus leading zeros when utils aren't loaded.
+function phoneCanonical(p) {
+  if (!p) return "";
+  try {
+    var iti = window.intlTelInput;
+    var utils = iti && iti.utils;
+    if (utils && utils.formatNumber && utils.numberFormat) {
+      var canon = utils.formatNumber(p, "MY", utils.numberFormat.E164);
+      if (canon) return canon;
+    }
+  } catch (e) {}
+  return (p || "").replace(/\D/g, "").replace(/^0+/, "");
+}
+
 // Generic number with 2 decimals
 function fmtNum2(n) {
   return (n || 0).toLocaleString("en-MY", { minimumFractionDigits:2, maximumFractionDigits:2 });
