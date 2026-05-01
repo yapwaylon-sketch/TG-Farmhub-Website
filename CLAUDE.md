@@ -17,6 +17,16 @@
 - Deploy is manual (git push does NOT auto-deploy)
 - SQL migrations: run via Node.js `pg` script (credentials below)
 - **DO NOT suggest regenerating or rotating API keys/tokens** — they are intentional and confirmed
+
+## Working Style for Claude (rules for me, learned the hard way)
+These are non-negotiable patterns to apply on EVERY task on this project. Established 2026-05-01 after a frustrating session where I made the user fix the same intl-tel-input bug three times by patching symptoms instead of root cause.
+
+1. **Root-cause first, patch second.** When a library/system rejects valid input or behaves unexpectedly, the FIRST move is to find out *why* — not to bypass, soften, or patch around it. Symptoms that often share a root cause (validation always failing, formatting always returning raw, parsing returning empty) are usually one missing piece — a dependency didn't load, an option is misconfigured, an API changed. Find the one piece. Fixes that look like fallbacks / try-catch / bypass are red flags: stop and ask whether I actually understood the failure.
+
+2. **No silent fallbacks during integration.** When integrating a new library or external dependency, do NOT add `try { ... } catch (e) {}` blocks that silently swallow errors and fall back to a "default". Let the integration fail loudly. The intl-tel-input rollout had `fmtPhone` wrapped in try/catch falling back to raw — and that fallback hid the fact that v23 utils.js wasn't loading at all. The user only noticed via a misbehaving display ("contact without dashes honestly its annoying"). Add fallbacks ONLY after the integration is confirmed working AND I understand exactly which failure cases need graceful handling.
+
+3. **Verify deployed behaviour before saying "try it".** Don't push code, deploy, and put the testing burden on the user. After any non-trivial frontend deploy: at minimum `curl` the deployed HTML/JS and grep for the change to confirm it's live; for library integrations, also fetch the CDN file and grep its API surface to confirm the lib actually exposes what we depend on. Better: write a tiny test page that exercises the new code path, deploy it alongside, hit it, then remove. The user-facing claim should be "verified working at <evidence>" — never "try it" as a substitute for verification.
+
 - Project syncs between two Windows PCs (main PC + secondary PC) via git/GitHub — migrated off OneDrive on 2026-04-09
   - Both PCs: `C:\dev\TG-Farmhub-Website` (and `C:\dev\TG-Nanas-Growth-TV` as a sibling)
   - Daily workflow: `git pull --ff-only origin main` when sitting down, `git push origin main` when standing up
