@@ -6050,8 +6050,235 @@ function renderInvoicing() {
 }
 
 function renderInvoicesView(body) {
-  // Filled in Task 5 \u2014 for now placeholder
-  body.innerHTML = '<div class="empty-state">Invoices view (TBD)</div>';
+  var view = invComputeView();
+  var html = '';
+
+  // Stats strip
+  html += renderInvoicesStatsStrip();
+
+  // Period preset row
+  html += '<div class="inv-presets">';
+  html += '<span class="inv-presets-label">Period</span>';
+  ['this-month','last-30','last-90','this-year','all','custom'].forEach(function(code) {
+    var label = ({'this-month':'This month','last-30':'Last 30 days','last-90':'Last 90 days','this-year':'This year','all':'All time','custom':'Custom\u2026'})[code];
+    html += '<button class="inv-preset' + (invPeriodPreset === code ? ' active' : '') + '" onclick="invSetPreset(\'' + code + '\')">' + label + '</button>';
+  });
+  html += '</div>';
+
+  // Search
+  html += '<input type="text" class="inv-search" placeholder="Search invoice number, customer, or reference..." value="' + esc(invSearchTerm) + '" oninput="invSetSearch(this.value)">';
+
+  // Quick-filter chips
+  html += renderInvoicesChips(view.fullList);
+
+  // (More Filters drawer is added in Task 10 \u2014 placeholder slot here.)
+
+  // Table
+  html += '<div class="inv-table">';
+  html += '<div class="inv-list-header">';
+  html += '<div>Invoice</div><div>Customer</div><div>Issued</div><div>Due</div>';
+  html += '<div class="center">Due in</div><div class="right">Amount</div><div class="right">Balance</div><div></div>';
+  html += '</div>';
+  if (!view.slice.length) {
+    html += '<div class="empty-state" style="padding:30px;">No invoices match your filters.</div>';
+  } else {
+    view.slice.forEach(function(inv) { html += renderInvoiceRow(inv); });
+  }
+  html += '</div>';
+
+  // Pagination
+  html += renderInvoicesPagination(view);
+
+  // Voided toggle
+  var voidedCount = invoices.filter(function(i) {
+    return (i.status === 'voided' || i.status === 'cancelled');
+  }).length;
+  if (voidedCount > 0) {
+    html += '<div class="inv-show-voided"><a onclick="invToggleShowVoided()">';
+    html += (invShowVoided ? 'Hide' : 'Show') + ' ' + voidedCount + ' voided / cancelled invoice' + (voidedCount !== 1 ? 's' : '');
+    html += '</a></div>';
+  }
+
+  body.innerHTML = html;
+
+  // Re-expand row if invExpandedId was set (preserved across re-renders)
+  if (invExpandedId) {
+    var row = document.getElementById('inv-row-' + invExpandedId);
+    if (row) {
+      row.classList.add('expanded');
+      var chev = row.querySelector('.inv-row-chev');
+      if (chev) chev.classList.add('open');
+      invInsertDetail(invExpandedId, row);
+    }
+  }
+}
+
+function invSetPreset(code) {
+  invPeriodPreset = code;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetSearch(term) {
+  invSearchTerm = term;
+  invPage = 1;
+  clearTimeout(window._invSearchTO);
+  window._invSearchTO = setTimeout(function() {
+    var body = document.getElementById('inv-page-body');
+    if (body) renderInvoicesView(body);
+    var input = document.querySelector('.inv-search');
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }, 200);
+}
+
+function invSetStatusFilter(s) {
+  invStatusFilter = s;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invToggleShowVoided() {
+  invShowVoided = !invShowVoided;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetPage(p) {
+  invPage = p;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function invSetPageSize(n) {
+  invPageSize = n;
+  invPage = 1;
+  renderInvoicesView(document.getElementById('inv-page-body'));
+}
+
+function renderInvoicesStatsStrip() {
+  var outstanding = 0, outstandingCount = 0;
+  var overdue = 0, overdueCount = 0;
+  var monthTotal = 0, monthCount = 0;
+  var thisMonth = todayStr().substring(0, 7);
+  invoices.forEach(function(inv) {
+    if (inv.status === 'draft' || inv.status === 'cancelled' || inv.status === 'voided') return;
+    var bal = invoiceBalance(inv);
+    if (bal > 0) { outstanding += bal; outstandingCount++; }
+    if (isInvoiceOverdue(inv)) { overdue += bal; overdueCount++; }
+    if ((inv.invoice_date || '').substring(0, 7) === thisMonth) {
+      monthTotal += parseFloat(inv.grand_total) || 0;
+      monthCount++;
+    }
+  });
+  var html = '<div class="inv-stats">';
+  html += '<div class="inv-stat warn"><div class="inv-stat-label">Outstanding</div><div class="inv-stat-value">' + formatRM(outstanding) + '</div><div class="inv-stat-meta">' + outstandingCount + ' invoice' + (outstandingCount !== 1 ? 's' : '') + '</div></div>';
+  html += '<div class="inv-stat danger"><div class="inv-stat-label">Overdue</div><div class="inv-stat-value">' + formatRM(overdue) + '</div><div class="inv-stat-meta">' + overdueCount + ' invoice' + (overdueCount !== 1 ? 's' : '') + '</div></div>';
+  html += '<div class="inv-stat"><div class="inv-stat-label">This Month</div><div class="inv-stat-value">' + formatRM(monthTotal) + '</div><div class="inv-stat-meta">' + monthCount + ' invoice' + (monthCount !== 1 ? 's' : '') + '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function renderInvoicesChips(fullList) {
+  var counts = { all: fullList.length, outstanding: 0, overdue: 0, paid: 0 };
+  fullList.forEach(function(inv) {
+    var ds = invGetDisplayStatus(inv);
+    if (ds === 'paid') counts.paid++;
+    else if (ds === 'overdue') { counts.overdue++; counts.outstanding++; }
+    else if (ds === 'issued' || ds === 'partial') counts.outstanding++;
+  });
+  var chips = [
+    {code:'all', label:'All', cls:''},
+    {code:'outstanding', label:'Outstanding', cls:''},
+    {code:'overdue', label:'Overdue', cls:'danger'},
+    {code:'paid', label:'Paid', cls:''}
+  ];
+  var html = '<div class="inv-chips">';
+  chips.forEach(function(c) {
+    var active = invStatusFilter === c.code ? ' active' : '';
+    html += '<span class="inv-chip ' + c.cls + active + '" onclick="invSetStatusFilter(\'' + c.code + '\')">';
+    html += c.label + ' <span class="inv-chip-count">' + counts[c.code] + '</span>';
+    html += '</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderInvoiceRow(inv) {
+  var c = customers.find(function(x) { return x.id === inv.customer_id; });
+  var custName = c ? c.name : '\u2014';
+  var bal = invoiceBalance(inv);
+  var partial = invIsPartial(inv);
+  var dueIn = invDueInDays(inv);
+  var voidedClass = (inv.status === 'voided' || inv.status === 'cancelled') ? ' voided' : '';
+  var balanceClass = bal === 0 ? 'zero' : (partial ? 'partial' : '');
+  var dueRedClass = isInvoiceOverdue(inv) ? ' danger' : '';
+
+  var dueInDisplay = '\u2014';
+  var dueInClass = 'muted';
+  if (dueIn !== null) {
+    if (dueIn < 0) { dueInDisplay = '\u2212' + Math.abs(dueIn); dueInClass = 'danger'; }
+    else { dueInDisplay = '+' + dueIn; dueInClass = ''; }
+  }
+
+  var amountStr = formatRM(parseFloat(inv.grand_total) || 0);
+  var balStr = formatRM(bal);
+
+  var html = '<div class="inv-list-row' + voidedClass + '" id="inv-row-' + esc(inv.id) + '" onclick="invToggleInvoice(\'' + esc(inv.id) + '\')">';
+  html += '<button class="inv-row-id" onclick="event.stopPropagation();generateInvoiceA4(\'' + esc(inv.id) + '\')">' + esc(inv.id) + '</button>';
+  html += '<div class="inv-row-cust">' + esc(custName) + '</div>';
+  html += '<div class="inv-row-date">' + fmtDateDM(inv.invoice_date) + '</div>';
+  html += '<div class="inv-row-date' + dueRedClass + '">' + fmtDateDM(inv.due_date) + '</div>';
+  html += '<div class="inv-row-duein ' + dueInClass + '">' + dueInDisplay + '</div>';
+  html += '<div class="inv-row-amount">' + amountStr + '</div>';
+  html += '<div class="inv-row-balance ' + balanceClass + '">' + balStr + '</div>';
+  html += '<svg class="inv-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
+  // Mobile-only meta line (CSS shows it only at <=720px)
+  var mobileMeta = '<strong>' + esc(custName) + '</strong>';
+  if (bal === 0) {
+    mobileMeta += ' \u00b7 Settled';
+  } else if (dueIn !== null) {
+    var dateLabel = fmtDateDM(inv.due_date);
+    if (dueIn < 0) mobileMeta += ' \u00b7 Due <span class="late">' + dateLabel + ' (\u2212' + Math.abs(dueIn) + ')</span>';
+    else mobileMeta += ' \u00b7 Due ' + dateLabel + ' (+' + dueIn + ')';
+  }
+  html += '<div class="inv-row-mobile-meta">' + mobileMeta + '</div>';
+  html += '</div>';
+  return html;
+}
+
+function renderInvoicesPagination(view) {
+  if (view.total === 0) return '';
+  var startIdx = (invPage - 1) * invPageSize + 1;
+  var endIdx = Math.min(invPage * invPageSize, view.total);
+  var html = '<div class="inv-pagination">';
+  html += '<div class="inv-pagination-info">Showing <strong>' + startIdx + '\u2013' + endIdx + '</strong> of <strong>' + view.total + '</strong> invoices</div>';
+  html += '<div class="inv-pagination-controls">';
+  html += '<button class="inv-page-btn"' + (invPage <= 1 ? ' disabled' : '') + ' onclick="invSetPage(' + (invPage - 1) + ')">\u2190 Prev</button>';
+
+  var pageNums = [];
+  for (var p = 1; p <= view.pages; p++) {
+    if (p === 1 || p === view.pages || Math.abs(p - invPage) <= 1) pageNums.push(p);
+    else if (pageNums[pageNums.length - 1] !== '...') pageNums.push('...');
+  }
+  pageNums.forEach(function(p) {
+    if (p === '...') {
+      html += '<button class="inv-page-btn" disabled>\u2026</button>';
+    } else {
+      html += '<button class="inv-page-btn' + (p === invPage ? ' active' : '') + '" onclick="invSetPage(' + p + ')">' + p + '</button>';
+    }
+  });
+  html += '<button class="inv-page-btn"' + (invPage >= view.pages ? ' disabled' : '') + ' onclick="invSetPage(' + (invPage + 1) + ')">Next \u2192</button>';
+  html += '</div>';
+  html += '<div class="inv-page-size">Rows per page <select onchange="invSetPageSize(parseInt(this.value,10))">';
+  [25, 50, 100].forEach(function(n) {
+    html += '<option value="' + n + '"' + (invPageSize === n ? ' selected' : '') + '>' + n + '</option>';
+  });
+  html += '</select></div>';
+  html += '</div>';
+  return html;
 }
 
 function renderCreateNewView(body) {
@@ -6847,24 +7074,34 @@ function invInsertDetail(invoiceId, cardEl) {
 
 function invToggleInvoice(invoiceId) {
   if (invExpandedId === invoiceId) {
-    // Collapse: remove detail div, reset chevron
     var detail = document.getElementById('inv-detail-' + invoiceId);
     if (detail) detail.remove();
-    var chevron = document.getElementById('inv-chevron-card-' + invoiceId);
-    if (chevron) chevron.style.transform = '';
+    var row = document.getElementById('inv-row-' + invoiceId);
+    if (row) {
+      row.classList.remove('expanded');
+      var chev = row.querySelector('.inv-row-chev');
+      if (chev) chev.classList.remove('open');
+    }
     invExpandedId = null;
   } else {
-    // Collapse previous if any
     if (invExpandedId) {
       var prevDetail = document.getElementById('inv-detail-' + invExpandedId);
       if (prevDetail) prevDetail.remove();
-      var prevChevron = document.getElementById('inv-chevron-card-' + invExpandedId);
-      if (prevChevron) prevChevron.style.transform = '';
+      var prevRow = document.getElementById('inv-row-' + invExpandedId);
+      if (prevRow) {
+        prevRow.classList.remove('expanded');
+        var pc = prevRow.querySelector('.inv-row-chev');
+        if (pc) pc.classList.remove('open');
+      }
     }
-    // Expand clicked
     invExpandedId = invoiceId;
-    var card = document.getElementById('inv-card-' + invoiceId);
-    if (card) invInsertDetail(invoiceId, card);
+    var row2 = document.getElementById('inv-row-' + invoiceId);
+    if (row2) {
+      row2.classList.add('expanded');
+      var chev2 = row2.querySelector('.inv-row-chev');
+      if (chev2) chev2.classList.add('open');
+      invInsertDetail(invoiceId, row2);
+    }
   }
 }
 
