@@ -165,7 +165,15 @@
       <div class="page-subtitle">Invoice management</div>
     </div>
   </div>
-  <div class="page-body"></div>
+  <div class="inv-subtabs" id="inv-subtabs">
+    <button class="inv-subtab active" data-subtab="invoices" onclick="invSwitchSubtab('invoices')">
+      Invoices <span class="inv-subtab-badge" id="inv-tab-invoices-badge">0</span>
+    </button>
+    <button class="inv-subtab" data-subtab="create" onclick="invSwitchSubtab('create')">
+      Create New <span class="inv-subtab-badge" id="inv-tab-create-badge">0</span>
+    </button>
+  </div>
+  <div class="page-body" id="inv-page-body"></div>
 </div>
 
 <!-- PAGE: DRIVERS -->
@@ -5996,11 +6004,67 @@ function amountInWords(amount) {
 }
 
 var _invDoSearchVal = '';
+var invSubtab = 'invoices'; // 'invoices' | 'create'
+
+function invSwitchSubtab(name) {
+  invSubtab = name;
+  var btns = document.querySelectorAll('#inv-subtabs .inv-subtab');
+  btns.forEach(function(b) {
+    b.classList.toggle('active', b.dataset.subtab === name);
+  });
+  renderInvoicing();
+}
+
+function invUpdateSubtabBadges() {
+  var invCount = invoices.filter(function(i) {
+    return i.status !== 'draft';
+  }).length;
+  var draft = invoices.find(function(i) { return i.status === 'draft'; });
+  var uninvoiced = orders.filter(function(o) {
+    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
+  }).length;
+
+  var bInv = document.getElementById('inv-tab-invoices-badge');
+  var bCreate = document.getElementById('inv-tab-create-badge');
+  if (bInv) bInv.textContent = invCount;
+  if (bCreate) {
+    if (draft) {
+      bCreate.textContent = '1 draft';
+      bCreate.classList.add('alert');
+    } else {
+      bCreate.textContent = uninvoiced + ' DOs';
+      bCreate.classList.remove('alert');
+    }
+  }
+}
+
 function renderInvoicing() {
+  var body = document.getElementById('inv-page-body');
+  if (!body) return;
+  invUpdateSubtabBadges();
+  if (invSubtab === 'create') {
+    renderCreateNewView(body);
+  } else {
+    renderInvoicesView(body);
+  }
+}
+
+function renderInvoicesView(body) {
+  // Filled in Task 5 \u2014 for now placeholder
+  body.innerHTML = '<div class="empty-state">Invoices view (TBD)</div>';
+}
+
+function renderCreateNewView(body) {
+  // Bridge: preserve the original renderInvoicing body so the Create New
+  // tab stays functional during the redesign rollout. Body is pasted
+  // below verbatim, with one substitution: the original
+  //   var body = document.getElementById('page-invoicing').querySelector('.page-body');
+  // line is removed (body is now passed in as a parameter).
+  // (Will be replaced in Tasks 7-9.)
+
   // Preserve search input across re-renders
   var existingSearch = document.getElementById('inv-do-search');
   if (existingSearch) _invDoSearchVal = existingSearch.value;
-  var body = document.getElementById('page-invoicing').querySelector('.page-body');
   var html = '';
 
   // ---- Section A: Uninvoiced Delivery Orders ----
