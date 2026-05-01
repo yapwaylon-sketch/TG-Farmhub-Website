@@ -4057,24 +4057,27 @@ function renderCustomerCards() {
     var ow = scCustomerOwingBreakdown(c.id);
     var custCell = '<a href="javascript:void(0)" onclick="scOpenDetail(\'' + esc(c.id) + '\')" style="font-weight:700;color:var(--green-light);text-decoration:none;">' + esc(c.name) + '</a>';
     if (c.contact_person) {
-      custCell += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + esc(c.contact_person) + '</div>';
+      custCell += '<span class="sc-contact-inline">· ' + esc(c.contact_person) + '</span>';
     }
 
     html += '<tr' + dimStyle + '>';
     html += '<td style="color:var(--text-muted);font-size:12px;">' + (idx + 1) + '</td>';
     html += '<td>' + custCell + '</td>';
     html += '<td style="white-space:nowrap;">' + esc(c.phone || '\u2014') + '</td>';
-    html += '<td><span class="badge badge-outline">' + scTypeLabel(c.type) + '</span></td>';
-    html += '<td><span class="badge badge-' + paymentTermsBadgeClass(c.payment_terms_days) + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></td>';
+    var typeKey = c.type || 'walkin';
+    var termsKey = (parseInt(c.payment_terms_days, 10) || 0) > 0 ? 'net' : 'cod';
+    html += '<td><span class="sc-tag sc-tag-' + typeKey + '">' + scTypeLabel(c.type) + '</span></td>';
+    html += '<td><span class="sc-tag sc-tag-' + termsKey + '">' + paymentTermsLabel(c.payment_terms_days) + '</span></td>';
     html += '<td style="text-align:right;white-space:nowrap;">' + fmtMoneyCell(ow.csOut) + '</td>';
     html += '<td style="text-align:right;white-space:nowrap;">' + fmtMoneyCell(ow.doUnbilled) + '</td>';
     html += '<td style="text-align:right;white-space:nowrap;">' + fmtMoneyCell(ow.invOut) + '</td>';
-    html += '<td><div style="display:flex;gap:4px;">';
+    html += '<td>';
     if (salesCan('manageCustomers')) {
-      html += '<button class="btn btn-outline btn-sm" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
-      html += '<button class="btn btn-outline btn-sm" onclick="scToggleActive(\'' + c.id + '\')">' + (c.is_active === false ? 'Activate' : 'Deactivate') + '</button>';
+      var isActive = c.is_active !== false;
+      html += '<button class="btn-tiny" onclick="scOpenModal(\'' + c.id + '\')">Edit</button>';
+      html += '<button class="btn-tiny' + (isActive ? ' danger' : '') + '" onclick="scToggleActive(\'' + c.id + '\')">' + (isActive ? 'Deactivate' : 'Activate') + '</button>';
     }
-    html += '</div></td>';
+    html += '</td>';
     html += '</tr>';
   });
 
