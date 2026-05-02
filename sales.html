@@ -1123,7 +1123,7 @@
       <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:500;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span id="pay-slip-label">Attach slip</span>
-        <input type="file" id="pay-slip-file" accept="image/*" onchange="paySlipPreview(this)" style="display:none;">
+        <input type="file" id="pay-slip-file" accept="image/*,application/pdf" onchange="paySlipPreview(this)" style="display:none;">
       </label>
     </div>
     <div class="form-field">
@@ -1179,7 +1179,7 @@
         <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);font-weight:500;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span id="inv-pay-slip-label">Attach slip</span>
-          <input type="file" id="inv-pay-slip-file" accept="image/*" onchange="invPaySlipPreview(this)" style="display:none;">
+          <input type="file" id="inv-pay-slip-file" accept="image/*,application/pdf" onchange="invPaySlipPreview(this)" style="display:none;">
         </label>
       </div>
       <div class="form-field">
@@ -1621,9 +1621,12 @@ async function recalcInvoicePaymentStatus(invoiceId) {
     .reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
   var creditTotal = parseFloat(inv.credit_total) || 0;
   var grandTotal = parseFloat(inv.grand_total) || 0;
+  // Compare in cents to avoid floating-point noise (e.g. 436.45 vs 436.45000000000005)
+  var paidCents = Math.round((totalPaid + creditTotal) * 100);
+  var grandCents = Math.round(grandTotal * 100);
   var status = 'unpaid';
-  if (totalPaid + creditTotal >= grandTotal && grandTotal > 0) status = 'paid';
-  else if (totalPaid + creditTotal > 0) status = 'partial';
+  if (paidCents >= grandCents && grandCents > 0) status = 'paid';
+  else if (paidCents > 0) status = 'partial';
   inv.amount_paid = totalPaid;
   inv.payment_status = status;
   await sbQuery(sb.from('sales_invoices').update({ amount_paid: totalPaid, payment_status: status }).eq('id', invoiceId).select());
@@ -2788,7 +2791,7 @@ function soRenderDetail() {
       html += '<td>' + esc(p.reference || '\u2014') + '</td>';
       html += '<td style="text-align:right;font-weight:600;color:var(--green-light);">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
       html += '<td>';
-      if (p.slip_url) html += '<a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);">View</a>';
+      if (p.slip_url) html += '<a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);">' + (p.slip_url.toLowerCase().endsWith('.pdf') ? 'PDF ↗' : 'View') + '</a>';
       else html += '\u2014';
       html += '</td>';
       html += '</tr>';
@@ -5547,7 +5550,7 @@ function renderPaymentsCS() {
             html += '<td></td>';
             html += '<td colspan="3" style="padding-left:8px;color:var(--text-muted);">' + fmtDateShort(p.payment_date) + ' &middot; ' + methodLabel + (p.reference ? ' (' + esc(p.reference) + ')' : '');
             html += ' <a href="javascript:void(0)" onclick="soReprintPayment(\'' + esc(p.id) + '\')" style="color:var(--purple);font-size:10px;margin-left:4px;">Reprint</a>';
-            if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:10px;margin-left:4px;">Slip</a>';
+            if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--green-light);font-size:10px;margin-left:4px;">' + (p.slip_url.toLowerCase().endsWith('.pdf') ? 'PDF ↗' : 'Slip') + '</a>';
             html += '</td>';
             html += '<td colspan="3" style="text-align:right;color:var(--green-light);font-weight:600;">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
             html += '<td colspan="2"></td>';
@@ -5702,7 +5705,7 @@ function renderPaymentsInvoice() {
           html += '<tr style="background:var(--bg-hover);font-size:11px;">';
           html += '<td></td>';
           html += '<td colspan="4" style="padding-left:8px;color:var(--text-muted);">' + fmtDateShort(p.payment_date) + ' &middot; ' + ml + (p.reference ? ' (' + esc(p.reference) + ')' : '');
-          if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--gold);font-size:10px;margin-left:4px;">Slip</a>';
+          if (p.slip_url) html += ' <a href="' + esc(p.slip_url) + '" target="_blank" style="color:var(--gold);font-size:10px;margin-left:4px;">' + (p.slip_url.toLowerCase().endsWith('.pdf') ? 'PDF ↗' : 'Slip') + '</a>';
           html += '</td>';
           html += '<td colspan="3" style="text-align:right;color:var(--green-light);font-weight:600;">+' + formatRM(parseFloat(p.amount) || 0) + '</td>';
           html += '<td colspan="2"></td></tr>';
@@ -5978,18 +5981,31 @@ async function paySavePayment() {
 function paySlipPreview(input) {
   if (!input.files || !input.files[0]) return;
   var file = input.files[0];
+  var preview = document.getElementById('pay-slip-preview');
+  var label = document.getElementById('pay-slip-label');
+  var clearBtn = '<button onclick="payClearSlip()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:1;">&times;</button>';
+  if (file.type === 'application/pdf') {
+    var sizeKb = Math.round(file.size / 1024);
+    preview.innerHTML = '<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-hover);border-radius:8px;border:1px solid var(--border);">' +
+      '<div style="font-size:28px;line-height:1;">📄</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(file.name) + '</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">PDF · ' + sizeKb + ' KB</div></div>' +
+      '</div>' + clearBtn;
+    preview.style.display = 'block';
+    label.textContent = file.name;
+    return;
+  }
   var reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById('pay-slip-img').src = e.target.result;
-    document.getElementById('pay-slip-preview').style.display = 'block';
-    document.getElementById('pay-slip-label').textContent = file.name;
+    preview.innerHTML = '<img id="pay-slip-img" src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">' + clearBtn;
+    preview.style.display = 'block';
+    label.textContent = file.name;
   };
   reader.readAsDataURL(file);
 }
 
 function payClearSlip() {
-  document.getElementById('pay-slip-preview').style.display = 'none';
-  document.getElementById('pay-slip-img').src = '';
+  var preview = document.getElementById('pay-slip-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
   document.getElementById('pay-slip-label').textContent = 'Attach slip';
   var fileInput = document.getElementById('pay-slip-file');
   if (fileInput) fileInput.value = '';
@@ -6000,6 +6016,16 @@ async function payUploadSlip(paymentId) {
   if (!fileInput || !fileInput.files || !fileInput.files[0]) return null;
 
   var file = fileInput.files[0];
+
+  if (file.type === 'application/pdf') {
+    var pdfPath = 'payment-slips/' + paymentId + '.pdf';
+    var pdfResult = await sbUpload(function() {
+      return sb.storage.from('sales-photos').upload(pdfPath, file, { contentType: 'application/pdf', upsert: true });
+    });
+    if (pdfResult.error) { console.error('Slip upload error:', pdfResult.error); return null; }
+    return sb.storage.from('sales-photos').getPublicUrl(pdfPath).data.publicUrl;
+  }
+
   // Resize image
   var canvas = document.createElement('canvas');
   var img = new Image();
@@ -7127,7 +7153,7 @@ function invInsertDetail(invoiceId, rowEl) {
         html += '<div class="inv-pay-method">' + esc(methodLabel);
         var sub = '';
         if (p.reference) sub += 'Ref: ' + esc(p.reference);
-        if (p.slip_url) sub += (sub ? ' · ' : '') + '<a href="' + esc(p.slip_url) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);">slip ↗</a>';
+        if (p.slip_url) sub += (sub ? ' · ' : '') + '<a href="' + esc(p.slip_url) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);">' + (p.slip_url.toLowerCase().endsWith('.pdf') ? 'PDF ↗' : 'slip ↗') + '</a>';
         if (sub) html += '<small>' + sub + '</small>';
         html += '</div>';
         html += '<div class="inv-pay-amount">' + formatRM(parseFloat(p.amount) || 0) + '</div>';
@@ -7308,7 +7334,8 @@ async function invPaySave() {
     btnLoading(btn, false, 'Save Payment');
     closeModal('inv-pay-modal');
     notify('Payment ' + paymentId + ' recorded (' + formatRM(amount) + ')', 'success');
-    renderInvoicing();
+    if (currentTab === 'payments') renderPayments();
+    else renderInvoicing();
   } catch(e) {
     btnLoading(btn, false, 'Save Payment');
     notify('Failed to save payment: ' + e.message, 'error');
@@ -7318,18 +7345,31 @@ async function invPaySave() {
 function invPaySlipPreview(input) {
   if (!input.files || !input.files[0]) return;
   var file = input.files[0];
+  var preview = document.getElementById('inv-pay-slip-preview');
+  var label = document.getElementById('inv-pay-slip-label');
+  var clearBtn = '<button onclick="invPayClearSlip()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:1;">&times;</button>';
+  if (file.type === 'application/pdf') {
+    var sizeKb = Math.round(file.size / 1024);
+    preview.innerHTML = '<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-hover);border-radius:8px;border:1px solid var(--border);">' +
+      '<div style="font-size:28px;line-height:1;">📄</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(file.name) + '</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">PDF · ' + sizeKb + ' KB</div></div>' +
+      '</div>' + clearBtn;
+    preview.style.display = 'block';
+    label.textContent = file.name;
+    return;
+  }
   var reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById('inv-pay-slip-img').src = e.target.result;
-    document.getElementById('inv-pay-slip-preview').style.display = 'block';
-    document.getElementById('inv-pay-slip-label').textContent = file.name;
+    preview.innerHTML = '<img id="inv-pay-slip-img" src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border);">' + clearBtn;
+    preview.style.display = 'block';
+    label.textContent = file.name;
   };
   reader.readAsDataURL(file);
 }
 
 function invPayClearSlip() {
-  document.getElementById('inv-pay-slip-preview').style.display = 'none';
-  document.getElementById('inv-pay-slip-img').src = '';
+  var preview = document.getElementById('inv-pay-slip-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
   document.getElementById('inv-pay-slip-label').textContent = 'Attach slip';
   var fileInput = document.getElementById('inv-pay-slip-file');
   if (fileInput) fileInput.value = '';
@@ -7339,6 +7379,16 @@ async function invPayUploadSlip(paymentId) {
   var fileInput = document.getElementById('inv-pay-slip-file');
   if (!fileInput || !fileInput.files || !fileInput.files[0]) return null;
   var file = fileInput.files[0];
+
+  if (file.type === 'application/pdf') {
+    var pdfPath = 'payment-slips/' + paymentId + '.pdf';
+    var pdfResult = await sbUpload(function() {
+      return sb.storage.from('sales-photos').upload(pdfPath, file, { contentType: 'application/pdf', upsert: true });
+    });
+    if (pdfResult.error) { console.error('Slip upload error:', pdfResult.error); return null; }
+    return sb.storage.from('sales-photos').getPublicUrl(pdfPath).data.publicUrl;
+  }
+
   var canvas = document.createElement('canvas');
   var img = new Image();
   return new Promise(function(resolve) {
