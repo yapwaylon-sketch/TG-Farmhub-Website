@@ -1627,6 +1627,24 @@ async function recalcInvoicePaymentStatus(invoiceId) {
   inv.amount_paid = totalPaid;
   inv.payment_status = status;
   await sbQuery(sb.from('sales_invoices').update({ amount_paid: totalPaid, payment_status: status }).eq('id', invoiceId).select());
+
+  // Sync payment_status to linked DOs — prorate amount_paid for partial
+  var linkedOrderIds = invoiceOrders
+    .filter(function(io) { return io.invoice_id === invoiceId; })
+    .map(function(io) { return io.order_id; });
+  var paidFraction = grandTotal > 0 ? Math.min((totalPaid + creditTotal) / grandTotal, 1) : 0;
+  for (var i = 0; i < linkedOrderIds.length; i++) {
+    var oid = linkedOrderIds[i];
+    var o = orders.find(function(x) { return x.id === oid; });
+    if (!o) continue;
+    var doTotal = parseFloat(o.grand_total) || 0;
+    var doAmtPaid = status === 'paid' ? doTotal : (status === 'partial' ? Math.round(doTotal * paidFraction * 100) / 100 : 0);
+    if (o.payment_status !== status || o.amount_paid !== doAmtPaid) {
+      o.payment_status = status;
+      o.amount_paid = doAmtPaid;
+      await sbQuery(sb.from('sales_orders').update({ payment_status: status, amount_paid: doAmtPaid }).eq('id', oid).select());
+    }
+  }
 }
 
 function isOrderInvoiced(orderId) {
@@ -1706,9 +1724,9 @@ async function invRecomputeInvoice(invoiceId) {
 
   // Update invoice totals and capture new updated_at (so callers using sbUpdateWithLock don't get stale timestamp)
   var grandTotal = subtotal - (parseFloat(inv.credit_total) || 0);
-  var updResult = await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: subtotal }).eq('id', invoiceId).select());
+  var updResult = await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: grandTotal }).eq('id', invoiceId).select());
   inv.subtotal = subtotal;
-  inv.grand_total = subtotal;
+  inv.grand_total = grandTotal;
   if (updResult && updResult[0] && updResult[0].updated_at) inv.updated_at = updResult[0].updated_at;
 
   return subtotal;
@@ -1964,7 +1982,7 @@ function renderDashboard() {
         html += '</div>';
 
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
-        html += '<span style="font-size:12px;font-weight:600;color:var(--purple);">' + esc(o.doc_number || o.id) + '</span>';
+        html += '<span style="font-size:12px;font-weight:600;color:var(--purple);text-decoration:underline;cursor:pointer;" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')">' + esc(o.doc_number || o.id) + '</span>';
         html += '<span class="badge badge-' + esc(o.status) + '">' + statusLabel(o.status) + '</span>';
         html += '</div>';
 
@@ -4684,9 +4702,19 @@ function scRenderDetail() {
   custCompleted.forEach(function(o) {
     totalPurchases += parseFloat(o.grand_total) || 0;
     totalPaid += parseFloat(o.amount_paid) || 0;
-    totalOutstanding += orderBalance(o);
+    // Invoiced DOs: outstanding tracked at invoice level, skip here to avoid double-counting
+    if (!(o.doc_type === 'delivery_order' && o.invoice_id)) {
+      totalOutstanding += orderBalance(o);
+    }
     if (o.doc_type === 'delivery_order') doCount++; else csCount++;
   });
+  // Add outstanding from this customer's invoices
+  var custInvOutstanding = invoices.filter(function(inv) {
+    return inv.customer_id === c.id && inv.status === 'issued';
+  }).reduce(function(sum, inv) {
+    return sum + ((parseFloat(inv.grand_total) || 0) - (parseFloat(inv.amount_paid) || 0) - (parseFloat(inv.credit_total) || 0));
+  }, 0);
+  totalOutstanding += custInvOutstanding;
   var rr = retCustomerReturnRate(c.id);
 
   html += '<div class="so-detail-section">';
@@ -6468,7 +6496,7 @@ function renderCreateNewView(body) {
         var ageCls = invDOAgeClass(age);
         html += '<div class="inv-do-row">';
         html += '<input type="checkbox" data-order-id="' + esc(o.id) + '" data-customer-id="' + esc(custId) + '"' + checked + ' onchange="invToggleDO(\'' + esc(o.id) + '\', \'' + esc(custId) + '\', this.checked)" style="width:16px;height:16px;accent-color:var(--gold);">';
-        html += '<span class="num">' + esc(o.doc_number || o.id) + '</span>';
+        html += '<span class="num" style="color:var(--purple);text-decoration:underline;cursor:pointer;" onclick="event.stopPropagation();soGenerateDocA4(\'' + esc(o.id) + '\')">' + esc(o.doc_number || o.id) + '</span>';
         html += '<span class="date">' + fmtDateDM(o.order_date) + '</span>';
         if (age != null) html += '<span class="inv-do-age ' + ageCls + '">' + age + 'd</span>';
         html += '<span class="amt">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
@@ -7777,7 +7805,7 @@ function invAddMoreDOs(invoiceId) {
   sorted.forEach(function(o) {
     html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">';
     html += '<input type="checkbox" class="inv-adddos-cb" data-oid="' + esc(o.id) + '" data-amount="' + (parseFloat(o.grand_total) || 0) + '" onchange="invAddDosToggle(this)">';
-    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
+    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--purple);text-decoration:underline;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();soGenerateDocA4(\'' + esc(o.id) + '\')">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
     html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
     html += '</label>';
   });
@@ -7877,13 +7905,13 @@ async function invCancelInvoice(invoiceId) {
 
   confirmAction('Cancel Draft', 'This will permanently delete draft invoice ' + invoiceId + ' and free all linked DOs. Continue?', async function() {
     try {
-      // Unlink DOs
+      // Unlink DOs and reset payment_status
       var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
       for (var i = 0; i < linkedOrders.length; i++) {
         var oid = linkedOrders[i].order_id;
-        await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', oid).select());
+        await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', oid).select());
         var idx = orders.findIndex(function(x) { return x.id === oid; });
-        if (idx >= 0) orders[idx].invoice_id = null;
+        if (idx >= 0) { orders[idx].invoice_id = null; orders[idx].payment_status = 'unpaid'; orders[idx].amount_paid = 0; }
       }
 
       // Delete credit notes, items, junction
@@ -7957,7 +7985,7 @@ function invEdRenderDOs(invoiceId) {
     var o = orders.find(function(x) { return x.id === io.order_id; });
     if (!o) return;
     html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">';
-    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--text);">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
+    html += '<span style="flex:1;"><span style="font-weight:600;color:var(--purple);text-decoration:underline;cursor:pointer;" onclick="soGenerateDocA4(\'' + esc(o.id) + '\')">' + esc(o.doc_number || o.id) + '</span> &middot; ' + fmtDateNice(o.order_date) + '</span>';
     html += '<span style="font-weight:600;color:var(--text);">' + formatRM(parseFloat(o.grand_total) || 0) + '</span>';
     html += '<button class="btn btn-outline btn-sm" onclick="invEdRemoveDO(\'' + esc(invoiceId) + '\',\'' + esc(io.order_id) + '\')" style="padding:2px 8px;border-color:var(--danger);color:var(--danger);min-width:auto;font-size:14px;line-height:1;">&times;</button>';
     html += '</div>';
@@ -8118,13 +8146,14 @@ async function invVoidConfirm() {
     }
 
     // 2. Null out invoice_id on all linked DOs (frees them for re-invoicing)
+    //    Reset payment_status since invoice is voided — DOs start fresh
     //    Keep sales_invoice_orders junction rows intact for audit trail
     var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
     for (var i = 0; i < linkedOrders.length; i++) {
       var oid = linkedOrders[i].order_id;
-      await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', oid).select());
+      await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', oid).select());
       var idx = orders.findIndex(function(x) { return x.id === oid; });
-      if (idx >= 0) orders[idx].invoice_id = null;
+      if (idx >= 0) { orders[idx].invoice_id = null; orders[idx].payment_status = 'unpaid'; orders[idx].amount_paid = 0; }
     }
 
     // 3. Set status to voided (items + junction stay intact for audit)
@@ -8179,10 +8208,10 @@ async function invUnlinkDO(invoiceId, orderId) {
         await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId).select());
         invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === orderId); });
 
-        // 2. Null the invoice_id on the order
-        await sbQuery(sb.from('sales_orders').update({ invoice_id: null }).eq('id', orderId).select());
+        // 2. Null the invoice_id on the order and reset payment_status
+        await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', orderId).select());
         var idx = orders.findIndex(function(x) { return x.id === orderId; });
-        if (idx >= 0) orders[idx].invoice_id = null;
+        if (idx >= 0) { orders[idx].invoice_id = null; orders[idx].payment_status = 'unpaid'; orders[idx].amount_paid = 0; }
 
         // 3. Re-aggregate remaining items and update totals
         var newSubtotal = await invRecomputeInvoice(invoiceId);
