@@ -4879,6 +4879,51 @@ function scRenderDetail() {
     html += '</div>';
   }
 
+  // ── Invoices ──
+  var custInvoices = invoices.filter(function(inv) {
+    return inv.customer_id === c.id && inv.status !== 'cancelled';
+  });
+  if (custInvoices.length) {
+    custInvoices.sort(function(a, b) { return (b.invoice_date || '').localeCompare(a.invoice_date || ''); });
+    var custInvTotal = 0, custInvOutstanding = 0;
+    custInvoices.forEach(function(inv) {
+      custInvTotal += parseFloat(inv.grand_total) || 0;
+      if (inv.status === 'issued' && inv.payment_status !== 'paid') custInvOutstanding += invoiceBalance(inv);
+    });
+
+    html += '<div class="so-detail-section">';
+    html += '<div class="so-detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">Invoices (' + custInvoices.length + ')';
+    if (custInvOutstanding > 0) html += '<span style="font-size:13px;font-weight:700;color:var(--gold);">Outstanding: ' + formatRM(custInvOutstanding) + '</span>';
+    html += '</div>';
+    html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
+    html += '<thead><tr><th>Invoice #</th><th>Date</th><th>Due</th><th>Status</th><th>DOs</th><th style="text-align:right;">Amount</th><th style="text-align:right;">Paid</th><th style="text-align:right;">Balance</th></tr></thead><tbody>';
+    custInvoices.forEach(function(inv) {
+      var bal = invoiceBalance(inv);
+      var overdue = isInvoiceOverdue(inv);
+      var statusColors = { draft: 'var(--text-muted)', issued: 'var(--purple)', paid: 'var(--good)', voided: 'var(--danger)' };
+      var statusLabels = { draft: 'Draft', issued: 'Issued', paid: 'Paid', voided: 'Voided' };
+      var linkedDOs = invoiceOrders.filter(function(io) { return io.invoice_id === inv.id; });
+      var doLabels = linkedDOs.map(function(io) {
+        var oo = orders.find(function(x) { return x.id === io.order_id; });
+        return oo ? (oo.doc_number || oo.id) : '';
+      }).filter(Boolean);
+      html += '<tr style="' + (overdue ? 'background:rgba(220,53,69,0.04);' : '') + '">';
+      html += '<td><a href="javascript:void(0)" onclick="generateInvoiceA4(\'' + esc(inv.id) + '\')" style="font-weight:700;color:var(--purple);text-decoration:underline;">' + esc(inv.id) + '</a></td>';
+      html += '<td>' + fmtDateDM(inv.invoice_date) + '</td>';
+      html += '<td' + (overdue ? ' style="color:var(--danger);font-weight:600;"' : '') + '>' + fmtDateDM(inv.due_date) + (overdue ? ' !' : '') + '</td>';
+      html += '<td><span style="font-size:11px;font-weight:600;color:' + (statusColors[inv.status] || 'var(--text)') + ';">' + (statusLabels[inv.status] || inv.status) + '</span>';
+      if (inv.status === 'issued' && inv.payment_status === 'partial') html += ' <span style="font-size:10px;color:var(--gold);">Partial</span>';
+      html += '</td>';
+      html += '<td style="font-size:11px;">' + esc(doLabels.join(', ')) + '</td>';
+      html += '<td style="text-align:right;">' + formatRM(parseFloat(inv.grand_total) || 0) + '</td>';
+      html += '<td style="text-align:right;">' + formatRM((parseFloat(inv.amount_paid) || 0) + (parseFloat(inv.credit_total) || 0)) + '</td>';
+      html += '<td style="text-align:right;font-weight:700;color:' + (bal > 0 ? 'var(--gold)' : 'var(--good)') + ';">' + formatRM(bal) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html += '</div>';
+  }
+
   // ── Recent Payment History ──
   if (custPayments.length) {
     html += '<div class="so-detail-section">';
