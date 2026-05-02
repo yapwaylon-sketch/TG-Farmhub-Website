@@ -6395,6 +6395,7 @@ function renderCreateNewView(body) {
     html += '<span class="inv-draft-meta"><strong>' + esc(dCustName) + '</strong> \u00B7 ' + dDoCount + ' DO' + (dDoCount !== 1 ? 's' : '') + ' \u00B7 Created ' + fmtDateDM(draft.created_at || draft.invoice_date) + ' \u00B7 <strong>' + formatRM(parseFloat(draft.grand_total) || 0) + '</strong></span>';
     html += '</div>';
     html += '<div class="inv-draft-actions">';
+    html += '<button class="btn btn-outline btn-sm" onclick="generateInvoiceA4(\'' + esc(draft.id) + '\')">View</button>';
     html += '<button class="btn btn-outline btn-sm" onclick="invEditDraft(\'' + esc(draft.id) + '\')">Edit</button>';
     html += '<button class="btn btn-outline btn-sm" style="border-color:var(--danger);color:var(--danger);" onclick="invCancelInvoice(\'' + esc(draft.id) + '\')">Cancel draft</button>';
     if (currentUser && currentUser.role === 'admin') {
