@@ -44,6 +44,14 @@ th.sortable:hover { color:var(--green-light); }
 .table-wrap th { white-space:nowrap; font-size:12px; }
 .table-wrap td { white-space:nowrap; }
 
+/* Mirrored top scroll bar — only shown on screens narrow enough to overflow */
+.table-scroll-top { overflow-x:auto; overflow-y:hidden; height:14px; }
+.table-scroll-top-inner { height:1px; }
+/* Hide on mobile — many columns hidden there, table fits */
+@media (max-width:768px) {
+  .table-scroll-top { display:none; }
+}
+
 /* Summary cards — 3 columns for overview */
 .cards-3 { grid-template-columns: repeat(3,1fr); }
 
