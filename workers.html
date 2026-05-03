@@ -1373,7 +1373,15 @@ async function saveWorker() {
     const oldRate = old ? parseFloat(old.pay_rate) || 0 : 0;
     const rateChanged = old && oldRate !== pay_rate;
     if (rateChanged) {
-      const probe = await sbQuery(sb.from("payroll_entries").select("id").eq("worker_id", editId).limit(1));
+      // Probe DB for any payroll entry under this worker for the CURRENT company.
+      // Without the company_id filter, a worker shared across companies (or pre-split
+      // historical data) would surface entries from the other company.
+      const probe = await sbQuery(
+        sb.from("payroll_entries").select("id")
+          .eq("worker_id", editId)
+          .eq("company_id", getCompanyId())
+          .limit(1)
+      );
       const hasEntries = probe && probe.length > 0;
       if (hasEntries) {
         if (btn) btnLoading(btn, false, 'Save');
@@ -2043,14 +2051,33 @@ function getCarryForwardRate(worker) {
 //   'leave_owed'         → cash_handed unchanged, top_up_note records the gap (no auto-action)
 //   'next_month_overpay' → cash_handed unchanged, Overpayment advance created for next period (rate-decrease only)
 //   null/undefined       → unpaid entry, just recompute (no top_up_note needed)
+// Source-of-truth aggregators for the entry's responsibility + task earnings.
+// Always prefer these over the snapshot columns (responsibility_total / task_total)
+// — those are written only by savePayrollEntry and can drift if any other code path
+// touches the underlying payroll_responsibilities / task_entries rows. Equivalent in
+// spirit to the orders_enforce_totals trigger we have on sales (commit 2563293).
+// REQUIRES that openApplyRateChangeModal has loaded the source rows for these peIds
+// into the in-memory caches.
+function _peRespTotalFromSource(peId) {
+  return payrollResponsibilities
+    .filter(pr => pr.payroll_entry_id === peId)
+    .reduce((s, pr) => s + (parseFloat(pr.rate) || 0), 0);
+}
+function _peTaskTotalFromSource(peId) {
+  return taskEntries
+    .filter(te => te.payroll_entry_id === peId && (parseFloat(te.total) || 0) > 0)
+    .reduce((s, te) => s + (parseFloat(te.total) || 0), 0);
+}
+
 async function recomputePayrollEntry(peId, newRate, oldRate, settleAction) {
   const pe = payrollEntries.find(x => x.id === peId);
   if (!pe) return false;
 
   const days = parseFloat(pe.days_worked) || 0;
   const otHours = parseFloat(pe.ot_hours) || 0;
-  const respTotal = parseFloat(pe.responsibility_total) || 0;
-  const taskTotal = parseFloat(pe.task_total) || 0;
+  // Read resp/task totals from the source-of-truth tables (not the snapshot columns).
+  const respTotal = _peRespTotalFromSource(peId);
+  const taskTotal = _peTaskTotalFromSource(peId);
   const totalDeduct = parseFloat(pe.total_deductions) || 0;
 
   const newDailyWage = newRate * days;
@@ -2068,6 +2095,10 @@ async function recomputePayrollEntry(peId, newRate, oldRate, settleAction) {
     pay_rate: newRate,
     daily_wage: newDailyWage,
     ot_pay: newOtPay,
+    // Resync the snapshot columns to match what we just recomputed from source.
+    // Defensive — also self-heals any pre-existing drift.
+    responsibility_total: respTotal,
+    task_total: taskTotal,
     total_pay: newTotalPay,
     final_pay: newFinalPay,
     updated_at: new Date().toISOString(),
@@ -2119,9 +2150,15 @@ async function openApplyRateChangeModal(workerId, oldRate, newRate, pendingWorke
   const w = workers.find(x => x.id === workerId);
   if (!w) return;
 
-  // Fetch ALL of this worker's payroll entries (across all periods) — the in-memory
-  // payrollEntries cache only holds the currently-selected period, so we can't rely on it.
-  const fetched = await sbQuery(sb.from("payroll_entries").select("*").eq("worker_id", workerId)) || [];
+  // Fetch ALL of this worker's payroll entries for THIS company (across all periods).
+  // The in-memory payrollEntries cache only holds the currently-selected period, so we
+  // can't rely on it. Company filter prevents leaking pre-multi-company-split entries
+  // from the other company into this worker's history (payroll_entries has company_id).
+  const fetched = await sbQuery(
+    sb.from("payroll_entries").select("*")
+      .eq("worker_id", workerId)
+      .eq("company_id", getCompanyId())
+  ) || [];
 
   // Merge into the in-memory cache so recomputePayrollEntry can find each entry by id.
   // De-dupe by id (current-period entries may already be present from loadPayrollPeriod).
@@ -2130,6 +2167,28 @@ async function openApplyRateChangeModal(workerId, oldRate, newRate, pendingWorke
     if (existing) Object.assign(existing, row);
     else payrollEntries.push(row);
   });
+
+  // Fetch source-of-truth rows (responsibilities + tasks) for these entries.
+  // recomputePayrollEntry + rcUpdatePreview re-aggregate from these instead of trusting
+  // the snapshot columns on the entry. Without this, periods other than the currently
+  // loaded one would have empty source data and recompute would yield 0 resp + 0 task.
+  const peIds = fetched.map(r => r.id);
+  if (peIds.length > 0) {
+    const [respRows, taskRows] = await Promise.all([
+      sbQuery(sb.from("payroll_responsibilities").select("*").in("payroll_entry_id", peIds)),
+      sbQuery(sb.from("task_entries").select("*").in("payroll_entry_id", peIds)),
+    ]);
+    (respRows || []).forEach(row => {
+      const existing = payrollResponsibilities.find(r => r.id === row.id);
+      if (existing) Object.assign(existing, row);
+      else payrollResponsibilities.push(row);
+    });
+    (taskRows || []).forEach(row => {
+      const existing = taskEntries.find(t => t.id === row.id);
+      if (existing) Object.assign(existing, row);
+      else taskEntries.push(row);
+    });
+  }
 
   // Resolve each entry's period; if a period isn't loaded (rare — periods load on init),
   // fall back to the period_id label so the dropdown still shows something usable.
@@ -2204,13 +2263,19 @@ function rcUpdatePreview() {
   affected.forEach((p, idx) => {
     const oldDays = parseFloat(p.pe.days_worked) || 0;
     const oldOt = parseFloat(p.pe.ot_hours) || 0;
-    const respTotal = parseFloat(p.pe.responsibility_total) || 0;
-    const taskTotal = parseFloat(p.pe.task_total) || 0;
+    // Source-of-truth: re-aggregate from payrollResponsibilities / taskEntries instead
+    // of trusting the snapshot columns. Recompute uses the same path.
+    const respTotal = _peRespTotalFromSource(p.pe.id);
+    const taskTotal = _peTaskTotalFromSource(p.pe.id);
     const totalDeduct = parseFloat(p.pe.total_deductions) || 0;
     const newDailyWage = rcContext.newRate * oldDays;
     const newOtPay = (rcContext.newRate / OT_DIVISOR) * oldOt;
     const newFinal = newDailyWage + newOtPay + respTotal + taskTotal - totalDeduct;
-    const oldFinal = parseFloat(p.pe.final_pay) || 0;
+    // Compute oldFinal from same source so preview delta matches what recompute will write.
+    // (pe.final_pay is also a snapshot — could be stale if anything other than savePayrollEntry wrote rows.)
+    const oldDailyWage = (parseFloat(p.pe.pay_rate) || 0) * oldDays;
+    const oldOtPay = ((parseFloat(p.pe.pay_rate) || 0) / OT_DIVISOR) * oldOt;
+    const oldFinal = oldDailyWage + oldOtPay + respTotal + taskTotal - totalDeduct;
     const delta = newFinal - oldFinal;
     const isPaid = (p.pe.payment_status || 'unpaid') === 'paid';
     const sign = delta > 0 ? '+' : '';
@@ -2239,11 +2304,13 @@ function rcUpdatePreview() {
     paidEntries.forEach(p => {
       const oldDays = parseFloat(p.pe.days_worked) || 0;
       const oldOt = parseFloat(p.pe.ot_hours) || 0;
-      const respTotal = parseFloat(p.pe.responsibility_total) || 0;
-      const taskTotal = parseFloat(p.pe.task_total) || 0;
+      // Source-of-truth (matches preview list above + recompute helper).
+      const respTotal = _peRespTotalFromSource(p.pe.id);
+      const taskTotal = _peTaskTotalFromSource(p.pe.id);
       const totalDeduct = parseFloat(p.pe.total_deductions) || 0;
       const newFinal = rcContext.newRate * oldDays + (rcContext.newRate / OT_DIVISOR) * oldOt + respTotal + taskTotal - totalDeduct;
-      const oldFinal = parseFloat(p.pe.final_pay) || 0;
+      const oldRate = parseFloat(p.pe.pay_rate) || 0;
+      const oldFinal = oldRate * oldDays + (oldRate / OT_DIVISOR) * oldOt + respTotal + taskTotal - totalDeduct;
       const delta = newFinal - oldFinal;
       const sign = delta > 0 ? '+' : '-';
       const absDelta = Math.abs(delta);
