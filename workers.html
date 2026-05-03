@@ -401,6 +401,43 @@
 </div>
 
 <!-- WORKER MODAL -->
+<!-- APPLY RATE CHANGE MODAL — opens when user changes pay_rate on an existing worker with payroll entries -->
+<div id="rate-change-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:680px;" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">Apply Rate Change</h3>
+      <button class="modal-close" onclick="rcCancel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <div id="rc-summary" style="background:var(--bg);border-radius:8px;padding:12px;margin-bottom:14px;font-size:14px;">
+      <!-- Filled by openApplyRateChangeModal -->
+    </div>
+
+    <div class="form-field" style="margin-bottom:14px;">
+      <label>Apply from period</label>
+      <select id="rc-period" onchange="rcUpdatePreview()"></select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Default "Going forward only" — safest. Pick a period to recompute that period and every later existing entry.</div>
+    </div>
+
+    <div id="rc-preview" style="margin-bottom:14px;"></div>
+
+    <div id="rc-paid-section" style="display:none;background:var(--bg);border-left:3px solid var(--gold);border-radius:6px;padding:12px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:12px;font-weight:700;color:var(--gold);">⚠ PAID ENTRIES — HOW TO SETTLE EACH</div>
+        <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="rc-batch-settle" onchange="rcBatchSettle(this)"> All caught up in cash today
+        </label>
+      </div>
+      <div id="rc-paid-list"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="rcCancel()">Cancel</button>
+      <button class="btn btn-primary" id="rc-apply-btn" onclick="rcApply()">Apply Rate Change</button>
+    </div>
+  </div>
+</div>
+
 <div id="worker-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -715,6 +752,9 @@
     </div>
     <input type="hidden" id="pe-id">
 
+    <!-- Top-up adjustments info (shown only when entry has top_up_note) -->
+    <div id="pe-topup-box" style="display:none;background:var(--bg);border-left:3px solid var(--gold);border-radius:6px;padding:10px 12px;margin-bottom:14px;"></div>
+
     <!-- Section: Base Pay -->
     <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);">
       <div style="font-size:12px;font-weight:700;color:var(--gold);margin-bottom:10px;">BASE PAY</div>
@@ -723,6 +763,7 @@
         <div class="form-field"><label>Days Worked</label><input type="number" id="pe-days" step="0.5" oninput="calcPayroll()"></div>
         <div class="form-field"><label>Daily Wage (auto)</label><input type="text" id="pe-dailywage" readonly style="color:var(--gold);"></div>
       </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.5;">💡 Editing the rate here only affects this month. To change the going-forward rate (and optionally backfill prior periods), edit the worker profile.</div>
     </div>
 
     <!-- Section: Overtime -->
@@ -1322,6 +1363,26 @@ async function saveWorker() {
     // Track changes before overwriting
     const old = workers.find(w => w.id === editId);
     const changesStr = old ? diffChanges(old, data, ["name", "gender", "pay_rate", "role", "phone", "ic_number", "active"]) : "";
+
+    // INTERCEPT: if pay_rate changed AND this worker has any payroll entries, defer the
+    // save to the Apply Rate Change modal so the user can pick an effective period and
+    // settle catch-ups for paid entries. The modal handles the worker UPDATE itself.
+    // NOTE: we probe the DB directly because `payrollEntries` in memory only holds the
+    // currently-selected period (loaded via loadPayrollPeriod) — it'll be empty if the
+    // user hasn't visited the Payroll tab yet this session.
+    const oldRate = old ? parseFloat(old.pay_rate) || 0 : 0;
+    const rateChanged = old && oldRate !== pay_rate;
+    if (rateChanged) {
+      const probe = await sbQuery(sb.from("payroll_entries").select("id").eq("worker_id", editId).limit(1));
+      const hasEntries = probe && probe.length > 0;
+      if (hasEntries) {
+        if (btn) btnLoading(btn, false, 'Save');
+        closeModal('worker-modal');
+        // Hand off to the rate-change modal. It will save `data` (incl. name cascade) on Apply.
+        await openApplyRateChangeModal(editId, oldRate, pay_rate, data);
+        return;
+      }
+    }
 
     var result = await sbQuery(sb.from("workers").update(data).eq("id", editId).select());
     if (result === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
@@ -1963,18 +2024,332 @@ async function confirmAddWorker() {
 // ============================================================
 // PAY RATE CARRY-FORWARD
 // ============================================================
-async function getCarryForwardRate(worker) {
-  // Look for most recent payroll entry for this worker
-  var data = await sbQuery(sb.from("payroll_entries")
-    .select("pay_rate, period_id")
-    .eq("worker_id", worker.id)
-    .order("period_id", { ascending: false })
-    .limit(1));
-  if (data && data.length > 0 && data[0].pay_rate > 0) {
-    return parseFloat(data[0].pay_rate);
-  }
-  // Fallback to worker profile
+// Worker profile is authoritative. Edits to a single payroll entry's rate are one-off
+// overrides for that month only and do NOT change the going-forward rate. To bump the
+// going-forward rate, use Edit Worker → Apply Rate Change (which can also backfill).
+function getCarryForwardRate(worker) {
   return parseFloat(worker.pay_rate) || 0;
+}
+
+// ============================================================
+// APPLY RATE CHANGE — recompute one payroll entry at a new rate
+// ============================================================
+// Single-purpose helper used by openApplyRateChangeModal.
+// Recomputes daily_wage / ot_pay / total_pay / final_pay from newRate.
+// Atomic write (CS047 pattern): single UPDATE, null-check abort, side effects only after success.
+//
+// settleAction (only relevant for PAID entries with delta != 0):
+//   'settle_now'         → cash_handed bumped to new final_pay, paid_at = today, top_up_note appended
+//   'leave_owed'         → cash_handed unchanged, top_up_note records the gap (no auto-action)
+//   'next_month_overpay' → cash_handed unchanged, Overpayment advance created for next period (rate-decrease only)
+//   null/undefined       → unpaid entry, just recompute (no top_up_note needed)
+async function recomputePayrollEntry(peId, newRate, oldRate, settleAction) {
+  const pe = payrollEntries.find(x => x.id === peId);
+  if (!pe) return false;
+
+  const days = parseFloat(pe.days_worked) || 0;
+  const otHours = parseFloat(pe.ot_hours) || 0;
+  const respTotal = parseFloat(pe.responsibility_total) || 0;
+  const taskTotal = parseFloat(pe.task_total) || 0;
+  const totalDeduct = parseFloat(pe.total_deductions) || 0;
+
+  const newDailyWage = newRate * days;
+  const newOtPay = (newRate / OT_DIVISOR) * otHours;
+  const newTotalPay = newDailyWage + newOtPay + respTotal + taskTotal;
+  const newFinalPay = newTotalPay - totalDeduct;
+  const oldFinalPay = parseFloat(pe.final_pay) || 0;
+  const delta = newFinalPay - oldFinalPay; // +ve = worker owed more, -ve = overpaid
+
+  const isPaid = (pe.payment_status || 'unpaid') === 'paid';
+  const today = new Date();
+  const todayStr = String(today.getDate()).padStart(2, '0') + '/' + String(today.getMonth() + 1).padStart(2, '0') + '/' + today.getFullYear();
+
+  const updateData = {
+    pay_rate: newRate,
+    daily_wage: newDailyWage,
+    ot_pay: newOtPay,
+    total_pay: newTotalPay,
+    final_pay: newFinalPay,
+    updated_at: new Date().toISOString(),
+  };
+
+  let topUpLine = '';
+  let overpayAmt = 0;
+
+  if (isPaid && delta !== 0) {
+    if (settleAction === 'settle_now') {
+      updateData.cash_handed = newFinalPay;
+      updateData.paid_at = today.toISOString();
+      const sign = delta > 0 ? '+' : '-';
+      topUpLine = sign + 'RM ' + fmtNum2(Math.abs(delta)) + ' on ' + todayStr + ' (rate ' + fmtNum2(oldRate) + ' → ' + fmtNum2(newRate) + ')';
+    } else if (settleAction === 'leave_owed') {
+      const label = delta > 0 ? 'Outstanding RM ' + fmtNum2(delta) : 'Overpaid RM ' + fmtNum2(Math.abs(delta));
+      topUpLine = label + ' (rate adjusted ' + fmtNum2(oldRate) + ' → ' + fmtNum2(newRate) + ' on ' + todayStr + ', not settled)';
+    } else if (settleAction === 'next_month_overpay' && delta < 0) {
+      overpayAmt = Math.abs(delta);
+      topUpLine = 'Overpaid RM ' + fmtNum2(overpayAmt) + ' (rate adjusted ' + fmtNum2(oldRate) + ' → ' + fmtNum2(newRate) + ' on ' + todayStr + ', deduct next month)';
+    }
+  }
+
+  if (topUpLine) {
+    updateData.top_up_note = pe.top_up_note ? pe.top_up_note + '\n' + topUpLine : topUpLine;
+  }
+
+  var result = await sbQuery(sb.from('payroll_entries').update(updateData).eq('id', peId).select());
+  if (result === null) return false;
+  Object.assign(pe, updateData);
+
+  // Side effect: Overpayment advance for next period — only after the entry write committed
+  if (overpayAmt > 0) {
+    await createOverpaymentAdvance(pe, overpayAmt);
+  }
+
+  return true;
+}
+
+// ============================================================
+// APPLY RATE CHANGE MODAL — opened from saveWorker when pay_rate is bumped
+// ============================================================
+// rcContext holds the deferred worker save:
+//   { workerId, oldRate, newRate, pendingWorkerData, periodSorted }
+//   periodSorted = [{periodId, periodLabel, pe, finalPay}, ...] sorted ASC (oldest first)
+let rcContext = null;
+
+async function openApplyRateChangeModal(workerId, oldRate, newRate, pendingWorkerData) {
+  const w = workers.find(x => x.id === workerId);
+  if (!w) return;
+
+  // Fetch ALL of this worker's payroll entries (across all periods) — the in-memory
+  // payrollEntries cache only holds the currently-selected period, so we can't rely on it.
+  const fetched = await sbQuery(sb.from("payroll_entries").select("*").eq("worker_id", workerId)) || [];
+
+  // Merge into the in-memory cache so recomputePayrollEntry can find each entry by id.
+  // De-dupe by id (current-period entries may already be present from loadPayrollPeriod).
+  fetched.forEach(row => {
+    const existing = payrollEntries.find(pe => pe.id === row.id);
+    if (existing) Object.assign(existing, row);
+    else payrollEntries.push(row);
+  });
+
+  // Resolve each entry's period; if a period isn't loaded (rare — periods load on init),
+  // fall back to the period_id label so the dropdown still shows something usable.
+  const periodSorted = fetched.map(row => {
+    const pe = payrollEntries.find(p => p.id === row.id); // canonical reference for later mutations
+    const period = payrollPeriods.find(p => p.id === pe.period_id);
+    const sortKey = period ? (period.year * 100 + period.month) : 0;
+    const periodLabel = period ? MONTH_NAMES[period.month] + " " + period.year : pe.period_id;
+    return { periodId: pe.period_id, periodLabel, pe, sortKey };
+  }).sort((a, b) => a.sortKey - b.sortKey);
+
+  rcContext = { workerId, oldRate, newRate, pendingWorkerData, periodSorted };
+
+  // Header summary
+  const direction = newRate > oldRate ? '↑' : '↓';
+  const dirColor = newRate > oldRate ? 'var(--good)' : 'var(--critical)';
+  document.getElementById("rc-summary").innerHTML =
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">Worker</div>' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:8px;">' + esc(w.name) + '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;">' +
+      '<span style="font-size:13px;">Pay rate</span>' +
+      '<span style="font-size:14px;font-weight:600;text-decoration:line-through;color:var(--text-muted);">RM ' + fmtNum2(oldRate) + '</span>' +
+      '<span style="font-size:18px;color:' + dirColor + ';">' + direction + '</span>' +
+      '<span style="font-size:16px;font-weight:800;color:var(--gold);">RM ' + fmtNum2(newRate) + '</span>' +
+    '</div>';
+
+  // Period dropdown — "Going forward only" + each period (descending: most recent first)
+  const sel = document.getElementById("rc-period");
+  let opts = '<option value="__none__">Going forward only (no recompute)</option>';
+  if (periodSorted.length > 0) {
+    opts += '<option disabled>──────────</option>';
+    // Reverse for display so most recent appears first
+    for (let i = periodSorted.length - 1; i >= 0; i--) {
+      const p = periodSorted[i];
+      const isPaid = (p.pe.payment_status || 'unpaid') === 'paid';
+      const tag = isPaid ? ' (paid)' : ' (unpaid)';
+      opts += '<option value="' + p.periodId + '">' + p.periodLabel + tag + '</option>';
+    }
+  }
+  sel.innerHTML = opts;
+  sel.value = '__none__';
+
+  rcUpdatePreview();
+  document.getElementById("rate-change-modal").style.display = "flex";
+}
+
+function rcUpdatePreview() {
+  if (!rcContext) return;
+  const sel = document.getElementById("rc-period");
+  const fromPeriod = sel.value;
+  const previewEl = document.getElementById("rc-preview");
+  const paidSection = document.getElementById("rc-paid-section");
+  const paidList = document.getElementById("rc-paid-list");
+  const applyBtn = document.getElementById("rc-apply-btn");
+
+  if (fromPeriod === '__none__') {
+    previewEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px;background:var(--bg);border-radius:6px;">No existing entries will be recomputed. New rate (RM ' + fmtNum2(rcContext.newRate) + ') saved to worker profile, used for next new period.</div>';
+    paidSection.style.display = 'none';
+    paidList.innerHTML = '';
+    applyBtn.textContent = 'Apply Rate Change';
+    return;
+  }
+
+  // Find affected entries: from selected period onwards (sortKey >= chosen.sortKey)
+  const chosen = rcContext.periodSorted.find(p => p.periodId === fromPeriod);
+  if (!chosen) return;
+  const affected = rcContext.periodSorted.filter(p => p.sortKey >= chosen.sortKey);
+
+  // Preview table
+  let html = '<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">AFFECTED ENTRIES (' + affected.length + ')</div>';
+  html += '<div style="background:var(--bg);border-radius:6px;overflow:hidden;">';
+  affected.forEach((p, idx) => {
+    const oldDays = parseFloat(p.pe.days_worked) || 0;
+    const oldOt = parseFloat(p.pe.ot_hours) || 0;
+    const respTotal = parseFloat(p.pe.responsibility_total) || 0;
+    const taskTotal = parseFloat(p.pe.task_total) || 0;
+    const totalDeduct = parseFloat(p.pe.total_deductions) || 0;
+    const newDailyWage = rcContext.newRate * oldDays;
+    const newOtPay = (rcContext.newRate / OT_DIVISOR) * oldOt;
+    const newFinal = newDailyWage + newOtPay + respTotal + taskTotal - totalDeduct;
+    const oldFinal = parseFloat(p.pe.final_pay) || 0;
+    const delta = newFinal - oldFinal;
+    const isPaid = (p.pe.payment_status || 'unpaid') === 'paid';
+    const sign = delta > 0 ? '+' : '';
+    const deltaColor = delta > 0 ? 'var(--good)' : (delta < 0 ? 'var(--critical)' : 'var(--text-muted)');
+    const statusBadge = isPaid
+      ? '<span style="background:rgba(255,140,40,0.2);color:#FF8C28;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;">⚠ PAID</span>'
+      : '<span style="background:rgba(80,160,80,0.18);color:var(--good);font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;">UNPAID</span>';
+    html += '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr 0.8fr;gap:8px;align-items:center;padding:8px 12px;font-size:12px;' + (idx > 0 ? 'border-top:1px solid var(--border);' : '') + '">';
+    html += '<div style="font-weight:600;">' + p.periodLabel + '</div>';
+    html += '<div style="color:var(--text-muted);">RM ' + fmtNum2(oldFinal) + ' → <span style="color:var(--gold);font-weight:600;">RM ' + fmtNum2(newFinal) + '</span></div>';
+    html += '<div style="color:' + deltaColor + ';font-weight:600;">' + sign + 'RM ' + fmtNum2(delta) + '</div>';
+    html += '<div>' + statusBadge + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  previewEl.innerHTML = html;
+
+  // Paid-entry settlement section
+  const paidEntries = affected.filter(p => (p.pe.payment_status || 'unpaid') === 'paid');
+  if (paidEntries.length === 0) {
+    paidSection.style.display = 'none';
+    paidList.innerHTML = '';
+  } else {
+    paidSection.style.display = 'block';
+    let phtml = '';
+    paidEntries.forEach(p => {
+      const oldDays = parseFloat(p.pe.days_worked) || 0;
+      const oldOt = parseFloat(p.pe.ot_hours) || 0;
+      const respTotal = parseFloat(p.pe.responsibility_total) || 0;
+      const taskTotal = parseFloat(p.pe.task_total) || 0;
+      const totalDeduct = parseFloat(p.pe.total_deductions) || 0;
+      const newFinal = rcContext.newRate * oldDays + (rcContext.newRate / OT_DIVISOR) * oldOt + respTotal + taskTotal - totalDeduct;
+      const oldFinal = parseFloat(p.pe.final_pay) || 0;
+      const delta = newFinal - oldFinal;
+      const sign = delta > 0 ? '+' : '-';
+      const absDelta = Math.abs(delta);
+      const isIncrease = delta > 0;
+      phtml += '<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:10px;align-items:center;padding:8px 0;' + (phtml ? 'border-top:1px dashed var(--border);' : '') + '">';
+      phtml += '<div style="font-size:12px;"><strong>' + p.periodLabel + '</strong><br><span style="color:var(--text-muted);font-size:11px;">' + (isIncrease ? 'Owed worker' : 'Worker overpaid') + ' ' + sign + 'RM ' + fmtNum2(absDelta) + '</span></div>';
+      phtml += '<select id="rc-settle-' + p.periodId + '" data-delta="' + delta + '" style="font-size:12px;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--white);">';
+      if (isIncrease) {
+        phtml += '<option value="settle_now" selected>I\'m paying RM ' + fmtNum2(absDelta) + ' cash now</option>';
+        phtml += '<option value="leave_owed">Don\'t change payment, leave RM ' + fmtNum2(absDelta) + ' owed</option>';
+      } else {
+        phtml += '<option value="settle_now" selected>Worker returned RM ' + fmtNum2(absDelta) + ' cash</option>';
+        phtml += '<option value="next_month_overpay">Recover RM ' + fmtNum2(absDelta) + ' from next month\'s pay</option>';
+        phtml += '<option value="leave_owed">Don\'t change payment, leave gap noted</option>';
+      }
+      phtml += '</select>';
+      phtml += '</div>';
+    });
+    paidList.innerHTML = phtml;
+    // Reset batch checkbox
+    document.getElementById("rc-batch-settle").checked = true;
+  }
+
+  applyBtn.textContent = 'Apply Rate Change (' + affected.length + ' entries)';
+}
+
+function rcBatchSettle(checkbox) {
+  if (!rcContext) return;
+  const targetVal = checkbox.checked ? 'settle_now' : 'leave_owed';
+  document.querySelectorAll('#rc-paid-list select').forEach(sel => { sel.value = targetVal; });
+}
+
+function rcCancel() {
+  rcContext = null;
+  closeModal('rate-change-modal');
+}
+
+async function rcApply() {
+  if (!rcContext) return;
+  const btn = document.getElementById("rc-apply-btn");
+  const sel = document.getElementById("rc-period");
+  const fromPeriod = sel.value;
+  const { workerId, oldRate, newRate, pendingWorkerData, periodSorted } = rcContext;
+
+  btnLoading(btn, true);
+
+  // 1. Save the worker (with new rate + any other field edits) — atomic, null-check abort
+  const wBefore = workers.find(x => x.id === workerId);
+  const oldName = wBefore ? wBefore.name : null;
+  const wResult = await sbQuery(sb.from("workers").update(pendingWorkerData).eq("id", workerId).select());
+  if (wResult === null) { btnLoading(btn, false, 'Apply Rate Change'); return; }
+  const w = workers.find(x => x.id === workerId);
+  if (w) Object.assign(w, pendingWorkerData);
+
+  // Cascade name rename to payroll_entries.worker_name (matches saveWorker's normal-path cascade)
+  if (oldName && oldName !== pendingWorkerData.name) {
+    await sbQuery(sb.from("payroll_entries").update({ worker_name: pendingWorkerData.name }).eq("worker_id", workerId).select());
+    payrollEntries.filter(pe => pe.worker_id === workerId).forEach(pe => { pe.worker_name = pendingWorkerData.name; });
+  }
+
+  // 2. Recompute affected entries (if any)
+  let recomputed = 0;
+  let auditLines = [];
+  if (fromPeriod !== '__none__') {
+    const chosen = periodSorted.find(p => p.periodId === fromPeriod);
+    if (chosen) {
+      const affected = periodSorted.filter(p => p.sortKey >= chosen.sortKey);
+      for (const p of affected) {
+        const isPaid = (p.pe.payment_status || 'unpaid') === 'paid';
+        let action = null;
+        if (isPaid) {
+          const settleSel = document.getElementById("rc-settle-" + p.periodId);
+          action = settleSel ? settleSel.value : 'leave_owed';
+        }
+        const oldFinal = parseFloat(p.pe.final_pay) || 0;
+        const ok = await recomputePayrollEntry(p.pe.id, newRate, oldRate, action);
+        if (ok) {
+          recomputed++;
+          const newFinal = parseFloat(p.pe.final_pay) || 0;
+          const delta = newFinal - oldFinal;
+          const sign = delta >= 0 ? '+' : '';
+          let suffix = '';
+          if (isPaid) suffix = ' [' + (action === 'settle_now' ? 'paid now' : (action === 'next_month_overpay' ? 'next-month deduct' : 'noted only')) + ']';
+          auditLines.push(p.periodLabel + ' ' + sign + fmtNum2(delta) + suffix);
+        }
+      }
+    }
+  }
+
+  // 3. Audit log — one row capturing the whole operation
+  const auditMsg = "Rate " + (w ? w.name : workerId) + " RM " + fmtNum2(oldRate) + "→" + fmtNum2(newRate) +
+    (fromPeriod === '__none__' ? ', going forward only' : ', effective ' + (periodSorted.find(p => p.periodId === fromPeriod) || {}).periodLabel) +
+    (recomputed > 0 ? ' (' + recomputed + ' recomputed: ' + auditLines.join(', ') + ')' : '');
+  await auditLog("workers", workerId, "rate_change", auditMsg);
+
+  btnLoading(btn, false, 'Apply Rate Change');
+  closeModal('rate-change-modal');
+  rcContext = null;
+
+  let msg = 'Rate updated to RM ' + fmtNum2(newRate);
+  if (recomputed > 0) msg += ' — ' + recomputed + ' entr' + (recomputed === 1 ? 'y' : 'ies') + ' recomputed';
+  notify(msg);
+
+  // Re-render whichever view is active
+  renderWorkerList();
+  if (currentPeriodId) renderPayrollEntries();
 }
 
 // ============================================================
@@ -2174,7 +2549,8 @@ function renderPayrollEntries() {
       html += '<td style="color:var(--critical);">RM ' + fmtNum2(pe.total_deductions) + '</td>';
       const netPay = parseFloat(pe.final_pay) || 0;
       html += '<td style="text-align:right;font-weight:700;color:' + (netPay < 0 ? 'var(--critical)' : 'var(--gold)') + ';">RM ' + fmtNum2(pe.final_pay) + '</td>';
-      html += '<td><span class="badge ' + (isPaid ? 'badge-active' : 'badge-inactive') + '">' + (isPaid ? 'Paid' : 'Unpaid') + '</span></td>';
+      const topUp = pe.top_up_note ? '<span title="' + esc(pe.top_up_note) + '" style="display:inline-block;background:rgba(212,175,55,0.18);color:var(--gold);font-size:10px;font-weight:700;padding:2px 5px;border-radius:3px;margin-left:6px;cursor:help;">↑ ADJ</span>' : '';
+      html += '<td><span class="badge ' + (isPaid ? 'badge-active' : 'badge-inactive') + '">' + (isPaid ? 'Paid' : 'Unpaid') + '</span>' + topUp + '</td>';
       html += '<td style="text-align:right;white-space:nowrap;" class="no-print">';
       html += '<button class="btn btn-outline btn-sm" onclick="openPaySlip(\'' + pe.id + '\')" style="margin-right:4px;">Slip</button>';
       html += '<button class="btn btn-outline btn-sm" onclick="openPayrollEntry(\'' + pe.id + '\')" style="margin-right:4px;" ' + (isClosed ? 'disabled' : '') + '>Edit</button>';
@@ -2596,6 +2972,18 @@ function openPayrollEntry(peId) {
 
   document.getElementById("pe-id").value = peId;
   document.getElementById("pe-modal-title").textContent = "Payroll — " + (pe.worker_name || pe.worker_id);
+
+  // Top-up note banner — appears when this entry has been adjusted via Apply Rate Change
+  const topUpBox = document.getElementById("pe-topup-box");
+  if (pe.top_up_note) {
+    const lines = pe.top_up_note.split('\n').map(l => esc(l)).join('<br>');
+    topUpBox.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:4px;">RATE-CHANGE ADJUSTMENTS</div><div style="font-size:12px;line-height:1.6;">' + lines + '</div>';
+    topUpBox.style.display = 'block';
+  } else {
+    topUpBox.style.display = 'none';
+    topUpBox.innerHTML = '';
+  }
+
   document.getElementById("pe-payrate").value = pe.pay_rate || (w ? w.pay_rate : 0);
   document.getElementById("pe-days").value = pe.days_worked || "";
   document.getElementById("pe-othours").value = pe.ot_hours || "";
@@ -2778,12 +3166,9 @@ async function savePayrollEntry() {
   if (result === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
   Object.assign(pe, updateData);
 
-  // Sync pay rate to worker profile
-  const w = workers.find(x => x.id === pe.worker_id);
-  if (w && w.pay_rate != payRate) {
-    await sbQuery(sb.from("workers").update({ pay_rate: payRate }).eq("id", w.id).select());
-    w.pay_rate = payRate;
-  }
+  // NOTE: rate edits here are a ONE-OFF override for this month only.
+  // They do NOT bump worker.pay_rate. To change the going-forward rate
+  // (and optionally backfill prior periods), use Edit Worker → Apply Rate Change.
 
   // Save responsibilities (delete old, insert new)
   await sbQuery(sb.from("payroll_responsibilities").delete().eq("payroll_entry_id", peId).select());
@@ -2918,6 +3303,22 @@ function openPaySlip(peId) {
     html += '<div style="background:#fff3cd;border:1px solid #e8a020;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:11px;color:#856404;">⚠ Hutang dibawa ke bulan hadapan: <strong>RM ' + fmtNum2(Math.abs(slipFinalPay)) + '</strong></div>';
   }
 
+  // Top-up adjustments — shows when entry was bumped via Apply Rate Change
+  if (pe.top_up_note) {
+    html += '<div style="background:#fffbe6;border:1px solid #d4af37;border-radius:6px;padding:8px 12px;margin-top:8px;font-size:11px;color:#5b4d10;line-height:1.6;">';
+    html += '<div style="font-size:10px;font-weight:700;color:#8a6d1f;letter-spacing:0.5px;margin-bottom:4px;">RATE-CHANGE ADJUSTMENTS</div>';
+    pe.top_up_note.split('\n').forEach(line => { html += '<div>' + esc(line) + '</div>'; });
+    const cashHanded = parseFloat(pe.cash_handed) || 0;
+    if (Math.abs(cashHanded - slipFinalPay) > 0.005) {
+      const gap = slipFinalPay - cashHanded;
+      const gapLabel = gap > 0 ? 'Outstanding (still owed to worker)' : 'Overpaid (still due back)';
+      html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #d4af37;display:flex;justify-content:space-between;"><span>Cash handed: RM ' + fmtNum2(cashHanded) + '</span><span style="font-weight:700;">' + gapLabel + ': RM ' + fmtNum2(Math.abs(gap)) + '</span></div>';
+    } else if (cashHanded > 0) {
+      html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #d4af37;display:flex;justify-content:space-between;"><span>Cash handed: RM ' + fmtNum2(cashHanded) + '</span><span style="font-weight:700;color:#22863a;">✓ Settled</span></div>';
+    }
+    html += '</div>';
+  }
+
   // Footer
   html += '<div style="margin-top:24px;display:flex;justify-content:space-between;font-size:10px;color:#999;">';
   html += '<span>Generated: ' + new Date().toLocaleDateString("en-MY") + '</span>';
@@ -3019,6 +3420,21 @@ function buildSlipHtml(pe) {
   const printFinalPay = parseFloat(pe.final_pay) || 0;
   h += '<div style="margin-top:8px;padding:6px 8px;border:2px solid #000;display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:800;background:#f5f5f5;">';
   h += '<span>NET PAY</span><span' + (printFinalPay < 0 ? ' style="color:#c00;"' : '') + '>RM ' + fmtNum2(pe.final_pay) + '</span></div>';
+  // Top-up adjustments — appears when entry was bumped via Apply Rate Change
+  if (pe.top_up_note) {
+    h += '<div style="margin-top:4px;padding:4px 8px;border:1px solid #d4af37;background:#fffbe6;font-size:10px;color:#5b4d10;line-height:1.5;">';
+    h += '<div style="font-size:9px;font-weight:700;color:#8a6d1f;letter-spacing:0.5px;margin-bottom:2px;">RATE-CHANGE ADJUSTMENTS</div>';
+    pe.top_up_note.split('\n').forEach(line => { h += '<div>' + esc(line) + '</div>'; });
+    const printCash = parseFloat(pe.cash_handed) || 0;
+    if (Math.abs(printCash - printFinalPay) > 0.005) {
+      const gap = printFinalPay - printCash;
+      const gapLabel = gap > 0 ? 'Outstanding' : 'Overpaid';
+      h += '<div style="margin-top:2px;padding-top:2px;border-top:1px dashed #d4af37;display:flex;justify-content:space-between;"><span>Cash handed: RM ' + fmtNum2(printCash) + '</span><span style="font-weight:700;">' + gapLabel + ': RM ' + fmtNum2(Math.abs(gap)) + '</span></div>';
+    } else if (printCash > 0) {
+      h += '<div style="margin-top:2px;padding-top:2px;border-top:1px dashed #d4af37;display:flex;justify-content:space-between;"><span>Cash handed: RM ' + fmtNum2(printCash) + '</span><span style="font-weight:700;color:#22863a;">✓ Settled</span></div>';
+    }
+    h += '</div>';
+  }
   if (printFinalPay < 0) {
     h += '<div style="font-size:10px;color:#856404;margin-top:3px;">⚠ Hutang dibawa ke bulan hadapan: RM ' + fmtNum2(Math.abs(printFinalPay)) + '</div>';
   }
