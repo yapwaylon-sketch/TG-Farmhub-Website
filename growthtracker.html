@@ -604,7 +604,12 @@ function renderOverview() {
     // becomes noise once Harvesting/Suckers/To Replant.
     const daiDisplay = postHarvest ? '—' : (r.days_after_induce != null ? r.days_after_induce : '—');
 
-    const varietyDisplay = esc(r.crop_name + ' - ' + r.variety_name);
+    // Variety cell: just the variety name (e.g. "MD2", "SG1") — short, scannable.
+    // Full crop · variety context lives in the tooltip so it works when other crops arrive.
+    const varietyDisplay = esc(r.variety_name || '—');
+    const varietyTitle = (r.crop_name && r.crop_name !== '—' && r.variety_name)
+      ? r.crop_name + ' · ' + r.variety_name
+      : (r.variety_name || '');
     const quantityDisplay = r.quantity != null ? Number(r.quantity).toLocaleString() : '—';
 
     // Days to Induce — only meaningful pre-induction. Once block is Induced or beyond, the
@@ -623,7 +628,7 @@ function renderOverview() {
       '<td class="td-bold">' + esc(r.block_name) + '</td>' +
       '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
       '<td style="white-space:nowrap;">' + ageCell + '</td>' +
-      '<td>' + varietyDisplay + '</td>' +
+      '<td title="' + esc(varietyTitle) + '">' + varietyDisplay + '</td>' +
       '<td>' + quantityDisplay + '</td>' +
       '<td>' + fmtDate(r.date_planted) + '</td>' +
       '<td>' + fmtDate(r.target_induce_date) + '</td>' +
