@@ -44,12 +44,38 @@ th.sortable:hover { color:var(--green-light); }
 .table-wrap th { white-space:nowrap; font-size:12px; }
 .table-wrap td { white-space:nowrap; }
 
-/* Mirrored top scroll bar — only shown on screens narrow enough to overflow */
-.table-scroll-top { overflow-x:auto; overflow-y:hidden; height:14px; }
-.table-scroll-top-inner { height:1px; }
-/* Hide on mobile — many columns hidden there, table fits */
+/* Hide the native horizontal scrollbar on the wrap — replaced by floating bar below.
+   Element remains scrollable programmatically (scrollLeft) and via shift+wheel/trackpad swipe. */
+.table-wrap-no-scrollbar { scrollbar-width:none; -ms-overflow-style:none; }
+.table-wrap-no-scrollbar::-webkit-scrollbar { display:none; }
+
+/* Floating horizontal scrollbar — fixed-position bar that follows the viewport bottom
+   while the table is in view. Width + left match the table's on-screen rect. */
+.floating-hscroll {
+  position:fixed; bottom:12px;
+  height:16px;
+  overflow-x:auto; overflow-y:hidden;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  z-index:100;
+  display:none;
+  box-shadow:0 4px 16px rgba(0,0,0,0.15);
+  scrollbar-width:thin;
+  scrollbar-color:var(--gold) transparent;
+}
+.floating-hscroll.visible { display:block; }
+.floating-hscroll::-webkit-scrollbar { height:14px; }
+.floating-hscroll::-webkit-scrollbar-track { background:transparent; }
+.floating-hscroll::-webkit-scrollbar-thumb {
+  background:var(--gold); border-radius:6px;
+  border:2px solid transparent; background-clip:padding-box;
+}
+.floating-hscroll::-webkit-scrollbar-thumb:hover { background:var(--gold-light); background-clip:padding-box; }
+.floating-hscroll-inner { height:1px; }
+/* Mobile drops 7 columns — table fits, no horizontal scroll needed */
 @media (max-width:768px) {
-  .table-scroll-top { display:none; }
+  .floating-hscroll { display:none !important; }
 }
 
 /* Summary cards — 3 columns for overview */

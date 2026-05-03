@@ -169,10 +169,7 @@
   <!-- Growth Table -->
   <div class="data-table">
     <div class="table-header">Block Growth Status</div>
-    <!-- Mirrored top scroll bar — same horizontal scroll position as the table below.
-         Saves user from scrolling all the way down to reach the bottom scroll bar. -->
-    <div class="table-scroll-top" id="growth-scroll-top"><div class="table-scroll-top-inner"></div></div>
-    <div class="table-wrap" id="growth-table-wrap">
+    <div class="table-wrap table-wrap-no-scrollbar" id="growth-table-wrap">
       <table>
         <thead>
           <tr>
@@ -195,6 +192,11 @@
         <tbody id="growth-body"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Floating horizontal scrollbar — pinned to viewport bottom while table is in view -->
+  <div class="floating-hscroll" id="growth-floating-scroll" aria-hidden="true">
+    <div class="floating-hscroll-inner"></div>
   </div>
 </div>
 
@@ -644,35 +646,55 @@ function renderOverview() {
     '</tr>';
   }).join("");
 
-  // Sync mirrored top scroll bar width + listeners (table width changes with content)
-  syncTopScrollBar();
+  // Refresh floating horizontal scrollbar (table width may have changed with new data)
+  setupFloatingScroll();
 }
 
-// Mirrored top scroll bar — sync width to table's scrollWidth + bidirectional scroll listeners
-function syncTopScrollBar() {
-  const top = document.getElementById('growth-scroll-top');
+// Floating horizontal scrollbar — pinned to viewport bottom, follows table position.
+// Bidirectional scroll sync between bar and the table-wrap; show/hide based on visibility.
+function setupFloatingScroll() {
+  const float = document.getElementById('growth-floating-scroll');
   const wrap = document.getElementById('growth-table-wrap');
-  if (!top || !wrap) return;
-  const inner = top.querySelector('.table-scroll-top-inner');
-  if (inner) inner.style.width = wrap.scrollWidth + 'px';
-  if (top.dataset.synced) return;
-  let syncing = false;
-  top.addEventListener('scroll', () => {
-    if (syncing) return; syncing = true;
-    wrap.scrollLeft = top.scrollLeft;
-    requestAnimationFrame(() => syncing = false);
-  });
-  wrap.addEventListener('scroll', () => {
-    if (syncing) return; syncing = true;
-    top.scrollLeft = wrap.scrollLeft;
-    requestAnimationFrame(() => syncing = false);
-  });
-  top.dataset.synced = '1';
+  if (!float || !wrap) return;
+  const inner = float.querySelector('.floating-hscroll-inner');
+
+  function updatePosition() {
+    const rect = wrap.getBoundingClientRect();
+    float.style.left = rect.left + 'px';
+    float.style.width = rect.width + 'px';
+    if (inner) inner.style.width = wrap.scrollWidth + 'px';
+  }
+
+  function checkVisibility() {
+    const rect = wrap.getBoundingClientRect();
+    const overflows = wrap.scrollWidth > wrap.clientWidth + 1; // +1 = sub-pixel tolerance
+    const inView = rect.top < window.innerHeight && rect.bottom > 0;
+    if (overflows && inView && currentPage === 'overview') {
+      float.classList.add('visible');
+      updatePosition();
+    } else {
+      float.classList.remove('visible');
+    }
+  }
+
+  if (!float.dataset.synced) {
+    let syncing = false;
+    float.addEventListener('scroll', () => {
+      if (syncing) return; syncing = true;
+      wrap.scrollLeft = float.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    });
+    wrap.addEventListener('scroll', () => {
+      if (syncing) return; syncing = true;
+      float.scrollLeft = wrap.scrollLeft;
+      requestAnimationFrame(() => { syncing = false; });
+    });
+    window.addEventListener('scroll', checkVisibility, { passive: true });
+    window.addEventListener('resize', checkVisibility);
+    float.dataset.synced = '1';
+  }
+  checkVisibility();
 }
-// Re-sync on viewport resize (column widths can change)
-window.addEventListener('resize', () => {
-  if (currentPage === 'overview') syncTopScrollBar();
-});
 
 function populateFilters() {
   const allRows = buildGrowthData();
