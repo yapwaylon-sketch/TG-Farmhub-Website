@@ -19,7 +19,7 @@
 .data-table table td:nth-child(6),
 .data-table table td:nth-child(7),
 .data-table table td:nth-child(9),
-.data-table table td:nth-child(11) { font-size: 11px; }
+.data-table table td:nth-child(11) { font-size: 12px; }
 
 .td-overdue { color: var(--red) !important; font-weight: 700; }
 .td-approaching { color: var(--gold-light) !important; font-weight: 700; }
