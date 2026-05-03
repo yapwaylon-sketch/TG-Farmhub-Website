@@ -127,6 +127,7 @@
       <div class="page-title">Growth Overview</div>
       <div class="page-subtitle">Monitor block growth, induction, and harvest schedules</div>
     </div>
+    <button class="btn btn-outline" onclick="openExportModal()">Download CSV</button>
   </div>
 
   <!-- Summary Cards -->
@@ -153,6 +154,7 @@
 
   <!-- Filter Bar -->
   <div class="filter-bar">
+    <input type="search" id="search-blocks" oninput="onSearchBlocks(this.value)" placeholder="Search block, variety, remarks…" style="min-width:240px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:inherit;">
     <select id="filter-status" onchange="onFilterStatus()">
       <option value="all">All Statuses</option>
     </select>
@@ -172,7 +174,7 @@
           <tr>
             <th class="sortable" onclick="sortGrowth('block_name')">Block<span id="sort-block_name"></span></th>
             <th class="sortable" onclick="sortGrowth('status_name')">Status<span id="sort-status_name"></span></th>
-            <th class="sortable" onclick="sortGrowth('dap')">Age (d)<span id="sort-dap"></span></th>
+            <th class="sortable" onclick="sortGrowth('dap')">Age<span id="sort-dap"></span></th>
             <th class="sortable" onclick="sortGrowth('variety_name')">Variety<span id="sort-variety_name"></span></th>
             <th class="sortable" onclick="sortGrowth('quantity')">Plants<span id="sort-quantity"></span></th>
             <th class="sortable" onclick="sortGrowth('date_planted')">Planted<span id="sort-date_planted"></span></th>
@@ -212,6 +214,7 @@ let blocks = [], blockCrops = [], varieties = [], statuses = [], growthRecords =
 let currentPage = 'overview';
 let sortField = 'block_name', sortDir = 'asc';
 let filterStatus = 'all', filterVariety = 'all', filterHarvest30 = false;
+let searchTerm = '';
 let refreshTimer = null;
 
 // ============================================================
@@ -423,6 +426,13 @@ function applyFilters(rows) {
   if(filterStatus !== 'all') rows = rows.filter(r => r.status_name === filterStatus);
   if(filterVariety !== 'all') rows = rows.filter(r => r.variety_id === filterVariety);
   if(filterHarvest30) rows = rows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
+  if(searchTerm) {
+    const q = searchTerm;
+    rows = rows.filter(r => {
+      const haystack = [r.block_name, r.variety_name, r.crop_name, r.status_name, r.remarks].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
   return rows;
 }
 
@@ -557,11 +567,14 @@ function renderOverview() {
     const dtiDisplay = r.days_to_induce != null ? r.days_to_induce : '—';
 
     const ageDisplay = ageFromPlanted(r.date_planted);
+    const ageCell = ageDisplay
+      ? (r.dap != null ? ageDisplay + ' <span style="color:var(--text-muted);font-size:11px;">(' + r.dap + 'd)</span>' : ageDisplay)
+      : '—';
 
     return '<tr class="' + rowClass + '">' +
       '<td class="td-bold">' + esc(r.block_name) + '</td>' +
       '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
-      '<td style="white-space:nowrap;">' + (ageDisplay || '—') + '</td>' +
+      '<td style="white-space:nowrap;">' + ageCell + '</td>' +
       '<td>' + varietyDisplay + '</td>' +
       '<td>' + quantityDisplay + '</td>' +
       '<td>' + fmtDate(r.date_planted) + '</td>' +
@@ -633,6 +646,127 @@ function clearAllFilters() {
   document.getElementById("btn-harvest30").classList.remove("active");
   updateClearFiltersBtn();
   renderOverview();
+}
+
+// Search handler — clears existing dropdown filters once when search becomes active (empty → non-empty)
+let _searchDebounce = null;
+function onSearchBlocks(val) {
+  const wasEmpty = !searchTerm;
+  const newTerm = (val || '').toLowerCase().trim();
+  if (wasEmpty && newTerm) {
+    // Search just became active — clear filters per user pref
+    filterStatus = 'all';
+    filterVariety = 'all';
+    filterHarvest30 = false;
+    document.getElementById('filter-status').value = 'all';
+    document.getElementById('filter-variety').value = 'all';
+    document.getElementById('btn-harvest30').classList.remove('active');
+    updateClearFiltersBtn();
+  }
+  searchTerm = newTerm;
+  // Debounce render for snappier typing
+  if (_searchDebounce) clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(renderOverview, 150);
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function openExportModal() {
+  const allRows = buildGrowthData();
+  const visibleRows = sortRows(applyFilters([...allRows]));
+  const visibleCount = visibleRows.length;
+  const allCount = allRows.length;
+  let mc = document.getElementById('gt-export-modal');
+  if (!mc) { mc = document.createElement('div'); mc.id = 'gt-export-modal'; document.body.appendChild(mc); }
+  mc.innerHTML =
+    '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:420px;max-width:90vw;position:relative;">' +
+        '<button onclick="closeExportModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;">&times;</button>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px;">Download CSV</div>' +
+        '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Which rows?</div>' +
+          '<label style="display:block;padding:6px 0;cursor:pointer;font-size:13px;"><input type="radio" name="exp-rows" value="visible" checked> Currently visible (' + visibleCount + ' rows — filters & search applied)</label>' +
+          '<label style="display:block;padding:6px 0;cursor:pointer;font-size:13px;"><input type="radio" name="exp-rows" value="all"> All blocks (' + allCount + ' rows)</label>' +
+        '</div>' +
+        '<div style="margin-bottom:14px;">' +
+          '<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Which columns?</div>' +
+          '<label style="display:block;padding:6px 0;cursor:pointer;font-size:13px;"><input type="radio" name="exp-cols" value="visible" checked> On-screen columns (formatted dates, readable labels)</label>' +
+          '<label style="display:block;padding:6px 0;cursor:pointer;font-size:13px;"><input type="radio" name="exp-cols" value="all"> Full data (raw fields, ISO dates, IDs included)</label>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+          '<button class="btn btn-outline" onclick="closeExportModal()">Cancel</button>' +
+          '<button class="btn btn-primary" onclick="doExportCSV()">Download</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function closeExportModal() {
+  const mc = document.getElementById('gt-export-modal');
+  if (mc) mc.innerHTML = '';
+}
+
+function doExportCSV() {
+  const rowsScope = document.querySelector('input[name="exp-rows"]:checked').value;
+  const colsScope = document.querySelector('input[name="exp-cols"]:checked').value;
+  const allRows = buildGrowthData();
+  const rows = rowsScope === 'all' ? allRows : sortRows(applyFilters([...allRows]));
+  if (!rows.length) { notify('No rows to export', 'warning'); return; }
+
+  let headers, mapper;
+  if (colsScope === 'visible') {
+    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induce Start', 'Induce End', 'Days After Induce', 'Harvest Days', 'Harvest Window', 'Days to Harvest', 'Remarks'];
+    mapper = r => [
+      r.block_name || '',
+      r.status_name || '',
+      ageFromPlanted(r.date_planted) || '',
+      r.dap != null ? r.dap : '',
+      (r.crop_name && r.variety_name) ? r.crop_name + ' - ' + r.variety_name : (r.variety_name || ''),
+      r.quantity != null ? r.quantity : '',
+      r.date_planted ? fmtDate(r.date_planted) : '',
+      r.target_induce_date ? fmtDate(r.target_induce_date) : '',
+      r.days_to_induce != null ? r.days_to_induce : '',
+      r.date_induced_start ? fmtDate(r.date_induced_start) : '',
+      r.date_induced_end ? fmtDate(r.date_induced_end) : '',
+      r.days_after_induce != null ? r.days_after_induce : '',
+      r.harvest_days != null ? r.harvest_days : '',
+      r.harvest_window || '',
+      r.days_to_harvest != null ? r.days_to_harvest : '',
+      r.remarks || ''
+    ];
+  } else {
+    // Full data — raw fields, ISO dates, IDs included
+    headers = ['block_id', 'block_name', 'block_crop_id', 'crop_name', 'variety_id', 'variety_name', 'status_id', 'status_name', 'date_planted', 'dap', 'months', 'quantity', 'target_induce_date', 'days_to_induce', 'date_induced_start', 'date_induced_end', 'days_after_induce', 'harvest_days', 'target_harvest_start', 'target_harvest_end', 'days_to_harvest', 'remarks'];
+    mapper = r => [
+      r.block_id || '', r.block_name || '', r.block_crop_id || '',
+      r.crop_name || '', r.variety_id || '', r.variety_name || '',
+      r.status_id || '', r.status_name || '',
+      r.date_planted || '', r.dap != null ? r.dap : '', r.months != null ? r.months : '',
+      r.quantity != null ? r.quantity : '',
+      r.target_induce_date || '', r.days_to_induce != null ? r.days_to_induce : '',
+      r.date_induced_start || '', r.date_induced_end || '',
+      r.days_after_induce != null ? r.days_after_induce : '',
+      r.harvest_days != null ? r.harvest_days : '',
+      (r.growth_record && r.growth_record.target_harvest_start) || '',
+      (r.growth_record && r.growth_record.target_harvest_end) || '',
+      r.days_to_harvest != null ? r.days_to_harvest : '',
+      r.remarks || ''
+    ];
+  }
+
+  const escapeCsv = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = headers.map(escapeCsv).join(',') + '\n' +
+              rows.map(r => mapper(r).map(escapeCsv).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = 'growth-tracker-' + today + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  closeExportModal();
+  notify('Exported ' + rows.length + ' row' + (rows.length === 1 ? '' : 's'));
 }
 
 // ============================================================
