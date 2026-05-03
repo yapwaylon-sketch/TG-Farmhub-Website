@@ -135,7 +135,7 @@
     <div class="summary-card clickable" id="card-total-box" onclick="resetAllFilters()" title="Click to clear all filters">
       <div class="sc-label">Total Active Blocks</div>
       <div class="sc-value" id="card-total" style="color:var(--text);">—</div>
-      <div class="sc-sub">Block crops being tracked</div>
+      <div class="sc-sub">Plants in ground · excludes To Replant</div>
     </div>
     <div class="summary-card clickable" id="card-approaching-box" onclick="toggleApproachingFilter()" title="Click to filter to approaching harvest">
       <div class="sc-label">Approaching Harvest</div>
@@ -217,9 +217,14 @@ if(!currentUser) { location.href = "index.html"; }
 const PRE_HARVEST_STATUSES = ['growing', 'to induce', 'induced'];
 const POST_HARVEST_STATUSES = ['harvesting', 'suckers', 'to replant'];
 const POST_INDUCTION_STATUSES = ['induced', 'harvesting', 'suckers', 'to replant'];
+// IN_GROUND = blocks where plants/suckers are still physically there.
+// Excludes To Replant (suckers being collected/cleared for next cycle — nothing productive left).
+// Used for the headline "Total Active Blocks" + Plant count cards so both stay consistent.
+const IN_GROUND_STATUSES = ['growing', 'to induce', 'induced', 'harvesting', 'suckers'];
 function isPreHarvest(s) { return PRE_HARVEST_STATUSES.includes((s || '').toLowerCase()); }
 function isPostHarvest(s) { return POST_HARVEST_STATUSES.includes((s || '').toLowerCase()); }
 function isPostInduction(s) { return POST_INDUCTION_STATUSES.includes((s || '').toLowerCase()); }
+function isInGround(s) { return IN_GROUND_STATUSES.includes((s || '').toLowerCase()); }
 
 // ============================================================
 // GLOBAL DATA
@@ -511,10 +516,11 @@ function renderOverview() {
   updateSortIndicators();
 
   // Summary cards — always based on all rows (unfiltered)
+  // Total Active Blocks excludes To Replant (those plants are being cleared, not productive).
   // Only PRE-HARVEST blocks are countable for Approaching/Overdue. Once a block reaches
   // Harvesting / Suckers / To Replant, the harvest is in progress or done — the countdown
   // is no longer actionable and shouldn't trigger warnings.
-  const totalBlocks = allRows.length;
+  const totalBlocks = allRows.filter(r => isInGround(r.status_name)).length;
   const harvestCountableRows = allRows.filter(r => isPreHarvest(r.status_name));
   const approaching = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30).length;
   const overdue = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest < 0).length;
@@ -526,8 +532,8 @@ function renderOverview() {
   document.getElementById("card-approaching-box").classList.toggle("active", filterHarvest30);
   document.getElementById("card-overdue-box").classList.toggle("active", filterOverdue);
 
-  // Plant count by variety & status (exclude "To Replant" from totals — no plants in ground)
-  const countableRows = allRows.filter(r => (r.status_name || '').toLowerCase() !== 'to replant');
+  // Plant count by variety & status — only IN-GROUND blocks (excludes To Replant)
+  const countableRows = allRows.filter(r => isInGround(r.status_name));
   const varietyNames = [...new Set(allRows.map(r => r.variety_name))].sort();
   const statusNames = [...new Set(countableRows.map(r => r.status_name))].filter(Boolean).sort();
   const pcContainer = document.getElementById("plant-count-cards");
