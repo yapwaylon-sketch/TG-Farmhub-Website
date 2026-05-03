@@ -492,9 +492,19 @@ function sortGrowth(field) {
 function naturalCompare(a, b) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
+// Phase-aware sort value — countdown fields are only meaningful during a specific lifecycle
+// phase. For rows out of phase, return null so they sink to the bottom of the sort (matches
+// the muting/blanking already applied in the row render). Date fields aren't nullified —
+// they're valid historical records even out of phase.
+function sortValueFor(row, field) {
+  if (field === 'days_to_induce' && isPostInduction(row.status_name)) return null;
+  if (field === 'days_after_induce' && (row.status_name || '').toLowerCase() !== 'induced') return null;
+  if (field === 'days_to_harvest' && isPostHarvest(row.status_name)) return null;
+  return row[field];
+}
 function sortRows(rows) {
   return rows.sort((a, b) => {
-    let va = a[sortField], vb = b[sortField];
+    let va = sortValueFor(a, sortField), vb = sortValueFor(b, sortField);
     if(va == null && vb == null) return 0;
     if(va == null) return 1;
     if(vb == null) return -1;
