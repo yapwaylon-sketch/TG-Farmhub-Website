@@ -42,6 +42,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span class="nav-label">Growth Overview</span>
     </div>
+    <div class="nav-item" data-page="changelog" onclick="navigateTo('changelog')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span class="nav-label">Changelog</span>
+    </div>
   </nav>
   <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
     <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
@@ -62,6 +66,59 @@
 
 <!-- MAIN CONTENT -->
 <div class="main-content" role="main" id="main-content">
+
+<!-- PAGE: CHANGELOG -->
+<div id="page-changelog" class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Changelog</div>
+      <div class="page-subtitle">History of manual changes to blocks, crops, and growth records</div>
+    </div>
+    <button class="btn btn-outline" onclick="exportChangelogCSV()">Download CSV</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <label style="font-size:11px;color:var(--text-muted);">From</label>
+      <input type="date" id="cl-from" onchange="loadChangelog()">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <label style="font-size:11px;color:var(--text-muted);">To</label>
+      <input type="date" id="cl-to" onchange="loadChangelog()">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <label style="font-size:11px;color:var(--text-muted);">Type</label>
+      <select id="cl-type" onchange="loadChangelog()">
+        <option value="all">All Types</option>
+        <option value="pnd_blocks">Blocks</option>
+        <option value="block_crops">Block Crops</option>
+        <option value="growth_records">Growth Records</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <label style="font-size:11px;color:var(--text-muted);">Action</label>
+      <select id="cl-action" onchange="loadChangelog()">
+        <option value="all">All Actions</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <label style="font-size:11px;color:var(--text-muted);">Changed By</label>
+      <select id="cl-user" onchange="loadChangelog()">
+        <option value="all">All Users</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="changelog-stats" class="cards-grid cards-3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:18px;"></div>
+
+  <!-- Table -->
+  <div class="data-table">
+    <div class="table-header">Changes</div>
+    <div class="table-wrap" id="changelog-table-content"></div>
+  </div>
+</div>
 
 <!-- PAGE: GROWTH OVERVIEW -->
 <div id="page-overview" class="page active">
@@ -221,6 +278,7 @@ function navigateTo(page) {
 
 function renderCurrentPage() {
   if(currentPage === 'overview') renderOverview();
+  else if(currentPage === 'changelog') initChangelogPage();
 }
 
 // ============================================================
@@ -575,6 +633,175 @@ function clearAllFilters() {
   document.getElementById("btn-harvest30").classList.remove("active");
   updateClearFiltersBtn();
   renderOverview();
+}
+
+// ============================================================
+// CHANGELOG
+// ============================================================
+const CL_TABLE_LABELS = {
+  pnd_blocks: 'Block',
+  block_crops: 'Block Crop',
+  growth_records: 'Growth Record'
+};
+const CL_ACTION_COLORS = {
+  create: 'var(--good)',
+  cycle_new: 'var(--good)',
+  reactivate: 'var(--good)',
+  delete: 'var(--red)',
+  deactivate: 'var(--red)',
+  cycle_close: 'var(--red)',
+  update: 'var(--gold)',
+  status_change: 'var(--gold)',
+  target_induce_change: 'var(--gold)',
+  induction: '#5B9BD5',
+  induction_update: '#5B9BD5'
+};
+let changelogData = [];
+let changelogInited = false;
+let allBlockCropsForChangelog = [];
+
+function initChangelogPage() {
+  if(changelogInited) { loadChangelog(); return; }
+  changelogInited = true;
+  // Default range: last 30 days
+  const now = new Date();
+  const from = new Date(now); from.setDate(from.getDate() - 30);
+  document.getElementById('cl-from').value = from.toISOString().slice(0,10);
+  document.getElementById('cl-to').value = now.toISOString().slice(0,10);
+  // Load all block_crops (including past cycles) for label resolution
+  sbQuery(sb.from('block_crops').select('id, block_id, variety_id, cycle, is_current')).then(d => {
+    allBlockCropsForChangelog = d || [];
+    loadChangelog();
+  });
+}
+
+async function loadChangelog() {
+  const fromDate = document.getElementById('cl-from').value;
+  const toDate = document.getElementById('cl-to').value;
+  const typeFilter = document.getElementById('cl-type').value;
+  const actionFilter = document.getElementById('cl-action').value;
+  const userFilter = document.getElementById('cl-user').value;
+
+  if(!fromDate || !toDate) {
+    document.getElementById('changelog-stats').innerHTML = '';
+    document.getElementById('changelog-table-content').innerHTML = '<div class="empty-state">Select date range</div>';
+    return;
+  }
+
+  // Inclusive end date
+  const toDatePlusOne = new Date(toDate);
+  toDatePlusOne.setDate(toDatePlusOne.getDate() + 1);
+
+  const tables = typeFilter === 'all'
+    ? ['pnd_blocks', 'block_crops', 'growth_records']
+    : [typeFilter];
+
+  let query = sb.from('audit_log').select('*')
+    .in('table_name', tables)
+    .gte('changed_at', fromDate)
+    .lt('changed_at', toDatePlusOne.toISOString().slice(0,10))
+    .order('changed_at', { ascending: false });
+
+  if(userFilter !== 'all') query = query.eq('changed_by', userFilter);
+  if(actionFilter !== 'all') query = query.eq('action', actionFilter);
+
+  const data = await sbQuery(query) || [];
+  changelogData = data;
+
+  // Populate user dropdown from results (preserve current selection)
+  const userSel = document.getElementById('cl-user');
+  const cur = userSel.value;
+  const uniqueUsers = [...new Set(data.map(d => d.changed_by))].filter(Boolean).sort();
+  userSel.innerHTML = '<option value="all">All Users</option>' +
+    uniqueUsers.map(u => '<option value="' + esc(u) + '"' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>').join('');
+
+  // Populate action dropdown from results (preserve current selection)
+  const actSel = document.getElementById('cl-action');
+  const curAct = actSel.value;
+  const uniqueActions = [...new Set(data.map(d => d.action))].filter(Boolean).sort();
+  actSel.innerHTML = '<option value="all">All Actions</option>' +
+    uniqueActions.map(a => '<option value="' + esc(a) + '"' + (a === curAct ? ' selected' : '') + '>' + esc(a) + '</option>').join('');
+
+  // Stats
+  const byTable = {};
+  tables.forEach(t => byTable[t] = 0);
+  data.forEach(d => byTable[d.table_name] = (byTable[d.table_name] || 0) + 1);
+  let statsHtml = '<div class="summary-card"><div class="sc-label">Total Changes</div><div class="sc-value" style="font-size:22px;">' + data.length + '</div></div>';
+  tables.forEach(t => {
+    statsHtml += '<div class="summary-card"><div class="sc-label">' + CL_TABLE_LABELS[t] + '</div><div class="sc-value" style="font-size:22px;color:' + (byTable[t] > 0 ? 'var(--gold)' : 'var(--text-muted)') + ';">' + (byTable[t] || 0) + '</div></div>';
+  });
+  document.getElementById('changelog-stats').innerHTML = statsHtml;
+
+  // Table
+  if(data.length === 0) {
+    document.getElementById('changelog-table-content').innerHTML = '<div class="empty-state">No changes for selected filters</div>';
+    return;
+  }
+
+  let html = '<table><thead><tr>';
+  html += '<th style="width:32px;">#</th><th>When</th><th>By</th><th>Type</th><th>Action</th><th>Record</th><th>Changes</th>';
+  html += '</tr></thead><tbody>';
+  data.forEach((d, i) => {
+    const dt = new Date(d.changed_at);
+    const dateStr = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const recordLabel = clResolveRecordLabel(d.table_name, d.record_id);
+    const actionColor = CL_ACTION_COLORS[d.action] || 'var(--text)';
+    html += '<tr>';
+    html += '<td style="color:var(--text-muted);">' + (i + 1) + '</td>';
+    html += '<td style="white-space:nowrap;font-size:12px;">' + dateStr + '<br><span style="color:var(--text-muted);">' + timeStr + '</span></td>';
+    html += '<td>' + esc(d.changed_by || '—') + '</td>';
+    html += '<td><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:var(--bg-hover);font-weight:600;">' + esc(CL_TABLE_LABELS[d.table_name] || d.table_name) + '</span></td>';
+    html += '<td style="color:' + actionColor + ';font-weight:600;text-transform:capitalize;white-space:nowrap;">' + esc((d.action || '').replace(/_/g, ' ')) + '</td>';
+    html += '<td style="font-size:12px;">' + esc(recordLabel) + '</td>';
+    html += '<td style="font-size:12px;max-width:380px;word-break:break-word;white-space:normal;">' + esc(d.changes || '') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('changelog-table-content').innerHTML = html;
+}
+
+function clResolveRecordLabel(tableName, recordId) {
+  if(!recordId) return '—';
+  if(tableName === 'pnd_blocks') {
+    const b = blocks.find(x => x.id === recordId);
+    return b ? b.block_name : recordId;
+  }
+  // block_crops + growth_records both keyed by block_crop_id
+  const bc = allBlockCropsForChangelog.find(x => x.id === recordId)
+          || blockCrops.find(x => x.id === recordId);
+  if(!bc) return recordId;
+  const block = blocks.find(b => b.id === bc.block_id);
+  const variety = varieties.find(v => v.id === bc.variety_id);
+  return (block ? block.block_name : '?') + ' / ' + (variety ? variety.name : '?') + (bc.cycle ? ' / Cycle ' + bc.cycle : '');
+}
+
+function exportChangelogCSV() {
+  if(!changelogData || changelogData.length === 0) { notify('No changelog data to export', 'warning'); return; }
+  const headers = ['#', 'Date', 'Time', 'By', 'Type', 'Action', 'Record', 'Changes'];
+  const rows = changelogData.map((d, i) => {
+    const dt = new Date(d.changed_at);
+    const date = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const time = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return [
+      String(i + 1),
+      date,
+      time,
+      d.changed_by || '',
+      CL_TABLE_LABELS[d.table_name] || d.table_name,
+      d.action || '',
+      clResolveRecordLabel(d.table_name, d.record_id),
+      d.changes || ''
+    ].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',');
+  });
+  const csv = headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = 'growth-changelog-' + today + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 </script>

@@ -1401,6 +1401,8 @@ var allWorkers = [];
 var salesDrivers = [];
 var systemUsers = [];
 var invoices = [], invoiceItems = [], invoiceOrders = [], invoicePayments = [], creditNotes = [];
+// Cross-company read of Agribusiness growth data — for harvest forecast on dashboard
+var harvestBlockCrops = [], harvestStatuses = [], harvestRecords = [];
 var currentTab = 'dashboard';
 var soDetailOrderId = null;
 var soOpenedFromCustomer = null;
@@ -1532,7 +1534,12 @@ async function loadAllData() {
     sbQuery(sb.from('sales_invoice_orders').select('*').eq('company_id', cid)),
     sbQuery(sb.from('sales_invoice_payments').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
     sbQuery(sb.from('sales_credit_notes').select('*').eq('company_id', cid).order('created_at', {ascending: false})),
-    sbQuery(sb.from('sales_customer_branches').select('*').eq('company_id', cid).eq('is_active', true).order('name'))
+    sbQuery(sb.from('sales_customer_branches').select('*').eq('company_id', cid).eq('is_active', true).order('name')),
+    // Harvest forecast data (cross-company read of Agribusiness growth)
+    // block_crops + crop_statuses have no company_id (Agribusiness-only by convention)
+    sbQuery(sb.from('block_crops').select('id,quantity,status_id,variety_id,is_current').eq('is_current', true)),
+    sbQuery(sb.from('crop_statuses').select('id,name')),
+    sbQuery(sb.from('growth_records_view').select('block_crop_id,target_harvest_start').eq('company_id', 'tg_agribusiness'))
   ]);
   customers = results[0] || [];
   salesProducts = results[1] || [];
@@ -1550,6 +1557,42 @@ async function loadAllData() {
   invoicePayments = results[13] || [];
   creditNotes = results[14] || [];
   branches = results[15] || [];
+  harvestBlockCrops = results[16] || [];
+  harvestStatuses = results[17] || [];
+  harvestRecords = results[18] || [];
+}
+
+// Compute harvest forecast buckets from cross-company growth data.
+// Returns {now, days7, days30, days60} — each {blocks, plants}.
+// "Now" includes status=Harvesting OR (induced and past target_harvest_start, i.e. overdue).
+// Other buckets exclude Harvesting/Suckers/To Replant statuses.
+function computeHarvestForecast() {
+  var todayMs = new Date(); todayMs.setHours(0,0,0,0); todayMs = todayMs.getTime();
+  var d7 = todayMs + 7*86400000, d30 = todayMs + 30*86400000, d60 = todayMs + 60*86400000;
+  var statusById = {};
+  harvestStatuses.forEach(function(s) { statusById[s.id] = (s.name || '').toLowerCase(); });
+  var grByBc = {};
+  harvestRecords.forEach(function(g) { grByBc[g.block_crop_id] = g; });
+
+  var buckets = { now: {blocks:0, plants:0}, days7: {blocks:0, plants:0}, days30: {blocks:0, plants:0}, days60: {blocks:0, plants:0} };
+  harvestBlockCrops.forEach(function(bc) {
+    var status = statusById[bc.status_id] || '';
+    if (status === 'suckers' || status === 'to replant') return; // no fruit coming
+    var qty = parseInt(bc.quantity) || 0;
+    var gr = grByBc[bc.id];
+    var hMs = (gr && gr.target_harvest_start) ? new Date(gr.target_harvest_start + 'T00:00:00').getTime() : null;
+
+    if (status === 'harvesting' || (hMs != null && hMs <= todayMs)) {
+      buckets.now.blocks++; buckets.now.plants += qty;
+    } else if (hMs != null && hMs <= d7) {
+      buckets.days7.blocks++; buckets.days7.plants += qty;
+    } else if (hMs != null && hMs <= d30) {
+      buckets.days30.blocks++; buckets.days30.plants += qty;
+    } else if (hMs != null && hMs <= d60) {
+      buckets.days60.blocks++; buckets.days60.plants += qty;
+    }
+  });
+  return buckets;
 }
 
 function getCustomerBranches(customerId) {
@@ -1894,6 +1937,31 @@ function renderDashboard() {
   }
   html += '</div>';
 
+  html += '</div>';
+
+  // --- Harvest Forecast (cross-company peek at Agribusiness pipeline) ---
+  var hf = computeHarvestForecast();
+  var hfTooltip = 'Plants are approximate — based on quantity at planting, not actual surviving plants. Predicted harvest dates use variety defaults; actual may vary.';
+  html += '<div style="margin-top:18px;">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--text);">Harvest Forecast</div>';
+  html += '<span title="' + esc(hfTooltip) + '" style="font-size:11px;color:var(--text-muted);cursor:help;">ⓘ approximate</span>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">';
+  function hfCard(label, bucket, color) {
+    var hasData = bucket.blocks > 0;
+    var s = '<div class="summary-card" style="padding:10px 12px;">';
+    s += '<div class="sc-label" style="margin:0 0 4px;">' + esc(label) + '</div>';
+    s += '<div class="sc-value" style="font-size:18px;color:' + (hasData ? color : 'var(--text-muted)') + ';">' + bucket.blocks + (bucket.blocks === 1 ? ' block' : ' blocks') + '</div>';
+    s += '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">~' + bucket.plants.toLocaleString() + ' plants</div>';
+    s += '</div>';
+    return s;
+  }
+  html += hfCard('Harvesting now', hf.now, 'var(--good)');
+  html += hfCard('Next 7 days', hf.days7, 'var(--gold)');
+  html += hfCard('In 8–30 days', hf.days30, '#5B9BD5');
+  html += hfCard('In 31–60 days', hf.days60, 'var(--text)');
+  html += '</div>';
   html += '</div>';
 
   // --- Active Orders (non-completed, non-cancelled) ---

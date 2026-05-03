@@ -1312,6 +1312,60 @@ async function loadFcBlocks() {
 }
 
 // ============================================================
+// FARM CONFIG — AUDIT LOG (manual overrides only)
+// ============================================================
+// Records growth-related changes (block lifecycle, block_crop edits, induction events,
+// manual target-date overrides, new cycle, deletions) to the audit_log table.
+// Auto-cascades (e.g. target_induce_date computed from date_planted change) are NOT logged.
+async function fcAuditLog(tableName, recordId, action, changes) {
+  if (!currentUser) return;
+  const who = currentUser.displayName || currentUser.username || "Unknown";
+  await sbQuery(sb.from("audit_log").insert({
+    table_name: tableName,
+    record_id: recordId,
+    action: action,
+    changes: changes || "",
+    changed_by: who
+  }).select());
+}
+// Diff helper — returns string like "date_planted: 2026-04-03 → 2026-04-05, quantity: 1000 → 950"
+// statusLookup (optional): {statusId: statusName} for resolving status_id field.
+function fcDiffChanges(oldObj, newObj, fields, statusLookup) {
+  const out = [];
+  for (const f of fields) {
+    const oldV = oldObj ? oldObj[f] : null;
+    const newV = newObj ? newObj[f] : null;
+    const oldS = (oldV === null || oldV === undefined || oldV === "") ? "" : String(oldV);
+    const newS = (newV === null || newV === undefined || newV === "") ? "" : String(newV);
+    if (oldS === newS) continue;
+    if (f === "status_id" && statusLookup) {
+      out.push("status: " + (statusLookup[oldV] || oldS || "—") + " → " + (statusLookup[newV] || newS || "—"));
+    } else if (f === "variety_id") {
+      const vOld = fcVarieties.find(v => v.id === oldV);
+      const vNew = fcVarieties.find(v => v.id === newV);
+      out.push("variety: " + (vOld ? vOld.name : (oldS || "—")) + " → " + (vNew ? vNew.name : (newS || "—")));
+    } else {
+      out.push(f + ": " + (oldS || "—") + " → " + (newS || "—"));
+    }
+  }
+  return out.join(", ");
+}
+// Status lookup helper — {id: name} from fcCropStatuses
+function fcStatusLookup() {
+  const m = {};
+  fcCropStatuses.forEach(s => { m[s.id] = s.name; });
+  return m;
+}
+// Resolve a block_crop record_id into a human label "Block 5A / MD2 / Cycle 1"
+function fcBlockCropLabel(bcId) {
+  const bc = fcBlockCrops.find(x => x.id === bcId);
+  if (!bc) return bcId;
+  const block = fcBlocks.find(b => b.id === bc.block_id);
+  const variety = fcVarieties.find(v => v.id === bc.variety_id);
+  return (block ? block.block_name : "?") + " / " + (variety ? variety.name : "?") + (bc.cycle ? " / Cycle " + bc.cycle : "");
+}
+
+// ============================================================
 // FARM CONFIG — TAB SWITCH
 // ============================================================
 function switchFarmTab(tab) {
@@ -1654,6 +1708,7 @@ function fcUpdateBlock(id, field, value) {
       const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
       if (result === null) { renderBlockList(); return; }
       if (bl) Object.assign(bl, upd);
+      await fcAuditLog("pnd_blocks", id, "deactivate", "Deactivated: " + blockName);
       notify(blockName + ' deactivated');
       renderBlockList();
     });
@@ -1665,10 +1720,19 @@ function fcUpdateBlock(id, field, value) {
 
   // Other updates proceed immediately
   (async function() {
+    const bl = fcBlocks.find(b => b.id === id);
+    const oldVal = bl ? bl[field] : null;
     const result = await sbQuery(sb.from('pnd_blocks').update(upd).eq('id', id).select());
     if (result === null) return;
-    const bl = fcBlocks.find(b => b.id === id); if (bl) Object.assign(bl, upd);
+    if (bl) Object.assign(bl, upd);
     showTick('fc-tick-' + id);
+    // Audit only meaningful field changes (skip is_active=true reactivation if no real change)
+    const oldS = (oldVal === null || oldVal === undefined) ? "" : String(oldVal);
+    const newS = (upd[field] === null || upd[field] === undefined) ? "" : String(upd[field]);
+    if (oldS !== newS) {
+      const action = (field === 'is_active' && upd[field]) ? "reactivate" : "update";
+      await fcAuditLog("pnd_blocks", id, action, field + ": " + (oldS || "—") + " → " + (newS || "—"));
+    }
   })();
 }
 
@@ -1680,6 +1744,8 @@ async function fcAddBlock() {
   if (fcBlocks.some(b => b.block_name.toLowerCase() === name.toLowerCase())) { notify('Block name already exists', 'warning'); return; }
   const result = await sbQuery(sb.from('pnd_blocks').insert({ block_name: name, remarks, sort_order: sortOrder }).select());
   if (result === null) return;
+  const newId = (result && result[0]) ? result[0].id : null;
+  if (newId) await fcAuditLog("pnd_blocks", newId, "create", "Created block: " + name + (remarks ? " (" + remarks + ")" : ""));
   document.getElementById('fc-block-name').value = '';
   document.getElementById('fc-block-remarks').value = '';
   notify('Block added');
@@ -1755,8 +1821,11 @@ document.addEventListener('keydown', function(e) {
 });
 
 async function fcExecuteDeleteBlock(blockId) {
+  const block = fcBlocks.find(b => b.id === blockId);
+  const blockName = block ? block.block_name : blockId;
   const result = await sbQuery(sb.from('pnd_blocks').delete().eq('id', blockId).select());
   if (result === null) return;
+  await fcAuditLog("pnd_blocks", blockId, "delete", "Deleted block: " + blockName);
   fcCloseDeleteModal();
   notify('Block deleted');
   await loadFcBlocks(); await loadFarmConfig(); renderBlockList();
@@ -1775,9 +1844,16 @@ async function fcSaveBlockCrop(id) {
     status_id: stEl.value || null
   };
   const bc = fcBlockCrops.find(x => x.id === id);
+  // Capture old values BEFORE the update for diff
+  const oldSnapshot = bc ? { date_planted: bc.date_planted, quantity: bc.quantity, status_id: bc.status_id } : null;
   const bcResult = await sbUpdateWithLock('block_crops', id, upd, bc ? bc.updated_at : null);
   if (bcResult === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
   if (bc) Object.assign(bc, bcResult[0] || upd);
+  // Audit any field that actually changed
+  if (oldSnapshot) {
+    const diff = fcDiffChanges(oldSnapshot, upd, ['date_planted', 'quantity', 'status_id'], fcStatusLookup());
+    if (diff) await fcAuditLog("block_crops", id, "update", fcBlockCropLabel(id) + " — " + diff);
+  }
 
   // Upsert target_induce_date in growth_records when date_planted changes
   if(upd.date_planted) {
@@ -1858,7 +1934,9 @@ async function fcSaveToInduce(bcId) {
   const targetDate = document.getElementById('fc-target-induce-date').value || null;
   if(!targetDate) { notify('Target induce date is required', 'warning'); return; }
 
-  const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', bcId).limit(1));
+  // Capture old target_induce_date for audit diff
+  const existing = await sbQuery(sb.from('growth_records').select('id, target_induce_date').eq('block_crop_id', bcId).limit(1));
+  const oldTarget = (existing && existing.length > 0) ? existing[0].target_induce_date : null;
   if(existing && existing.length > 0) {
     const r = await sbQuery(sb.from('growth_records').update({ target_induce_date: targetDate }).eq('id', existing[0].id).select());
     if(r === null) return;
@@ -1866,12 +1944,21 @@ async function fcSaveToInduce(bcId) {
     const r = await sbQuery(sb.from('growth_records').insert({ block_crop_id: bcId, target_induce_date: targetDate, company_id: 'tg_agribusiness' }).select());
     if(r === null) return;
   }
+  if (oldTarget !== targetDate) {
+    await fcAuditLog("growth_records", bcId, "target_induce_change", fcBlockCropLabel(bcId) + " — target_induce_date: " + (oldTarget || "—") + " → " + targetDate);
+  }
 
-  // Save status on block_crops
+  // Save status on block_crops (also audit if changed)
   const stEl = document.getElementById('fc-st-' + bcId);
   if(stEl && stEl.value) {
+    const bc = fcBlockCrops.find(x => x.id === bcId);
+    const oldStatusId = bc ? bc.status_id : null;
     await sbQuery(sb.from('block_crops').update({ status_id: stEl.value }).eq('id', bcId).select());
-    const bc = fcBlockCrops.find(x => x.id === bcId); if(bc) bc.status_id = stEl.value;
+    if(bc) bc.status_id = stEl.value;
+    if (String(oldStatusId || "") !== String(stEl.value || "")) {
+      const sl = fcStatusLookup();
+      await fcAuditLog("block_crops", bcId, "status_change", fcBlockCropLabel(bcId) + " — status: " + (sl[oldStatusId] || "—") + " → " + (sl[stEl.value] || stEl.value));
+    }
   }
 
   notify('Target induce date saved');
@@ -1952,7 +2039,8 @@ async function fcSaveInductionFromConfig(bcId) {
     date_induced_start: startDate, date_induced_end: endDate, harvest_days: harvestDays,
     target_harvest_start: targetHarvestStart, target_harvest_end: targetHarvestEnd
   };
-  const existing = await sbQuery(sb.from('growth_records').select('id').eq('block_crop_id', bcId).limit(1));
+  const existing = await sbQuery(sb.from('growth_records').select('id, date_induced_start, date_induced_end, harvest_days, target_harvest_start, target_harvest_end').eq('block_crop_id', bcId).limit(1));
+  const oldGr = (existing && existing.length > 0) ? existing[0] : null;
   if(existing && existing.length > 0) {
     const grResult = await sbQuery(sb.from('growth_records').update(grData).eq('id', existing[0].id).select());
     if(grResult === null) return;
@@ -1962,14 +2050,25 @@ async function fcSaveInductionFromConfig(bcId) {
     const grResult = await sbQuery(sb.from('growth_records').insert(grData).select());
     if(grResult === null) return;
   }
+  // Audit induction event — capture all set fields, or diff from prior values
+  const indDiff = fcDiffChanges(oldGr || {}, grData, ['date_induced_start','date_induced_end','harvest_days','target_harvest_start','target_harvest_end']);
+  if (indDiff) {
+    const action = oldGr ? "induction_update" : "induction";
+    await fcAuditLog("growth_records", bcId, action, fcBlockCropLabel(bcId) + " — " + indDiff);
+  }
 
   // Also save the status_id on block_crops so it persists
   const stEl = document.getElementById('fc-st-' + bcId);
   if(stEl && stEl.value) {
     const bc = fcBlockCrops.find(x => x.id === bcId);
+    const oldStatusId = bc ? bc.status_id : null;
     const lockResult = await sbUpdateWithLock('block_crops', bcId, { status_id: stEl.value }, bc ? bc.updated_at : null);
     if(lockResult === null) return;
     if(bc) Object.assign(bc, lockResult[0]);
+    if (String(oldStatusId || "") !== String(stEl.value || "")) {
+      const sl = fcStatusLookup();
+      await fcAuditLog("block_crops", bcId, "status_change", fcBlockCropLabel(bcId) + " — status: " + (sl[oldStatusId] || "—") + " → " + (sl[stEl.value] || stEl.value));
+    }
   }
 
   notify('Induction details saved');
@@ -2049,6 +2148,17 @@ async function fcDoAddCrop(blockId) {
       await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate, company_id: 'tg_agribusiness' }).select());
     }
   }
+  // Audit new crop assignment
+  if (inserted && inserted.id) {
+    const block = fcBlocks.find(b => b.id === blockId);
+    const blockName = block ? block.block_name : "?";
+    const v = fcVarieties.find(x => x.id === varietyId);
+    const vName = v ? v.name : "?";
+    const parts = ["Block " + blockName + " / " + vName];
+    if (qty) parts.push("qty: " + qty);
+    if (datePlanted) parts.push("planted: " + datePlanted);
+    await fcAuditLog("block_crops", inserted.id, "create", parts.join(", "));
+  }
 
   notify('Crop added');
   fcCloseAddCropModal();
@@ -2057,8 +2167,10 @@ async function fcDoAddCrop(blockId) {
 
 async function fcRemoveBlockCrop(id, blockId) {
   confirmAction('Remove Crop Assignment', 'Remove this crop assignment from the block?', async function() {
+    const label = fcBlockCropLabel(id);
     const result = await sbQuery(sb.from('block_crops').delete().eq('id', id).select());
     if (result === null) return;
+    await fcAuditLog("block_crops", id, "delete", "Removed: " + label);
     notify('Removed');
     await loadFarmConfig(); renderBlockList();
   }, true);
@@ -2122,8 +2234,10 @@ async function fcDoNewCycle(oldBcId, blockId) {
   if(!datePlanted) { notify('Date planted is required for new cycle', 'warning'); return; }
 
   // 1. Mark old block_crop as not current
+  const oldLabel = fcBlockCropLabel(oldBcId);
   const closeResult = await sbQuery(sb.from('block_crops').update({ is_current: false }).eq('id', oldBcId).select());
   if(closeResult === null) return;
+  await fcAuditLog("block_crops", oldBcId, "cycle_close", "Closed cycle: " + oldLabel);
 
   // 2. Find next cycle number for this block + variety
   const existing = await sbQuery(sb.from('block_crops').select('cycle').eq('block_id', blockId).eq('variety_id', varietyId).order('cycle', { ascending: false }).limit(1));
@@ -2162,6 +2276,14 @@ async function fcDoNewCycle(oldBcId, blockId) {
     await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, target_induce_date: targetInduceDate, company_id: 'tg_agribusiness' }).select());
   } else {
     await sbQuery(sb.from('growth_records').insert({ block_crop_id: inserted.id, company_id: 'tg_agribusiness' }).select());
+  }
+
+  // Audit new cycle creation
+  if (inserted && inserted.id) {
+    const block = fcBlocks.find(b => b.id === blockId);
+    const blockName = block ? block.block_name : "?";
+    const vName = variety ? variety.name : "?";
+    await fcAuditLog("block_crops", inserted.id, "cycle_new", "New Cycle " + nextCycle + ": " + blockName + " / " + vName + ", planted " + datePlanted + (qty ? ", qty " + qty : ""));
   }
 
   notify('New cycle started — Cycle ' + nextCycle);
