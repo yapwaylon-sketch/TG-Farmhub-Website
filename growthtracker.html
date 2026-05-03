@@ -132,20 +132,20 @@
 
   <!-- Summary Cards -->
   <div class="cards-grid cards-3" style="grid-template-columns:repeat(3,1fr);">
-    <div class="summary-card">
+    <div class="summary-card clickable" id="card-total-box" onclick="resetAllFilters()" title="Click to clear all filters">
       <div class="sc-label">Total Active Blocks</div>
-      <div class="sc-value" id="card-total" style="color:var(--white);">—</div>
+      <div class="sc-value" id="card-total" style="color:var(--text);">—</div>
       <div class="sc-sub">Block crops being tracked</div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card clickable" id="card-approaching-box" onclick="toggleApproachingFilter()" title="Click to filter to approaching harvest">
       <div class="sc-label">Approaching Harvest</div>
       <div class="sc-value" id="card-approaching" style="color:var(--gold-light);">—</div>
-      <div class="sc-sub">Within 30 days</div>
+      <div class="sc-sub">Within 30 days · click to filter</div>
     </div>
-    <div class="summary-card">
+    <div class="summary-card clickable" id="card-overdue-box" onclick="toggleOverdueFilter()" title="Click to filter to overdue harvest">
       <div class="sc-label">Overdue Harvest</div>
       <div class="sc-value" id="card-overdue" style="color:var(--red);">—</div>
-      <div class="sc-sub">Past expected harvest date</div>
+      <div class="sc-sub">Past expected harvest · click to filter</div>
     </div>
   </div>
 
@@ -213,7 +213,7 @@ if(!currentUser) { location.href = "index.html"; }
 let blocks = [], blockCrops = [], varieties = [], statuses = [], growthRecords = [];
 let currentPage = 'overview';
 let sortField = 'block_name', sortDir = 'asc';
-let filterStatus = 'all', filterVariety = 'all', filterHarvest30 = false;
+let filterStatus = 'all', filterVariety = 'all', filterHarvest30 = false, filterOverdue = false;
 let searchTerm = '';
 let refreshTimer = null;
 
@@ -425,7 +425,10 @@ function buildGrowthData() {
 function applyFilters(rows) {
   if(filterStatus !== 'all') rows = rows.filter(r => r.status_name === filterStatus);
   if(filterVariety !== 'all') rows = rows.filter(r => r.variety_id === filterVariety);
-  if(filterHarvest30) rows = rows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
+  // Approaching: 0–30d to harvest, exclude Harvesting (matches summary card definition)
+  if(filterHarvest30) rows = rows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting' && r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
+  // Overdue: days_to_harvest < 0, exclude Harvesting (already-harvesting blocks aren't "overdue")
+  if(filterOverdue) rows = rows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting' && r.days_to_harvest != null && r.days_to_harvest < 0);
   if(searchTerm) {
     const q = searchTerm;
     rows = rows.filter(r => {
@@ -503,6 +506,9 @@ function renderOverview() {
   document.getElementById("card-total").textContent = totalBlocks;
   document.getElementById("card-approaching").textContent = approaching;
   document.getElementById("card-overdue").textContent = overdue;
+  // Sync active state on clickable cards
+  document.getElementById("card-approaching-box").classList.toggle("active", filterHarvest30);
+  document.getElementById("card-overdue-box").classList.toggle("active", filterOverdue);
 
   // Plant count by variety & status (exclude "To Replant" from totals — no plants in ground)
   const countableRows = allRows.filter(r => (r.status_name || '').toLowerCase() !== 'to replant');
@@ -626,14 +632,56 @@ function onFilterVariety() {
 
 function toggleHarvest30() {
   filterHarvest30 = !filterHarvest30;
+  if (filterHarvest30) filterOverdue = false; // mutually exclusive with overdue
   const btn = document.getElementById("btn-harvest30");
   btn.classList.toggle("active", filterHarvest30);
   updateClearFiltersBtn();
   renderOverview();
 }
 
+// Card-click handlers
+function toggleApproachingFilter() {
+  filterHarvest30 = !filterHarvest30;
+  if (filterHarvest30) filterOverdue = false;
+  document.getElementById("btn-harvest30").classList.toggle("active", filterHarvest30);
+  updateClearFiltersBtn();
+  renderOverview();
+  scrollToTable();
+}
+
+function toggleOverdueFilter() {
+  filterOverdue = !filterOverdue;
+  if (filterOverdue) {
+    filterHarvest30 = false;
+    document.getElementById("btn-harvest30").classList.remove("active");
+  }
+  updateClearFiltersBtn();
+  renderOverview();
+  scrollToTable();
+}
+
+function resetAllFilters() {
+  filterStatus = 'all';
+  filterVariety = 'all';
+  filterHarvest30 = false;
+  filterOverdue = false;
+  searchTerm = '';
+  const ss = document.getElementById('filter-status'); if (ss) ss.value = 'all';
+  const vs = document.getElementById('filter-variety'); if (vs) vs.value = 'all';
+  const sboxEl = document.getElementById('search-blocks'); if (sboxEl) sboxEl.value = '';
+  document.getElementById('btn-harvest30').classList.remove('active');
+  updateClearFiltersBtn();
+  renderOverview();
+  scrollToTable();
+}
+
+function scrollToTable() {
+  const t = document.querySelector('#page-overview .data-table');
+  if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function updateClearFiltersBtn() {
-  const hasFilter = filterStatus !== 'all' || filterVariety !== 'all' || filterHarvest30;
+  const hasFilter = filterStatus !== 'all' || filterVariety !== 'all' || filterHarvest30 || filterOverdue || !!searchTerm;
   document.getElementById("btn-clear-filters").style.display = hasFilter ? '' : 'none';
 }
 
@@ -641,8 +689,11 @@ function clearAllFilters() {
   filterStatus = 'all';
   filterVariety = 'all';
   filterHarvest30 = false;
+  filterOverdue = false;
+  searchTerm = '';
   document.getElementById("filter-status").value = 'all';
   document.getElementById("filter-variety").value = 'all';
+  const sboxEl = document.getElementById('search-blocks'); if (sboxEl) sboxEl.value = '';
   document.getElementById("btn-harvest30").classList.remove("active");
   updateClearFiltersBtn();
   renderOverview();
@@ -664,6 +715,7 @@ function onSearchBlocks(val) {
     updateClearFiltersBtn();
   }
   searchTerm = newTerm;
+  updateClearFiltersBtn();
   // Debounce render for snappier typing
   if (_searchDebounce) clearTimeout(_searchDebounce);
   _searchDebounce = setTimeout(renderOverview, 150);

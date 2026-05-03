@@ -1,3 +1,9 @@
+/* Clickable summary cards (overview filter shortcuts) */
+.summary-card.clickable { cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s, transform 0.05s; }
+.summary-card.clickable:hover { border-color:var(--gold); box-shadow:0 2px 8px rgba(212,175,55,0.15); }
+.summary-card.clickable:active { transform:scale(0.99); }
+.summary-card.clickable.active { border-color:var(--gold); background:var(--gold-pale, rgba(212,175,55,0.08)); box-shadow:0 0 0 1px var(--gold); }
+
 /* Row colour coding */
 .row-overdue td { background: rgba(232,96,96,0.06); }
 .row-approaching td { background: rgba(232,160,32,0.06); }
