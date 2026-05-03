@@ -943,6 +943,7 @@
             <option value="cash_sales">Cash Sales (CS)</option>
             <option value="delivery_order">Delivery Order (DO)</option>
           </select>
+          <div id="so-doc-type-lock-note" style="display:none;font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.4;">🔒 Doc number already issued — type locked to keep the prefix in sync.</div>
         </div>
         <div class="form-field">
           <label for="so-channel">CHANNEL</label>
@@ -2569,7 +2570,12 @@ function soRenderDetail() {
   // Header: doc number + customer + status
   html += '<div class="so-detail-header">';
   html += '<div>';
-  html += '<div style="font-size:22px;font-weight:800;color:var(--white);">' + esc(o.doc_number || o.id) + '</div>';
+  // doc_number is null until completion; fall back to internal SO id with a small hint.
+  var detailDocPrefix = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
+  var detailDocLine = o.doc_number
+    ? '<div style="font-size:22px;font-weight:800;color:var(--white);">' + esc(o.doc_number) + '</div>'
+    : '<div style="font-size:22px;font-weight:800;color:var(--white);">' + esc(o.id) + ' <span style="font-size:11px;font-weight:500;color:var(--text-muted);letter-spacing:0.5px;">(' + detailDocPrefix + ' no. issued on completion)</span></div>';
+  html += detailDocLine;
   html += '<div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px;">' + esc(cust ? cust.name : '\u2014') + '</div>';
   html += '</div>';
   html += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">';
@@ -2947,6 +2953,27 @@ async function soUpdateStatus(orderId, newStatus, extraData) {
   return true;
 }
 
+// ============================================================
+// DOC NUMBER ASSIGNMENT — deferred until completion
+// ============================================================
+// Customer-facing CS / DO numbers are NOT generated at order creation. They are
+// generated at the moment status flips to 'completed' (Walk-in / Mark Delivered /
+// Mark Collected / driver-app Mark Delivered). This makes receipt numbers chronological
+// by collection date, which matches how cash businesses keep books — and removes the
+// pain point of "CS-0010 was created on Mon, completed today, but today's other
+// receipts are CS-0035+; the sequence reads backwards." It also kills counter waste
+// on orders that get cancelled before completion.
+//
+// Returns o.doc_number if already set (idempotent — safe to call multiple times,
+// safe to call on legacy orders that already had a doc_number assigned at creation).
+// Otherwise generates a new one via dbNextId(prefix). Returns null if generation fails.
+async function soEnsureDocNumber(o) {
+  if (o.doc_number) return o.doc_number;
+  var prefix = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
+  var num = await dbNextId(prefix);
+  return num || null;
+}
+
 // ── BM Translation ──────────────────────────────────────────
 var CATEGORY_BM = {
   whole_crown: 'Biji (Bermahkota)', whole_no_crown: 'Biji (Tanpa Mahkota)',
@@ -2982,7 +3009,11 @@ function buildPrepMessage(orderId) {
   }
 
   var msg = '\uD83C\uDF4D *Order Baru*\n';
-  msg += '\uD83D\uDCCB No: ' + (o.doc_number || o.id) + '\n';
+  // Use internal SO id for the worker notification \u2014 doc_number (CS/DO) isn't issued
+  // until the order completes (Mark Delivered / Mark Collected / Walk-in), and at the
+  // moment Start Preparing fires the order is still 'preparing'. SO id is the stable
+  // internal reference workers use day-to-day anyway.
+  msg += '\uD83D\uDCCB Order: ' + o.id + '\n';
   if (workerName) msg += '\uD83D\uDC77 Tugasan: ' + workerName + '\n';
   msg += '\uD83D\uDC64 Pelanggan: ' + (cust ? cust.name : '\u2014') + '\n';
   msg += '\uD83D\uDCC5 Tarikh Hantar: ' + (deliveryStr || '\u2014') + '\n\n';
@@ -3499,7 +3530,16 @@ function soMarkCollected(orderId) {
   confirmAction('Mark as Collected?', 'Confirm that the customer has collected this order?', async function() {
     var btn = document.getElementById('btn-mark-collected');
     if (btn) btnLoading(btn, true);
-    var ok = await soUpdateStatus(orderId, 'completed');
+    var o = orders.find(function(x) { return x.id === orderId; });
+    if (!o) { if (btn) btnLoading(btn, false, 'Mark Collected'); return; }
+    // Generate doc_number FIRST — null-check abort. Idempotent for legacy orders.
+    var docNumber = await soEnsureDocNumber(o);
+    if (!docNumber) {
+      if (btn) btnLoading(btn, false, 'Mark Collected');
+      notify('Could not generate receipt number — please retry', 'error');
+      return;
+    }
+    var ok = await soUpdateStatus(orderId, 'completed', { doc_number: docNumber });
     if (btn) btnLoading(btn, false, 'Mark Collected');
     if (ok) { notify('Order completed (collected)', 'success'); soRenderDetail(); soGenerateDoc(orderId); }
   });
@@ -3817,6 +3857,15 @@ async function soDeliveryCommitAll() {
     if (newGrand > 0 && totalPaidFinal >= newGrand) paymentStatusFinal = 'paid';
     else if (totalPaidFinal > 0) paymentStatusFinal = 'partial';
 
+    // Generate doc_number BEFORE the order UPDATE — null-check abort.
+    // Idempotent: returns existing o.doc_number if already set (e.g. legacy order).
+    var docNumber = await soEnsureDocNumber(o);
+    if (!docNumber) {
+      soDeliveryPending = null;
+      notify('Items and payment saved, but receipt number generation failed — refresh and retry Mark Delivered', 'error');
+      return;
+    }
+
     var completedNow = new Date().toISOString();
     var orderUpdate = {
       status: 'completed',
@@ -3824,7 +3873,8 @@ async function soDeliveryCommitAll() {
       subtotal: newSubtotal,
       grand_total: newGrand,
       amount_paid: totalPaidFinal,
-      payment_status: paymentStatusFinal
+      payment_status: paymentStatusFinal,
+      doc_number: docNumber
     };
     if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
 
@@ -3918,13 +3968,23 @@ async function soWalkInConfirm() {
       return;
     }
 
-    // 3. Single atomic order update — status + completed_at + amount_paid + payment_status
+    // 3. Generate doc_number (CS / DO) BEFORE the order UPDATE — null-check abort.
+    //    Idempotent: returns existing o.doc_number if already set (e.g. legacy order).
+    var docNumber = await soEnsureDocNumber(o);
+    if (!docNumber) {
+      btnLoading(btn, false, 'Complete & Print Receipt');
+      notify('Could not generate receipt number — payment recorded, retry to complete', 'error');
+      return;
+    }
+
+    // 4. Single atomic order update — status + completed_at + amount_paid + payment_status + doc_number
     var completedNow = new Date().toISOString();
     var orderUpdate = {
       status: 'completed',
       completed_at: completedNow,
       amount_paid: total,
-      payment_status: 'paid'
+      payment_status: 'paid',
+      doc_number: docNumber
     };
     var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
     if (orderResult === null) {
@@ -3935,7 +3995,7 @@ async function soWalkInConfirm() {
       return;
     }
 
-    // 4. Commit local state only after both DB writes confirmed
+    // 5. Commit local state only after both DB writes confirmed
     payments.unshift(payResult[0] || payData);
     var localOrder = orders.find(function(x) { return x.id === orderId; });
     if (localOrder) Object.assign(localOrder, orderUpdate);
@@ -9128,6 +9188,10 @@ function openNewOrderModal(editOrderId) {
   document.getElementById('so-delivery-time').value = '';
   document.getElementById('so-fulfillment').value = 'delivery';
   document.getElementById('so-doc-type').value = 'cash_sales';
+  // Reset lock state from any prior edit; the edit-mode branch below re-disables when needed.
+  document.getElementById('so-doc-type').disabled = false;
+  var docLockNote = document.getElementById('so-doc-type-lock-note');
+  if (docLockNote) docLockNote.style.display = 'none';
   document.getElementById('so-channel').value = 'whatsapp';
   document.getElementById('so-notes').value = '';
   document.getElementById('so-branch-section').style.display = 'none';
@@ -9167,6 +9231,14 @@ function openNewOrderModal(editOrderId) {
     document.getElementById('so-delivery-time').value = o.delivery_time || '';
     document.getElementById('so-fulfillment').value = o.fulfillment || 'delivery';
     document.getElementById('so-doc-type').value = o.doc_type || 'cash_sales';
+    // Lock doc_type if a doc_number has already been issued (post-completion).
+    // Changing the type after issuance would desync the prefix from the issued number.
+    // Pre-completion / null doc_number: still freely editable.
+    if (o.doc_number) {
+      document.getElementById('so-doc-type').disabled = true;
+      var dlNote = document.getElementById('so-doc-type-lock-note');
+      if (dlNote) dlNote.style.display = 'block';
+    }
     document.getElementById('so-channel').value = o.channel || 'whatsapp';
     document.getElementById('so-notes').value = o.notes || '';
 
@@ -9366,6 +9438,16 @@ function soWizSyncAll() {
 // ── Toggle buttons ──
 function soWizToggle(btn) {
   var parent = btn.parentElement;
+  // Mirror the lock on so-doc-type — once a doc_number has been issued we lock the
+  // type so the prefix can't drift away from the issued number. Both UI surfaces
+  // (the wizard buttons + the form select) share the same source of truth.
+  if (parent && parent.id === 'so-wiz-doctype') {
+    var docTypeSel = document.getElementById('so-doc-type');
+    if (docTypeSel && docTypeSel.disabled) {
+      notify('Doc number already issued — type cannot be changed', 'warning');
+      return;
+    }
+  }
   parent.querySelectorAll('.so-wiz-toggle-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
 }
@@ -10285,10 +10367,10 @@ async function soSaveOrder() {
       notify('Order updated');
       renderOrders(); // auto-routes to soRenderDetail if detail view is active
     } else {
-      // CREATE new order
+      // CREATE new order — doc_number is INTENTIONALLY null here. It gets assigned
+      // when the order completes (Walk-in / Mark Delivered / Mark Collected / driver app).
+      // See soEnsureDocNumber for the why. Display layer falls back to o.id when null.
       var orderId = await dbNextId('SO');
-      var docPrefix = docType === 'delivery_order' ? 'DO' : 'CS';
-      var docNumber = await dbNextId(docPrefix);
 
       var orderData = {
         id: orderId,
@@ -10298,7 +10380,7 @@ async function soSaveOrder() {
         delivery_time: document.getElementById('so-delivery-time').value || null,
         fulfillment: document.getElementById('so-fulfillment').value,
         doc_type: docType,
-        doc_number: docNumber,
+        doc_number: null,
         channel: document.getElementById('so-channel').value,
         status: 'pending',
         subtotal: subtotalVal,
@@ -10527,7 +10609,10 @@ function soGenerateDocA4(orderId) {
   var cust = customers.find(function(c) { return c.id === o.customer_id; });
   var items = orderItems.filter(function(i) { return i.order_id === o.id; });
   var isDO = o.doc_type === 'delivery_order';
-  var docNumber = esc(o.doc_number || o.id) + ' (A4)';
+  // Until completion, doc_number is null. Show a clear DRAFT watermark + "(pending)"
+  // in the number cell so this preview can never be mistaken for an issued receipt.
+  var isDraft = !o.doc_number;
+  var docNumber = isDraft ? '(pending — issued on completion)' : esc(o.doc_number) + ' (A4)';
   var docLabel = isDO ? 'DELIVERY ORDER' : 'CASH SALES';
   var preparedBy = currentUser ? esc(currentUser.displayName) : '—';
 
@@ -10551,6 +10636,10 @@ function soGenerateDocA4(orderId) {
     html += '<div class="a4-title">' + docLabel + '</div>';
     html += '<div class="a4-doc-number">' + docNumber + '</div>';
     html += '<div class="a4-copy-label">' + copyLabel + '</div>';
+    // DRAFT banner — only when this is a pre-completion preview (no doc_number issued)
+    if (isDraft) {
+      html += '<div style="background:#c00;color:#fff;text-align:center;font-weight:800;letter-spacing:2px;font-size:13px;padding:6px;margin:6px 0 12px;border:2px dashed #fff;outline:2px solid #c00;">DRAFT — DO NOT ISSUE TO CUSTOMER · NUMBER ASSIGNED ON COMPLETION</div>';
+    }
 
     // Bill To + Ship To (two-column layout)
     var orderBranch = o.branch_id ? getBranch(o.branch_id) : null;

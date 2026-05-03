@@ -853,16 +853,31 @@ async function delCommitAll() {
     var returnsTotal = parseFloat(o.return_total) || 0;
     var newGrand = Math.max(0, newSubtotal - returnsTotal);
 
-    // 3. Build order update
+    // 3. Generate doc_number (CS / DO) — null-check abort. Idempotent for legacy orders
+    //    that already have a doc_number (created before the deferred-assignment change).
+    //    See sales.html soEnsureDocNumber for the why.
+    var docNumber = o.doc_number;
+    if (!docNumber) {
+      var prefix = o.doc_type === 'delivery_order' ? 'DO' : 'CS';
+      docNumber = await dbNextId(prefix);
+      if (!docNumber) {
+        notify('Could not generate receipt number — please retry Mark Delivered', 'error');
+        delPending = null;
+        return;
+      }
+    }
+
+    // 4. Build order update
     var orderUpdate = {
       status: 'completed',
       completed_at: new Date().toISOString(),
       subtotal: newSubtotal,
-      grand_total: newGrand
+      grand_total: newGrand,
+      doc_number: docNumber
     };
     if (pending.photoUrl) orderUpdate.delivery_photo_url = pending.photoUrl;
 
-    // 4. Insert payment if collected — abort with clear error if this fails.
+    // 5. Insert payment if collected — abort with clear error if this fails.
     //    Drivers are on mobile/cell networks; we must never flip the order to paid
     //    without a matching payment row (silent cash-missing bug in the books).
     if (pending.payment) {
@@ -887,7 +902,7 @@ async function delCommitAll() {
       orderUpdate.payment_status = totalPaid >= newGrand ? 'paid' : 'partial';
     }
 
-    // 5. Commit order status
+    // 6. Commit order status
     var result = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
     if (result === null) {
       notify('Items and payment saved, but order status update failed — refresh and retry', 'error');
@@ -895,7 +910,7 @@ async function delCommitAll() {
       return;
     }
 
-    // 6. Update local state
+    // 7. Update local state
     Object.assign(o, orderUpdate);
 
     notify('Delivery completed!', 'success');
