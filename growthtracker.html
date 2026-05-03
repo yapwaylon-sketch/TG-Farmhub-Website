@@ -184,7 +184,6 @@
             <th class="sortable" onclick="sortGrowth('date_induced_start')">Induce Start<span id="sort-date_induced_start"></span></th>
             <th class="sortable" onclick="sortGrowth('date_induced_end')">Induce End<span id="sort-date_induced_end"></span></th>
             <th class="sortable" onclick="sortGrowth('days_after_induce')">After Induce (d)<span id="sort-days_after_induce"></span></th>
-            <th class="sortable" onclick="sortGrowth('harvest_days')">Harvest (d)<span id="sort-harvest_days"></span></th>
             <th>Harvest Window</th>
             <th class="sortable" onclick="sortGrowth('days_to_harvest')">To Harvest (d)<span id="sort-days_to_harvest"></span></th>
             <th>Remarks</th>
@@ -494,7 +493,7 @@ function sortIcon(field) {
 
 function updateSortIndicators() {
   const fields = ['block_name','status_name','dap','variety_name','quantity','date_planted',
-                  'target_induce_date','days_to_induce','date_induced_start','date_induced_end','days_after_induce','harvest_days','days_to_harvest'];
+                  'target_induce_date','days_to_induce','date_induced_start','date_induced_end','days_after_induce','days_to_harvest'];
   fields.forEach(f => {
     const el = document.getElementById("sort-" + f);
     if(el) el.innerHTML = (sortField === f ? (sortDir === 'asc' ? ' &#9650;' : ' &#9660;') : '');
@@ -576,7 +575,7 @@ function renderOverview() {
   // Table
   const tbody = document.getElementById("growth-body");
   if(!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="15" class="empty-state">No blocks match the current filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No blocks match the current filters</td></tr>';
     return;
   }
 
@@ -636,7 +635,6 @@ function renderOverview() {
       '<td>' + fmtDate(r.date_induced_start) + '</td>' +
       '<td>' + fmtDate(r.date_induced_end) + '</td>' +
       '<td>' + daiDisplay + '</td>' +
-      '<td>' + (r.harvest_days != null ? r.harvest_days : '—') + '</td>' +
       '<td>' + esc(r.harvest_window) + '</td>' +
       '<td class="' + dthClass + '">' + dthDisplay + '</td>' +
       '<td>' + esc(r.remarks) + '</td>' +
@@ -815,7 +813,7 @@ function doExportCSV() {
 
   let headers, mapper;
   if (colsScope === 'visible') {
-    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induce Start', 'Induce End', 'Days After Induce', 'Harvest Days', 'Harvest Window', 'Days to Harvest', 'Remarks'];
+    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induce Start', 'Induce End', 'Days After Induce', 'Harvest Window', 'Days to Harvest', 'Remarks'];
     mapper = r => [
       r.block_name || '',
       r.status_name || '',
@@ -829,7 +827,6 @@ function doExportCSV() {
       r.date_induced_start ? fmtDate(r.date_induced_start) : '',
       r.date_induced_end ? fmtDate(r.date_induced_end) : '',
       r.days_after_induce != null ? r.days_after_induce : '',
-      r.harvest_days != null ? r.harvest_days : '',
       r.harvest_window || '',
       r.days_to_harvest != null ? r.days_to_harvest : '',
       r.remarks || ''

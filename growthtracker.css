@@ -56,7 +56,8 @@ th.sortable:hover { color:var(--green-light); }
 
 tr:last-child td { border-bottom:none; }
 
-/* Mobile: hide non-essential columns (Age, Target Induce, Days to Induce, Induce Start, Induce End, Days After Induce, Harvest Days, Remarks) */
+/* Mobile: hide non-essential columns (Age, Target Induce, Days to Induce, Induce Start, Induce End, Days After Induce, Remarks) */
+/* Visible: Block(1), Status(2), Variety(4), Plants(5), Planted(6), Harvest Window(12), Days to Harvest(13) */
 @media (max-width:768px) {
   .data-table table th:nth-child(3),
   .data-table table td:nth-child(3),
@@ -70,10 +71,8 @@ tr:last-child td { border-bottom:none; }
   .data-table table td:nth-child(10),
   .data-table table th:nth-child(11),
   .data-table table td:nth-child(11),
-  .data-table table th:nth-child(12),
-  .data-table table td:nth-child(12),
-  .data-table table th:nth-child(15),
-  .data-table table td:nth-child(15) {
+  .data-table table th:nth-child(14),
+  .data-table table td:nth-child(14) {
     display: none;
   }
 }
