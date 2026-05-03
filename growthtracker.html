@@ -175,7 +175,7 @@
           <tr>
             <th class="sortable" onclick="sortGrowth('block_name')">Block<span id="sort-block_name"></span></th>
             <th class="sortable" onclick="sortGrowth('status_name')">Status<span id="sort-status_name"></span></th>
-            <th class="sortable" onclick="sortGrowth('dap')">Age<span id="sort-dap"></span></th>
+            <th class="sortable" onclick="sortGrowth('dap')" title="Age in months (hover any cell for full breakdown)">Age (m)<span id="sort-dap"></span></th>
             <th class="sortable" onclick="sortGrowth('variety_name')">Variety<span id="sort-variety_name"></span></th>
             <th class="sortable" onclick="sortGrowth('quantity')">Plants<span id="sort-quantity"></span></th>
             <th class="sortable" onclick="sortGrowth('date_planted')">Planted<span id="sort-date_planted"></span></th>
@@ -640,9 +640,9 @@ function renderOverview() {
       : (r.days_to_induce != null && r.days_to_induce <= 30 ? 'td-approaching' : ''));
     const dtiDisplay = postInduction ? '—' : (r.days_to_induce != null ? r.days_to_induce : '—');
 
-    // Age cell — decimal months ("14.0M"); YMD breakdown + raw days available on hover
+    // Age cell — decimal months ("14.0"); unit ("m") lives in the header. Hover for YMD + days.
     const ageYMD = ageFromPlanted(r.date_planted);
-    const ageCell = r.months != null ? r.months.toFixed(1) + 'M' : '—';
+    const ageCell = r.months != null ? r.months.toFixed(1) : '—';
     const ageTitle = ageYMD ? ageYMD + (r.dap != null ? ' · ' + r.dap + ' days' : '') : '';
 
     // Per-cell muting — fade cells that aren't relevant to the block's current lifecycle phase.
