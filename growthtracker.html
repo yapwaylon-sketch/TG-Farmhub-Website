@@ -492,19 +492,30 @@ function sortGrowth(field) {
 function naturalCompare(a, b) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
-// Phase-aware sort value — countdown fields are only meaningful during a specific lifecycle
-// phase. For rows out of phase, return null so they sink to the bottom of the sort (matches
-// the muting/blanking already applied in the row render). Date fields aren't nullified —
-// they're valid historical records even out of phase.
-function sortValueFor(row, field) {
-  if (field === 'days_to_induce' && isPostInduction(row.status_name)) return null;
-  if (field === 'days_after_induce' && (row.status_name || '').toLowerCase() !== 'induced') return null;
-  if (field === 'days_to_harvest' && isPostHarvest(row.status_name)) return null;
-  return row[field];
+// Two-level sort: primary = lifecycle status priority (always lifecycle order),
+// secondary = the column the user clicked (asc/desc applies to the secondary only).
+// Rationale: scanning a farm-wide table, blocks needing soonest action (To Induce)
+// should always cluster at the top regardless of which column is clicked.
+const STATUS_PRIORITY = {
+  'to induce':  1,
+  'growing':    2,
+  'induced':    3,
+  'harvesting': 4,
+  'suckers':    5,
+  'to replant': 6
+};
+function statusPriority(statusName) {
+  return STATUS_PRIORITY[(statusName || '').toLowerCase()] || 99;
 }
 function sortRows(rows) {
   return rows.sort((a, b) => {
-    let va = sortValueFor(a, sortField), vb = sortValueFor(b, sortField);
+    // PRIMARY — fixed lifecycle priority, doesn't flip with sortDir
+    const pa = statusPriority(a.status_name);
+    const pb = statusPriority(b.status_name);
+    if (pa !== pb) return pa - pb;
+
+    // SECONDARY — the clicked column, honors sortDir
+    let va = a[sortField], vb = b[sortField];
     if(va == null && vb == null) return 0;
     if(va == null) return 1;
     if(vb == null) return -1;
