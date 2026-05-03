@@ -13,6 +13,10 @@
    Lower opacity than row-no-induction so it reads as background context, not actionable. */
 .cell-muted { opacity: 0.35; }
 
+/* Quieter table body — dates + numbers were dominating the page.
+   Headers stay at default (14px desktop) so they remain scannable. */
+.data-table table td { font-size: 11px; }
+
 .td-overdue { color: var(--red) !important; font-weight: 700; }
 .td-approaching { color: var(--gold-light) !important; font-weight: 700; }
 
