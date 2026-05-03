@@ -208,6 +208,20 @@ try { const s = localStorage.getItem("tgfarmhub_user"); if(s) currentUser = JSON
 if(!currentUser) { location.href = "index.html"; }
 
 // ============================================================
+// STATUS SEMANTICS — single source of truth for all harvest/induction logic
+// ============================================================
+// Lifecycle: Growing → To Induce → Induced → Harvesting → Suckers → To Replant
+// PRE_HARVEST  = harvest hasn't started yet — countdowns + warnings are meaningful
+// POST_HARVEST = harvest in progress or already done — countdowns are noise, no overdue warnings
+// POST_INDUCTION = induction is done — "Days to Induce" countdown is no longer actionable
+const PRE_HARVEST_STATUSES = ['growing', 'to induce', 'induced'];
+const POST_HARVEST_STATUSES = ['harvesting', 'suckers', 'to replant'];
+const POST_INDUCTION_STATUSES = ['induced', 'harvesting', 'suckers', 'to replant'];
+function isPreHarvest(s) { return PRE_HARVEST_STATUSES.includes((s || '').toLowerCase()); }
+function isPostHarvest(s) { return POST_HARVEST_STATUSES.includes((s || '').toLowerCase()); }
+function isPostInduction(s) { return POST_INDUCTION_STATUSES.includes((s || '').toLowerCase()); }
+
+// ============================================================
 // GLOBAL DATA
 // ============================================================
 let blocks = [], blockCrops = [], varieties = [], statuses = [], growthRecords = [];
@@ -425,10 +439,10 @@ function buildGrowthData() {
 function applyFilters(rows) {
   if(filterStatus !== 'all') rows = rows.filter(r => r.status_name === filterStatus);
   if(filterVariety !== 'all') rows = rows.filter(r => r.variety_id === filterVariety);
-  // Approaching: 0–30d to harvest, exclude Harvesting (matches summary card definition)
-  if(filterHarvest30) rows = rows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting' && r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
-  // Overdue: days_to_harvest < 0, exclude Harvesting (already-harvesting blocks aren't "overdue")
-  if(filterOverdue) rows = rows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting' && r.days_to_harvest != null && r.days_to_harvest < 0);
+  // Approaching: 0–30d to harvest, only PRE-harvest blocks (matches summary card definition)
+  if(filterHarvest30) rows = rows.filter(r => isPreHarvest(r.status_name) && r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30);
+  // Overdue: days_to_harvest < 0, only PRE-harvest blocks (post-harvest blocks have already started/finished)
+  if(filterOverdue) rows = rows.filter(r => isPreHarvest(r.status_name) && r.days_to_harvest != null && r.days_to_harvest < 0);
   if(searchTerm) {
     const q = searchTerm;
     rows = rows.filter(r => {
@@ -497,9 +511,11 @@ function renderOverview() {
   updateSortIndicators();
 
   // Summary cards — always based on all rows (unfiltered)
-  // Exclude Harvesting blocks from Approaching/Overdue — once supervisor marks Harvesting, warnings silence
+  // Only PRE-HARVEST blocks are countable for Approaching/Overdue. Once a block reaches
+  // Harvesting / Suckers / To Replant, the harvest is in progress or done — the countdown
+  // is no longer actionable and shouldn't trigger warnings.
   const totalBlocks = allRows.length;
-  const harvestCountableRows = allRows.filter(r => (r.status_name || '').toLowerCase() !== 'harvesting');
+  const harvestCountableRows = allRows.filter(r => isPreHarvest(r.status_name));
   const approaching = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest >= 0 && r.days_to_harvest <= 30).length;
   const overdue = harvestCountableRows.filter(r => r.days_to_harvest != null && r.days_to_harvest < 0).length;
 
@@ -549,28 +565,38 @@ function renderOverview() {
   }
 
   tbody.innerHTML = rows.map(r => {
-    const isHarvesting = (r.status_name || '').toLowerCase() === 'harvesting';
+    // Status-aware display rules: post-harvest blocks (Harvesting/Suckers/To Replant) shouldn't
+    // show harvest countdowns or overdue warnings — the harvest event is in progress or done.
+    // Post-induction blocks (Induced/Harvesting/Suckers/To Replant) shouldn't show "Days to Induce"
+    // countdown — induction is done, the countdown is historical noise.
+    const postHarvest = isPostHarvest(r.status_name);
+    const postInduction = isPostInduction(r.status_name);
 
-    // Row colour coding — skip overdue/approaching tint for harvesting (supervisor has it)
+    // Row tint — only flag PRE-harvest blocks as overdue/approaching
     let rowClass = '';
-    if(!isHarvesting && r.days_to_harvest != null && r.days_to_harvest < 0) rowClass = 'row-overdue';
-    else if(!isHarvesting && r.days_to_harvest != null && r.days_to_harvest <= 30) rowClass = 'row-approaching';
+    if(!postHarvest && r.days_to_harvest != null && r.days_to_harvest < 0) rowClass = 'row-overdue';
+    else if(!postHarvest && r.days_to_harvest != null && r.days_to_harvest <= 30) rowClass = 'row-approaching';
     else if(!r.date_induced_start) rowClass = 'row-no-induction';
 
-    const dthClass = isHarvesting ? '' : (r.days_to_harvest != null && r.days_to_harvest < 0
+    // Days to Harvest cell — color & value blanked once harvest has started or finished
+    const dthClass = postHarvest ? '' : (r.days_to_harvest != null && r.days_to_harvest < 0
       ? 'td-overdue'
       : (r.days_to_harvest != null && r.days_to_harvest <= 30 ? 'td-approaching' : ''));
+    const dthDisplay = postHarvest ? '—' : (r.days_to_harvest != null ? r.days_to_harvest : '—');
+
+    // Days After Induce — meaningful only during Induced phase (counting up to harvest);
+    // becomes noise once Harvesting/Suckers/To Replant.
+    const daiDisplay = postHarvest ? '—' : (r.days_after_induce != null ? r.days_after_induce : '—');
 
     const varietyDisplay = esc(r.crop_name + ' - ' + r.variety_name);
     const quantityDisplay = r.quantity != null ? Number(r.quantity).toLocaleString() : '—';
-    // Blank the countdown columns when harvesting — active harvest, countdowns no longer meaningful
-    const dthDisplay = isHarvesting ? '—' : (r.days_to_harvest != null ? r.days_to_harvest : '—');
-    const daiDisplay = isHarvesting ? '—' : (r.days_after_induce != null ? r.days_after_induce : '—');
 
-    const dtiClass = r.days_to_induce != null && r.days_to_induce < 0
+    // Days to Induce — only meaningful pre-induction. Once block is Induced or beyond, the
+    // induction event has happened; no countdown to show.
+    const dtiClass = postInduction ? '' : (r.days_to_induce != null && r.days_to_induce < 0
       ? 'td-overdue'
-      : (r.days_to_induce != null && r.days_to_induce <= 30 ? 'td-approaching' : '');
-    const dtiDisplay = r.days_to_induce != null ? r.days_to_induce : '—';
+      : (r.days_to_induce != null && r.days_to_induce <= 30 ? 'td-approaching' : ''));
+    const dtiDisplay = postInduction ? '—' : (r.days_to_induce != null ? r.days_to_induce : '—');
 
     const ageDisplay = ageFromPlanted(r.date_planted);
     const ageCell = ageDisplay
