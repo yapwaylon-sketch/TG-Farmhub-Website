@@ -181,8 +181,7 @@
             <th class="sortable" onclick="sortGrowth('date_planted')">Planted<span id="sort-date_planted"></span></th>
             <th class="sortable" onclick="sortGrowth('target_induce_date')" title="Target Induce Date">Target<span id="sort-target_induce_date"></span></th>
             <th class="sortable" onclick="sortGrowth('days_to_induce')" title="Days To Induce">DTI<span id="sort-days_to_induce"></span></th>
-            <th class="sortable" onclick="sortGrowth('date_induced_start')" title="Induction Start Date">Ind. Start<span id="sort-date_induced_start"></span></th>
-            <th class="sortable" onclick="sortGrowth('date_induced_end')" title="Induction End Date">Ind. End<span id="sort-date_induced_end"></span></th>
+            <th class="sortable" onclick="sortGrowth('date_induced_start')" title="Induction Window (start — end)">Induction<span id="sort-date_induced_start"></span></th>
             <th class="sortable" onclick="sortGrowth('days_after_induce')" title="Days After Induce">DAI<span id="sort-days_after_induce"></span></th>
             <th title="Harvest Window">Harvest</th>
             <th class="sortable" onclick="sortGrowth('days_to_harvest')" title="Days To Harvest">DTH<span id="sort-days_to_harvest"></span></th>
@@ -384,6 +383,24 @@ function harvestWindowStr(gr) {
   }
   return result;
 }
+// Induction range — same pattern as harvestWindowStr. Single cell, "DD/MM/YY — DD/MM/YY".
+function inductionRangeStr(r) {
+  if(!r || !r.date_induced_start) return "—";
+  let result = fmtDate(r.date_induced_start);
+  if(r.date_induced_end) result += " — " + fmtDate(r.date_induced_end);
+  return result;
+}
+// Lifecycle phase — drives per-cell muting in the row render.
+//   1 = pre-induction (Growing, To Induce) — focus on getting to induction
+//   2 = induced (pre-harvest) — focus on harvest readiness
+//   3 = harvest+aftermath (Harvesting, Suckers, To Replant) — block done or being harvested
+function lifecyclePhase(statusName) {
+  const s = (statusName || '').toLowerCase();
+  if (s === 'growing' || s === 'to induce') return 1;
+  if (s === 'induced') return 2;
+  if (s === 'harvesting' || s === 'suckers' || s === 'to replant') return 3;
+  return 0;
+}
 
 function daysToHarvest(gr) {
   if(!gr || !gr.target_harvest_start) return null;
@@ -498,7 +515,7 @@ function sortIcon(field) {
 
 function updateSortIndicators() {
   const fields = ['block_name','status_name','dap','variety_name','quantity','date_planted',
-                  'target_induce_date','days_to_induce','date_induced_start','date_induced_end','days_after_induce','days_to_harvest'];
+                  'target_induce_date','days_to_induce','date_induced_start','days_after_induce','days_to_harvest'];
   fields.forEach(f => {
     const el = document.getElementById("sort-" + f);
     if(el) el.innerHTML = (sortField === f ? (sortDir === 'asc' ? ' &#9650;' : ' &#9660;') : '');
@@ -580,7 +597,7 @@ function renderOverview() {
   // Table
   const tbody = document.getElementById("growth-body");
   if(!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">No blocks match the current filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No blocks match the current filters</td></tr>';
     return;
   }
 
@@ -628,20 +645,32 @@ function renderOverview() {
       ? (r.dap != null ? ageDisplay + ' <span style="color:var(--text-muted);font-size:11px;">(' + r.dap + 'd)</span>' : ageDisplay)
       : '—';
 
+    // Per-cell muting — fade cells that aren't relevant to the block's current lifecycle phase.
+    // Phase 1 (pre-induction): Planted/Target/DTI active; induction + harvest cells muted.
+    // Phase 2 (induced): Induction + DAI + Harvest + DTH active; pre-induction cells muted.
+    // Phase 3 (post-harvest): Harvest active (history); everything else muted.
+    const phase = lifecyclePhase(r.status_name);
+    const mPlanted = phase === 1 ? '' : ' cell-muted';
+    const mTarget = phase === 1 ? '' : ' cell-muted';
+    const mDTI = phase === 1 ? '' : ' cell-muted';
+    const mInduction = phase === 2 ? '' : ' cell-muted';
+    const mDAI = phase === 2 ? '' : ' cell-muted';
+    const mHarvest = (phase === 2 || phase === 3) ? '' : ' cell-muted';
+    const mDTH = phase === 2 ? '' : ' cell-muted';
+
     return '<tr class="' + rowClass + '">' +
       '<td class="td-bold">' + esc(r.block_name) + '</td>' +
       '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
       '<td style="white-space:nowrap;">' + ageCell + '</td>' +
       '<td title="' + esc(varietyTitle) + '">' + varietyDisplay + '</td>' +
       '<td>' + quantityDisplay + '</td>' +
-      '<td>' + fmtDate(r.date_planted) + '</td>' +
-      '<td>' + fmtDate(r.target_induce_date) + '</td>' +
-      '<td class="' + dtiClass + '">' + dtiDisplay + '</td>' +
-      '<td>' + fmtDate(r.date_induced_start) + '</td>' +
-      '<td>' + fmtDate(r.date_induced_end) + '</td>' +
-      '<td>' + daiDisplay + '</td>' +
-      '<td>' + esc(r.harvest_window) + '</td>' +
-      '<td class="' + dthClass + '">' + dthDisplay + '</td>' +
+      '<td class="' + mPlanted.trim() + '">' + fmtDate(r.date_planted) + '</td>' +
+      '<td class="' + mTarget.trim() + '">' + fmtDate(r.target_induce_date) + '</td>' +
+      '<td class="' + (dtiClass + mDTI).trim() + '">' + dtiDisplay + '</td>' +
+      '<td class="' + mInduction.trim() + '">' + esc(inductionRangeStr(r)) + '</td>' +
+      '<td class="' + mDAI.trim() + '">' + daiDisplay + '</td>' +
+      '<td class="' + mHarvest.trim() + '">' + esc(r.harvest_window) + '</td>' +
+      '<td class="' + (dthClass + mDTH).trim() + '">' + dthDisplay + '</td>' +
       '<td>' + esc(r.remarks) + '</td>' +
     '</tr>';
   }).join("");
@@ -867,7 +896,7 @@ function doExportCSV() {
 
   let headers, mapper;
   if (colsScope === 'visible') {
-    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induce Start', 'Induce End', 'Days After Induce', 'Harvest Window', 'Days to Harvest', 'Remarks'];
+    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induction', 'Days After Induce', 'Harvest Window', 'Days to Harvest', 'Remarks'];
     mapper = r => [
       r.block_name || '',
       r.status_name || '',
@@ -878,8 +907,7 @@ function doExportCSV() {
       r.date_planted ? fmtDate(r.date_planted) : '',
       r.target_induce_date ? fmtDate(r.target_induce_date) : '',
       r.days_to_induce != null ? r.days_to_induce : '',
-      r.date_induced_start ? fmtDate(r.date_induced_start) : '',
-      r.date_induced_end ? fmtDate(r.date_induced_end) : '',
+      inductionRangeStr(r),
       r.days_after_induce != null ? r.days_after_induce : '',
       r.harvest_window || '',
       r.days_to_harvest != null ? r.days_to_harvest : '',
