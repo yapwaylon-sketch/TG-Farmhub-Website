@@ -136,6 +136,7 @@
       <div class="sc-label">Total Active Blocks</div>
       <div class="sc-value" id="card-total" style="color:var(--text);">—</div>
       <div class="sc-sub">Plants in ground · excludes To Replant</div>
+      <div id="card-total-replant-note" style="font-size:11px;color:var(--gold-light);margin-top:4px;font-weight:600;"></div>
     </div>
     <div class="summary-card clickable" id="card-approaching-box" onclick="toggleApproachingFilter()" title="Click to filter to approaching harvest">
       <div class="sc-label">Approaching Harvest</div>
@@ -528,6 +529,15 @@ function renderOverview() {
   document.getElementById("card-total").textContent = totalBlocks;
   document.getElementById("card-approaching").textContent = approaching;
   document.getElementById("card-overdue").textContent = overdue;
+  // To Replant note on Total card — shows what's hidden from the headline
+  const replantRows = allRows.filter(r => (r.status_name || '').toLowerCase() === 'to replant');
+  const replantPlants = replantRows.reduce((s, r) => s + (parseInt(r.quantity) || 0), 0);
+  const replantNote = document.getElementById("card-total-replant-note");
+  if (replantNote) {
+    replantNote.textContent = replantRows.length > 0
+      ? '+ ' + replantRows.length + ' to replant (' + replantPlants.toLocaleString() + ' plants)'
+      : '';
+  }
   // Sync active state on clickable cards
   document.getElementById("card-approaching-box").classList.toggle("active", filterHarvest30);
   document.getElementById("card-overdue-box").classList.toggle("active", filterOverdue);
