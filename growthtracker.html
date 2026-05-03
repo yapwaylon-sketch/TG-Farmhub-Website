@@ -640,10 +640,10 @@ function renderOverview() {
       : (r.days_to_induce != null && r.days_to_induce <= 30 ? 'td-approaching' : ''));
     const dtiDisplay = postInduction ? '—' : (r.days_to_induce != null ? r.days_to_induce : '—');
 
-    const ageDisplay = ageFromPlanted(r.date_planted);
-    const ageCell = ageDisplay
-      ? (r.dap != null ? ageDisplay + ' <span style="color:var(--text-muted);font-size:11px;">(' + r.dap + 'd)</span>' : ageDisplay)
-      : '—';
+    // Age cell — decimal months ("14.0M"); YMD breakdown + raw days available on hover
+    const ageYMD = ageFromPlanted(r.date_planted);
+    const ageCell = r.months != null ? r.months.toFixed(1) + 'M' : '—';
+    const ageTitle = ageYMD ? ageYMD + (r.dap != null ? ' · ' + r.dap + ' days' : '') : '';
 
     // Per-cell muting — fade cells that aren't relevant to the block's current lifecycle phase.
     // Phase 1 (pre-induction): Planted/Target/DTI active; induction + harvest cells muted.
@@ -661,7 +661,7 @@ function renderOverview() {
     return '<tr class="' + rowClass + '">' +
       '<td class="td-bold">' + esc(r.block_name) + '</td>' +
       '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
-      '<td style="white-space:nowrap;">' + ageCell + '</td>' +
+      '<td style="white-space:nowrap;" title="' + esc(ageTitle) + '">' + ageCell + '</td>' +
       '<td title="' + esc(varietyTitle) + '">' + varietyDisplay + '</td>' +
       '<td>' + quantityDisplay + '</td>' +
       '<td class="' + mPlanted.trim() + '">' + fmtDate(r.date_planted) + '</td>' +
@@ -896,11 +896,11 @@ function doExportCSV() {
 
   let headers, mapper;
   if (colsScope === 'visible') {
-    headers = ['Block', 'Status', 'Age', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induction', 'Days After Induce', 'Harvest Window', 'Days to Harvest', 'Remarks'];
+    headers = ['Block', 'Status', 'Age (months)', 'Days After Planting', 'Variety', 'Plants', 'Planted', 'Target Induce', 'Days to Induce', 'Induction', 'Days After Induce', 'Harvest Window', 'Days to Harvest', 'Remarks'];
     mapper = r => [
       r.block_name || '',
       r.status_name || '',
-      ageFromPlanted(r.date_planted) || '',
+      r.months != null ? r.months.toFixed(1) : '',
       r.dap != null ? r.dap : '',
       (r.crop_name && r.variety_name) ? r.crop_name + ' - ' + r.variety_name : (r.variety_name || ''),
       r.quantity != null ? r.quantity : '',
