@@ -10515,11 +10515,12 @@ async function soSaveOrder() {
       closeModal('so-modal');
 
       if (soIsWalkIn) {
-        // Walk-in: skip all stages, show quick completion modal
-        notify('Walk-in order ' + docNumber + ' created');
+        // Walk-in: skip all stages, show quick completion modal.
+        // doc_number is null until completion — show SO id (matches WhatsApp prep msg).
+        notify('Walk-in order ' + orderId + ' created');
         soShowWalkInComplete(orderId);
       } else {
-        notify('Order ' + docNumber + ' created');
+        notify('Order ' + orderId + ' created');
         switchTab('orders');
         renderOrders();
       }
