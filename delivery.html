@@ -971,8 +971,8 @@ function showDoc(orderId) {
   if (cust && cust.address) {
     html += '<div class="doc-info-label">Address:</div><div class="doc-info-value">' + esc(cust.address) + '</div>';
   }
-  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(o.delivery_date || o.order_date) + '</div>';
-  html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDate(o.order_date) + '</div>';
+  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDateLong(o.delivery_date || o.order_date) + '</div>';
+  html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDateLong(o.order_date) + '</div>';
   if (o.driver_id) {
     html += '<div class="doc-info-label">Driver:</div><div class="doc-info-value">' + esc(getDriverName(o.driver_id) || '\u2014') + '</div>';
   }

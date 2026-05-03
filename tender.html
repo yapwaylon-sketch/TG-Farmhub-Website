@@ -527,6 +527,11 @@ function fmtRM(n) {
 function fmtDate(d) {
   if (!d) return '—';
   var dt = new Date(d);
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+function fmtDateLong(d) {
+  if (!d) return '—';
+  var dt = new Date(d);
   return dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function daysUntil(dateStr) {
@@ -1653,7 +1658,7 @@ function renderSummaryReport() {
     '<tr><td style="font-weight:600;">Title</td><td>' + esc(t.title || '—') + '</td></tr>' +
     '<tr><td style="font-weight:600;">Variety</td><td>' + esc(t.variety) + '</td></tr>' +
     '<tr><td style="font-weight:600;">Issuer</td><td>' + esc(t.issuer) + '</td></tr>' +
-    '<tr><td style="font-weight:600;">Period</td><td>' + fmtDate(t.start_date) + ' — ' + fmtDate(t.end_date) + '</td></tr>' +
+    '<tr><td style="font-weight:600;">Period</td><td>' + fmtDateLong(t.start_date) + ' — ' + fmtDateLong(t.end_date) + '</td></tr>' +
     '<tr><td style="font-weight:600;">Total Qty</td><td>' + fmtNum(t.total_qty) + ' suckers</td></tr>' +
     '<tr><td style="font-weight:600;">Delivered</td><td>' + fmtNum(deliveredQty) + ' (' + pct + '%)</td></tr>' +
     '<tr><td style="font-weight:600;">Remaining</td><td>' + fmtNum(t.total_qty - deliveredQty) + '</td></tr>' +
@@ -1687,7 +1692,7 @@ function renderBatchReport() {
     html += '<table><thead><tr><th>#</th><th>LO No</th><th>Recipient</th><th>Qty</th><th>Delivery</th><th>Status</th></tr></thead><tbody>';
     bLos.forEach(function(lo) {
       html += '<tr><td>' + lo.seq_no + '</td><td>' + esc(lo.lo_number||'—') + '</td><td>' + esc(lo.recipient_name||'—') + '</td>' +
-        '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td><td>' + fmtDate(lo.delivery_date) + '</td>' +
+        '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td><td>' + fmtDateLong(lo.delivery_date) + '</td>' +
         '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td></tr>';
     });
     html += '</tbody></table>';
@@ -1718,7 +1723,7 @@ function renderPaymentReport() {
     html += '<tr><td>' + esc(lo.lo_number||'—') + '</td><td>' + esc(lo.recipient_name||'—') + '</td>' +
       '<td style="text-align:right;">' + fmtNum(lo.qty) + '</td>' +
       '<td style="text-align:right;">' + fmtRM(amt) + '</td>' +
-      '<td>' + fmtDate(lo.payment_date) + '</td>' +
+      '<td>' + fmtDateLong(lo.payment_date) + '</td>' +
       '<td>' + esc(lo.payment_ref || '—') + '</td>' +
       '<td>' + esc(lo.payment_bank || '—') + '</td>' +
       '<td><span class="lo-badge lo-badge-' + lo.status + '">' + LO_STATUS_LABELS[lo.status] + '</span></td></tr>';

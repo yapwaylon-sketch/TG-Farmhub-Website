@@ -513,20 +513,25 @@ function showTick(id) {
 // Date & Number Formatters
 // ============================================================
 
-// DD/MM/YYYY
+// DD/MM/YY — UI default (dashboards, tables, lists). Backend still stores 4-digit year.
 function fmtDate(d) {
   if (!d) return "—";
   var p = String(d).split("-");
   if (p.length !== 3) return d;
-  return p[2] + "/" + p[1] + "/" + p[0];
+  return p[2] + "/" + p[1] + "/" + p[0].slice(2);
 }
 
-// DD/MM/YY (short)
-function fmtDateShort(d) {
+// DD/MM/YY — alias of fmtDate (kept for backwards compatibility with existing call sites).
+function fmtDateShort(d) { return fmtDate(d); }
+
+// DD/MM/YYYY — formal documents only (receipts, A4 invoices, payslips, certificates,
+// customer statements, MPOB reports, etc). Use this when 4-digit year is conventionally
+// expected (audit / archive / customer-facing professional output).
+function fmtDateLong(d) {
   if (!d) return "—";
   var p = String(d).split("-");
   if (p.length !== 3) return d;
-  return p[2] + "/" + p[1] + "/" + p[0].slice(2);
+  return p[2] + "/" + p[1] + "/" + p[0];
 }
 
 // "9 Mar 2026" style

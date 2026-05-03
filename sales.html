@@ -7697,7 +7697,7 @@ function generateCreditNoteA4(cnId) {
   html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Credit Note Details</div>';
   html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
   html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">CN Number:</td><td>' + esc(cn.id) + '</td></tr>';
-  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Credit Date:</td><td>' + fmtDate(cn.credit_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Credit Date:</td><td>' + fmtDateLong(cn.credit_date) + '</td></tr>';
   html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice Ref:</td><td>' + esc(cn.invoice_id || '\u2014') + '</td></tr>';
   html += '</table>';
   html += '</div>';
@@ -7799,8 +7799,8 @@ function generateInvoiceA4(invoiceId) {
   html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:6px;">Invoice Details</div>';
   html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
   html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice No:</td><td>' + esc(inv.id) + '</td></tr>';
-  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice Date:</td><td>' + fmtDate(inv.invoice_date) + '</td></tr>';
-  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Due Date:</td><td>' + fmtDate(inv.due_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Invoice Date:</td><td>' + fmtDateLong(inv.invoice_date) + '</td></tr>';
+  html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Due Date:</td><td>' + fmtDateLong(inv.due_date) + '</td></tr>';
   html += '<tr><td style="padding:2px 12px 2px 0;font-weight:600;">Payment Terms:</td><td>' + esc(termsLabel) + '</td></tr>';
   html += '</table>';
   html += '</div>';
@@ -7938,8 +7938,8 @@ function generateInvoiceA4(invoiceId) {
       html += '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:6px;">';
       html += '<div style="font-size:12px;font-weight:700;color:#000;">' + esc(o.doc_number || o.id) + '</div>';
       html += '<div style="font-size:11px;color:#666;">';
-      html += 'DO Date: ' + fmtDate(o.order_date);
-      if (o.delivery_date) html += ' &nbsp;|&nbsp; Delivery: ' + fmtDate(o.delivery_date);
+      html += 'DO Date: ' + fmtDateLong(o.order_date);
+      if (o.delivery_date) html += ' &nbsp;|&nbsp; Delivery: ' + fmtDateLong(o.delivery_date);
       if (o.driver_name) html += ' &nbsp;|&nbsp; Driver: ' + esc(o.driver_name);
       html += '</div>';
       html += '</div>';
@@ -10578,8 +10578,8 @@ function soGenerateDoc(orderId) {
   if (receiptBranch) {
     html += '<div class="doc-info-label">Ship To:</div><div class="doc-info-value">' + esc(receiptBranch.name) + '</div>';
   }
-  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(o.delivery_date || o.order_date) + '</div>';
-  html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDate(o.order_date) + '</div>';
+  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDateLong(o.delivery_date || o.order_date) + '</div>';
+  html += '<div class="doc-info-label">Order Date:</div><div class="doc-info-value">' + fmtDateLong(o.order_date) + '</div>';
   if (o.fulfillment === 'delivery' && o.driver_id) {
     html += '<div class="doc-info-label">Driver:</div><div class="doc-info-value">' + esc(getDriverName(o.driver_id, o.driver_source)) + '</div>';
   }
@@ -10735,8 +10735,8 @@ function soGenerateDocA4(orderId) {
     }
     html += '<div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;margin-bottom:4px;' + (orderBranch ? 'margin-top:12px;' : '') + '">Order Details</div>';
     html += '<table style="font-size:11px;color:#333;border-collapse:collapse;">';
-    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Date:</td><td>' + fmtDate(o.delivery_date || o.order_date) + '</td></tr>';
-    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Order Date:</td><td>' + fmtDate(o.order_date) + '</td></tr>';
+    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Date:</td><td>' + fmtDateLong(o.delivery_date || o.order_date) + '</td></tr>';
+    html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Order Date:</td><td>' + fmtDateLong(o.order_date) + '</td></tr>';
     if (o.fulfillment === 'delivery' && o.driver_id) {
       html += '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">Driver:</td><td>' + esc(getDriverName(o.driver_id, o.driver_source)) + '</td></tr>';
     }
@@ -11367,7 +11367,7 @@ function soGeneratePaymentSlip(paymentInfo) {
 
   html += '<div class="doc-info-grid">';
   html += '<div class="doc-info-label">Customer:</div><div class="doc-info-value">' + esc(paymentInfo.customerName) + '</div>';
-  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDate(paymentInfo.date) + '</div>';
+  html += '<div class="doc-info-label">Date:</div><div class="doc-info-value">' + fmtDateLong(paymentInfo.date) + '</div>';
   html += '</div>';
 
   // Amount Received breakdown by method
@@ -11532,7 +11532,7 @@ function soGenerateStatementConfirm() {
   });
   var agingTotal = aging.current + aging.d30 + aging.d60 + aging.d90 + aging.d90plus;
 
-  var periodLabel = fmtDate(dateFrom) + ' to ' + fmtDate(dateTo);
+  var periodLabel = fmtDateLong(dateFrom) + ' to ' + fmtDateLong(dateTo);
   var preparedBy = currentUser ? esc(currentUser.displayName) : '—';
 
   var html = '<div class="a4-page">';
@@ -11557,7 +11557,7 @@ function soGenerateStatementConfirm() {
   // Customer Info
   html += '<div class="a4-info-grid">';
   html += '<div class="a4-info-label">Customer:</div><div class="a4-info-value" style="font-weight:700;">' + esc(cust.name) + '</div>';
-  html += '<div class="a4-info-label">Date:</div><div class="a4-info-value">' + fmtDate(todayStr()) + '</div>';
+  html += '<div class="a4-info-label">Date:</div><div class="a4-info-value">' + fmtDateLong(todayStr()) + '</div>';
   if (cust.phone) {
     html += '<div class="a4-info-label">Phone:</div><div class="a4-info-value">' + esc(fmtPhone(cust.phone)) + '</div>';
   } else {
@@ -11584,7 +11584,7 @@ function soGenerateStatementConfirm() {
     txns.forEach(function(t) {
       runBal += t.debit - t.credit;
       html += '<tr>';
-      html += '<td>' + fmtDate(t.date) + '</td>';
+      html += '<td>' + fmtDateLong(t.date) + '</td>';
       html += '<td style="font-weight:600;">' + esc(t.docNo) + '</td>';
       html += '<td>' + esc(t.desc) + '</td>';
       html += '<td style="text-align:right;">' + (t.debit > 0 ? t.debit.toFixed(2) : '') + '</td>';

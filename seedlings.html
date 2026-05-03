@@ -1288,7 +1288,7 @@ function renderMPOBReport(el) {
     html += '<div class="data-table"><div class="table-wrap"><table><thead><tr><th>Batch</th><th>Supplier</th><th>Variety</th><th>Qty</th><th>Date Planted</th></tr></thead><tbody>';
     planted.forEach(function(b) {
       var sup = suppliers.find(function(s) { return s.id === b.supplier_id; });
-      html += '<tr><td>' + esc(b.batch_number) + '</td><td>' + esc(sup ? sup.name : '—') + '</td><td>' + esc(b.variety) + '</td><td>' + b.qty_seeds_received + '</td><td>' + fmtDate(b.date_planted) + '</td></tr>';
+      html += '<tr><td>' + esc(b.batch_number) + '</td><td>' + esc(sup ? sup.name : '—') + '</td><td>' + esc(b.variety) + '</td><td>' + b.qty_seeds_received + '</td><td>' + fmtDateLong(b.date_planted) + '</td></tr>';
     });
     html += '</tbody></table></div></div>';
   }
@@ -1299,7 +1299,7 @@ function renderMPOBReport(el) {
     html += '<div class="data-table"><div class="table-wrap"><table><thead><tr><th>Batch</th><th>Qty</th><th>Reason</th><th>Date</th></tr></thead><tbody>';
     culled.forEach(function(e) {
       var b = batches.find(function(x) { return x.id === e.batch_id; });
-      html += '<tr><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + Math.abs(e.qty) + '</td><td>' + esc(e.reason || '—') + '</td><td>' + fmtDate(e.event_date) + '</td></tr>';
+      html += '<tr><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + Math.abs(e.qty) + '</td><td>' + esc(e.reason || '—') + '</td><td>' + fmtDateLong(e.event_date) + '</td></tr>';
     });
     html += '</tbody></table></div></div>';
   }
@@ -1311,7 +1311,7 @@ function renderMPOBReport(el) {
     monthCollections.forEach(function(cl) {
       var cust = customers.find(function(c) { return c.id === cl.customer_id; });
       var b = batches.find(function(x) { return x.id === cl.batch_id; });
-      html += '<tr><td>' + fmtDate(cl.collection_date) + '</td><td>' + esc(cust ? cust.name : '—') + '</td><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + cl.qty_collected + '</td><td>' + esc(cl.l31_serial_no || '—') + '</td><td>' + formatRM(cl.subtotal||0) + '</td></tr>';
+      html += '<tr><td>' + fmtDateLong(cl.collection_date) + '</td><td>' + esc(cust ? cust.name : '—') + '</td><td>' + esc(b ? b.batch_number : '—') + '</td><td>' + cl.qty_collected + '</td><td>' + esc(cl.l31_serial_no || '—') + '</td><td>' + formatRM(cl.subtotal||0) + '</td></tr>';
     });
     html += '</tbody></table></div></div>';
   }
@@ -1363,8 +1363,8 @@ function renderBatchSummaryReport(el) {
       '<td style="color:var(--gold);">' + (b.qty_booked||0) + '</td>' +
       '<td>' + uncommitted + '</td>' +
       '<td>' + statusBadge(b.status) + '</td>' +
-      '<td>' + (b.date_planted ? fmtDate(b.date_planted) : '—') + '</td>' +
-      '<td>' + (b.date_sellable ? fmtDate(b.date_sellable) : '—') + '</td>' +
+      '<td>' + (b.date_planted ? fmtDateLong(b.date_planted) : '—') + '</td>' +
+      '<td>' + (b.date_sellable ? fmtDateLong(b.date_sellable) : '—') + '</td>' +
     '</tr>';
   });
 
@@ -2087,7 +2087,7 @@ function showBookingSlip(bookingId) {
     '</div>' +
     '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">' +
       '<div>Mr/Ms: <b>' + esc(cust ? cust.name : '—') + '</b></div>' +
-      '<div>Date: <b>' + (bk.booking_date ? fmtDate(bk.booking_date) : '—') + '</b></div>' +
+      '<div>Date: <b>' + (bk.booking_date ? fmtDateLong(bk.booking_date) : '—') + '</b></div>' +
     '</div>' +
     '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
       '<tr style="border-bottom:1px solid #000;"><th style="text-align:left;padding:4px;">Quantity</th><th style="text-align:left;padding:4px;">Description</th><th style="text-align:right;padding:4px;">Unit Price</th><th style="text-align:right;padding:4px;">Amount (RM)</th></tr>' +
@@ -2099,7 +2099,7 @@ function showBookingSlip(bookingId) {
     '</div>' +
     '<div style="text-align:right;margin-bottom:2px;">Deposit Paid: ' + (bk.total_paid||0).toFixed(2) + '</div>' +
     '<div style="text-align:right;margin-bottom:10px;"><b>Balance RM: ' + balance.toFixed(2) + '</b></div>' +
-    (bk.expected_ready_date ? '<div style="margin-bottom:8px;">Expected Ready: <b>' + fmtDate(bk.expected_ready_date) + '</b></div>' : '') +
+    (bk.expected_ready_date ? '<div style="margin-bottom:8px;">Expected Ready: <b>' + fmtDateLong(bk.expected_ready_date) + '</b></div>' : '') +
     '<div style="border-top:1px solid #000;padding-top:8px;margin-bottom:12px;">' +
       '<div style="font-size:12px;font-weight:700;margin-bottom:4px;">Contact Information:</div>' +
       '<div style="display:flex;gap:20px;font-size:12px;">' +
