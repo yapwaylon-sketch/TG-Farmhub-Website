@@ -1373,13 +1373,12 @@ async function saveWorker() {
     const oldRate = old ? parseFloat(old.pay_rate) || 0 : 0;
     const rateChanged = old && oldRate !== pay_rate;
     if (rateChanged) {
-      // Probe DB for any payroll entry under this worker for the CURRENT company.
-      // Without the company_id filter, a worker shared across companies (or pre-split
-      // historical data) would surface entries from the other company.
+      // Probe DB for any payroll entry under this worker. payroll_entries has no
+      // company_id column (workers + payroll are shared across companies), so all
+      // entries under this worker_id belong to this worker — nothing to filter.
       const probe = await sbQuery(
         sb.from("payroll_entries").select("id")
           .eq("worker_id", editId)
-          .eq("company_id", getCompanyId())
           .limit(1)
       );
       const hasEntries = probe && probe.length > 0;
@@ -2150,14 +2149,13 @@ async function openApplyRateChangeModal(workerId, oldRate, newRate, pendingWorke
   const w = workers.find(x => x.id === workerId);
   if (!w) return;
 
-  // Fetch ALL of this worker's payroll entries for THIS company (across all periods).
-  // The in-memory payrollEntries cache only holds the currently-selected period, so we
-  // can't rely on it. Company filter prevents leaking pre-multi-company-split entries
-  // from the other company into this worker's history (payroll_entries has company_id).
+  // Fetch ALL of this worker's payroll entries across all periods. The in-memory
+  // payrollEntries cache only holds the currently-selected period, so we can't rely
+  // on it. payroll_entries has no company_id (shared across companies), so worker_id
+  // alone identifies all entries belonging to this worker.
   const fetched = await sbQuery(
     sb.from("payroll_entries").select("*")
       .eq("worker_id", workerId)
-      .eq("company_id", getCompanyId())
   ) || [];
 
   // Merge into the in-memory cache so recomputePayrollEntry can find each entry by id.
