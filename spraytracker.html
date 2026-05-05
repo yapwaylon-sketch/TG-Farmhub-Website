@@ -1060,29 +1060,43 @@ function populateJobFilters() {
 }
 
 // Multi-product display helpers for job tables
+// Junction (pnd_job_products) is authoritative for AI rows on new jobs.
+// Each junction row carries either ai_combo_key (new model) or product_id (legacy).
 function njJobProductNames(j) {
   const jps = getJobProducts(j.id);
-  if(jps.length > 1) {
-    return jps.map(jp => { const p=getProduct(jp.product_id); return '<div style="font-size:12px;">'+esc(p?.product_name||'?')+'</div>'; }).join('');
+  // Legacy multi-product junction (product_id set, no ai_combo_key)
+  const productJps = jps.filter(jp => jp.product_id && !jp.ai_combo_key);
+  if(productJps.length > 1) {
+    return productJps.map(jp => { const p=getProduct(jp.product_id); return '<div style="font-size:12px;">'+esc(p?.product_name||'?')+'</div>'; }).join('');
   }
+  // Post-completion: primary product on parent row
   if(j.product_id) {
     const p = getProduct(j.product_id);
     return esc(p?.product_name||'?');
   }
-  // AI combo job: show combo label as product name
-  const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
-  return combo ? '<span style="font-size:12px;">'+esc(combo.label)+'</span>' : '—';
+  // Pre-completion AI job (junction holds AI rows, no product picked yet)
+  return '<span style="color:var(--text-muted);font-size:11px;">Pending</span>';
 }
 
 function njJobAIs(j) {
-  // AI combo job: use combo label directly
-  if(j.ai_combo_key) {
-    const combo = getAICombos().find(c => c.key === j.ai_combo_key);
-    if(combo) return combo.label;
-  }
-  // Legacy: look up from products
   const jps = getJobProducts(j.id);
-  const prodIds = jps.length ? jps.map(jp=>jp.product_id) : [j.product_id];
+  const combos = getAICombos();
+  // New model: junction has AI rows
+  const aiJps = jps.filter(jp => jp.ai_combo_key);
+  if(aiJps.length) {
+    const labels = aiJps.map(jp => {
+      const c = combos.find(x => x.key === jp.ai_combo_key);
+      return c ? esc(c.label) : '?';
+    });
+    return labels.length > 1 ? labels.map(l=>'<div>'+l+'</div>').join('') : labels[0];
+  }
+  // Legacy single-AI on parent without junction row
+  if(j.ai_combo_key) {
+    const combo = combos.find(c => c.key === j.ai_combo_key);
+    if(combo) return esc(combo.label);
+  }
+  // Legacy product-based: derive AI names from product ingredients
+  const prodIds = jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]);
   const allAIs = [];
   prodIds.forEach(pid => {
     const p = getProduct(pid);
@@ -1095,12 +1109,21 @@ function njJobTotals(j) {
   const jps = getJobProducts(j.id);
   const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
   if(jps.length > 1) {
+    const combos = getAICombos();
     return jps.map(jp => {
-      const p = getProduct(jp.product_id);
       const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
-      return '<div style="font-size:11px;white-space:nowrap;">' + esc(p?.product_name||'?') + ': <b>' + fmtNum(total) + ' ' + esc(jp.dose_unit||'') + '</b></div>';
+      let label = '?';
+      if(jp.ai_combo_key) {
+        const c = combos.find(x => x.key === jp.ai_combo_key);
+        if(c) label = c.label;
+      } else if(jp.product_id) {
+        const p = getProduct(jp.product_id);
+        if(p) label = p.product_name;
+      }
+      return '<div style="font-size:11px;white-space:nowrap;">' + esc(label) + ': <b>' + fmtNum(total) + ' ' + esc(jp.dose_unit||'') + '</b></div>';
     }).join('');
   }
+  // Single-AI (or single-product legacy): use parent row's total_product_required
   return fmtNum(j.total_product_required) + ' ' + esc(j.dose_unit||'');
 }
 
@@ -1111,38 +1134,48 @@ function renderJobsProductSummary() {
   const activeJobs = jobs.filter(j => activeStatuses.includes(j.status));
   if(!activeJobs.length) { el.style.display = 'none'; return; }
 
-  // Aggregate product usage per spray product
-  const productUsage = {};
+  // Group active job needs by AI combo (the unit of stock checking).
+  // New jobs: junction rows carry ai_combo_key directly.
+  // Legacy product-based jobs: aggregate by product_id, then look up which combo each product belongs to.
+  const combos = getAICombos();
+  const comboCards = {};
+  function bumpCombo(comboKey, amount, unit) {
+    const combo = combos.find(c => c.key === comboKey);
+    if(!combo) return;
+    if(!comboCards[comboKey]) {
+      comboCards[comboKey] = { combo, needed: 0, unit: unit||'', stock: 0, stockUnit: '', linked: false, totalWacCost: 0, totalWacQty: 0, productNames: [] };
+    }
+    comboCards[comboKey].needed += amount;
+    if(!comboCards[comboKey].unit && unit) comboCards[comboKey].unit = unit;
+  }
+
   activeJobs.forEach(j => {
     const jps = getJobProducts(j.id);
     const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
-    if(jps.length > 0) {
-      jps.forEach(jp => {
+    const aiJps = jps.filter(jp => jp.ai_combo_key);
+    if(aiJps.length) {
+      // New model: one row per AI on this job
+      aiJps.forEach(jp => {
         const amt = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
-        const unit = jp.dose_unit || j.dose_unit || '';
-        if(!productUsage[jp.product_id]) productUsage[jp.product_id] = { amount: 0, unit };
-        productUsage[jp.product_id].amount += amt;
+        bumpCombo(jp.ai_combo_key, amt, jp.dose_unit || j.dose_unit || '');
       });
-    } else {
+    } else if(jps.length) {
+      // Legacy product-based junction: each row has product_id
+      jps.forEach(jp => {
+        if(!jp.product_id) return;
+        const amt = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+        const combo = combos.find(c => c.productIds.includes(jp.product_id));
+        if(combo) bumpCombo(combo.key, amt, jp.dose_unit || j.dose_unit || '');
+      });
+    } else if(j.ai_combo_key) {
+      // Legacy single-AI parent without junction row
       const amt = parseFloat(j.total_product_required) || 0;
-      const unit = j.dose_unit || '';
-      if(!productUsage[j.product_id]) productUsage[j.product_id] = { amount: 0, unit };
-      productUsage[j.product_id].amount += amt;
+      bumpCombo(j.ai_combo_key, amt, j.dose_unit || '');
+    } else if(j.product_id) {
+      // Legacy single-product parent
+      const combo = combos.find(c => c.productIds.includes(j.product_id));
+      if(combo) bumpCombo(combo.key, parseFloat(j.total_product_required) || 0, j.dose_unit || '');
     }
-  });
-
-  // Group by AI combo — sum usage and stock across products sharing the same AI combo
-  const combos = getAICombos();
-  const comboCards = {};
-  Object.keys(productUsage).forEach(pid => {
-    const usage = productUsage[pid];
-    // Find which combo this product belongs to
-    const combo = combos.find(c => c.productIds.includes(pid));
-    if(!combo) return;
-    if(!comboCards[combo.key]) {
-      comboCards[combo.key] = { combo, needed: 0, unit: usage.unit, stock: 0, stockUnit: '', linked: false, totalWacCost: 0, totalWacQty: 0, productNames: [] };
-    }
-    comboCards[combo.key].needed += usage.amount;
   });
 
   // Now add stock from ALL products in each combo (not just those with active jobs)
@@ -1243,12 +1276,10 @@ function renderJobsTable() {
   }
   tbody.innerHTML = filtered.map(j => {
     const b = getBlock(j.block_id);
-    const p = j.product_id ? getProduct(j.product_id) : null;
     const bname = b?b.block_name:"?";
-    // AI combo label
-    const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
-    const aiLabel = combo ? combo.label : (p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '—');
-    const productUsed = p ? p.product_name : '<span style="color:var(--text-muted);font-size:11px;">Pending</span>';
+    // AI label and Product Used cell — both already return HTML-safe content (escape inside helpers)
+    const aiLabel = njJobAIs(j);
+    const productUsed = njJobProductNames(j);
     let actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button> <button class="btn btn-outline btn-sm" onclick="shareJobWhatsApp('${j.id}')" title="Send via WhatsApp" style="color:#25D366;border-color:#25D366;padding:4px 8px;"><svg viewBox="0 0 24 24" fill="#25D366" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
     if(j.status==="Completed") {
       actionsHtml += ` <button class="btn btn-outline btn-sm" onclick="viewSprayLog('${j.id}')" title="View spray log">📋</button>`;
@@ -1260,7 +1291,7 @@ function renderJobsTable() {
       <td>${fmtDateShort(j.planned_date)}</td>
       <td style="font-weight:600;">${esc(bname)}</td>
       <td>${typeBadge}</td>
-      <td style="font-size:11px;color:#8fcf80;">${esc(aiLabel)}</td>
+      <td style="font-size:11px;color:#8fcf80;">${aiLabel}</td>
       <td style="font-size:11px;">${productUsed}</td>
       <td>${esc(j.worker_name)}</td>
       <td>${j.tank_size_litres}L</td>
@@ -1335,6 +1366,7 @@ function buildJobMessage(jobId) {
   const p = j.product_id ? getProduct(j.product_id) : null;
   const displayName = p ? p.product_name : (aiName || '?');
 
+  // (legacy fallback path \u2014 overwritten below for AI-row jobs)
   let line = '\u2022 ' + fmtNum(perTank) + unit + ' ' + displayName;
   if(aiName && p) line += ' [' + aiName + ']';
   if(p && p.packaging_size && p.packaging_unit && p.packaging_type && perTank > 0) {
@@ -1343,6 +1375,33 @@ function buildJobMessage(jobId) {
     line += ' (' + pkgCount + ' ' + malayType + ' x ' + p.packaging_size + p.packaging_unit + ')';
   }
   productLines.push(line);
+
+  // If this is a multi-AI (or any AI-row-backed) job, replace the legacy single line with one line per AI from junction.
+  const jpsForMsg = getJobProducts(j.id);
+  const aiRows = jpsForMsg.filter(jp => jp.ai_combo_key);
+  if(aiRows.length) {
+    productLines = [];
+    const combosForMsg = getAICombos();
+    aiRows.forEach(jp => {
+      const c = combosForMsg.find(x => x.key === jp.ai_combo_key);
+      const aiName2 = c ? c.label : '?';
+      const amt2 = parseFloat(jp.dose_amount) || 0;
+      const unit2 = jp.dose_unit || '';
+      const perL2 = parseFloat(jp.dose_per_litres) || 0;
+      const perTank2 = (amt2 && perL2 && tankSize) ? (tankSize / perL2) * amt2 : 0;
+      const showProduct = (aiRows.length === 1 && p);
+      const displayName2 = showProduct ? p.product_name : aiName2;
+      let line2 = '\u2022 ' + fmtNum(perTank2) + unit2 + ' ' + displayName2;
+      if(showProduct) line2 += ' [' + aiName2 + ']';
+      if(showProduct && p.packaging_size && p.packaging_unit && p.packaging_type && perTank2 > 0) {
+        const pkgCount2 = Math.ceil(perTank2 / p.packaging_size);
+        const malayType2 = MALAY_PKG_TYPE[p.packaging_type] || p.packaging_type;
+        line2 += ' (' + pkgCount2 + ' ' + malayType2 + ' x ' + p.packaging_size + p.packaging_unit + ')';
+      }
+      productLines.push(line2);
+    });
+  }
+
   productLines.push('\u2022 \uD83D\uDCA7 ' + tankSize + 'L Air');
 
   let msg = '*\uD83C\uDF3F Kerja Semburan PND*\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
@@ -1676,8 +1735,8 @@ async function submitNewJob() {
     if(!row.doseAmt || !row.dosePer) { notify("Fill dose fields for all AIs","warning"); return; }
   }
 
-  // Build combined ai_combo_key for the job (all selected AI combos)
-  // For single AI job: the combo key. For tank mix: sorted combination of all combo keys
+  // One pnd_jobs row carries the primary AI (for backward compat with single-AI legacy paths).
+  // All AIs (including primary) are stored as pnd_job_products junction rows with ai_combo_key set.
   const primary = njAIs[0];
   const result = await sbQuery(sb.from("pnd_jobs").insert({
     block_id:blockId, product_id:null, ai_combo_key:primary.comboKey, worker_name:worker, planned_date:date,
@@ -1685,25 +1744,23 @@ async function submitNewJob() {
     dose_per_litres:primary.dosePer, notes, logged_by:logged, job_type:jobType, company_id:getCompanyId()
   }).select());
   if(result===null) return;
-
-  // Insert all AI combos into junction table (store combo key as product_id placeholder for now)
   const jobId = result[0].id;
+
+  // Junction rows — one per AI. product_id stays NULL until completion (worker picks actual product used).
   const jpRows = njAIs.map(row => ({
-    job_id:jobId, product_id:null,
-    dose_amount:row.doseAmt, dose_unit:row.doseUnit, dose_per_litres:row.dosePer
+    job_id: jobId,
+    product_id: null,
+    ai_combo_key: row.comboKey,
+    dose_amount: row.doseAmt,
+    dose_unit: row.doseUnit,
+    dose_per_litres: row.dosePer,
+    company_id: getCompanyId()
   }));
-  // We can't insert null product_id into junction table if it has NOT NULL constraint
-  // Instead, skip junction table for now — the job stores primary AI combo key
-  // Additional AI combos for tank mix stored as separate jobs (one per AI combo per block)
-  if(njAIs.length > 1) {
-    for(let i = 1; i < njAIs.length; i++) {
-      const extra = njAIs[i];
-      await sbQuery(sb.from("pnd_jobs").insert({
-        block_id:blockId, product_id:null, ai_combo_key:extra.comboKey, worker_name:worker, planned_date:date,
-        tank_size_litres:tankSize, tanks_planned:tanks, dose_amount:extra.doseAmt, dose_unit:extra.doseUnit,
-        dose_per_litres:extra.dosePer, notes: notes ? notes + ' (tank mix)' : '(tank mix)', logged_by:logged, job_type:jobType, company_id:getCompanyId()
-      }).select());
-    }
+  const jpResult = await sbQuery(sb.from("pnd_job_products").insert(jpRows).select());
+  if(jpResult === null) {
+    // Junction insert failed — roll back parent job so we don't leave an orphan.
+    await sbQuery(sb.from("pnd_jobs").delete().eq("id", jobId).select());
+    return;
   }
 
   notify("Job created with " + njAIs.length + " AI" + (njAIs.length>1?"s":""));
@@ -1723,10 +1780,28 @@ function openEditJobModal(jobId) {
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
   const W = (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0);
 
-  // Build products display — support both AI combo jobs and legacy product jobs
+  // Build products display — three cases:
+  //   1. New AI-mode junction (jps with ai_combo_key) — one card per AI
+  //   2. Legacy product-mode junction (jps with product_id, no ai_combo_key) — one card per product
+  //   3. No junction rows — fall back to parent ai_combo_key or product_id
   let productsHtml = '';
-  if (jps.length) {
-    // Legacy: products in junction table
+  const aiJpsForEdit = jps.filter(jp => jp.ai_combo_key);
+  if (aiJpsForEdit.length) {
+    const combos = getAICombos();
+    productsHtml = aiJpsForEdit.map(jp => {
+      const c = combos.find(x => x.key === jp.ai_combo_key);
+      const label = c ? c.label : '?';
+      const total = (jp.dose_amount && jp.dose_per_litres && W) ? (W / jp.dose_per_litres) * jp.dose_amount : 0;
+      return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><span style="font-weight:700;font-size:13px;">${esc(label)}</span></div>
+          <span style="font-size:14px;font-weight:800;color:var(--gold-light);">${total ? fmtNum(total)+' '+esc(jp.dose_unit||'') : '—'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${jp.dose_amount||'?'} ${esc(jp.dose_unit||'')} / ${jp.dose_per_litres||'?'}L</div>
+      </div>`;
+    }).join('');
+  } else if (jps.length) {
+    // Legacy: products in junction
     productsHtml = jps.map(jp => {
       const p = getProduct(jp.product_id);
       const ais = p ? getProductIngredients(p.id).map(i=>i.name).join(', ') : '';
@@ -1740,7 +1815,7 @@ function openEditJobModal(jobId) {
       </div>`;
     }).join('');
   } else {
-    // AI combo job (or legacy single product)
+    // No junction rows — legacy single-AI or single-product on parent
     const combo = j.ai_combo_key ? getAICombos().find(c => c.key === j.ai_combo_key) : null;
     const p = j.product_id ? getProduct(j.product_id) : null;
     const displayName = combo ? combo.label : (p ? p.product_name : '?');
@@ -1857,7 +1932,7 @@ function ejStatusChange(jobId) {
     html += '<div id="ej-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'ej\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
     completionProducts = [];
-    html += buildCompletionProductsHTML('ej', j?.ai_combo_key || '');
+    html += buildCompletionProductsHTML('ej', j);
     html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="ej-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     html += '<div class="form-field"><label>Actual Water Volume Used (L)</label><div class="form-row"><div class="form-field" style="margin:0;"><label style="font-size:10px;">Tank Size</label><select id="ej-aw-tank-sel" style="width:100%;" onchange="ejAwTankChange()"><option value="200">200L</option><option value="500">500L</option><option value="1000">1000L</option><option value="custom">Custom</option></select></div><div class="form-field" id="ej-aw-tank-custom-wrap" style="margin:0;display:none;"><label style="font-size:10px;">Custom (L)</label><input id="ej-aw-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">No. of Tanks</label><input id="ej-aw-tanks" type="number" step="any" style="width:100%;" oninput="ejCalcActualWater()"></div><div class="form-field" style="margin:0;"><label style="font-size:10px;">Total Water (L)</label><input id="ej-aw-total" type="number" step="any" data-job-id="'+jobId+'" style="width:100%;font-weight:700;" oninput="ejCalcActualProduct()"></div></div></div>';
     // Pre-fill from job values
@@ -1963,21 +2038,23 @@ async function submitEditJob(jobId) {
   Object.assign(j, result[0] || update);
   notify("Job updated successfully");
   if(willTriggerLog) {
-    // DB trigger handles primary product; manually log additional products in the mix
-    const jps = getJobProducts(jobId);
-    const extraProds = jps.filter(jp => jp.product_id !== j.product_id);
-    for(const jp of extraProds) {
-      const ep = getProduct(jp.product_id);
+    // DB trigger handles primary product (j.product_id); manually log the rest of completionProducts.
+    const allCompProds = completionProducts.length
+      ? completionProducts.map(cp => cp.productId)
+      : (() => { const jps = getJobProducts(jobId); return jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]); })();
+    const extraProdIds = allCompProds.filter(pid => pid !== j.product_id);
+    for(const pid of extraProdIds) {
+      const ep = getProduct(pid);
       const nextDate = (ep?.default_interval_days && update.completion_date) ? (() => { const d=new Date(update.completion_date); d.setDate(d.getDate()+ep.default_interval_days); return d.toISOString().split('T')[0]; })() : null;
       await sbQuery(sb.from("pnd_spray_logs").insert({
-        block_id: j.block_id, product_id: jp.product_id,
+        block_id: j.block_id, product_id: pid,
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
         logged_by: 'auto:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     const b=getBlock(j.block_id);
-    const prodCount = jps.length || 1;
+    const prodCount = allCompProds.length || 1;
     setTimeout(()=>notify("Spray log updated for "+prodCount+" product(s) on "+(b?.block_name||"?"),"info",4000),500);
   }
   closeModal();
@@ -2196,7 +2273,7 @@ function esStatusChange(jobId) {
     html += '<div id="es-cd-fields" style="display:none;"><div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;" onchange="ejAutoNextDate(\'es\',\''+prodId+'\')"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div></div>';
   } else if(st==="Completed") {
     completionProducts = [];
-    html += buildCompletionProductsHTML('es', j?.ai_combo_key || '');
+    html += buildCompletionProductsHTML('es', j);
     html += '<div class="form-row"><div class="form-field"><label>Completion Date</label><input id="es-comp-date" type="date" value="'+todayStr()+'" style="width:100%;"></div><div class="form-field"><label>Next Spray Date</label><input id="es-next-date" type="date" value="'+(autoNext||'')+'" style="width:100%;"></div></div>';
     const tankVal = j ? j.tank_size_litres : 200;
     const isStd = [200,500,1000].includes(+tankVal);
@@ -2207,11 +2284,27 @@ function esStatusChange(jobId) {
   el.innerHTML = html;
 }
 
-// Multi-product selection for job completion
-function buildCompletionProductsHTML(prefix, comboKey) {
+// Multi-product selection for job completion.
+// Filters product dropdown by the UNION of all the job's AIs (junction or parent fallback).
+function buildCompletionProductsHTML(prefix, job) {
   const combos = getAICombos();
-  const combo = comboKey ? combos.find(c => c.key === comboKey) : null;
-  const matchingProducts = combo ? products.filter(p => p.is_active && combo.productIds.includes(p.id)) : products.filter(p => p.is_active);
+  // Collect all AI combo keys for this job — junction first, parent as fallback
+  const aiKeys = [];
+  if(job) {
+    const jps = getJobProducts(job.id).filter(jp => jp.ai_combo_key);
+    jps.forEach(jp => { if(!aiKeys.includes(jp.ai_combo_key)) aiKeys.push(jp.ai_combo_key); });
+    if(!aiKeys.length && job.ai_combo_key) aiKeys.push(job.ai_combo_key);
+  }
+  // Build a Set of product IDs allowed across all AIs
+  let allowedProductIds = null; // null = no filter
+  if(aiKeys.length) {
+    allowedProductIds = new Set();
+    aiKeys.forEach(k => {
+      const c = combos.find(x => x.key === k);
+      if(c) c.productIds.forEach(pid => allowedProductIds.add(pid));
+    });
+  }
+  const matchingProducts = products.filter(p => p.is_active && (allowedProductIds === null || allowedProductIds.has(p.id)));
   const prodOpts = matchingProducts.map(p => '<option value="'+p.id+'">'+esc(p.product_name)+'</option>').join('');
 
   return '<div class="form-field"><label>Products Used <span style="color:var(--danger);font-size:10px;">*required</span></label>' +
@@ -2359,21 +2452,23 @@ async function submitEditStatus(jobId) {
   Object.assign(j, result[0] || update);
   notify("Status updated successfully");
   if(willTriggerLog) {
-    // DB trigger handles primary product; manually log additional products in the mix
-    const jps = getJobProducts(jobId);
-    const extraProds = jps.filter(jp => jp.product_id !== j.product_id);
-    for(const jp of extraProds) {
-      const ep = getProduct(jp.product_id);
+    // DB trigger handles primary product (j.product_id); manually log the rest of completionProducts.
+    const allCompProds = completionProducts.length
+      ? completionProducts.map(cp => cp.productId)
+      : (() => { const jps = getJobProducts(jobId); return jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]); })();
+    const extraProdIds = allCompProds.filter(pid => pid !== j.product_id);
+    for(const pid of extraProdIds) {
+      const ep = getProduct(pid);
       const nextDate = (ep?.default_interval_days && update.completion_date) ? (() => { const d=new Date(update.completion_date); d.setDate(d.getDate()+ep.default_interval_days); return d.toISOString().split('T')[0]; })() : null;
       await sbQuery(sb.from("pnd_spray_logs").insert({
-        block_id: j.block_id, product_id: jp.product_id,
+        block_id: j.block_id, product_id: pid,
         date_completed: update.completion_date, next_spray_date: nextDate,
         notes: 'Auto-logged (tank mix). Job ID: '+jobId,
         logged_by: 'auto:job:'+jobId, company_id: getCompanyId()
       }).select());
     }
     const b=getBlock(j.block_id);
-    const prodCount = jps.length || 1;
+    const prodCount = allCompProds.length || 1;
     setTimeout(()=>notify("Spray log updated for "+prodCount+" product(s) on "+(b?.block_name||"?"),"info",4000),500);
   }
   closeModal();
@@ -2388,11 +2483,13 @@ async function submitEditStatus(jobId) {
 async function showInterventionDecision(jobId, updateObj, afterSaveCb) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
-  const b = getBlock(j.block_id), p = getProduct(j.product_id);
+  // For new AI-mode jobs, parent.product_id is still NULL at this point — use the primary from updateObj
+  const primaryProductId = updateObj.product_id || j.product_id;
+  const b = getBlock(j.block_id), p = primaryProductId ? getProduct(primaryProductId) : null;
   const bName = b?.block_name||'?', pName = p?.product_name||'?';
 
   // Get latest spray info for context
-  const ls = latestSprays.find(s=>s.block_id===j.block_id && s.product_id===j.product_id);
+  const ls = primaryProductId ? latestSprays.find(s=>s.block_id===j.block_id && s.product_id===primaryProductId) : null;
   const lastDate = ls?.date_completed ? fmtDateShort(ls.date_completed) : 'No data';
   const nextDate = ls?.next_spray_date ? fmtDateShort(ls.next_spray_date) : 'Not set';
   const today = todayStr();
@@ -2484,9 +2581,10 @@ async function confirmInterventionDecision() {
     const result = await sbUpdateWithLock("pnd_jobs", jobId, updateObj, j.updated_at);
     if(result===null) return;
     if(result[0]) Object.assign(j, result[0]);
-    // Manually insert spray log for each product in the mix
-    const jps1 = getJobProducts(jobId);
-    const prodIds1 = jps1.length ? jps1.map(jp=>jp.product_id) : [j.product_id];
+    // Manually insert spray log for each user-picked product (no DB trigger here — countdown unchanged).
+    const prodIds1 = completionProducts.length
+      ? completionProducts.map(cp => cp.productId)
+      : (() => { const jps = getJobProducts(jobId); return jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]); })();
     for(const pid of prodIds1) {
       const ls2 = latestSprays.find(s=>s.block_id===j.block_id && s.product_id===pid);
       await sbQuery(sb.from("pnd_spray_logs").insert({
@@ -2516,14 +2614,16 @@ async function confirmInterventionDecision() {
     if(existingSched && newNextDate) {
       await sbQuery(sb.from("pnd_jobs").update({planned_date: newNextDate}).eq("id", existingSched.id).select());
     }
-    // DB trigger handles primary product; manually log additional products
-    const jps2 = getJobProducts(jobId);
-    const extraProds2 = jps2.filter(jp => jp.product_id !== j.product_id);
-    for(const jp of extraProds2) {
-      const ep = getProduct(jp.product_id);
+    // DB trigger handles primary product (j.product_id); manually log the rest of completionProducts.
+    const allComp2 = completionProducts.length
+      ? completionProducts.map(cp => cp.productId)
+      : (() => { const jps = getJobProducts(jobId); return jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]); })();
+    const extraIds2 = allComp2.filter(pid => pid !== j.product_id);
+    for(const pid of extraIds2) {
+      const ep = getProduct(pid);
       const epNext = (ep?.default_interval_days && compDate) ? (() => { const d2=new Date(compDate); d2.setDate(d2.getDate()+ep.default_interval_days); return d2.toISOString().split('T')[0]; })() : newNextDate;
       await sbQuery(sb.from("pnd_spray_logs").insert({
-        block_id: j.block_id, product_id: jp.product_id,
+        block_id: j.block_id, product_id: pid,
         date_completed: compDate, next_spray_date: epNext,
         notes: 'Intervention spray (schedule reset). Job ID: '+jobId,
         logged_by: 'intervention:job:'+jobId, company_id: getCompanyId()
@@ -2545,12 +2645,14 @@ async function confirmInterventionDecision() {
     if(existingSched) {
       await sbQuery(sb.from("pnd_jobs").update({planned_date: manualDate}).eq("id", existingSched.id).select());
     }
-    // DB trigger handles primary product; manually log additional products
-    const jps3 = getJobProducts(jobId);
-    const extraProds3 = jps3.filter(jp => jp.product_id !== j.product_id);
-    for(const jp of extraProds3) {
+    // DB trigger handles primary product (j.product_id); manually log the rest of completionProducts.
+    const allComp3 = completionProducts.length
+      ? completionProducts.map(cp => cp.productId)
+      : (() => { const jps = getJobProducts(jobId); return jps.length ? jps.map(jp=>jp.product_id).filter(Boolean) : (j.product_id?[j.product_id]:[]); })();
+    const extraIds3 = allComp3.filter(pid => pid !== j.product_id);
+    for(const pid of extraIds3) {
       await sbQuery(sb.from("pnd_spray_logs").insert({
-        block_id: j.block_id, product_id: jp.product_id,
+        block_id: j.block_id, product_id: pid,
         date_completed: compDate, next_spray_date: manualDate,
         notes: 'Intervention spray (manual date). Job ID: '+jobId,
         logged_by: 'intervention:job:'+jobId, company_id: getCompanyId()
