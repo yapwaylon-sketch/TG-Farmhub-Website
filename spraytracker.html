@@ -655,6 +655,53 @@ function getAICombosForProducts(productIds) {
   return Object.values(comboMap).sort((a,b) => a.label.localeCompare(b.label));
 }
 
+// ============================================================
+// UNIT HELPERS
+// pack_unit / dose_unit normalization. Mass family (g, kg → canonical g),
+// volume family (ml, L → canonical ml). No mass↔volume conversion.
+// ============================================================
+function unitFamily(u) {
+  if(!u) return null;
+  const s = String(u);
+  if(s === 'g' || s === 'kg') return 'mass';
+  if(s === 'ml' || s === 'L') return 'volume';
+  return null;
+}
+function unitCanonical(family) {
+  return family === 'mass' ? 'g' : family === 'volume' ? 'ml' : null;
+}
+function toCanonical(qty, unit) {
+  // Returns { amount, unit } in canonical (g or ml) for the input's family, or null on unknown.
+  const fam = unitFamily(unit);
+  if(!fam) return null;
+  const q = parseFloat(qty) || 0;
+  if(unit === 'kg') return { amount: q * 1000, unit: 'g' };
+  if(unit === 'L')  return { amount: q * 1000, unit: 'ml' };
+  return { amount: q, unit }; // already canonical (g or ml)
+}
+// Look up an AI combo's canonical unit from its linked products' inventory pack_units.
+// Returns { family, unit, mixed } where mixed=true means the AI has products in BOTH mass and volume.
+// `combo` is a combo object from getAICombos() (has .productIds).
+function aiCanonicalUnit(combo) {
+  if(!combo) return { family: null, unit: null, mixed: false };
+  const families = new Set();
+  const units = new Set();
+  combo.productIds.forEach(pid => {
+    const sp = getProduct(pid);
+    if(!sp || !sp.inventory_product_id) return;
+    const inv = getInventoryProduct(sp.inventory_product_id);
+    if(!inv || !inv.pack_unit) return;
+    const fam = unitFamily(inv.pack_unit);
+    if(fam) { families.add(fam); units.add(inv.pack_unit); }
+  });
+  if(families.size === 0) return { family: null, unit: null, mixed: false };
+  if(families.size > 1) return { family: 'mixed', unit: null, mixed: true };
+  // Single family — pick smallest unit for granularity (g over kg, ml over L)
+  const family = [...families][0];
+  const unit = units.has(family === 'mass' ? 'g' : 'ml') ? (family === 'mass' ? 'g' : 'ml') : (family === 'mass' ? 'kg' : 'L');
+  return { family, unit, mixed: false };
+}
+
 function renderSummary() {
   pruneWatchlist();
 
@@ -1178,58 +1225,128 @@ function renderJobsProductSummary() {
     }
   });
 
-  // Now add stock from ALL products in each combo (not just those with active jobs)
+  // For each combo card: walk linked products, multiply pack_count × pack_size, normalize to
+  // canonical unit (g for mass, ml for volume), build per-product breakdown.
   Object.values(comboCards).forEach(cc => {
+    cc.aiUnit = aiCanonicalUnit(cc.combo);  // {family, unit, mixed}
+    cc.products = [];           // [{name, packs, packSize, packUnit, packType, totalCanonical, family}]
+    cc.stockMass = 0;           // sum of canonical-g across mass-family linked products
+    cc.stockVolume = 0;         // sum of canonical-ml across volume-family linked products
+    cc.linked = false;
+    cc.wacCostMass = 0; cc.wacQtyMass = 0;
+    cc.wacCostVolume = 0; cc.wacQtyVolume = 0;
     cc.combo.productIds.forEach(pid => {
       const p = getProduct(pid);
       if(!p) return;
-      const pName = p.product_name;
-      if(!cc.productNames.includes(pName)) cc.productNames.push(pName);
       const inv = p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
-      if(inv) {
-        cc.linked = true;
-        cc.stock += parseFloat(inv.current_stock) || 0;
-        cc.stockUnit = inv.pack_unit || '';
-        const wac = getInventoryWAC(inv.id);
-        const qty = parseFloat(inv.current_stock) || 0;
-        cc.totalWacCost += wac * qty;
-        cc.totalWacQty += qty;
+      if(!inv || !inv.pack_unit) return;
+      const fam = unitFamily(inv.pack_unit);
+      if(!fam) return;
+      cc.linked = true;
+      const packs = parseFloat(inv.current_stock) || 0;
+      const packSize = parseFloat(inv.pack_size) || 0;
+      const canonical = toCanonical(packs * packSize, inv.pack_unit);
+      const totalCanonical = canonical ? canonical.amount : 0;
+      cc.products.push({
+        name: p.product_name, packs, packSize, packUnit: inv.pack_unit,
+        packType: inv.pack_type || '', totalCanonical, family: fam,
+      });
+      if(fam === 'mass') cc.stockMass += totalCanonical;
+      else cc.stockVolume += totalCanonical;
+      const wac = getInventoryWAC(inv.id); // RM per pack
+      if(wac > 0 && packSize > 0) {
+        const packSizeCanonical = toCanonical(packSize, inv.pack_unit)?.amount || 0;
+        if(packSizeCanonical > 0) {
+          const wacPerCanonical = wac / packSizeCanonical;
+          if(fam === 'mass') { cc.wacCostMass += wacPerCanonical * totalCanonical; cc.wacQtyMass += totalCanonical; }
+          else { cc.wacCostVolume += wacPerCanonical * totalCanonical; cc.wacQtyVolume += totalCanonical; }
+        }
       }
     });
+    // Need converted to canonical (uses cc.unit which is the dose unit summed from junction rows)
+    const needCanon = toCanonical(cc.needed, cc.unit);
+    cc.needCanonical = needCanon ? needCanon.amount : cc.needed;
+    cc.needCanonicalUnit = needCanon ? needCanon.unit : cc.unit;
+    cc.needFamily = needCanon ? unitFamily(needCanon.unit) : null;
   });
 
   const keys = Object.keys(comboCards).sort((a,b) => comboCards[a].combo.label.localeCompare(comboCards[b].combo.label));
   if(!keys.length) { el.style.display = 'none'; return; }
 
+  function packLabel(packType, count) {
+    const t = (packType||'pack').toLowerCase();
+    return count + ' ' + (count === 1 ? t : t + 's');
+  }
+
   const cards = keys.map(key => {
     const cc = comboCards[key];
     const aiLabel = cc.combo.label;
-    const prodList = cc.productNames.join(', ');
-    const avgWac = cc.totalWacQty > 0 ? cc.totalWacCost / cc.totalWacQty : 0;
+    const prodNamesAll = cc.combo.productIds.map(pid => { const p=getProduct(pid); return p?p.product_name:'?'; });
 
     if(!cc.linked) {
-      return '<div style="background:var(--bg-card);border:1px solid rgba(113,113,122,0.4);border-radius:10px;padding:10px 16px;min-width:180px;">' +
+      return '<div style="background:var(--bg-card);border:1px solid rgba(113,113,122,0.4);border-radius:10px;padding:10px 16px;min-width:220px;">' +
         '<div style="font-size:12px;font-weight:700;color:#8fcf80;margin-bottom:2px;">' + esc(aiLabel) + '</div>' +
-        '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">' + esc(prodList) + '</div>' +
-        '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needed) + ' ' + esc(cc.unit) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">' + esc(prodNamesAll.join(', ')) + '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needCanonical) + ' ' + esc(cc.needCanonicalUnit) + '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Not linked to inventory</div>' +
       '</div>';
     }
 
-    const enough = cc.stock >= cc.needed;
+    // Sufficiency check happens in the dose's family only
+    const needFam = cc.needFamily;
+    const stockSame = needFam === 'mass' ? cc.stockMass : needFam === 'volume' ? cc.stockVolume : 0;
+    const enough = needFam ? (stockSame >= cc.needCanonical) : false;
     const borderColor = enough ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.4)';
     const statusIcon = enough ? '✓' : '⚠';
     const statusColor = enough ? '#4ade80' : '#f87171';
-    const statusText = enough ? 'Sufficient' : 'Short ' + fmtNum(cc.needed - cc.stock) + ' ' + esc(cc.unit);
-    let costLabel = '';
-    if(avgWac > 0) costLabel = '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Est. cost: RM ' + fmtNum(cc.needed * avgWac) + '</div>';
+    const shortAmt = cc.needCanonical - stockSame;
+    const statusText = enough ? 'Sufficient' : (needFam ? 'Short ' + fmtNum(shortAmt) + ' ' + cc.needCanonicalUnit : 'Unit unknown — verify');
 
-    return '<div style="background:var(--bg-card);border:1px solid ' + borderColor + ';border-radius:10px;padding:10px 16px;min-width:180px;">' +
-      '<div style="font-size:12px;font-weight:700;color:#8fcf80;margin-bottom:2px;">' + esc(aiLabel) + '</div>' +
-      '<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">' + esc(prodList) + '</div>' +
-      '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needed) + ' ' + esc(cc.unit) + '</div>' +
-      '<div style="font-size:13px;color:var(--text-dim);">Stock: ' + fmtNum(cc.stock) + ' ' + esc(cc.stockUnit) + '</div>' +
-      '<div style="font-size:12px;font-weight:700;color:' + statusColor + ';margin-top:3px;">' + statusIcon + ' ' + statusText + '</div>' +
+    // Packs-needed line: based on smallest same-family pack size for granularity
+    const sameFamilyProducts = cc.products.filter(p => p.family === needFam && p.packSize > 0);
+    let packsNeededLine = '';
+    if(sameFamilyProducts.length) {
+      const sizesCanonical = sameFamilyProducts.map(p => ({ size: toCanonical(p.packSize, p.packUnit).amount, type: p.packType }));
+      sizesCanonical.sort((a,b) => a.size - b.size); // smallest first
+      const smallest = sizesCanonical[0];
+      const packsNeeded = Math.ceil(cc.needCanonical / smallest.size);
+      packsNeededLine = ' (' + packLabel(smallest.type, packsNeeded) + ')';
+    }
+
+    // Per-product breakdown
+    const productLines = cc.products.map(p => {
+      const totalDisplay = fmtNum(p.totalCanonical) + ' ' + (p.family==='mass'?'g':'ml');
+      return '<div style="font-size:10px;color:var(--text-dim);padding-left:8px;line-height:1.5;">• ' + esc(p.name) + ': ' + fmtNum(p.packs) + ' × ' + fmtNum(p.packSize) + esc(p.packUnit) + ' = ' + totalDisplay + '</div>';
+    }).join('');
+
+    // Cost estimate (RM per canonical unit × need)
+    const sameFamWacCost = needFam === 'mass' ? cc.wacCostMass : cc.wacCostVolume;
+    const sameFamWacQty  = needFam === 'mass' ? cc.wacQtyMass  : cc.wacQtyVolume;
+    const wacPerCanon = sameFamWacQty > 0 ? sameFamWacCost / sameFamWacQty : 0;
+    const costLabel = wacPerCanon > 0 ? '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Est. cost: RM ' + fmtNum(cc.needCanonical * wacPerCanon) + '</div>' : '';
+
+    // Cross-family note (only when AI itself spans both, AND there's stock in the other family)
+    let crossFamilyWarn = '';
+    if(cc.aiUnit && cc.aiUnit.mixed) {
+      const otherFam = needFam === 'mass' ? 'volume' : 'mass';
+      const otherStock = otherFam === 'mass' ? cc.stockMass : cc.stockVolume;
+      if(otherStock > 0) {
+        crossFamilyWarn = '<div style="font-size:10px;color:#E8A020;margin-top:3px;">⚠ Also ' + fmtNum(otherStock) + ' ' + (otherFam==='mass'?'g':'ml') + ' in different unit family — not summed (verify product manually)</div>';
+      }
+    }
+
+    // "Have" summary line
+    const haveStockText = needFam ? fmtNum(stockSame) + ' ' + (needFam==='mass'?'g':'ml') : '—';
+    const productCount = cc.products.length;
+    const haveLine = '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">Have: ' + haveStockText + ' — from ' + productCount + ' product' + (productCount===1?'':'s') + ':</div>';
+
+    return '<div style="background:var(--bg-card);border:1px solid ' + borderColor + ';border-radius:10px;padding:10px 16px;min-width:240px;max-width:320px;">' +
+      '<div style="font-size:12px;font-weight:700;color:#8fcf80;margin-bottom:4px;">' + esc(aiLabel) + '</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ' + fmtNum(cc.needCanonical) + ' ' + esc(cc.needCanonicalUnit) + packsNeededLine + '</div>' +
+      haveLine +
+      productLines +
+      '<div style="font-size:12px;font-weight:700;color:' + statusColor + ';margin-top:4px;">' + statusIcon + ' ' + statusText + '</div>' +
+      crossFamilyWarn +
       costLabel +
     '</div>';
   }).join('');
@@ -1541,12 +1658,21 @@ function njAddAI() {
 
   const combo = getAICombos().find(c=>c.key===comboKey);
   const def = getAIComboDefault(comboKey);
+  const aiUnit = combo ? aiCanonicalUnit(combo) : { family:null, unit:null, mixed:false };
+  // Lock unit to product side. If single-family AI, force canonical. If mixed, allow user choice.
+  let unit;
+  if(aiUnit.mixed || !aiUnit.unit) {
+    unit = (def && def.dose_unit) || 'g';
+  } else {
+    unit = aiUnit.unit;
+  }
   const rowId = njNextId++;
   njAIs.push({
     id: rowId, comboKey, label: combo?combo.label:'?',
     doseAmt: def?parseFloat(def.dose_amount)||0:0,
-    doseUnit: def?def.dose_unit||'g':'g',
-    dosePer: def?parseInt(def.dose_per_litres)||0:0
+    doseUnit: unit,
+    dosePer: def?parseInt(def.dose_per_litres)||0:0,
+    unitLocked: !aiUnit.mixed && !!aiUnit.unit
   });
   njRenderAIs();
   njCalcAllTotals();
@@ -1564,6 +1690,11 @@ function njRenderAIs() {
   const usedKeys = njAIs.map(a=>a.comboKey);
 
   container.innerHTML = njAIs.map(row => {
+    // Unit cell: static label when locked (single-family AI), select when mixed-family.
+    const unitCell = row.unitLocked
+      ? `<div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><div style="padding:9px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-weight:700;font-size:13px;color:var(--white);text-align:center;" title="Unit set by product (cannot change)">${esc(row.doseUnit)}</div></div>`
+      : `<div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><select style="width:100%;" onchange="njUpdateAIField(${row.id},'doseUnit',this.value);njCalcAllTotals()"><option value="g" ${row.doseUnit==='g'?'selected':''}>g</option><option value="ml" ${row.doseUnit==='ml'?'selected':''}>ml</option><option value="kg" ${row.doseUnit==='kg'?'selected':''}>kg</option><option value="L" ${row.doseUnit==='L'?'selected':''}>L</option></select></div>`;
+    const mixedWarn = row.unitLocked ? '' : `<div style="font-size:10px;color:#E8A020;margin-top:4px;">⚠ This AI's products span both mass and volume — pick the unit that matches the product you'll use.</div>`;
     return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <span style="background:rgba(74,124,63,0.25);color:#8fcf80;border:1px solid rgba(74,124,63,0.4);border-radius:12px;padding:3px 12px;font-size:12px;font-weight:600;">${esc(row.label)}</span>
@@ -1571,9 +1702,10 @@ function njRenderAIs() {
       </div>
       <div style="display:flex;gap:8px;align-items:end;">
         <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Dose</label><input type="number" step="0.001" value="${row.doseAmt||''}" style="width:100%;" onchange="njUpdateAIField(${row.id},'doseAmt',parseFloat(this.value)||0);njCalcAllTotals()"></div>
-        <div style="width:60px;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">Unit</label><select style="width:100%;" onchange="njUpdateAIField(${row.id},'doseUnit',this.value);njCalcAllTotals()"><option value="g" ${row.doseUnit==='g'?'selected':''}>g</option><option value="ml" ${row.doseUnit==='ml'?'selected':''}>ml</option><option value="kg" ${row.doseUnit==='kg'?'selected':''}>kg</option><option value="L" ${row.doseUnit==='L'?'selected':''}>L</option></select></div>
+        ${unitCell}
         <div style="flex:1;"><label style="font-size:10px;text-transform:uppercase;color:var(--text-muted);">per Litres</label><input type="number" min="1" value="${row.dosePer||''}" style="width:100%;" onchange="njUpdateAIField(${row.id},'dosePer',parseInt(this.value)||0);njCalcAllTotals()"></div>
       </div>
+      ${mixedWarn}
     </div>`;
   }).join('');
 
@@ -3322,16 +3454,21 @@ function renderAIDoseSettings() {
     combos.map(c => {
       const def = getAIComboDefault(c.key) || {};
       const prodNames = c.productIds.map(pid => { const p=getProduct(pid); return p?p.product_name:'?'; }).join(', ');
+      const aiUnit = aiCanonicalUnit(c);
+      // Lock dose unit when AI's products are single-family. Show static label instead of dropdown.
+      const unitCell = (!aiUnit.mixed && aiUnit.unit)
+        ? '<td><div style="padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-weight:700;font-size:13px;color:var(--white);text-align:center;" title="Unit set by product pack_unit (cannot change)">' + esc(aiUnit.unit) + '</div></td>'
+        : '<td><select class="inline-select" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_unit\',this.value||null)">' +
+            '<option value="g"' + (def.dose_unit==='g'?' selected':'') + '>g</option>' +
+            '<option value="ml"' + (def.dose_unit==='ml'?' selected':'') + '>ml</option>' +
+            '<option value="kg"' + (def.dose_unit==='kg'?' selected':'') + '>kg</option>' +
+            '<option value="L"' + (def.dose_unit==='L'?' selected':'') + '>L</option>' +
+          '</select>' + (aiUnit.mixed ? '<div style="font-size:9px;color:#E8A020;margin-top:2px;">⚠ mixed family</div>' : '') + '</td>';
       return '<tr>' +
         '<td style="font-weight:600;color:#8fcf80;font-size:12px;">' + esc(c.label) + '</td>' +
         '<td style="font-size:11px;color:var(--text-dim);">' + esc(prodNames) + '</td>' +
         '<td><input class="inline-input" type="number" step="0.001" value="' + (def.dose_amount||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_amount\',parseFloat(this.value)||null)"></td>' +
-        '<td><select class="inline-select" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_unit\',this.value||null)">' +
-          '<option value="g"' + (def.dose_unit==='g'?' selected':'') + '>g</option>' +
-          '<option value="ml"' + (def.dose_unit==='ml'?' selected':'') + '>ml</option>' +
-          '<option value="kg"' + (def.dose_unit==='kg'?' selected':'') + '>kg</option>' +
-          '<option value="L"' + (def.dose_unit==='L'?' selected':'') + '>L</option>' +
-        '</select></td>' +
+        unitCell +
         '<td><input class="inline-input" type="number" value="' + (def.dose_per_litres||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'dose_per_litres\',parseInt(this.value)||null)"></td>' +
         '<td><input class="inline-input" type="number" value="' + (def.interval_days||'') + '" style="width:100%;" onchange="updateAIDose(\'' + esc(c.key) + '\',\'interval_days\',parseInt(this.value)||null)"></td>' +
         '<td><span class="save-tick" id="tick-ai-' + c.key.replace(/[^a-z0-9]/gi,'_') + '">✓</span></td>' +
