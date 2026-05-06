@@ -268,9 +268,16 @@ body { overflow: auto; height: auto; min-height: 100vh; }
   <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
     <div class="modal-title">Payment Collection</div>
     <div id="del-paydecision-info" style="font-size:13px;margin-bottom:16px;"></div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <button class="btn btn-primary" style="min-height:48px;" onclick="delPayDecision('now')">Collect Payment Now</button>
-      <button class="btn btn-outline" style="min-height:48px;" onclick="delPayDecision('later')">Pay Later</button>
+    <div id="del-paydecision-buttons" style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" style="min-height:48px;" onclick="delPayDecisionAsk('now')">Collect Payment Now</button>
+      <button class="btn btn-outline" style="min-height:48px;" onclick="delPayDecisionAsk('later')">Pay Later</button>
+    </div>
+    <div id="del-paydecision-confirm" style="display:none;margin-top:14px;padding:12px;background:var(--bg-hover);border-radius:8px;text-align:center;">
+      <div id="del-paydecision-confirm-msg" style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn btn-outline" style="min-width:80px;min-height:44px;" onclick="delPayDecisionNo()">No</button>
+        <button class="btn btn-primary" style="min-width:80px;min-height:44px;" onclick="delPayDecisionYes()">Yes</button>
+      </div>
     </div>
   </div>
 </div>
@@ -278,7 +285,7 @@ body { overflow: auto; height: auto; min-height: 100vh; }
 <!-- Payment Collection Modal -->
 <div id="del-pay-modal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:380px;" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="delPayDecision('later')">
+    <button class="modal-close" onclick="delPayBack()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="modal-title">Receive Payment</div>
@@ -294,7 +301,7 @@ body { overflow: auto; height: auto; min-height: 100vh; }
       </select>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="delPayDecision('later')">Skip</button>
+      <button class="btn btn-outline" onclick="delPayBack()">Back</button>
       <button class="btn btn-primary" id="del-pay-confirm-btn" onclick="delPayConfirm()">Confirm Payment</button>
     </div>
   </div>
@@ -761,9 +768,23 @@ function delAfterPhoto() {
   if (!o) return;
 
   if (o.doc_type === 'cash_sales') {
-    // Recalculate balance from pending items
-    var newGrand = 0;
-    delPending.items.forEach(function(it) { newGrand += it.line_total; });
+    // Compute pending grand from in-memory qty adjustments. Fall back to the
+    // order's stored grand_total when pending math sums to 0 — we've seen
+    // delPending.items come back empty in production (16+ silent popup skips
+    // for Sweety Fruits), and the order's grand_total reflects the items
+    // committed at Mark Prepared so it's the authoritative balance source.
+    var pendingItemsTotal = 0;
+    delPending.items.forEach(function(it) { pendingItemsTotal += (parseFloat(it.line_total) || 0); });
+    var returnsTotal = parseFloat(o.return_total) || 0;
+    var newGrand;
+    if (pendingItemsTotal > 0.01) {
+      newGrand = Math.max(0, pendingItemsTotal - returnsTotal);
+    } else {
+      newGrand = parseFloat(o.grand_total) || 0;
+      if (delPending.items.length === 0) {
+        console.warn('[del] delPending.items empty for ' + o.id + ' — using order.grand_total fallback. Investigate UI race.');
+      }
+    }
     var paid = parseFloat(o.amount_paid) || 0;
     var balance = newGrand - paid;
     if (balance > 0.01) {
@@ -773,6 +794,10 @@ function delAfterPhoto() {
         'Outstanding: <strong style="color:var(--gold);">' + formatRM(balance) + '</strong>';
       document.getElementById('del-pay-amount').value = balance.toFixed(2);
       document.getElementById('del-pay-amount').max = balance.toFixed(2);
+      // Reset two-button view (in case modal was previously left in confirm state)
+      delPayDecisionChoice = null;
+      document.getElementById('del-paydecision-buttons').style.display = 'flex';
+      document.getElementById('del-paydecision-confirm').style.display = 'none';
       document.getElementById('del-paydecision-modal').style.display = 'flex';
       return;
     }
@@ -782,15 +807,44 @@ function delAfterPhoto() {
   delCommitAll();
 }
 
-// Step 3: Payment decision
-function delPayDecision(choice) {
+// Step 3: Two-step payment decision (matches sales.html pattern).
+// First tap picks Now/Later → second tap confirms intent. Prevents silent
+// "Pay Later" commits via accidental tap.
+var delPayDecisionChoice = null;
+
+function delPayDecisionAsk(choice) {
+  delPayDecisionChoice = choice;
+  document.getElementById('del-paydecision-buttons').style.display = 'none';
+  document.getElementById('del-paydecision-confirm').style.display = 'block';
+  document.getElementById('del-paydecision-confirm-msg').textContent =
+    choice === 'later' ? 'Confirm pay later?' : 'Confirm payment received?';
+}
+
+function delPayDecisionNo() {
+  delPayDecisionChoice = null;
+  document.getElementById('del-paydecision-buttons').style.display = 'flex';
+  document.getElementById('del-paydecision-confirm').style.display = 'none';
+}
+
+function delPayDecisionYes() {
+  var choice = delPayDecisionChoice;
+  delPayDecisionChoice = null;
   closeModal('del-paydecision-modal');
   if (choice === 'now') {
     document.getElementById('del-pay-modal').style.display = 'flex';
   } else {
-    // Pay later — commit without payment
     delCommitAll();
   }
+}
+
+// Back from Receive Payment modal → re-show paydecision modal.
+// Replaces the old silent "Skip / X = commit unpaid" path.
+function delPayBack() {
+  closeModal('del-pay-modal');
+  delPayDecisionChoice = null;
+  document.getElementById('del-paydecision-buttons').style.display = 'flex';
+  document.getElementById('del-paydecision-confirm').style.display = 'none';
+  document.getElementById('del-paydecision-modal').style.display = 'flex';
 }
 
 // Step 3b: Payment confirm

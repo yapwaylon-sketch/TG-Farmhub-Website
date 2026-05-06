@@ -3727,11 +3727,22 @@ function soShowPayDecision() {
     return;
   }
 
-  // Calculate pending balance using in-memory qty adjustments
+  // Calculate pending balance using in-memory qty adjustments. Fall back to
+  // the order's stored grand_total when pending math sums to 0 — defends
+  // against an empty soDeliveryPending.items race that has caused silent
+  // popup skips in delivery.html (same defensive pattern there).
   var newSubtotal = 0;
-  soDeliveryPending.items.forEach(function(it) { newSubtotal += it.lineTotal; });
+  soDeliveryPending.items.forEach(function(it) { newSubtotal += (parseFloat(it.lineTotal) || 0); });
   var returnsTotal = parseFloat(o.return_total) || 0;
-  var pendingGrand = Math.max(0, newSubtotal - returnsTotal);
+  var pendingGrand;
+  if (newSubtotal > 0.01) {
+    pendingGrand = Math.max(0, newSubtotal - returnsTotal);
+  } else {
+    pendingGrand = parseFloat(o.grand_total) || 0;
+    if (soDeliveryPending.items.length === 0) {
+      console.warn('[so] soDeliveryPending.items empty for ' + o.id + ' — using order.grand_total fallback. Investigate UI race.');
+    }
+  }
   var currentPaid = parseFloat(o.amount_paid) || 0;
   var pendingBalance = pendingGrand - currentPaid;
 
