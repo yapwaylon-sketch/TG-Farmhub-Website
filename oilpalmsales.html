@@ -200,12 +200,428 @@
       suppliers = data || [];
     }
 
-    // === Render stubs (filled in by Tasks 3.2 — 3.11) ===
+    // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
     function renderSummaryTab()     { document.getElementById('tab-summary').innerHTML     = '<p class="muted">Summary — TODO Task 3.3</p>'; }
     function renderBookingsTab()    { document.getElementById('tab-bookings').innerHTML    = '<p class="muted">Bookings — TODO Task 3.4</p>'; }
     function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
-    function renderCustomersTab()   { document.getElementById('tab-customers').innerHTML   = '<p class="muted">Customers — TODO Task 3.2</p>'; }
     function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+
+    // === Customers tab (Task 3.2) ===
+    let opsCustomerSearchTerm = '';
+    let selectedCustomerId = null;
+    let opscPhoneIti = null;
+
+    function renderCustomersTab() {
+      // If a customer is selected, show their detail page instead of the list
+      if (selectedCustomerId) {
+        opsRenderCustomerDetail();
+        return;
+      }
+
+      // Compute aggregates per customer from in-memory state
+      const bookedByCust = {};
+      const owedByCust = {};
+      const hasActiveBooking = {};
+      bookings.forEach(b => {
+        const cid = b.customer_id;
+        bookedByCust[cid] = (bookedByCust[cid] || 0) + Number(b.booked_qty || 0);
+        // Outstanding: across active+cancelled bookings, sum (total_amount - total_paid)
+        // (Walk-ins have no booking row → not counted here.)
+        if (b.status === 'active' || b.status === 'cancelled') {
+          const paid = paymentsByBooking[b.id] || 0;
+          const owed = Math.max(0, Number(b.total_amount || 0) - paid);
+          owedByCust[cid] = (owedByCust[cid] || 0) + owed;
+          if (b.status === 'active') hasActiveBooking[cid] = true;
+        }
+      });
+
+      const collectedByCust = {};
+      collections.forEach(c => {
+        const cid = c.customer_id;
+        collectedByCust[cid] = (collectedByCust[cid] || 0) + Number(c.qty || 0);
+      });
+
+      // Filter by search term — match on name OR phone digits
+      const term = (opsCustomerSearchTerm || '').trim().toLowerCase();
+      const termDigits = phoneDigitsOnly(term).replace(/^0+/, '');
+      const filtered = customers.filter(c => {
+        if (!term) return true;
+        const nameMatch = (c.name || '').toLowerCase().includes(term);
+        const phoneStored = phoneDigitsOnly(c.phone || '').replace(/^0+/, '');
+        const phoneMatch = termDigits && phoneStored.includes(termDigits);
+        return nameMatch || phoneMatch;
+      });
+
+      const tbody = filtered.map((c, i) => {
+        const booked = bookedByCust[c.id] || 0;
+        const collected = collectedByCust[c.id] || 0;
+        const owed = owedByCust[c.id] || 0;
+        const owedClass = owed > 0
+          ? (hasActiveBooking[c.id] ? 'style="color:var(--red);font-weight:600;"' : 'style="color:#8A6D1F;font-weight:600;"')
+          : 'style="color:var(--text-muted);"';
+        const typeBadge = c.customer_type === 'walkin'
+          ? '<span class="ops-status-badge ops-status-walkin">Walk-in</span>'
+          : '<span class="ops-status-badge ops-status-active">Booking</span>';
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a></td>
+            <td>${typeBadge}</td>
+            <td>${c.phone ? esc(fmtPhone(c.phone)) : '<span class="muted">—</span>'}</td>
+            <td>${esc(c.address || '—')}</td>
+            <td style="text-align:right;">${booked.toLocaleString()}</td>
+            <td style="text-align:right;">${collected.toLocaleString()}</td>
+            <td style="text-align:right;" ${owedClass}>${formatRM(owed)}</td>
+            <td>${c.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>'}</td>
+            <td class="actions">
+              <button class="btn-tiny" onclick="opsOpenCustomerModal('${c.id}')">Edit</button>
+              <button class="btn-tiny ${c.is_active ? 'danger' : ''}" onclick="opsToggleCustomer('${c.id}', ${!c.is_active})">${c.is_active ? 'Deactivate' : 'Activate'}</button>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No customers' + (term ? ' match this search.' : ' yet.') + '</td></tr>';
+
+      document.getElementById('tab-customers').innerHTML = `
+        <div class="page-header">
+          <h2>Customers</h2>
+          <button class="btn btn-primary" onclick="opsOpenCustomerModal()">+ Add Customer</button>
+        </div>
+        <div class="filters-bar">
+          <input type="text" id="ops-cust-search" placeholder="Search name or phone..." value="${esc(opsCustomerSearchTerm)}" oninput="opsCustSearchInput(this.value)" style="min-width:240px;" />
+          ${term ? `<button class="btn-tiny" onclick="opsCustSearchInput('')">Clear</button>` : ''}
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th style="text-align:right;">Total Booked</th>
+                <th style="text-align:right;">Total Collected</th>
+                <th style="text-align:right;">Outstanding</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${tbody}</tbody>
+          </table>
+        </div>
+      `;
+
+      // Restore focus + caret to the search box if user is typing
+      const searchEl = document.getElementById('ops-cust-search');
+      if (searchEl && document.activeElement && document.activeElement.id !== 'ops-cust-search' && term) {
+        // no-op: don't steal focus; only re-apply if we were typing in it
+      }
+    }
+
+    function opsCustSearchInput(val) {
+      opsCustomerSearchTerm = val || '';
+      renderCustomersTab();
+      // Re-focus the input + put cursor at end (renderCustomersTab destroyed the DOM)
+      const el = document.getElementById('ops-cust-search');
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        try { el.setSelectionRange(len, len); } catch (e) {}
+      }
+    }
+
+    // ----- Add / Edit modal -----
+    function opsOpenCustomerModal(id) {
+      const c = id
+        ? customers.find(x => x.id === id)
+        : { name: '', customer_type: 'booking', contact_person: '', phone: '', address: '', notes: '' };
+      if (id && !c) { notify('Customer not found', 'error'); return; }
+
+      showModal(`
+        <h3>${id ? 'Edit' : 'Add'} Customer</h3>
+        <div class="form-grid">
+          <label class="full">Name <input id="oc-name" value="${esc(c.name || '')}" /></label>
+          <label>Customer Type
+            <select id="oc-type">
+              <option value="booking" ${c.customer_type === 'walkin' ? '' : 'selected'}>Booking</option>
+              <option value="walkin" ${c.customer_type === 'walkin' ? 'selected' : ''}>Walk-in</option>
+            </select>
+          </label>
+          <label>Contact Person <input id="oc-contact" value="${esc(c.contact_person || '')}" /></label>
+          <label class="full">Phone <input id="oc-phone" type="tel" /></label>
+          <label class="full">Address <textarea id="oc-addr">${esc(c.address || '')}</textarea></label>
+          <label class="full">Notes <textarea id="oc-notes">${esc(c.notes || '')}</textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-cust-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveCustomer('${id || ''}')">Save</button>
+        </div>
+      `, 'ops-cust-overlay');
+
+      // Bind intl-tel-input AFTER showModal injected the input into the DOM
+      opsInitPhoneInput();
+      if (id && c.phone) opsSetItiNumber(opscPhoneIti, c.phone);
+    }
+
+    function opsInitPhoneInput() {
+      const input = document.getElementById('oc-phone');
+      if (!input || !window.intlTelInput) { opscPhoneIti = null; return; }
+      opscPhoneIti = window.intlTelInput(input, {
+        initialCountry: 'my',
+        preferredCountries: ['my', 'sg', 'bn', 'id', 'th']
+      });
+    }
+
+    function opsSetItiNumber(iti, value) {
+      if (!iti || !value) return;
+      try { iti.setNumber(value); } catch (e) {
+        const el = document.getElementById('oc-phone');
+        if (el) el.value = value;
+      }
+    }
+
+    function opsReadPhone(iti) {
+      if (!iti) {
+        // CDN didn't load — fall back to raw input
+        const el = document.getElementById('oc-phone');
+        return { value: el ? el.value.trim() : '', error: null };
+      }
+      const raw = iti.getNumber ? iti.getNumber() : '';
+      if (!raw) {
+        // Empty input is allowed (phone is optional)
+        const fallback = (document.getElementById('oc-phone').value || '').trim();
+        return { value: fallback, error: null };
+      }
+      if (typeof iti.isValidNumber === 'function') {
+        if (iti.isValidNumber()) return { value: raw, error: null };
+        return { value: '', error: 'Invalid phone number' };
+      }
+      return { value: raw, error: null };
+    }
+
+    async function opsSaveCustomer(id) {
+      const name = document.getElementById('oc-name').value.trim();
+      if (!name) { notify('Name is required', 'error'); return; }
+
+      const phoneRead = opsReadPhone(opscPhoneIti);
+      if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
+
+      const data = {
+        name,
+        customer_type: document.getElementById('oc-type').value || 'booking',
+        contact_person: document.getElementById('oc-contact').value.trim() || null,
+        phone: phoneRead.value || null,
+        address: document.getElementById('oc-addr').value.trim() || null,
+        notes: document.getElementById('oc-notes').value.trim() || null
+      };
+
+      if (id) {
+        const result = await sbMutate(sb.from('oilpalm_customers').update(data).eq('id', id).select());
+        if (result === null) return;
+      } else {
+        const newId = await dbNextId('OC');
+        if (!newId) { notify('Failed to generate ID', 'error'); return; }
+        const insertData = Object.assign({}, data, { id: newId, company_id: getCompanyId() });
+        const result = await sbMutate(sb.from('oilpalm_customers').insert(insertData).select());
+        if (result === null) return;
+      }
+
+      await loadCustomers();
+      closeModal('ops-cust-overlay');
+      opscPhoneIti = null;
+      renderCustomersTab();
+      notify(id ? 'Customer updated' : 'Customer added', 'success');
+    }
+
+    async function opsToggleCustomer(id, makeActive) {
+      const result = await sbMutate(sb.from('oilpalm_customers').update({ is_active: makeActive }).eq('id', id).select());
+      if (result === null) return;
+      await loadCustomers();
+      renderCustomersTab();
+      notify(makeActive ? 'Customer activated' : 'Customer deactivated', 'success');
+    }
+
+    // ----- Customer detail page (mini) -----
+    function opsOpenCustomerDetail(id) {
+      selectedCustomerId = id;
+      renderCustomersTab();
+    }
+
+    function opsCloseCustomerDetail() {
+      selectedCustomerId = null;
+      renderCustomersTab();
+    }
+
+    function opsRenderCustomerDetail() {
+      const c = customers.find(x => x.id === selectedCustomerId);
+      if (!c) {
+        // Customer was deleted/missing — bail back to list
+        selectedCustomerId = null;
+        renderCustomersTab();
+        return;
+      }
+
+      const myBookings = bookings.filter(b => b.customer_id === c.id);
+      const myCollections = collections.filter(co => co.customer_id === c.id);
+      const myPayments = payments.filter(p => {
+        if (p.booking_id) return myBookings.some(b => b.id === p.booking_id);
+        if (p.collection_id) return myCollections.some(co => co.id === p.collection_id);
+        return false;
+      });
+
+      const totalBooked = myBookings.reduce((s, b) => s + Number(b.booked_qty || 0), 0);
+      const totalCollected = myCollections.reduce((s, co) => s + Number(co.qty || 0), 0);
+      const totalOwed = myBookings
+        .filter(b => b.status === 'active' || b.status === 'cancelled')
+        .reduce((s, b) => {
+          const paid = paymentsByBooking[b.id] || 0;
+          return s + Math.max(0, Number(b.total_amount || 0) - paid);
+        }, 0);
+
+      const batchLabel = (bid) => {
+        const b = batches.find(x => x.id === bid);
+        return b ? esc(b.batch_number || b.id) : '<span class="muted">—</span>';
+      };
+
+      const bookingsRows = myBookings.map(b => {
+        const paid = paymentsByBooking[b.id] || 0;
+        const balance = Math.max(0, Number(b.total_amount || 0) - paid);
+        const statusCls = ({
+          active: 'ops-status-active',
+          completed: 'ops-status-completed',
+          cancelled: 'ops-status-cancelled'
+        })[b.status] || 'ops-status-active';
+        return `
+          <tr>
+            <td>${esc(b.id)}</td>
+            <td>${batchLabel(b.batch_id)}</td>
+            <td style="text-align:right;">${Number(b.booked_qty || 0).toLocaleString()}</td>
+            <td style="text-align:right;">${formatRM(b.total_amount || 0)}</td>
+            <td style="text-align:right;">${formatRM(paid)}</td>
+            <td style="text-align:right;${balance > 0 ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</td>
+            <td><span class="ops-status-badge ${statusCls}">${esc(b.status || '')}</span></td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--text-muted);">No bookings.</td></tr>';
+
+      const collectionsRows = myCollections.map(co => `
+        <tr>
+          <td>${fmtDate(co.collection_date)}</td>
+          <td>${esc(co.l3_form_no || '—')}</td>
+          <td>${batchLabel(co.batch_id)}</td>
+          <td style="text-align:right;">${Number(co.qty || 0).toLocaleString()}</td>
+          <td>${co.booking_id ? '<span class="ops-status-badge ops-status-active">Booking</span>' : '<span class="ops-status-badge ops-status-walkin">Walk-in</span>'}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--text-muted);">No collections.</td></tr>';
+
+      const paymentsRows = myPayments.map(p => `
+        <tr>
+          <td>${fmtDate(p.payment_date)}</td>
+          <td style="text-align:right;">${formatRM(p.amount || 0)}</td>
+          <td>${esc(p.method || '—')}</td>
+          <td>${esc(p.reference || '—')}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--text-muted);">No payments.</td></tr>';
+
+      document.getElementById('tab-customers').innerHTML = `
+        <div class="page-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button class="btn btn-outline" onclick="opsCloseCustomerDetail()">← Back</button>
+            <h2 style="margin:0;">${esc(c.name)}</h2>
+            ${c.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>'}
+          </div>
+          <button class="btn btn-primary" onclick="opsOpenCustomerModal('${c.id}')">Edit Customer</button>
+        </div>
+
+        <div class="ops-section">
+          <h3>Customer Info</h3>
+          <div class="form-grid">
+            <div><strong>Type:</strong> ${c.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
+            <div><strong>Phone:</strong> ${c.phone ? esc(fmtPhone(c.phone)) : '—'}</div>
+            <div><strong>Contact:</strong> ${esc(c.contact_person || '—')}</div>
+            <div><strong>Status:</strong> ${c.is_active ? 'Active' : 'Inactive'}</div>
+            <div class="full"><strong>Address:</strong> ${esc(c.address || '—')}</div>
+            <div class="full"><strong>Notes:</strong> ${esc(c.notes || '—')}</div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Aggregates</h3>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;">
+            <div class="ops-summary-card">
+              <div class="label">Total Booked</div>
+              <div class="value">${totalBooked.toLocaleString()}</div>
+              <div class="muted">across ${myBookings.length} booking${myBookings.length === 1 ? '' : 's'}</div>
+            </div>
+            <div class="ops-summary-card">
+              <div class="label">Total Collected</div>
+              <div class="value">${totalCollected.toLocaleString()}</div>
+              <div class="muted">across ${myCollections.length} collection${myCollections.length === 1 ? '' : 's'}</div>
+            </div>
+            <div class="ops-summary-card">
+              <div class="label">Outstanding</div>
+              <div class="value" style="${totalOwed > 0 ? 'color:var(--red);' : 'color:var(--text-muted);'}">${formatRM(totalOwed)}</div>
+              <div class="muted">unpaid balance</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Bookings</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Batch</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th style="text-align:right;">Total</th>
+                  <th style="text-align:right;">Paid</th>
+                  <th style="text-align:right;">Balance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${bookingsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Collections</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>L3.1 #</th>
+                  <th>Batch</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody>${collectionsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Payments</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th style="text-align:right;">Amount</th>
+                  <th>Method</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody>${paymentsRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
 
     // === Modal helper (module-local) ===
     // shared.js exposes openModal(id)/closeModal(id) for pre-defined modal HTML, but the
