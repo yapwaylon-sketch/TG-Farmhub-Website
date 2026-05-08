@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="assets/logo-agribusiness.png">
+  <title>Oil Palm Sales — TG FarmHub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css?v=2" />
+  <link rel="stylesheet" href="oilpalmsales.css?v=1" />
+  <!-- intl-tel-input — combined bundle (NOT plain min + separate utils.js). The split utils
+       loads as ES module on v23 and silently fails — see CLAUDE.md 2026-05-01 entry. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/css/intlTelInput.css" />
+  <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInputWithUtils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script src="shared.js?v=2"></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <div id="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
+        <div class="sidebar-logo"><img src="assets/logo-agribusiness.png" alt="TG"></div>
+        <div>
+          <div class="sidebar-brand-text">Oil Palm Sales</div>
+          <div style="font-size:10px;color:var(--text-muted);">&lt; TG FarmHub</div>
+        </div>
+      </a>
+    </div>
+    <div id="company-switcher"></div>
+    <nav class="sidebar-nav" aria-label="Module navigation">
+      <div class="nav-item active" data-page="summary" onclick="switchTab('summary')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span class="nav-label">Summary</span>
+      </div>
+      <div class="nav-item" data-page="bookings" onclick="switchTab('bookings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="nav-label">Bookings</span>
+      </div>
+      <div class="nav-item" data-page="collections" onclick="switchTab('collections')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="nav-label">Collections</span>
+      </div>
+      <div class="nav-item" data-page="customers" onclick="switchTab('customers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Customers</span>
+      </div>
+      <div class="nav-item" data-page="reports" onclick="switchTab('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="nav-label">Reports</span>
+      </div>
+    </nav>
+    <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+      <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);">
+        <span id="sidebar-user-name"></span>
+      </div>
+      <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">← Back to Hub</button>
+      <button onclick="doLogout()" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;color:var(--red);border-color:var(--red);">Logout</button>
+    </div>
+  </div>
+
+  <main id="main-content" role="main" class="main-content">
+    <div id="tab-summary"     class="page active"></div>
+    <div id="tab-bookings"    class="page"></div>
+    <div id="tab-collections" class="page"></div>
+    <div id="tab-customers"   class="page"></div>
+    <div id="tab-reports"     class="page"></div>
+  </main>
+  </div><!-- /#app -->
+
+  <div id="modal-host"></div>
+
+  <script>
+    // Supabase client (sb) is provided by shared.js as a global.
+    // Do NOT re-declare SUPABASE_URL/SUPABASE_KEY here — that throws a SyntaxError
+    // and halts the entire inline script (functions never get defined).
+
+    // === State ===
+    let currentUser = null;
+    let currentTab = 'summary';
+    let customers = [];
+    let bookings = [];
+    let collections = [];
+    let payments = [];           // both booking-tied + collection-tied (walk-in)
+    let batches = [];            // read-only (created by Growth module)
+    let varieties = [];          // for display only
+    let suppliers = [];          // for batch-row supplier-name lookups (e.g. on booking detail)
+    let paymentsByBooking = {};  // {booking_id: total_paid}
+
+    // === Init ===
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Session guard — match the codebase pattern (shared.js does NOT export ensureSession/currentUser)
+      const userData = localStorage.getItem('tgfarmhub_user');
+      if (!userData) { location.href = 'index.html'; return; }
+      try { currentUser = JSON.parse(userData); } catch (e) { location.href = 'index.html'; return; }
+
+      // Force company to Agribusiness for this module
+      setCompanyId('tg_agribusiness');
+
+      // Inject company switcher (redirect to hub if Agro Fruits selected)
+      if (typeof injectCompanySwitcher === 'function') {
+        injectCompanySwitcher();
+        document.querySelectorAll('.company-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var cid = btn.getAttribute('data-company');
+            if (cid !== 'tg_agribusiness') {
+              setCompanyId(cid);
+              location.href = 'index.html';
+            }
+          });
+        });
+      }
+
+      // Inject user badge / start inactivity timer (graceful no-op if helpers absent)
+      if (typeof injectUserBadge === 'function') injectUserBadge(currentUser);
+      if (typeof startInactivityTimer === 'function') startInactivityTimer();
+
+      const nameEl = document.getElementById('sidebar-user-name');
+      if (nameEl) nameEl.textContent = currentUser.displayName || currentUser.username || currentUser.name || '';
+
+      await Promise.all([
+        loadCustomers(),
+        loadBookings(),
+        loadCollections(),
+        loadPayments(),
+        loadBatches(),
+        loadVarieties(),
+        loadSuppliers()
+      ]);
+      renderSummaryTab();
+    });
+
+    function doLogout() {
+      try { localStorage.removeItem('tgfarmhub_user'); } catch (e) {}
+      try { localStorage.removeItem('tg_session'); } catch (e) {}
+      location.href = 'index.html';
+    }
+
+    function switchTab(name) {
+      currentTab = name;
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+      document.querySelectorAll('.main-content > .page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      if (name === 'summary')     renderSummaryTab();
+      if (name === 'bookings')    renderBookingsTab();
+      if (name === 'collections') renderCollectionsTab();
+      if (name === 'customers')   renderCustomersTab();
+      if (name === 'reports')     renderReportsTab();
+    }
+
+    // === Loaders ===
+    async function loadCustomers() {
+      const data = await sbQuery(sb.from('oilpalm_customers').select('*').eq('company_id', getCompanyId()).order('name'));
+      customers = data || [];
+    }
+
+    async function loadBookings() {
+      const data = await sbQuery(sb.from('oilpalm_bookings').select('*').eq('company_id', getCompanyId()).order('created_at', { ascending: false }));
+      bookings = data || [];
+    }
+
+    async function loadCollections() {
+      const data = await sbQuery(sb.from('oilpalm_collections').select('*').eq('company_id', getCompanyId()).order('collection_date', { ascending: false }));
+      collections = data || [];
+    }
+
+    async function loadPayments() {
+      // oilpalm_payments has NO company_id column — DO NOT add the filter
+      // (would PostgREST 400 → swallowed by sbQuery → silent empty result; see CLAUDE.md
+      //  2026-05-05 pay-rate modal silent-skip lesson on tables without company_id.)
+      const data = await sbQuery(sb.from('oilpalm_payments').select('*'));
+      payments = data || [];
+      paymentsByBooking = {};
+      payments.filter(p => p.booking_id).forEach(p => {
+        paymentsByBooking[p.booking_id] = (paymentsByBooking[p.booking_id] || 0) + Number(p.amount || 0);
+      });
+    }
+
+    async function loadBatches() {
+      // Read-only here — Growth module owns batch lifecycle. Pull every column we
+      // might need (qty_mn_start, qty_planted, default_price, bookable_pct, status...)
+      // so booking-side Available math works without joins.
+      const data = await sbQuery(sb.from('oilpalm_batches').select('*').eq('company_id', getCompanyId()).order('created_at', { ascending: false }));
+      batches = data || [];
+    }
+
+    async function loadVarieties() {
+      // crop_varieties is shared. Filter by oil palm crop.
+      const crops = await sbQuery(sb.from('crops').select('id,name'));
+      const oilPalm = (crops || []).find(c => /oil\s*palm/i.test(c.name));
+      if (!oilPalm) { varieties = []; return; }
+      const data = await sbQuery(sb.from('crop_varieties').select('id,name,crop_id').eq('crop_id', oilPalm.id).order('name'));
+      varieties = data || [];
+    }
+
+    async function loadSuppliers() {
+      // For supplier-name lookups on batch rows shown in booking detail.
+      const data = await sbQuery(sb.from('oilpalm_suppliers').select('*').eq('company_id', getCompanyId()).order('name'));
+      suppliers = data || [];
+    }
+
+    // === Render stubs (filled in by Tasks 3.2 — 3.11) ===
+    function renderSummaryTab()     { document.getElementById('tab-summary').innerHTML     = '<p class="muted">Summary — TODO Task 3.3</p>'; }
+    function renderBookingsTab()    { document.getElementById('tab-bookings').innerHTML    = '<p class="muted">Bookings — TODO Task 3.4</p>'; }
+    function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
+    function renderCustomersTab()   { document.getElementById('tab-customers').innerHTML   = '<p class="muted">Customers — TODO Task 3.2</p>'; }
+    function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+
+    // === Modal helper (module-local) ===
+    // shared.js exposes openModal(id)/closeModal(id) for pre-defined modal HTML, but the
+    // sales module uses dynamic modal HTML. We inject into #modal-host wrapped in the
+    // standard .modal-overlay/.modal-box structure so shared CSS applies, and reuse
+    // closeModal(overlayId) so focus-trap teardown still runs.
+    // Optional overlayId arg lets distinct modals coexist (default: 'ops-modal-overlay').
+    function showModal(innerHtml, overlayId) {
+      const id = overlayId || 'ops-modal-overlay';
+      const host = document.getElementById('modal-host');
+      host.innerHTML = `
+        <div id="${id}" class="modal-overlay" style="display:flex;">
+          <div class="modal-box" style="max-width:520px;">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      // openModal handles focus-trap + display
+      if (typeof openModal === 'function') openModal(id);
+    }
+  </script>
+</body>
+</html>
