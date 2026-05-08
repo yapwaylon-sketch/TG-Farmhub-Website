@@ -831,7 +831,15 @@
     }
 
     async function opsSaveNewBooking() {
-      const custId    = (document.getElementById('ops-bk-cust-id').value || '').trim();
+      // If the user opened the inline new-customer form (State B) and clicked Create Booking
+      // without saving or cancelling, the hidden customer-id field doesn't exist in the DOM.
+      // Guard against the null-deref here with a clear error.
+      const custIdEl = document.getElementById('ops-bk-cust-id');
+      if (!custIdEl) {
+        notify('Please Save or Cancel the new customer form first', 'error');
+        return;
+      }
+      const custId    = (custIdEl.value || '').trim();
       const batchId   = (document.getElementById('ops-bk-batch').value || '').trim();
       const qty       = parseInt(document.getElementById('ops-bk-qty').value, 10);
       const price     = parseFloat(document.getElementById('ops-bk-price').value);
