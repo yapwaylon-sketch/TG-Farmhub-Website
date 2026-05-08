@@ -75,6 +75,22 @@
 /* Modal actions row */
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 
+/* Warning banner (cap-exceeded warning in New Booking modal — Task 3.5) */
+.warn-box {
+  background: rgba(255, 140, 40, 0.10);
+  border: 1px solid rgba(255, 140, 40, 0.40);
+  color: #C96A1A;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* Customer search dropdown rows (New Booking modal) */
+.ops-bk-cust-row:hover { background: var(--overlay-subtle); }
+
 /* Mobile */
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }

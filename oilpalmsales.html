@@ -215,8 +215,380 @@
     }
 
     // Stubs — real modals land in later tasks.
-    function opsOpenNewBookingModal() { notify('TBD Task 3.5', 'info'); }
     function opsOpenWalkInModal()      { notify('TBD Task 3.9', 'info'); }
+
+    // === New Booking modal (Task 3.5) ===
+    // Inline-new-customer state lives only across the State-A ↔ State-B swap inside this modal.
+    let opscBkPhoneIti = null;
+
+    function opsOpenNewBookingModal() {
+      // Only PN/MN/Selling are bookable per design (received/ordered/sold_out/closed excluded).
+      const eligibleBatches = batches.filter(b => ['pre_nursery', 'main_nursery', 'selling'].includes(b.status));
+      const varietyMap = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      const stageLabel = (s) => ({
+        pre_nursery: 'PN',
+        main_nursery: 'MN',
+        selling: 'Selling'
+      })[s] || s;
+
+      const batchOpts = eligibleBatches.map(b => {
+        const vname = varietyMap[b.variety_id] || '—';
+        // Embed price + cap math on data-* so opsBkRecalc can read without batches[] lookup
+        return `<option value="${esc(b.id)}"
+          data-price="${Number(b.default_price || 0)}"
+          data-mn="${Number(b.qty_mn_start || 0)}"
+          data-pct="${Number(b.bookable_pct || 50)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)}</option>`;
+      }).join('');
+
+      showModal(`
+        <h3>New Booking</h3>
+        <div class="form-grid">
+          <!-- Customer area: state A (search) by default -->
+          <div class="full" id="ops-bk-cust-area">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted);font-weight:600;">
+              Customer
+              <input type="text" id="ops-bk-cust-search" placeholder="Type name or phone to search..." oninput="opsBkSearchCustomers()" autocomplete="off" />
+              <input type="hidden" id="ops-bk-cust-id" />
+              <div id="ops-bk-cust-selected" style="font-size:12px;color:#2D5224;font-weight:600;display:none;margin-top:4px;"></div>
+              <div id="ops-bk-cust-results" style="border:1px solid var(--border);border-radius:4px;background:var(--bg-card);max-height:200px;overflow-y:auto;display:none;margin-top:2px;"></div>
+              <div style="margin-top:6px;">
+                <button class="btn-tiny" type="button" onclick="opsBkOpenInlineNewCustomer()">+ New Customer</button>
+              </div>
+            </label>
+          </div>
+
+          <label class="full">Batch
+            <select id="ops-bk-batch" onchange="opsBkBatchChanged()">
+              <option value="">— select —</option>
+              ${batchOpts}
+            </select>
+          </label>
+
+          <label>Booked Qty <input id="ops-bk-qty" type="number" min="1" step="1" oninput="opsBkRecalc()" /></label>
+          <label>Unit Price (RM) <input id="ops-bk-price" type="number" step="0.01" min="0" oninput="opsBkRecalc()" /></label>
+          <label class="full">Total Amount (RM) <input id="ops-bk-total" readonly value="0.00" /></label>
+
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;margin-top:4px;">Initial Payment (mandatory, > 0)</label>
+          <label>Amount (RM) <input id="ops-bk-pay-amt" type="number" step="0.01" min="0.01" oninput="opsBkRecalc()" /></label>
+          <label>Method
+            <select id="ops-bk-pay-method">
+              <option value="cash">Cash</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </label>
+          <label>Reference <input id="ops-bk-pay-ref" /></label>
+          <label class="full">Slip (optional) <input type="file" id="ops-bk-pay-slip" accept="image/*,application/pdf" /></label>
+
+          <div id="ops-bk-warning" class="warn-box" style="display:none;"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-newbk-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveNewBooking()">Create Booking</button>
+        </div>
+      `, 'ops-newbk-overlay');
+    }
+
+    // Filter `customers` array on every keystroke; render dropdown of up to 8 matches.
+    function opsBkSearchCustomers() {
+      const term = (document.getElementById('ops-bk-cust-search').value || '').trim().toLowerCase();
+      const box  = document.getElementById('ops-bk-cust-results');
+      if (!term) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const termDigits = phoneDigitsOnly(term).replace(/^0+/, '');
+      // Only active customers in search results (deactivated ones can't book new)
+      const matches = customers.filter(c => {
+        if (c.is_active === false) return false;
+        const nameMatch = (c.name || '').toLowerCase().includes(term);
+        const phoneStored = phoneDigitsOnly(c.phone || '').replace(/^0+/, '');
+        const phoneMatch = termDigits && phoneStored.includes(termDigits);
+        return nameMatch || phoneMatch;
+      }).slice(0, 8);
+
+      if (matches.length === 0) {
+        box.style.display = 'block';
+        box.innerHTML = '<div style="padding:8px 10px;color:var(--text-muted);font-size:12px;">No matches.</div>';
+        return;
+      }
+      box.style.display = 'block';
+      box.innerHTML = matches.map(c => {
+        const phoneDisp = c.phone ? esc(fmtPhone(c.phone)) : '';
+        // Stash name on a data-attribute. esc() doesn't escape double quotes, so
+        // also replace " with &quot; for HTML-attribute-safe output before reading
+        // back via event.currentTarget.dataset.name in opsBkSelectCustomerFromEvent.
+        const nameAttr = esc(c.name || '').replace(/"/g, '&quot;');
+        return `<div class="ops-bk-cust-row" data-cid="${esc(c.id)}" data-name="${nameAttr}" onclick="opsBkSelectCustomerFromEvent(event)"
+          style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;">
+          <div style="font-weight:600;color:var(--text);">${esc(c.name || '')}</div>
+          ${phoneDisp ? `<div style="color:var(--text-muted);font-size:11px;">${phoneDisp}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function opsBkSelectCustomerFromEvent(ev) {
+      const el = ev && ev.currentTarget ? ev.currentTarget : null;
+      if (!el) return;
+      opsBkSelectCustomer(el.dataset.cid || '', el.dataset.name || '');
+    }
+
+    function opsBkSelectCustomer(id, name) {
+      document.getElementById('ops-bk-cust-id').value = id;
+      const sel = document.getElementById('ops-bk-cust-selected');
+      sel.style.display = 'block';
+      sel.textContent = '✓ ' + (name || '');
+      // Show selected name in the search box too, hide dropdown
+      const search = document.getElementById('ops-bk-cust-search');
+      if (search) search.value = name || '';
+      const box = document.getElementById('ops-bk-cust-results');
+      if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    }
+
+    // Inline new-customer State B — swap the customer area in-place.
+    function opsBkOpenInlineNewCustomer() {
+      const area = document.getElementById('ops-bk-cust-area');
+      area.innerHTML = `
+        <div style="border:1px dashed var(--border);border-radius:4px;padding:10px;background:rgba(212,175,55,0.06);">
+          <div style="font-size:12px;font-weight:700;color:#6B4C8A;margin-bottom:8px;">+ New Customer</div>
+          <div class="form-grid" style="margin-bottom:8px;">
+            <label class="full">Name <input id="ops-bk-newcust-name" /></label>
+            <label class="full">Phone <input id="ops-bk-newcust-phone" type="tel" /></label>
+          </div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button class="btn-tiny" type="button" onclick="opsBkCancelInlineNewCustomer()">Cancel</button>
+            <button class="btn-tiny" type="button" onclick="opsBkSaveInlineNewCustomer()" style="background:#6B4C8A;color:#fff;border-color:#6B4C8A;">Save Customer</button>
+          </div>
+        </div>
+      `;
+      // Initialise intl-tel-input on the new phone field
+      opsInitBkPhoneInput();
+    }
+
+    function opsBkCancelInlineNewCustomer() {
+      // Tear down the iti instance so we don't leak it (also unbinds DOM)
+      try { if (opscBkPhoneIti && opscBkPhoneIti.destroy) opscBkPhoneIti.destroy(); } catch (e) {}
+      opscBkPhoneIti = null;
+      opsBkRestoreCustomerSearchArea();
+    }
+
+    function opsBkRestoreCustomerSearchArea() {
+      const area = document.getElementById('ops-bk-cust-area');
+      area.innerHTML = `
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted);font-weight:600;">
+          Customer
+          <input type="text" id="ops-bk-cust-search" placeholder="Type name or phone to search..." oninput="opsBkSearchCustomers()" autocomplete="off" />
+          <input type="hidden" id="ops-bk-cust-id" />
+          <div id="ops-bk-cust-selected" style="font-size:12px;color:#2D5224;font-weight:600;display:none;margin-top:4px;"></div>
+          <div id="ops-bk-cust-results" style="border:1px solid var(--border);border-radius:4px;background:var(--bg-card);max-height:200px;overflow-y:auto;display:none;margin-top:2px;"></div>
+          <div style="margin-top:6px;">
+            <button class="btn-tiny" type="button" onclick="opsBkOpenInlineNewCustomer()">+ New Customer</button>
+          </div>
+        </label>
+      `;
+    }
+
+    function opsInitBkPhoneInput() {
+      const input = document.getElementById('ops-bk-newcust-phone');
+      if (!input || !window.intlTelInput) { opscBkPhoneIti = null; return; }
+      opscBkPhoneIti = window.intlTelInput(input, {
+        initialCountry: 'my',
+        preferredCountries: ['my', 'sg', 'bn', 'id', 'th']
+      });
+    }
+
+    function opsBkReadInlinePhone() {
+      if (!opscBkPhoneIti) {
+        const el = document.getElementById('ops-bk-newcust-phone');
+        return { value: el ? el.value.trim() : '', error: null };
+      }
+      const raw = opscBkPhoneIti.getNumber ? opscBkPhoneIti.getNumber() : '';
+      if (!raw) {
+        const fallback = (document.getElementById('ops-bk-newcust-phone').value || '').trim();
+        return { value: fallback, error: null };
+      }
+      if (typeof opscBkPhoneIti.isValidNumber === 'function') {
+        if (opscBkPhoneIti.isValidNumber()) return { value: raw, error: null };
+        return { value: '', error: 'Invalid phone number' };
+      }
+      return { value: raw, error: null };
+    }
+
+    async function opsBkSaveInlineNewCustomer() {
+      const name = (document.getElementById('ops-bk-newcust-name').value || '').trim();
+      if (!name) { notify('Name is required', 'error'); return; }
+      const phoneRead = opsBkReadInlinePhone();
+      if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
+
+      const newId = await dbNextId('OC');
+      if (!newId) { notify('Failed to generate customer ID', 'error'); return; }
+
+      const insertData = {
+        id: newId,
+        company_id: getCompanyId(),
+        name,
+        customer_type: 'booking',
+        phone: phoneRead.value || null,
+        is_active: true
+      };
+      const result = await sbMutate(sb.from('oilpalm_customers').insert(insertData).select());
+      if (result === null) return;
+
+      // Tear down iti before swapping the DOM
+      try { if (opscBkPhoneIti && opscBkPhoneIti.destroy) opscBkPhoneIti.destroy(); } catch (e) {}
+      opscBkPhoneIti = null;
+
+      await loadCustomers();
+      // Restore State A then pre-select the new customer
+      opsBkRestoreCustomerSearchArea();
+      opsBkSelectCustomer(newId, name);
+      notify('Customer added', 'success');
+    }
+
+    // Auto-populate price from batch.default_price + recompute total + cap warning.
+    // Always overwrites the price field on batch change — the spec says the field
+    // defaults to the batch price; user can still type an override after.
+    function opsBkBatchChanged() {
+      const sel = document.getElementById('ops-bk-batch');
+      const opt = sel.options[sel.selectedIndex];
+      const price = opt ? (parseFloat(opt.dataset.price) || 0) : 0;
+      const priceEl = document.getElementById('ops-bk-price');
+      if (priceEl) priceEl.value = price > 0 ? price.toFixed(2) : '';
+      opsBkRecalc();
+    }
+
+    function opsBkRecalc() {
+      const sel  = document.getElementById('ops-bk-batch');
+      const opt  = sel ? sel.options[sel.selectedIndex] : null;
+      const mn   = opt ? (parseFloat(opt.dataset.mn) || 0) : 0;
+      const pct  = opt ? (parseFloat(opt.dataset.pct) || 50) : 50;
+      const cap  = Math.floor(mn * pct / 100);
+
+      const qty   = parseFloat(document.getElementById('ops-bk-qty').value) || 0;
+      const price = parseFloat(document.getElementById('ops-bk-price').value) || 0;
+      const total = qty * price;
+      document.getElementById('ops-bk-total').value = total.toFixed(2);
+
+      // Cap warning — only meaningful when a batch is picked + qty > 0
+      const warn = document.getElementById('ops-bk-warning');
+      const batchId = sel ? sel.value : '';
+      if (batchId && qty > 0 && mn > 0) {
+        // Existing not-yet-collected booked qty for this batch (active bookings only)
+        const existing = bookings.filter(b => b.batch_id === batchId && b.status === 'active')
+          .reduce((s, bk) => {
+            const collected = collections
+              .filter(c => c.booking_id === bk.id)
+              .reduce((a, c) => a + (Number(c.qty) || 0), 0);
+            return s + Math.max(0, (Number(bk.booked_qty) || 0) - collected);
+          }, 0);
+        const totalIfThis = existing + qty;
+        if (totalIfThis > cap) {
+          warn.style.display = 'block';
+          warn.innerHTML = `⚠️ This booking would push total bookings to <strong>${totalIfThis}</strong> on a batch with cap <strong>${cap}</strong> (${pct}% of ${mn}). Save will require confirmation.`;
+        } else {
+          warn.style.display = 'none';
+          warn.innerHTML = '';
+        }
+      } else {
+        warn.style.display = 'none';
+        warn.innerHTML = '';
+      }
+    }
+
+    async function opsSaveNewBooking() {
+      const custId    = (document.getElementById('ops-bk-cust-id').value || '').trim();
+      const batchId   = (document.getElementById('ops-bk-batch').value || '').trim();
+      const qty       = parseInt(document.getElementById('ops-bk-qty').value, 10);
+      const price     = parseFloat(document.getElementById('ops-bk-price').value);
+      const total     = parseFloat(document.getElementById('ops-bk-total').value);
+      const payAmt    = parseFloat(document.getElementById('ops-bk-pay-amt').value);
+      const payMethod = document.getElementById('ops-bk-pay-method').value || 'cash';
+      const payRef    = (document.getElementById('ops-bk-pay-ref').value || '').trim();
+      const slipFileEl = document.getElementById('ops-bk-pay-slip');
+      const slipFile   = slipFileEl && slipFileEl.files && slipFileEl.files[0] ? slipFileEl.files[0] : null;
+
+      if (!custId)               { notify('Customer required', 'error'); return; }
+      if (!batchId)              { notify('Batch required', 'error'); return; }
+      if (!qty || qty < 1)       { notify('Qty must be at least 1', 'error'); return; }
+      if (!price || price <= 0)  { notify('Unit price must be > 0', 'error'); return; }
+      if (!payAmt || payAmt <= 0){ notify('Initial payment must be > 0 (zero-deposit not allowed)', 'error'); return; }
+      if (!isFinite(total) || total <= 0) { notify('Total amount invalid', 'error'); return; }
+
+      const warn = document.getElementById('ops-bk-warning');
+      const capExceeded = warn && warn.style.display === 'block';
+
+      // Helper that runs the actual save (reused by the cap-override callback path)
+      const doSave = async () => {
+        // 1. Generate booking ID
+        const bookingId = await dbNextId('OK');
+        if (!bookingId) { notify('Failed to generate booking ID', 'error'); return; }
+
+        // 2. Insert booking row (HAS company_id)
+        const bkInsert = {
+          id: bookingId,
+          company_id: getCompanyId(),
+          customer_id: custId,
+          batch_id: batchId,
+          booked_qty: qty,
+          unit_price: price,
+          total_amount: total,
+          booking_date: new Date().toISOString().slice(0, 10),
+          status: 'active'
+        };
+        const bkResult = await sbMutate(sb.from('oilpalm_bookings').insert(bkInsert).select());
+        if (bkResult === null) return;
+
+        // 3. Upload slip if provided (failure logged, doesn't abort the payment)
+        let slipUrl = null;
+        if (slipFile) {
+          const ext  = slipFile.name.split('.').pop();
+          const path = `payments/${bookingId}/initial.${ext}`;
+          try {
+            const up = await sb.storage.from('oilpalm-photos').upload(path, slipFile, { upsert: true, contentType: slipFile.type });
+            if (up.error) {
+              console.warn('[ops-newbk] slip upload failed:', up.error.message);
+              notify('Slip upload failed (' + up.error.message + ') — payment recorded without slip', 'warning');
+            } else {
+              slipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+            }
+          } catch (e) {
+            console.warn('[ops-newbk] slip upload threw:', e);
+            notify('Slip upload error — payment recorded without slip', 'warning');
+          }
+        }
+
+        // 4. Generate payment ID + insert (NO company_id — table doesn't have one)
+        const payId = await dbNextId('OP');
+        if (!payId) { notify('Failed to generate payment ID', 'error'); return; }
+        const payInsert = {
+          id: payId,
+          booking_id: bookingId,
+          collection_id: null,
+          amount: payAmt,
+          method: payMethod,
+          payment_date: new Date().toISOString().slice(0, 10),
+          reference: payRef || null,
+          slip_url: slipUrl,
+          logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+        };
+        const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+        if (payResult === null) return;
+
+        // 5. Refresh in-memory state + close + re-render current tab
+        await Promise.all([loadBookings(), loadPayments(), loadCustomers()]);
+        closeModal('ops-newbk-overlay');
+        if (currentTab === 'bookings')      renderBookingsTab();
+        else if (currentTab === 'summary')  renderSummaryTab();
+        else if (currentTab === 'customers') renderCustomersTab();
+        notify('Booking ' + bookingId + ' created', 'success');
+      };
+
+      // Cap override prompt — confirmAction is callback-based in this codebase
+      if (capExceeded) {
+        confirmAction('Override Cap', 'This booking exceeds the bookable cap. Continue anyway?', () => { doSave(); });
+        return;
+      }
+      await doSave();
+    }
+    // === End New Booking modal ===
 
     // Booking detail page — STUB until Task 3.6 builds the real view.
     function opsOpenBookingDetail(id) { notify('Booking detail TBD Task 3.6', 'info'); }
