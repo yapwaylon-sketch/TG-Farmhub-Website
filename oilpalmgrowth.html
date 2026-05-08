@@ -59,10 +59,9 @@
   <div id="modal-host"></div>
 
   <script>
-    // === Supabase init ===
-    const SUPABASE_URL = 'https://qwlagcriiyoflseduvvc.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA';
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Supabase client (sb) is provided by shared.js as a global.
+    // Do NOT re-declare SUPABASE_URL/SUPABASE_KEY here — that throws a SyntaxError
+    // and halts the entire inline script (functions never get defined).
 
     // === State ===
     let currentUser = null;
