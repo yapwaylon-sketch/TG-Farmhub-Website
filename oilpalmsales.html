@@ -217,8 +217,337 @@
       return x.toISOString().slice(0, 10);
     }
 
-    // Stubs — real modals land in later tasks.
-    function opsOpenWalkInModal()      { notify('TBD Task 3.9', 'info'); }
+    // === Walk-in Sale modal (Task 3.9) ===
+    // One-shot: customer + collection + payment in a single save. NO booking row.
+    let opscWalkinPhoneIti = null;
+
+    function opsOpenWalkInModal() {
+      // Walk-ins collect immediately from selling-stage stock only.
+      const sellingBatches = batches.filter(b => b.status === 'selling');
+      const varietyMap = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      const batchOpts = sellingBatches.map(b => {
+        const vname = varietyMap[b.variety_id] || '—';
+        return `<option value="${esc(b.id)}"
+          data-price="${Number(b.default_price || 0)}">${esc(b.batch_number || b.id)} · ${esc(vname)}</option>`;
+      }).join('');
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      showModal(`
+        <h3>+ New Walk-in Sale</h3>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Walk-ins pay full amount at counter. No booking row is created.</div>
+
+        <div class="form-grid">
+          <!-- Section A — Customer details -->
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;">Customer Details</label>
+          <label class="full">Name <input id="ops-wi-name" /></label>
+          <label>Contact Person <input id="ops-wi-contact" /></label>
+          <label>Phone <input id="ops-wi-phone" type="tel" /></label>
+          <label class="full">Address <textarea id="ops-wi-address" rows="2"></textarea></label>
+
+          <!-- Section B — Collection details -->
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;margin-top:8px;">Collection Details</label>
+          <label class="full">Batch (Selling stage)
+            <select id="ops-wi-batch" onchange="opsWiBatchChanged()">
+              <option value="">— select —</option>
+              ${batchOpts}
+            </select>
+          </label>
+          <label>Quantity <input id="ops-wi-qty" type="number" min="1" step="1" oninput="opsWiRecalc()" /></label>
+          <label>Unit Price (RM) <input id="ops-wi-price" type="number" step="0.01" min="0" oninput="opsWiRecalc()" /></label>
+          <label class="full">Total Amount (RM) <input id="ops-wi-total" readonly value="0.00" /></label>
+          <label class="full">L3.1 Form # <input id="ops-wi-l3" placeholder="From physical MPOB booklet" /></label>
+          <label class="full">L3.1 Photo (required) <input type="file" id="ops-wi-l3-photo" accept="image/*,application/pdf" /></label>
+          <label class="full">Collection Photo (required) <input type="file" id="ops-wi-coll-photo" accept="image/*" /></label>
+          <label>Car Plate # <input id="ops-wi-plate" /></label>
+          <label>Date <input id="ops-wi-date" type="date" value="${today}" /></label>
+
+          <!-- Section C — Payment (mandatory full payment) -->
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;margin-top:8px;">Payment (full amount at counter)</label>
+          <label>Amount (RM) <input id="ops-wi-pay-amt" type="number" step="0.01" min="0.01" /></label>
+          <label>Method
+            <select id="ops-wi-pay-method">
+              <option value="cash">Cash</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </label>
+          <label>Reference <input id="ops-wi-pay-ref" /></label>
+          <label class="full">Slip (optional) <input type="file" id="ops-wi-pay-slip" accept="image/*,application/pdf" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="opsCloseWalkInModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveWalkIn()">Save Walk-in Sale</button>
+        </div>
+      `, 'ops-walkin-overlay');
+
+      // Lazy-init intl-tel-input on the phone field
+      opsInitWalkinPhoneInput();
+    }
+
+    function opsCloseWalkInModal() {
+      try { if (opscWalkinPhoneIti && opscWalkinPhoneIti.destroy) opscWalkinPhoneIti.destroy(); } catch (e) {}
+      opscWalkinPhoneIti = null;
+      closeModal('ops-walkin-overlay');
+    }
+
+    function opsInitWalkinPhoneInput() {
+      const input = document.getElementById('ops-wi-phone');
+      if (!input || !window.intlTelInput) { opscWalkinPhoneIti = null; return; }
+      opscWalkinPhoneIti = window.intlTelInput(input, {
+        initialCountry: 'my',
+        preferredCountries: ['my', 'sg', 'bn', 'id', 'th']
+      });
+    }
+
+    function opsWiReadPhone() {
+      if (!opscWalkinPhoneIti) {
+        const el = document.getElementById('ops-wi-phone');
+        return { value: el ? el.value.trim() : '', error: null };
+      }
+      const raw = opscWalkinPhoneIti.getNumber ? opscWalkinPhoneIti.getNumber() : '';
+      if (!raw) {
+        const fallback = (document.getElementById('ops-wi-phone').value || '').trim();
+        return { value: fallback, error: null };
+      }
+      if (typeof opscWalkinPhoneIti.isValidNumber === 'function') {
+        if (opscWalkinPhoneIti.isValidNumber()) return { value: raw, error: null };
+        return { value: '', error: 'Invalid phone number' };
+      }
+      return { value: raw, error: null };
+    }
+
+    function opsWiBatchChanged() {
+      const sel = document.getElementById('ops-wi-batch');
+      const opt = sel.options[sel.selectedIndex];
+      const price = opt ? (parseFloat(opt.dataset.price) || 0) : 0;
+      const priceEl = document.getElementById('ops-wi-price');
+      if (priceEl) priceEl.value = price > 0 ? price.toFixed(2) : '';
+      opsWiRecalc();
+    }
+
+    function opsWiRecalc() {
+      const qty   = parseFloat(document.getElementById('ops-wi-qty').value) || 0;
+      const price = parseFloat(document.getElementById('ops-wi-price').value) || 0;
+      const total = qty * price;
+      document.getElementById('ops-wi-total').value = total.toFixed(2);
+      // Auto-fill payment amount to match total (allow override)
+      const payEl = document.getElementById('ops-wi-pay-amt');
+      if (payEl) payEl.value = total > 0 ? total.toFixed(2) : '';
+    }
+
+    async function opsSaveWalkIn() {
+      // === Read all fields ===
+      const name        = (document.getElementById('ops-wi-name').value || '').trim();
+      const contact     = (document.getElementById('ops-wi-contact').value || '').trim();
+      const address     = (document.getElementById('ops-wi-address').value || '').trim();
+      const batchId     = (document.getElementById('ops-wi-batch').value || '').trim();
+      const qty         = parseInt(document.getElementById('ops-wi-qty').value, 10);
+      const price       = parseFloat(document.getElementById('ops-wi-price').value);
+      const total       = parseFloat(document.getElementById('ops-wi-total').value);
+      const l3          = (document.getElementById('ops-wi-l3').value || '').trim();
+      const plate       = (document.getElementById('ops-wi-plate').value || '').trim();
+      const dateVal     = (document.getElementById('ops-wi-date').value || '').trim();
+
+      const l3PhotoEl   = document.getElementById('ops-wi-l3-photo');
+      const collPhotoEl = document.getElementById('ops-wi-coll-photo');
+      const l3PhotoFile   = l3PhotoEl   && l3PhotoEl.files   && l3PhotoEl.files[0]   ? l3PhotoEl.files[0]   : null;
+      const collPhotoFile = collPhotoEl && collPhotoEl.files && collPhotoEl.files[0] ? collPhotoEl.files[0] : null;
+
+      const payAmt    = parseFloat(document.getElementById('ops-wi-pay-amt').value);
+      const payMethod = document.getElementById('ops-wi-pay-method').value || 'cash';
+      const payRef    = (document.getElementById('ops-wi-pay-ref').value || '').trim();
+      const paySlipEl = document.getElementById('ops-wi-pay-slip');
+      const paySlipFile = paySlipEl && paySlipEl.files && paySlipEl.files[0] ? paySlipEl.files[0] : null;
+
+      // === Validation ===
+      if (!name)              { notify('Customer name is required', 'error'); return; }
+      if (!batchId)           { notify('Batch is required', 'error'); return; }
+      if (!qty || qty < 1)    { notify('Quantity must be at least 1', 'error'); return; }
+      if (!price || price <= 0) { notify('Unit price must be > 0', 'error'); return; }
+      if (!isFinite(total) || total <= 0) { notify('Total amount invalid', 'error'); return; }
+      if (!l3)                { notify('L3.1 Form # is required', 'error'); return; }
+      if (!l3PhotoFile)       { notify('L3.1 photo required', 'error'); return; }
+      if (!collPhotoFile)     { notify('Collection photo required', 'error'); return; }
+      if (!plate)             { notify('Car Plate # is required', 'error'); return; }
+      if (!dateVal)           { notify('Date is required', 'error'); return; }
+      if (!isFinite(payAmt) || payAmt <= 0) { notify('Payment amount must be > 0', 'error'); return; }
+      if (payAmt + 0.005 < total) {
+        notify('Walk-in sale requires full payment (RM ' + total.toFixed(2) + '). Add more or use a booking instead.', 'error');
+        return;
+      }
+
+      const phoneRead = opsWiReadPhone();
+      if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
+      const phoneVal = phoneRead.value || '';
+
+      // Re-check batch is still selling (race window)
+      const batch = batches.find(b => b.id === batchId);
+      if (!batch || batch.status !== 'selling') {
+        notify('Batch must be in Selling stage to collect', 'error');
+        return;
+      }
+
+      // === Step 2: L3.1 dup check ===
+      const dupCheck = await sbQuery(sb.from('oilpalm_collections').select('id,l3_form_no').eq('l3_form_no', l3));
+      if (dupCheck && dupCheck.length > 0) {
+        notify('L3.1 #' + l3 + ' was already used. Cannot reuse.', 'error');
+        return;
+      }
+
+      // === Step 3: Find or create customer ===
+      // Dedup by canonical phone if phone provided
+      let customerId = null;
+      const phoneCanon = phoneVal ? phoneCanonical(phoneVal) : '';
+      if (phoneCanon) {
+        const existing = customers.find(c => phoneCanonical(c.phone || '') === phoneCanon);
+        if (existing) customerId = existing.id;
+      }
+
+      if (!customerId) {
+        const newCustId = await dbNextId('OC');
+        if (!newCustId) { notify('Failed to generate customer ID', 'error'); return; }
+        const custInsert = {
+          id: newCustId,
+          company_id: getCompanyId(),
+          name,
+          contact_person: contact || null,
+          phone: phoneVal || null,
+          address: address || null,
+          customer_type: 'walkin',
+          is_active: true
+        };
+        const custResult = await sbMutate(sb.from('oilpalm_customers').insert(custInsert).select());
+        if (custResult === null) { notify('Customer insert failed — sale NOT recorded', 'error'); return; }
+        customerId = newCustId;
+      }
+
+      // === Step 4: Generate collection ID ===
+      const collectionId = await dbNextId('OL');
+      if (!collectionId) { notify('Failed to generate collection ID', 'error'); return; }
+
+      // === Step 5: Upload BOTH photos (mandatory — abort if either fails) ===
+      let l3Url = null;
+      try {
+        const ext = l3PhotoFile.name.split('.').pop();
+        const path = `collections/${collectionId}/l3.${ext}`;
+        const up = await sb.storage.from('oilpalm-photos').upload(path, l3PhotoFile, { upsert: true, contentType: l3PhotoFile.type });
+        if (up.error) {
+          console.warn('[ops-walkin] L3.1 photo upload failed:', up.error.message);
+          notify('L3.1 photo upload failed: ' + up.error.message, 'error');
+          return;
+        }
+        l3Url = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      } catch (e) {
+        console.warn('[ops-walkin] L3.1 photo upload threw:', e);
+        notify('L3.1 photo upload error — sale NOT recorded', 'error');
+        return;
+      }
+
+      let collUrl = null;
+      try {
+        const ext = collPhotoFile.name.split('.').pop();
+        const path = `collections/${collectionId}/seedlings.${ext}`;
+        const up = await sb.storage.from('oilpalm-photos').upload(path, collPhotoFile, { upsert: true, contentType: collPhotoFile.type });
+        if (up.error) {
+          console.warn('[ops-walkin] collection photo upload failed:', up.error.message);
+          notify('Collection photo upload failed: ' + up.error.message, 'error');
+          return;
+        }
+        collUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      } catch (e) {
+        console.warn('[ops-walkin] collection photo upload threw:', e);
+        notify('Collection photo upload error — sale NOT recorded', 'error');
+        return;
+      }
+
+      // === Step 6: Generate payment ID ===
+      const payId = await dbNextId('OP');
+      if (!payId) { notify('Failed to generate payment ID — sale NOT recorded', 'error'); return; }
+
+      // === Step 7: Upload payment slip (optional, non-fatal) ===
+      let paySlipUrl = null;
+      if (paySlipFile) {
+        const ext = paySlipFile.name.split('.').pop();
+        const path = `payments/walkin/${collectionId}.${ext}`;
+        try {
+          const up = await sb.storage.from('oilpalm-photos').upload(path, paySlipFile, { upsert: true, contentType: paySlipFile.type });
+          if (up.error) {
+            console.warn('[ops-walkin] slip upload failed:', up.error.message);
+            notify('Slip upload failed (' + up.error.message + ') — payment will be recorded without slip', 'warning');
+          } else {
+            paySlipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+          }
+        } catch (e) {
+          console.warn('[ops-walkin] slip upload threw:', e);
+          notify('Slip upload error — payment will be recorded without slip', 'warning');
+        }
+      }
+
+      // === Step 8: Insert payment row (NO company_id — table doesn't have one) ===
+      const payInsert = {
+        id: payId,
+        booking_id: null,
+        collection_id: collectionId,
+        amount: payAmt,
+        method: payMethod,
+        payment_date: dateVal,
+        reference: payRef || null,
+        slip_url: paySlipUrl,
+        logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+      };
+      const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+      if (payResult === null) {
+        notify('Payment insert failed — sale NOT recorded', 'error');
+        return;
+      }
+
+      // === Step 9: Insert collection row (HAS company_id, booking_id null for walk-in) ===
+      const collInsert = {
+        id: collectionId,
+        company_id: getCompanyId(),
+        customer_id: customerId,
+        booking_id: null,
+        batch_id: batchId,
+        qty,
+        unit_price: price,
+        subtotal: qty * price,
+        l3_form_no: l3,
+        l3_photo_url: l3Url,
+        collection_photo_url: collUrl,
+        plate_no: plate,
+        collection_date: dateVal,
+        logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+      };
+      const collResult = await sbMutate(sb.from('oilpalm_collections').insert(collInsert).select());
+      if (collResult === null) {
+        // Photos + payment now orphaned, but per the codebase pattern we don't try to delete them.
+        notify('Collection insert failed — payment was recorded; please retry the collection', 'error');
+        return;
+      }
+
+      // === Step 10: Auto-flip batch to sold_out if needed ===
+      // Reload collections FIRST so opsAutoFlipBatchSoldOut sees the new row.
+      await loadCollections();
+      try { await opsAutoFlipBatchSoldOut(batchId); } catch (e) { console.warn('[ops-walkin] auto-flip threw:', e); }
+
+      // === Step 11: Refresh state + render ===
+      await Promise.all([loadCustomers(), loadPayments(), loadBatches()]);
+
+      // Tear down iti before closing
+      try { if (opscWalkinPhoneIti && opscWalkinPhoneIti.destroy) opscWalkinPhoneIti.destroy(); } catch (e) {}
+      opscWalkinPhoneIti = null;
+
+      closeModal('ops-walkin-overlay');
+      if (currentTab === 'summary')          renderSummaryTab();
+      else if (currentTab === 'customers')   renderCustomersTab();
+      else if (currentTab === 'collections') renderCollectionsTab();
+      else if (currentTab === 'bookings')    renderBookingsTab();
+
+      notify('Walk-in sale recorded — L3.1 ' + l3, 'success');
+    }
+    // === End Walk-in Sale modal ===
 
     // === New Booking modal (Task 3.5) ===
     // Inline-new-customer state lives only across the State-A ↔ State-B swap inside this modal.
