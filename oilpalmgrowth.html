@@ -498,8 +498,156 @@
       notify('Document removed', 'success');
     }
 
-    // Stubs for next tasks (1.7 / 1.8)
-    function opgRenderReceiptSection(b) { document.getElementById('opg-receipt-section').innerHTML = '<div class="opg-section"><h3>Receipt + Planting</h3><p class="muted">TBD Task 1.7</p></div>'; }
+    // === Receipt + Plant + Transplant (Task 1.7) ===
+    function opgRenderReceiptSection(b) {
+      const planted = b.qty_planted || 0;
+      document.getElementById('opg-receipt-section').innerHTML = `
+        <div class="opg-section">
+          <h3>Receipt + Planting</h3>
+          ${b.status === 'received' && !b.date_planted
+            ? `<p class="muted">Stage: Received. Record planting to advance to Pre-Nursery.</p>
+               <button class="btn btn-primary" onclick="opgOpenPlantModal()">Record Planting</button>`
+            : b.date_planted
+            ? `<div class="form-grid">
+                 <label>Seeds Received <input value="${b.seeds_received || 0}" readonly /></label>
+                 <label>Seeds Damaged <input value="${b.seeds_damaged || 0}" readonly /></label>
+                 <label>Total Planted <input value="${planted}" readonly /></label>
+                 <label>Date Planted <input value="${fmtDateDM(b.date_planted)}" readonly /></label>
+               </div>
+               ${b.status === 'pre_nursery' ? `<button class="btn btn-primary" onclick="opgOpenTransplantModal()" style="margin-top:8px">Record Transplant (PN → MN)</button>` : ''}`
+            : `<p class="muted">Awaiting delivery. Set Actual Delivery date in Procurement to advance.</p>`
+          }
+        </div>
+      `;
+    }
+
+    function opgOpenPlantModal() {
+      showModal(`
+        <h3>Record Planting</h3>
+        <p class="muted">Stage: Received → Pre-Nursery.</p>
+        <div class="form-grid">
+          <label>Seeds Received <input id="opg-plant-rcvd" type="number" min="1" /></label>
+          <label>Seeds Damaged <input id="opg-plant-dmg" type="number" min="0" value="0" /></label>
+          <label>Total Planted <input id="opg-plant-total" readonly /></label>
+          <label>Date Planted <input id="opg-plant-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('opg-plant-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opgSavePlantEvent()">Save</button>
+        </div>
+      `, 'opg-plant-overlay');
+      const recompute = () => {
+        const r = parseInt(document.getElementById('opg-plant-rcvd').value, 10) || 0;
+        const d = parseInt(document.getElementById('opg-plant-dmg').value, 10) || 0;
+        document.getElementById('opg-plant-total').value = Math.max(0, r - d);
+      };
+      document.getElementById('opg-plant-rcvd').addEventListener('input', recompute);
+      document.getElementById('opg-plant-dmg').addEventListener('input', recompute);
+    }
+
+    async function opgSavePlantEvent() {
+      const id = selectedBatchId;
+      const rcvd = parseInt(document.getElementById('opg-plant-rcvd').value, 10);
+      const dmg  = parseInt(document.getElementById('opg-plant-dmg').value, 10) || 0;
+      const date = document.getElementById('opg-plant-date').value;
+      if (!rcvd || rcvd < 1) { notify('Seeds Received required', 'error'); return; }
+      if (dmg < 0 || dmg >= rcvd) { notify('Damaged must be between 0 and Received', 'error'); return; }
+      if (!date) { notify('Date required', 'error'); return; }
+
+      const planted = rcvd - dmg;
+
+      const eventId = await dbNextId('OE');
+      if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
+      const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+        id: eventId,
+        batch_id: id,
+        event_type: 'plant',
+        qty: planted,
+        event_date: date,
+        logged_by: currentUser.username,
+        notes: `Received ${rcvd}, damaged ${dmg}, planted ${planted}`
+      }).select());
+      if (evResult === null) return;
+
+      const result = await sbMutate(sb.from('oilpalm_batches').update({
+        status: 'pre_nursery',
+        date_planted: date,
+        seeds_received: rcvd,
+        seeds_damaged: dmg,
+        qty_planted: planted
+      }).eq('id', id).select());
+      if (result === null) return;
+
+      await loadBatches();
+      closeModal('opg-plant-overlay');
+      renderBatchesTab();
+      notify('Planting recorded — batch is now in Pre-Nursery', 'success');
+    }
+
+    function opgOpenTransplantModal() {
+      const b = batches.find(x => x.id === selectedBatchId);
+      showModal(`
+        <h3>Record Transplant (Pre-Nursery → Main Nursery)</h3>
+        <p class="muted">Planted: ${b.qty_planted}</p>
+        <div class="form-grid">
+          <label>Culls (dead/abnormal) <input id="opg-tp-culls" type="number" min="0" value="0" /></label>
+          <label>Multi-germination Extras <input id="opg-tp-extras" type="number" min="0" value="0" /></label>
+          <label>MN Qty (calculated) <input id="opg-tp-mn" readonly /></label>
+          <label>Date Transplanted <input id="opg-tp-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('opg-transplant-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opgSaveTransplantEvent()">Save</button>
+        </div>
+      `, 'opg-transplant-overlay');
+      const recompute = () => {
+        const c = parseInt(document.getElementById('opg-tp-culls').value, 10) || 0;
+        const e = parseInt(document.getElementById('opg-tp-extras').value, 10) || 0;
+        document.getElementById('opg-tp-mn').value = Math.max(0, (b.qty_planted || 0) - c + e);
+      };
+      document.getElementById('opg-tp-culls').addEventListener('input', recompute);
+      document.getElementById('opg-tp-extras').addEventListener('input', recompute);
+      recompute();
+    }
+
+    async function opgSaveTransplantEvent() {
+      const id = selectedBatchId;
+      const b  = batches.find(x => x.id === id);
+      const culls   = parseInt(document.getElementById('opg-tp-culls').value, 10) || 0;
+      const extras  = parseInt(document.getElementById('opg-tp-extras').value, 10) || 0;
+      const date    = document.getElementById('opg-tp-date').value;
+      const mn = Math.max(0, (b.qty_planted || 0) - culls + extras);
+      if (!date) { notify('Date required', 'error'); return; }
+
+      const eventId = await dbNextId('OE');
+      if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
+      const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+        id: eventId,
+        batch_id: id,
+        event_type: 'transplant',
+        qty: mn,
+        event_date: date,
+        logged_by: currentUser.username,
+        notes: `Culls ${culls}, extras ${extras}, MN qty ${mn}`
+      }).select());
+      if (evResult === null) return;
+
+      const result = await sbMutate(sb.from('oilpalm_batches').update({
+        status: 'main_nursery',
+        date_transplanted: date,
+        transplant_culls: culls,
+        transplant_extras: extras,
+        qty_mn_start: mn
+      }).eq('id', id).select());
+      if (result === null) return;
+
+      await loadBatches();
+      closeModal('opg-transplant-overlay');
+      renderBatchesTab();
+      notify('Transplant recorded — batch is now in Main Nursery', 'success');
+    }
+
+    // Stub for next task (1.8)
     function opgRenderMnSection(b)      { document.getElementById('opg-mn-section').innerHTML      = ''; }
 
     function opgMarkSelling() { notify('TBD Task 1.8', 'info'); }
