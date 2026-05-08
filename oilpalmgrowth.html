@@ -74,6 +74,16 @@
     let batchesFilter = { stage: 'all', supplier: 'all', variety: 'all' };
     let selectedBatchId = null;   // when set, renderBatchesTab delegates to opgRenderDetail
 
+    // Document slots for batch detail Documents section. `slot` is used as the storage path stem
+    // (procurement/{batch_id}/{slot}.{ext}), and `key` is the DB column on oilpalm_batches.
+    const OPG_DOC_SLOTS = [
+      { key: 'proforma_url',         slot: 'proforma',         label: 'Proforma Invoice' },
+      { key: 'k3_chit_url',          slot: 'k3_chit',          label: 'K3 Chit' },
+      { key: 'airwaybill_url',       slot: 'airwaybill',       label: 'Airwaybill' },
+      { key: 'official_invoice_url', slot: 'official_invoice', label: 'Official Invoice' },
+      { key: 'phyto_cert_url',       slot: 'phyto_cert',       label: 'Phytosanitary Certificate' }
+    ];
+
     // === Init ===
     document.addEventListener('DOMContentLoaded', async () => {
       // Session guard — match the codebase pattern (shared.js does NOT export ensureSession/currentUser)
@@ -360,9 +370,135 @@
       notify('Procurement saved', 'success');
     }
 
-    // Stubs for next tasks (1.6 / 1.7 / 1.8)
-    function opgRenderPaymentSection(b) { document.getElementById('opg-payment-section').innerHTML = '<div class="opg-section"><h3>Payment</h3><p class="muted">TBD Task 1.6</p></div>'; }
-    function opgRenderDocsSection(b)    { document.getElementById('opg-docs-section').innerHTML    = '<div class="opg-section"><h3>Documents</h3><p class="muted">TBD Task 1.6</p></div>'; }
+    // === Payment section (Task 1.6) ===
+    // Single payment per batch, all fields stored on oilpalm_batches as payment_*.
+    function opgRenderPaymentSection(b) {
+      const slipUrl = b.payment_slip_url || '';
+      const slipExt = slipUrl ? slipUrl.split('.').pop().toLowerCase().split('?')[0] : '';
+      const slipLabel = slipExt === 'pdf' ? 'PDF' : 'Image';
+      const slipLink = slipUrl
+        ? `<a href="${slipUrl}" target="_blank">${slipLabel} ↗</a>`
+        : '<span class="muted">No slip uploaded</span>';
+
+      document.getElementById('opg-payment-section').innerHTML = `
+        <div class="opg-section">
+          <h3>Payment</h3>
+          <div class="form-grid">
+            <label>Date <input id="opg-pay-date" type="date" value="${b.payment_date || ''}" /></label>
+            <label>Amount (RM) <input id="opg-pay-amount" type="number" step="0.01" min="0" value="${b.payment_amount != null ? b.payment_amount : ''}" /></label>
+            <label>Method
+              <select id="opg-pay-method">
+                <option value="">—</option>
+                <option value="cash"   ${b.payment_method === 'cash'   ? 'selected' : ''}>Cash</option>
+                <option value="bank"   ${b.payment_method === 'bank'   ? 'selected' : ''}>Bank Transfer</option>
+                <option value="cheque" ${b.payment_method === 'cheque' ? 'selected' : ''}>Cheque</option>
+              </select>
+            </label>
+            <label>Reference <input id="opg-pay-ref" value="${esc(b.payment_reference || '')}" /></label>
+            <label class="full">Slip (image or PDF)
+              <input type="file" id="opg-pay-slip" accept="image/*,application/pdf" />
+              <div class="muted" style="font-size:12px;margin-top:4px">Current: ${slipLink}</div>
+            </label>
+            <label class="full">Notes <textarea id="opg-pay-notes">${esc(b.payment_notes || '')}</textarea></label>
+          </div>
+          <div class="modal-actions"><button class="btn btn-primary" onclick="opgSavePayment()">Save Payment</button></div>
+        </div>
+      `;
+    }
+
+    async function opgSavePayment() {
+      const id = selectedBatchId;
+      const before = batches.find(x => x.id === id);
+      if (!before) return;
+      const slipFileEl = document.getElementById('opg-pay-slip');
+      const slipFile = slipFileEl && slipFileEl.files && slipFileEl.files[0] ? slipFileEl.files[0] : null;
+      let slipUrl = before.payment_slip_url || null;
+
+      if (slipFile) {
+        const ext  = slipFile.name.split('.').pop();
+        const path = `procurement/${id}/payment-slip.${ext}`;
+        const upload = await sb.storage.from('oilpalm-photos').upload(path, slipFile, { upsert: true, contentType: slipFile.type });
+        if (upload.error) { notify('Slip upload failed: ' + upload.error.message, 'error'); return; }
+        slipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      }
+
+      const amtRaw = document.getElementById('opg-pay-amount').value;
+      const data = {
+        payment_date:      document.getElementById('opg-pay-date').value || null,
+        payment_amount:    amtRaw === '' ? null : (parseFloat(amtRaw) || 0),
+        payment_method:    document.getElementById('opg-pay-method').value || null,
+        payment_reference: document.getElementById('opg-pay-ref').value.trim() || null,
+        payment_slip_url:  slipUrl,
+        payment_notes:     document.getElementById('opg-pay-notes').value.trim() || null
+      };
+
+      const result = await sbMutate(sb.from('oilpalm_batches').update(data).eq('id', id).select());
+      if (result === null) return;
+      await loadBatches();
+      renderBatchesTab();
+      notify('Payment saved', 'success');
+    }
+
+    // === Documents section (Task 1.6) ===
+    // 5 fixed slots driven by OPG_DOC_SLOTS. Each slot holds 1 file (replaceable).
+    function opgRenderDocsSection(b) {
+      const slotsHtml = OPG_DOC_SLOTS.map(s => {
+        const url = b[s.key];
+        const ext = url ? url.split('.').pop().toLowerCase().split('?')[0] : '';
+        const label = ext === 'pdf' ? 'PDF' : 'Image';
+        const fileCell = url
+          ? `<a href="${url}" target="_blank">${label} ↗</a>`
+          : '<span class="muted">No file</span>';
+        return `
+          <div class="opg-doc-slot">
+            <div class="opg-doc-label">${esc(s.label)}</div>
+            <div class="opg-doc-file">${fileCell}</div>
+            <div>
+              <input type="file" id="opg-doc-${s.key}" accept="image/*,application/pdf" style="display:none" onchange="opgUploadDoc('${s.key}', this.files[0])" />
+              <button class="btn btn-tiny" onclick="document.getElementById('opg-doc-${s.key}').click()">${url ? 'Replace' : 'Upload'}</button>
+              ${url ? `<button class="btn btn-tiny danger" onclick="opgClearDoc('${s.key}')">Remove</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('opg-docs-section').innerHTML = `
+        <div class="opg-section">
+          <h3>Documents</h3>
+          ${slotsHtml}
+        </div>
+      `;
+    }
+
+    async function opgUploadDoc(field, file) {
+      if (!file) return;
+      const id = selectedBatchId;
+      const slotDef = OPG_DOC_SLOTS.find(s => s.key === field);
+      if (!slotDef) { notify('Unknown document slot', 'error'); return; }
+      const ext  = file.name.split('.').pop();
+      const path = `procurement/${id}/${slotDef.slot}.${ext}`;
+      const btn = event && event.target;
+      btnLoading(btn, true);
+      const upload = await sb.storage.from('oilpalm-photos').upload(path, file, { upsert: true, contentType: file.type });
+      if (upload.error) { notify('Upload failed: ' + upload.error.message, 'error'); btnLoading(btn, false); return; }
+      const url = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      const result = await sbMutate(sb.from('oilpalm_batches').update({ [field]: url }).eq('id', id).select());
+      if (result === null) { btnLoading(btn, false); return; }
+      await loadBatches();
+      renderBatchesTab();
+      notify('Document uploaded', 'success');
+    }
+
+    async function opgClearDoc(field) {
+      const id = selectedBatchId;
+      const result = await sbMutate(sb.from('oilpalm_batches').update({ [field]: null }).eq('id', id).select());
+      if (result === null) return;
+      await loadBatches();
+      renderBatchesTab();
+      notify('Document removed', 'success');
+    }
+
+    // Stubs for next tasks (1.7 / 1.8)
     function opgRenderReceiptSection(b) { document.getElementById('opg-receipt-section').innerHTML = '<div class="opg-section"><h3>Receipt + Planting</h3><p class="muted">TBD Task 1.7</p></div>'; }
     function opgRenderMnSection(b)      { document.getElementById('opg-mn-section').innerHTML      = ''; }
 
