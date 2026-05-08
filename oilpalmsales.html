@@ -200,11 +200,168 @@
       suppliers = data || [];
     }
 
+    // === Helpers ===
+    // Add m months to a date (ISO date or string in, ISO date YYYY-MM-DD out).
+    // Copied verbatim from oilpalmgrowth.html so Sales can compute Ready Date
+    // (planting + 10 months) without depending on Growth being loaded.
+    function addMonths(d, m) {
+      if (!d) return null;
+      const x = new Date(d);
+      x.setMonth(x.getMonth() + m);
+      return x.toISOString().slice(0, 10);
+    }
+
+    // Stubs — real modals land in later tasks.
+    function opsOpenNewBookingModal() { notify('TBD Task 3.5', 'info'); }
+    function opsOpenWalkInModal()      { notify('TBD Task 3.9', 'info'); }
+
     // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
-    function renderSummaryTab()     { document.getElementById('tab-summary').innerHTML     = '<p class="muted">Summary — TODO Task 3.3</p>'; }
     function renderBookingsTab()    { document.getElementById('tab-bookings').innerHTML    = '<p class="muted">Bookings — TODO Task 3.4</p>'; }
     function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
     function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+
+    // === Summary tab (Task 3.3) ===
+    function renderSummaryTab() {
+      const varietyMap = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      // Card 1 — Pre-Nursery total qty_planted
+      const preNurseryQty = batches
+        .filter(b => b.status === 'pre_nursery')
+        .reduce((s, b) => s + (Number(b.qty_planted) || 0), 0);
+
+      // Card 2 — Main Nursery total qty_mn_start
+      const mainNurseryQty = batches
+        .filter(b => b.status === 'main_nursery')
+        .reduce((s, b) => s + (Number(b.qty_mn_start) || 0), 0);
+
+      // Aggregate collected + booked-not-yet-collected per batch.
+      // (Mid-MN culls live in batch_events, owned by Growth — we don't load them here.
+      //  Growth auto-flips a batch to sold_out when real availability hits 0, so trusting
+      //  qty_mn_start − collected − booked is safe per the task spec G2 note.)
+      const collectedByBatch = {};
+      collections.forEach(c => {
+        collectedByBatch[c.batch_id] = (collectedByBatch[c.batch_id] || 0) + (Number(c.qty) || 0);
+      });
+
+      const bookedByBatch = {};
+      bookings.filter(b => b.status === 'active').forEach(bk => {
+        const collectedForBk = collections
+          .filter(c => c.booking_id === bk.id)
+          .reduce((s, c) => s + (Number(c.qty) || 0), 0);
+        const remaining = (Number(bk.booked_qty) || 0) - collectedForBk;
+        bookedByBatch[bk.batch_id] = (bookedByBatch[bk.batch_id] || 0) + remaining;
+      });
+
+      // Card 3 — Available across all selling batches
+      const sellingBatches = batches.filter(b => b.status === 'selling');
+      const availableTotal = sellingBatches.reduce((s, b) => {
+        const total = Number(b.qty_mn_start) || 0;
+        const coll  = collectedByBatch[b.id] || 0;
+        const bkd   = bookedByBatch[b.id] || 0;
+        return s + Math.max(0, total - coll - bkd);
+      }, 0);
+
+      // Card 4 — Active bookings
+      const activeBks = bookings.filter(b => b.status === 'active');
+      const activeQty = activeBks.reduce((s, b) => {
+        const collectedForBk = collections
+          .filter(c => c.booking_id === b.id)
+          .reduce((cs, c) => cs + (Number(c.qty) || 0), 0);
+        return s + ((Number(b.booked_qty) || 0) - collectedForBk);
+      }, 0);
+      const activeOwed = activeBks.reduce((s, b) => {
+        const paid = paymentsByBooking[b.id] || 0;
+        return s + Math.max(0, (Number(b.total_amount) || 0) - paid);
+      }, 0);
+
+      // Card 5 — Today's collections (ISO date string compare)
+      const today = new Date().toISOString().slice(0, 10);
+      const todaysCols = collections.filter(c => c.collection_date === today);
+      const todaysQty = todaysCols.reduce((s, c) => s + (Number(c.qty) || 0), 0);
+
+      // Per-batch table — only batches in selling stage
+      let batchRows = '';
+      if (sellingBatches.length === 0) {
+        batchRows = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No batches in selling stage.</td></tr>';
+      } else {
+        batchRows = sellingBatches.map(b => {
+          const total = Number(b.qty_mn_start) || 0;
+          const coll  = collectedByBatch[b.id] || 0;
+          const bkd   = bookedByBatch[b.id] || 0;
+          const avail = Math.max(0, total - coll - bkd);
+          const ready = b.date_planted ? addMonths(b.date_planted, 10) : null;
+          return `
+            <tr>
+              <td>${esc(b.batch_number || '—')}</td>
+              <td>${esc(varietyMap[b.variety_id] || '—')}</td>
+              <td style="text-align:right;">${total}</td>
+              <td style="text-align:right;">${bkd}</td>
+              <td style="text-align:right;">${coll}</td>
+              <td style="text-align:right;font-weight:600;">${avail}</td>
+              <td>${ready ? fmtDate(ready) : '—'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('tab-summary').innerHTML = `
+        <div class="page-header">
+          <h2>Summary</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" onclick="opsOpenNewBookingModal()">+ New Booking</button>
+            <button class="btn btn-primary" onclick="opsOpenWalkInModal()">+ New Walk-in Sale</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
+          <div class="ops-summary-card">
+            <div class="label">Pre-Nursery</div>
+            <div class="value">${preNurseryQty}</div>
+            <div class="muted">seedlings planted</div>
+          </div>
+          <div class="ops-summary-card">
+            <div class="label">Main Nursery</div>
+            <div class="value">${mainNurseryQty}</div>
+            <div class="muted">in MN stage</div>
+          </div>
+          <div class="ops-summary-card">
+            <div class="label">Available (Total)</div>
+            <div class="value">${availableTotal}</div>
+            <div class="muted">across selling batches</div>
+          </div>
+          <div class="ops-summary-card">
+            <div class="label">Active Bookings</div>
+            <div class="value">${activeBks.length}</div>
+            <div class="muted">${activeQty} qty · RM ${activeOwed.toFixed(2)} owed</div>
+          </div>
+          <div class="ops-summary-card">
+            <div class="label">Today's Activity</div>
+            <div class="value">${todaysCols.length}</div>
+            <div class="muted">${todaysQty} seedlings collected</div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Selling batches</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Batch #</th>
+                  <th>Variety</th>
+                  <th style="text-align:right;">Total</th>
+                  <th style="text-align:right;">Booked</th>
+                  <th style="text-align:right;">Collected</th>
+                  <th style="text-align:right;">Available</th>
+                  <th>Ready Date</th>
+                </tr>
+              </thead>
+              <tbody>${batchRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
 
     // === Customers tab (Task 3.2) ===
     let opsCustomerSearchTerm = '';
