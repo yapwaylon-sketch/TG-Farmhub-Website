@@ -89,6 +89,9 @@
     let suppliers = [];          // for batch-row supplier-name lookups (e.g. on booking detail)
     let paymentsByBooking = {};  // {booking_id: total_paid}
 
+    // Bookings tab filter state (Task 3.4)
+    let bookingsFilter = { status: 'all', customer: '', batch: 'all' };
+
     // === Init ===
     document.addEventListener('DOMContentLoaded', async () => {
       // Session guard — match the codebase pattern (shared.js does NOT export ensureSession/currentUser)
@@ -215,10 +218,174 @@
     function opsOpenNewBookingModal() { notify('TBD Task 3.5', 'info'); }
     function opsOpenWalkInModal()      { notify('TBD Task 3.9', 'info'); }
 
+    // Booking detail page — STUB until Task 3.6 builds the real view.
+    function opsOpenBookingDetail(id) { notify('Booking detail TBD Task 3.6', 'info'); }
+
     // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
-    function renderBookingsTab()    { document.getElementById('tab-bookings').innerHTML    = '<p class="muted">Bookings — TODO Task 3.4</p>'; }
     function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
     function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+
+    // === Bookings tab (Task 3.4) ===
+    function renderBookingsTab() {
+      const customerMap = Object.fromEntries(customers.map(c => [c.id, c]));
+      const batchMap    = Object.fromEntries(batches.map(b => [b.id, b]));
+
+      // Aggregate collected qty per booking (only collections tied to a booking)
+      const collectedByBooking = {};
+      collections.forEach(c => {
+        if (!c.booking_id) return;
+        collectedByBooking[c.booking_id] = (collectedByBooking[c.booking_id] || 0) + Number(c.qty || 0);
+      });
+
+      // Compute display status string for each booking (used for badge + filter)
+      function bookingDisplayStatus(b) {
+        const collected = collectedByBooking[b.id] || 0;
+        if (b.status === 'completed') return { code: 'completed', label: 'Completed', cls: 'ops-status-completed' };
+        if (b.status === 'cancelled') {
+          if (b.refund_status === 'pending')   return { code: 'refund_pending', label: 'Refund Pending', cls: 'ops-status-refund-pending' };
+          if (b.refund_status === 'paid')      return { code: 'refund_paid',    label: 'Refund Done',    cls: 'ops-status-refund-paid' };
+          // 'forfeited' or null both render as Cancelled
+          return { code: 'cancelled', label: 'Cancelled', cls: 'ops-status-cancelled' };
+        }
+        // active
+        if (collected > 0) return { code: 'partial', label: 'Partial', cls: 'ops-status-partial' };
+        return { code: 'active', label: 'Active', cls: 'ops-status-active' };
+      }
+
+      // Apply filters
+      const term = (bookingsFilter.customer || '').trim().toLowerCase();
+      const termDigits = phoneDigitsOnly(term).replace(/^0+/, '');
+      const filtered = bookings.filter(b => {
+        // Status filter
+        if (bookingsFilter.status !== 'all') {
+          if (bookingsFilter.status === 'active') {
+            // Match all active bookings (including those with partial collections)
+            if (b.status !== 'active') return false;
+          } else if (bookingsFilter.status === 'completed') {
+            if (b.status !== 'completed') return false;
+          } else if (bookingsFilter.status === 'cancelled') {
+            if (b.status !== 'cancelled') return false;
+          } else if (bookingsFilter.status === 'refund_pending') {
+            if (!(b.status === 'cancelled' && b.refund_status === 'pending')) return false;
+          }
+        }
+        // Batch filter
+        if (bookingsFilter.batch !== 'all') {
+          if (b.batch_id !== bookingsFilter.batch) return false;
+        }
+        // Customer search — match name OR phone digits
+        if (term) {
+          const cust = customerMap[b.customer_id];
+          if (!cust) return false;
+          const nameMatch = (cust.name || '').toLowerCase().includes(term);
+          const phoneStored = phoneDigitsOnly(cust.phone || '').replace(/^0+/, '');
+          const phoneMatch = termDigits && phoneStored.includes(termDigits);
+          if (!nameMatch && !phoneMatch) return false;
+        }
+        return true;
+      });
+
+      const tbody = filtered.map(b => {
+        const cust = customerMap[b.customer_id];
+        const batch = batchMap[b.batch_id];
+        const booked = Number(b.booked_qty || 0);
+        const collected = collectedByBooking[b.id] || 0;
+        const remaining = Math.max(0, booked - collected);
+        const total = Number(b.total_amount || 0);
+        const paid = paymentsByBooking[b.id] || 0;
+        const balance = Math.max(0, total - paid);
+        const statusInfo = bookingDisplayStatus(b);
+        const isActive = b.status === 'active';
+        const balanceStyle = balance > 0 && isActive
+          ? 'color:var(--red);font-weight:600;'
+          : (balance === 0 ? 'color:var(--text-muted);' : '');
+        return `
+          <tr onclick="opsOpenBookingDetail('${esc(b.id)}')" style="cursor:pointer;">
+            <td>${esc(b.id)}</td>
+            <td>${cust ? esc(cust.name) : '<span class="muted">—</span>'}</td>
+            <td>${batch ? esc(batch.batch_number || batch.id) : '<span class="muted">—</span>'}</td>
+            <td>${booked.toLocaleString()} <span class="muted">(${collected.toLocaleString()} done · ${remaining.toLocaleString()} left)</span></td>
+            <td style="text-align:right;">${formatRM(total)}</td>
+            <td style="text-align:right;">${formatRM(paid)}</td>
+            <td style="text-align:right;${balanceStyle}">${formatRM(balance)}</td>
+            <td><span class="ops-status-badge ${statusInfo.cls}">${esc(statusInfo.label)}</span></td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">No bookings yet.</td></tr>';
+
+      // Batch dropdown options — show batches that have at least one booking, or all selling batches
+      const batchOpts = batches
+        .slice()
+        .sort((a, b) => (a.batch_number || '').localeCompare(b.batch_number || ''))
+        .map(b => `<option value="${esc(b.id)}" ${bookingsFilter.batch === b.id ? 'selected' : ''}>${esc(b.batch_number || b.id)}</option>`)
+        .join('');
+
+      document.getElementById('tab-bookings').innerHTML = `
+        <div class="page-header">
+          <h2>Bookings</h2>
+          <button class="btn btn-primary" onclick="opsOpenNewBookingModal()">+ New Booking</button>
+        </div>
+
+        <div class="filters-bar">
+          <select id="ops-bk-status" onchange="opsBkFilterStatus(this.value)">
+            <option value="all"            ${bookingsFilter.status === 'all'            ? 'selected' : ''}>All statuses</option>
+            <option value="active"         ${bookingsFilter.status === 'active'         ? 'selected' : ''}>Active</option>
+            <option value="completed"      ${bookingsFilter.status === 'completed'      ? 'selected' : ''}>Completed</option>
+            <option value="cancelled"      ${bookingsFilter.status === 'cancelled'      ? 'selected' : ''}>Cancelled</option>
+            <option value="refund_pending" ${bookingsFilter.status === 'refund_pending' ? 'selected' : ''}>Refund Pending</option>
+          </select>
+          <input type="text" id="ops-bk-cust" placeholder="Search customer name or phone..." value="${esc(bookingsFilter.customer)}" oninput="opsBkFilterCustomer(this.value)" style="min-width:240px;" />
+          <select id="ops-bk-batch" onchange="opsBkFilterBatch(this.value)">
+            <option value="all" ${bookingsFilter.batch === 'all' ? 'selected' : ''}>All batches</option>
+            ${batchOpts}
+          </select>
+          ${(bookingsFilter.status !== 'all' || bookingsFilter.customer || bookingsFilter.batch !== 'all')
+            ? `<button class="btn-tiny" onclick="opsBkClearFilters()">Clear filters</button>` : ''}
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Booking #</th>
+                <th>Customer</th>
+                <th>Batch</th>
+                <th>Qty (booked / collected / remaining)</th>
+                <th style="text-align:right;">Total</th>
+                <th style="text-align:right;">Paid</th>
+                <th style="text-align:right;">Balance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${tbody}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function opsBkFilterStatus(v) {
+      bookingsFilter.status = v || 'all';
+      renderBookingsTab();
+    }
+    function opsBkFilterCustomer(v) {
+      bookingsFilter.customer = v || '';
+      renderBookingsTab();
+      // Re-focus the input + put cursor at end (renderBookingsTab destroyed the DOM)
+      const el = document.getElementById('ops-bk-cust');
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        try { el.setSelectionRange(len, len); } catch (e) {}
+      }
+    }
+    function opsBkFilterBatch(v) {
+      bookingsFilter.batch = v || 'all';
+      renderBookingsTab();
+    }
+    function opsBkClearFilters() {
+      bookingsFilter = { status: 'all', customer: '', batch: 'all' };
+      renderBookingsTab();
+    }
 
     // === Summary tab (Task 3.3) ===
     function renderSummaryTab() {
