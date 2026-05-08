@@ -236,9 +236,84 @@
       return x.toISOString().slice(0, 10);
     }
 
-    // Stubs — implemented in Tasks 1.4 and 1.5
+    // Stubs — implemented in Task 1.5
     function opgOpenBatchDetail(id) { notify('Batch detail page TBD next task', 'info'); }
-    function opgOpenNewBatchModal()  { notify('New batch modal TBD next task', 'info'); }
+
+    // === New Batch modal (Task 1.4) ===
+    async function opgOpenNewBatchModal() {
+      const yr = new Date().getFullYear();
+      const yrBatches = batches.filter(b => (b.batch_number || '').endsWith('-' + yr));
+      const nextNum = yrBatches.length + 1;
+      const defaultBatchNumber = `${nextNum}-${yr}`;
+
+      showModal(`
+        <h3>New Batch</h3>
+        <div class="form-grid">
+          <label>Batch # <input id="opg-bn" value="${esc(defaultBatchNumber)}" /></label>
+          <label>Order Date <input id="opg-od" type="date" value="${new Date().toISOString().slice(0,10)}" /></label>
+          <label>Supplier
+            <select id="opg-sup">
+              <option value="">— select —</option>
+              ${suppliers.filter(s => s.is_active).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Variety
+            <select id="opg-var">
+              <option value="">— select —</option>
+              ${varieties.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Ordered Qty <input id="opg-qty" type="number" min="1" /></label>
+          <label>Unit Cost (RM) <input id="opg-uc" type="number" step="0.01" min="0" /></label>
+          <label>Estimated Delivery <input id="opg-edd" type="date" /></label>
+          <label class="full">Notes <textarea id="opg-notes"></textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('opg-newbatch-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opgSaveNewBatch()">Create Batch</button>
+        </div>
+      `, 'opg-newbatch-overlay');
+    }
+
+    async function opgSaveNewBatch() {
+      const bn  = document.getElementById('opg-bn').value.trim();
+      const od  = document.getElementById('opg-od').value;
+      const sup = document.getElementById('opg-sup').value;
+      const va  = document.getElementById('opg-var').value;
+      const qty = parseInt(document.getElementById('opg-qty').value, 10);
+      const uc  = parseFloat(document.getElementById('opg-uc').value) || 0;
+      const edd = document.getElementById('opg-edd').value || null;
+      const notes = document.getElementById('opg-notes').value.trim() || null;
+
+      if (!bn || !sup || !va || !qty || qty < 1) {
+        notify('Batch #, supplier, variety, qty are required', 'error');
+        return;
+      }
+
+      const id = await dbNextId('OB');
+      if (!id) { notify('Failed to generate ID', 'error'); return; }
+
+      const result = await sbMutate(sb.from('oilpalm_batches').insert({
+        id,
+        company_id: getCompanyId(),
+        batch_number: bn,
+        supplier_id: sup,
+        variety_id: va,
+        ordered_qty: qty,
+        unit_cost: uc,
+        total_cost: qty * uc,
+        order_date: od,
+        estimated_delivery_date: edd,
+        notes,
+        status: 'ordered'
+      }).select());
+
+      if (result === null) return;
+      await loadBatches();
+      closeModal('opg-newbatch-overlay');
+      renderBatchesTab();
+      notify('Batch created', 'success');
+    }
 
     // === Other tab render stubs (filled in later tasks) ===
     function renderReportsTab()   { document.getElementById('tab-reports').innerHTML = '<p>Reports — TODO</p>'; }
@@ -247,18 +322,20 @@
     // shared.js exposes openModal(id)/closeModal(id) for pre-defined modal HTML, but the plan
     // for this module uses dynamic modal HTML. We inject into #modal-host wrapped in the
     // standard .modal-overlay/.modal-box structure so shared CSS applies, and reuse
-    // closeModal('os-modal-overlay') so focus-trap teardown still runs.
-    function showModal(innerHtml) {
+    // closeModal(overlayId) so focus-trap teardown still runs.
+    // Optional overlayId arg lets distinct modals coexist with their own IDs (default: 'os-modal-overlay').
+    function showModal(innerHtml, overlayId) {
+      const id = overlayId || 'os-modal-overlay';
       const host = document.getElementById('modal-host');
       host.innerHTML = `
-        <div id="os-modal-overlay" class="modal-overlay" style="display:flex;">
+        <div id="${id}" class="modal-overlay" style="display:flex;">
           <div class="modal-box" style="max-width:520px;">
             ${innerHtml}
           </div>
         </div>
       `;
       // openModal handles focus-trap + display
-      openModal('os-modal-overlay');
+      openModal(id);
     }
 
     // === Suppliers tab ===
