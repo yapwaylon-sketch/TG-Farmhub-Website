@@ -13,6 +13,15 @@
 .ops-status-refund-paid    { background: rgba(80, 80, 80, 0.20);  color: #333; }
 .ops-status-walkin         { background: rgba(107, 76, 138, 0.18); color: #4D356B; }
 
+/* Batch lifecycle stages — used in Summary all-batches table */
+.ops-status-ordered      { background: rgba(120, 120, 120, 0.18); color: #555; }
+.ops-status-received     { background: rgba(74, 124, 63, 0.20);  color: #2D5224; }
+.ops-status-pre_nursery  { background: rgba(212, 175, 55, 0.22); color: #8A6D1F; }
+.ops-status-main_nursery { background: rgba(107, 76, 138, 0.20); color: #4D356B; }
+.ops-status-selling      { background: rgba(255, 140, 40, 0.20); color: #C96A1A; }
+.ops-status-sold_out     { background: rgba(196, 64, 64, 0.18); color: #8A2828; }
+.ops-status-closed       { background: rgba(80, 80, 80, 0.20);  color: #333; }
+
 /* Summary cards (used in Task 3.3) */
 .ops-summary-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;

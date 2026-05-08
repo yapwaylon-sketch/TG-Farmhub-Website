@@ -2545,25 +2545,43 @@ async function shareSlip() {
       const todaysCols = collections.filter(c => c.collection_date === today);
       const todaysQty = todaysCols.reduce((s, c) => s + (Number(c.qty) || 0), 0);
 
-      // Per-batch table — only batches in selling stage
+      // Per-batch table — ALL batches, sorted by stage priority then batch number.
+      // For each stage, "Total" picks the most relevant qty (ordered_qty / qty_planted / qty_mn_start).
+      // Booked/Collected/Available only meaningful for stages that allow bookings or collections.
+      const STAGE_ORDER = { selling:1, main_nursery:2, pre_nursery:3, received:4, ordered:5, sold_out:6, closed:7 };
+      const STAGE_LABEL = { ordered:'Ordered', received:'Received', pre_nursery:'Pre-Nursery', main_nursery:'Main Nursery', selling:'Selling', sold_out:'Sold Out', closed:'Closed' };
+      const sortedBatches = [...batches].sort((a, b) => {
+        const sa = STAGE_ORDER[a.status] || 99, sb = STAGE_ORDER[b.status] || 99;
+        if (sa !== sb) return sa - sb;
+        return (a.batch_number || '').localeCompare(b.batch_number || '');
+      });
+
       let batchRows = '';
-      if (sellingBatches.length === 0) {
-        batchRows = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No batches in selling stage.</td></tr>';
+      if (sortedBatches.length === 0) {
+        batchRows = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">No batches yet. Create one in Oil Palm Growth.</td></tr>';
       } else {
-        batchRows = sellingBatches.map(b => {
-          const total = Number(b.qty_mn_start) || 0;
+        batchRows = sortedBatches.map(b => {
+          // Pick "Total" relevant to stage
+          let total;
+          if (b.status === 'ordered' || b.status === 'received') total = Number(b.ordered_qty) || 0;
+          else if (b.status === 'pre_nursery')                    total = Number(b.qty_planted) || 0;
+          else                                                    total = Number(b.qty_mn_start) || 0;
+
           const coll  = collectedByBatch[b.id] || 0;
           const bkd   = bookedByBatch[b.id] || 0;
-          const avail = Math.max(0, total - coll - bkd);
+          const isAvailableMeaningful = (b.status === 'selling');
+          const avail = isAvailableMeaningful ? Math.max(0, total - coll - bkd) : null;
           const ready = b.date_planted ? addMonths(b.date_planted, 10) : null;
+
           return `
             <tr>
               <td>${esc(b.batch_number || '—')}</td>
               <td>${esc(varietyMap[b.variety_id] || '—')}</td>
+              <td><span class="ops-status-badge ops-status-${b.status}">${STAGE_LABEL[b.status] || b.status}</span></td>
               <td style="text-align:right;">${total}</td>
-              <td style="text-align:right;">${bkd}</td>
-              <td style="text-align:right;">${coll}</td>
-              <td style="text-align:right;font-weight:600;">${avail}</td>
+              <td style="text-align:right;">${bkd || '—'}</td>
+              <td style="text-align:right;">${coll || '—'}</td>
+              <td style="text-align:right;font-weight:${isAvailableMeaningful ? '600' : '400'};color:${isAvailableMeaningful ? 'inherit' : 'var(--text-muted)'};">${avail !== null ? avail : '—'}</td>
               <td>${ready ? fmtDate(ready) : '—'}</td>
             </tr>
           `;
@@ -2608,13 +2626,14 @@ async function shareSlip() {
         </div>
 
         <div class="ops-section">
-          <h3>Selling batches</h3>
+          <h3>All batches</h3>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Batch #</th>
                   <th>Variety</th>
+                  <th>Stage</th>
                   <th style="text-align:right;">Total</th>
                   <th style="text-align:right;">Booked</th>
                   <th style="text-align:right;">Collected</th>
