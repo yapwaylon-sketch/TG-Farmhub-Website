@@ -1,0 +1,13 @@
+const XLSX = require('xlsx');
+const wb = XLSX.readFile('C:/dev/TG-Farmhub-Website/growth-blocks-export.xlsx');
+const ws = wb.Sheets['Growth Blocks'];
+const rows = XLSX.utils.sheet_to_json(ws);
+console.log(`Rows: ${rows.length}`);
+console.log('First 5:');
+console.table(rows.slice(0, 5));
+console.log('Last 3:');
+console.table(rows.slice(-3));
+const noPlanted = rows.filter(r => !r['Date Planted']).length;
+const noStatus = rows.filter(r => !r['Status']).length;
+const noPlants = rows.filter(r => r['Plants'] == null).length;
+console.log(`\nMissing values — Date Planted: ${noPlanted}, Status: ${noStatus}, Plants: ${noPlants}`);

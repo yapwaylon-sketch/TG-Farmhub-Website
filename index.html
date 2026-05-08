@@ -370,22 +370,21 @@ const MODULES = [
     ]
   },
   {
-    key: "seedlings",
+    key: "oilpalmsales",
     name: "Oil Palm Sales",
     icon: "🌴",
     iconImg: "icons/modules/seedlings.png",
     category: "operations",
-    desc: "Batch management, bookings, collections, L3.1 tracking, and MPOB reports",
-    url: "seedlings.html",
+    desc: "Bookings, walk-in sales, L3.1 collections, and customer management",
+    url: "oilpalmsales.html",
     active: true,
     permissions: [
-      { key: "view", label: "View batches, bookings & stock" },
-      { key: "manageBatches", label: "Create / edit batches, log events" },
-      { key: "manageBookings", label: "Create / edit bookings" },
-      { key: "recordCollections", label: "Process collections & L3.1" },
+      { key: "view", label: "View bookings, collections & customers" },
+      { key: "createBooking", label: "Create / edit bookings" },
+      { key: "recordCollection", label: "Record collections & issue L3.1" },
+      { key: "cancelBooking", label: "Cancel bookings" },
+      { key: "processRefund", label: "Process refunds" },
       { key: "manageCustomers", label: "Add / edit customers" },
-      { key: "manageSuppliers", label: "Add / edit suppliers" },
-      { key: "viewReports", label: "Access reports" },
     ]
   },
   {
