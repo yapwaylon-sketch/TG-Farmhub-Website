@@ -605,10 +605,338 @@
     }
 
     // Stubs for action buttons — real handlers land in later tasks.
-    function opsOpenReassignModal()         { notify('Reassign Batch — TBD Task 3.8', 'info'); }
-    function opsOpenCancelModal()           { notify('Cancel Booking — TBD Task 3.8', 'info'); }
-    function opsOpenMarkRefundPaidModal()   { notify('Mark Refund Paid — TBD Task 3.8', 'info'); }
     function opsOpenBookingSlip()           { notify('Booking Slip — TBD Task 3.11', 'info'); }
+
+    // === Reassign Batch modal (Task 3.8) ===
+    // Pre-flight: zero collections only. If any collections issued, must Cancel & re-book.
+    function opsOpenReassignModal(bookingId) {
+      bookingId = bookingId || selectedBookingId;
+      if (!bookingId) { notify('No booking selected', 'error'); return; }
+
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+
+      // Pre-flight: zero-collections-only
+      const collected = collections.filter(c => c.booking_id === bookingId).length;
+      if (collected > 0) {
+        notify('Cannot reassign — collections already issued. Cancel & re-book.', 'error');
+        return;
+      }
+
+      const vMap = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+      const sLabel = (s) => ({ pre_nursery: 'PN', main_nursery: 'MN', selling: 'Selling' })[s] || s;
+
+      const currentBatch = batches.find(b => b.id === bk.batch_id);
+      const currentBatchLabel = currentBatch
+        ? `${esc(currentBatch.batch_number || currentBatch.id)} · ${esc(vMap[currentBatch.variety_id] || '—')} · ${formatRM(currentBatch.default_price || 0)}/seedling`
+        : '<span class="muted">— missing —</span>';
+
+      // Eligible new batches: pre_nursery | main_nursery | selling, excluding current
+      const eligible = batches
+        .filter(b => b.id !== bk.batch_id && ['pre_nursery', 'main_nursery', 'selling'].includes(b.status))
+        .sort((a, b) => (a.batch_number || '').localeCompare(b.batch_number || ''));
+
+      const batchOptions = ['<option value="">— Select new batch —</option>']
+        .concat(eligible.map(b => {
+          const v = vMap[b.variety_id] || '—';
+          const dp = Number(b.default_price || 0);
+          return `<option value="${esc(b.id)}" data-price="${dp}">${esc(b.batch_number || b.id)} · ${esc(v)} · ${sLabel(b.status)}${dp > 0 ? ' · ' + formatRM(dp) : ''}</option>`;
+        }))
+        .join('');
+
+      const currentPrice = Number(bk.unit_price || 0);
+
+      showModal(`
+        <h3>Reassign Booking to Different Batch</h3>
+        <div class="info-box" style="background:rgba(212,175,55,0.1);border:1px solid var(--gold);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">
+          <div><strong>Booking:</strong> ${esc(bookingId)}</div>
+          <div><strong>Current batch:</strong> ${currentBatchLabel}</div>
+          <div><strong>Current price:</strong> ${formatRM(currentPrice)}/seedling</div>
+        </div>
+
+        <div class="form-grid">
+          <label class="full">New Batch
+            <select id="ops-rea-batch" onchange="opsReassignOnBatchChange()">
+              ${batchOptions}
+            </select>
+          </label>
+
+          <label class="full">Pricing
+            <select id="ops-rea-pricing">
+              <option value="keep" selected>Keep current ${formatRM(currentPrice)}/seedling</option>
+            </select>
+          </label>
+
+          <label class="full">Reason <textarea id="ops-rea-reason" rows="3" placeholder="Why are we moving this booking?"></textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-reassign-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveReassign('${esc(bookingId)}')">Save Reassignment</button>
+        </div>
+      `, 'ops-reassign-overlay');
+    }
+
+    // Refresh pricing dropdown when new batch is picked — adds the "use new batch's default price" option only when it has one.
+    function opsReassignOnBatchChange() {
+      const batchSel = document.getElementById('ops-rea-batch');
+      const priceSel = document.getElementById('ops-rea-pricing');
+      if (!batchSel || !priceSel) return;
+      const bk = bookings.find(x => x.id === selectedBookingId);
+      if (!bk) return;
+      const currentPrice = Number(bk.unit_price || 0);
+      const opt = batchSel.options[batchSel.selectedIndex];
+      const newPrice = opt ? parseFloat(opt.getAttribute('data-price') || '0') : 0;
+
+      let html = `<option value="keep" selected>Keep current ${formatRM(currentPrice)}/seedling</option>`;
+      if (newPrice > 0) {
+        html += `<option value="new">Use new batch's default price (${formatRM(newPrice)}/seedling)</option>`;
+      }
+      priceSel.innerHTML = html;
+    }
+
+    async function opsSaveReassign(bookingId) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+
+      // Re-check no collections (race window)
+      const collectedNow = collections.filter(c => c.booking_id === bookingId).length;
+      if (collectedNow > 0) {
+        notify('Cannot reassign — collections already issued', 'error');
+        return;
+      }
+
+      const newBatchId = (document.getElementById('ops-rea-batch').value || '').trim();
+      const pricingChoice = (document.getElementById('ops-rea-pricing').value || 'keep').trim();
+      const reason = (document.getElementById('ops-rea-reason').value || '').trim();
+
+      if (!newBatchId) { notify('Pick a new batch', 'error'); return; }
+      if (newBatchId === bk.batch_id) { notify('That is the current batch — pick a different one', 'error'); return; }
+      if (!reason) { notify('Reason is required', 'error'); return; }
+
+      const newBatch = batches.find(b => b.id === newBatchId);
+      if (!newBatch) { notify('New batch not found', 'error'); return; }
+
+      const oldPrice = Number(bk.unit_price || 0);
+      const newDefault = Number(newBatch.default_price || 0);
+      const keptPrice = pricingChoice !== 'new';
+      const newUnitPrice = keptPrice ? oldPrice : newDefault;
+      const bookedQty = Number(bk.booked_qty || 0);
+      const newTotal = bookedQty * newUnitPrice;
+
+      // Append history entry to existing JSONB array
+      const history = Array.isArray(bk.reassignment_history) ? bk.reassignment_history.slice() : [];
+      history.push({
+        from_batch: bk.batch_id,
+        to_batch: newBatchId,
+        date: new Date().toISOString(),
+        by_user: currentUser ? (currentUser.username || currentUser.name || null) : null,
+        reason: reason,
+        kept_price: keptPrice,
+        old_price: oldPrice,
+        new_price: newUnitPrice
+      });
+
+      const updateData = {
+        batch_id: newBatchId,
+        unit_price: newUnitPrice,
+        total_amount: newTotal,
+        reassignment_history: history
+      };
+      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      if (result === null) { notify('Reassign failed — please retry', 'error'); return; }
+
+      await loadBookings();
+      closeModal('ops-reassign-overlay');
+      if (currentTab === 'bookings')      renderBookingsTab();
+      else if (currentTab === 'summary')  renderSummaryTab();
+
+      notify('Booking reassigned to ' + (newBatch.batch_number || newBatchId), 'success');
+    }
+    // === End Reassign Batch modal ===
+
+    // === Cancel Booking modal (Task 3.8) ===
+    // Auto-suggests refund owed = paid - (collected × unit_price).
+    // Refund stays pending until finance updates via Mark Refund Paid (separate flow).
+    function opsOpenCancelModal(bookingId) {
+      bookingId = bookingId || selectedBookingId;
+      if (!bookingId) { notify('No booking selected', 'error'); return; }
+
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (bk.status !== 'active') {
+        notify('Only active bookings can be cancelled', 'error');
+        return;
+      }
+
+      const paid = paymentsByBooking[bookingId] || 0;
+      const collectedQty = collections
+        .filter(c => c.booking_id === bookingId)
+        .reduce((s, c) => s + Number(c.qty || 0), 0);
+      const unitPrice = Number(bk.unit_price || 0);
+      const usedValue = collectedQty * unitPrice;
+      const owed = Math.max(0, paid - usedValue);
+
+      const refundLineHtml = owed > 0
+        ? `<div style="margin-top:6px;font-weight:700;color:var(--red);">Refund owed: <strong>${formatRM(owed)}</strong> (will be marked refund-pending)</div>`
+        : `<div style="margin-top:6px;font-weight:700;color:#2D5224;">No refund owed — booking will be cancelled / forfeited.</div>`;
+
+      showModal(`
+        <h3>Cancel Booking ${esc(bookingId)}</h3>
+        <div class="info-box" style="background:rgba(196,64,64,0.08);border:1px solid var(--red);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">
+          <div>Customer paid <strong>${formatRM(paid)}</strong></div>
+          <div>Collected <strong>${collectedQty.toLocaleString()}</strong> seedlings (value <strong>${formatRM(usedValue)}</strong>)</div>
+          ${refundLineHtml}
+        </div>
+
+        <div class="form-grid">
+          <label class="full">Cancel Reason <textarea id="ops-cancel-reason" rows="3" placeholder="Why is this booking being cancelled?"></textarea></label>
+          <div class="full" style="font-size:11px;color:var(--text-muted);line-height:1.5;">
+            Note: refund slip + actual amount paid is recorded later via <em>Mark Refund Paid</em> after finance processes the refund.
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-cancel-overlay')">Back</button>
+          <button class="btn btn-primary" style="background:var(--red);border-color:var(--red);" onclick="opsSaveCancel('${esc(bookingId)}', ${owed})">Confirm Cancel</button>
+        </div>
+      `, 'ops-cancel-overlay');
+    }
+
+    async function opsSaveCancel(bookingId, owed) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (bk.status !== 'active') { notify('Only active bookings can be cancelled', 'error'); return; }
+
+      const reason = (document.getElementById('ops-cancel-reason').value || '').trim();
+      if (!reason) { notify('Cancel reason is required', 'error'); return; }
+
+      const numOwed = Number(owed) || 0;
+      const updateData = {
+        status: 'cancelled',
+        cancel_reason: reason,
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: currentUser ? (currentUser.username || currentUser.name || null) : null,
+        refund_status: numOwed > 0 ? 'pending' : 'forfeited',
+        refund_owed: numOwed
+      };
+      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      if (result === null) { notify('Cancel failed — please retry', 'error'); return; }
+
+      await loadBookings();
+      closeModal('ops-cancel-overlay');
+      if (currentTab === 'bookings')      renderBookingsTab();
+      else if (currentTab === 'summary')  renderSummaryTab();
+
+      notify(numOwed > 0
+        ? 'Cancelled — ' + formatRM(numOwed) + ' refund pending'
+        : 'Cancelled — no refund owed',
+        'success');
+    }
+    // === End Cancel Booking modal ===
+
+    // === Mark Refund Paid modal (Task 3.8) ===
+    // Two-stage cancellation: finance updates the actual refund amount + slip + date here.
+    function opsOpenMarkRefundPaidModal(bookingId) {
+      bookingId = bookingId || selectedBookingId;
+      if (!bookingId) { notify('No booking selected', 'error'); return; }
+
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (bk.status !== 'cancelled' || bk.refund_status !== 'pending') {
+        notify('Only cancelled bookings with pending refund can be marked paid', 'error');
+        return;
+      }
+
+      const owed = Number(bk.refund_owed || 0);
+      const today = new Date().toISOString().slice(0, 10);
+
+      showModal(`
+        <h3>Mark Refund Paid · ${esc(bookingId)}</h3>
+        <div class="info-box" style="background:rgba(212,175,55,0.1);border:1px solid var(--gold);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">
+          <div><strong>Refund owed:</strong> ${formatRM(owed)}</div>
+          <div><strong>Cancel reason:</strong> ${esc(bk.cancel_reason || '—')}</div>
+        </div>
+
+        <div class="form-grid">
+          <label>Actual Refund Amount (RM) <input id="ops-ref-amt" type="number" step="0.01" min="0" value="${owed.toFixed(2)}" /></label>
+          <label>Date <input id="ops-ref-date" type="date" value="${today}" /></label>
+          <label>Method
+            <select id="ops-ref-method">
+              <option value="cash">Cash</option>
+              <option value="bank" selected>Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </label>
+          <label>Reference <input id="ops-ref-ref" /></label>
+          <label class="full">Slip (optional) <input type="file" id="ops-ref-slip" accept="image/*,application/pdf" /></label>
+          <label class="full">Notes <textarea id="ops-ref-notes" rows="2"></textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-refund-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveRefund('${esc(bookingId)}')">Save Refund</button>
+        </div>
+      `, 'ops-refund-overlay');
+    }
+
+    async function opsSaveRefund(bookingId) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (bk.status !== 'cancelled' || bk.refund_status !== 'pending') {
+        notify('Refund already processed or booking not cancelled', 'error');
+        return;
+      }
+
+      const amtRaw = parseFloat(document.getElementById('ops-ref-amt').value);
+      const amt = isFinite(amtRaw) ? amtRaw : NaN;
+      const dateVal = (document.getElementById('ops-ref-date').value || '').trim();
+      const method = (document.getElementById('ops-ref-method').value || 'bank').trim();
+      const ref = (document.getElementById('ops-ref-ref').value || '').trim();
+      const notes = (document.getElementById('ops-ref-notes').value || '').trim();
+      const slipEl = document.getElementById('ops-ref-slip');
+      const slipFile = slipEl && slipEl.files && slipEl.files[0] ? slipEl.files[0] : null;
+
+      if (!isFinite(amt) || amt < 0) { notify('Amount must be ≥ 0', 'error'); return; }
+      if (!dateVal) { notify('Date is required', 'error'); return; }
+
+      // Upload slip if provided — non-fatal per spec
+      let slipUrl = null;
+      if (slipFile) {
+        try {
+          const ext = slipFile.name.split('.').pop();
+          const path = `refunds/${bookingId}/slip.${ext}`;
+          const up = await sb.storage.from('oilpalm-photos').upload(path, slipFile, { upsert: true, contentType: slipFile.type });
+          if (up.error) {
+            console.warn('[ops-refund] slip upload failed:', up.error.message);
+            notify('Slip upload failed (' + up.error.message + ') — refund will be saved without slip', 'warning');
+          } else {
+            slipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+          }
+        } catch (e) {
+          console.warn('[ops-refund] slip upload threw:', e);
+          notify('Slip upload error — refund will be saved without slip', 'warning');
+        }
+      }
+
+      const updateData = {
+        refund_status: 'paid',
+        refund_amount: amt,
+        refund_method: method,
+        refund_reference: ref || null,
+        refund_slip_url: slipUrl,
+        refund_paid_at: new Date(dateVal).toISOString(),
+        refund_paid_by: currentUser ? (currentUser.username || currentUser.name || null) : null,
+        refund_notes: notes || null
+      };
+      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      if (result === null) { notify('Refund save failed — please retry', 'error'); return; }
+
+      await loadBookings();
+      closeModal('ops-refund-overlay');
+      if (currentTab === 'bookings')      renderBookingsTab();
+      else if (currentTab === 'summary')  renderSummaryTab();
+
+      notify('Refund marked paid', 'success');
+    }
+    // === End Mark Refund Paid modal ===
 
     // === Record Collection modal (Task 3.7 — booking-driven) ===
     // Walk-in collections live in Task 3.9 (different entry path, no booking, no payment cap).
@@ -982,9 +1310,9 @@
       const showMarkRefundPaid = b.status === 'cancelled' && b.refund_status === 'pending';
 
       const actionButtons = [
-        showReassign       ? `<button class="btn btn-outline" onclick="opsOpenReassignModal()">Reassign Batch</button>` : '',
-        showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal()" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
-        showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal()">Mark Refund Paid</button>` : '',
+        showReassign       ? `<button class="btn btn-outline" onclick="opsOpenReassignModal('${esc(b.id)}')">Reassign Batch</button>` : '',
+        showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal('${esc(b.id)}')" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
+        showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal('${esc(b.id)}')">Mark Refund Paid</button>` : '',
         showPrint          ? `<button class="btn btn-outline" onclick="opsOpenBookingSlip()">Print Booking Slip</button>` : '',
         cust               ? `<button class="btn btn-outline" onclick="opsOpenCustomerModal('${esc(cust.id)}')">Edit Customer</button>` : ''
       ].filter(Boolean).join(' ');
