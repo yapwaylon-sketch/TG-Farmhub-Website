@@ -938,8 +938,137 @@
       renderBookingsTab();
     }
 
-    // Stubs for action buttons — real handlers land in later tasks.
-    function opsOpenBookingSlip()           { notify('Booking Slip — TBD Task 3.11', 'info'); }
+    // === Booking slip (Task 3.11) ===
+    // A4 printable + WhatsApp-shareable booking order. Opens a popup window so
+    // user can Print or Share without leaving the Sales page.
+    const SLIP_CSS = `
+@page { size: A4 portrait; margin: 12mm; }
+@media print {
+  .no-print { display: none !important; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background: white; }
+}
+body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background: white; margin: 0; padding: 0; }
+#slip-content { padding: 16px 20px; max-width: 210mm; margin: 0 auto; box-sizing: border-box; }
+.bs-letterhead { text-align: center; margin-bottom: 16px; }
+.bs-letterhead h1 { font-size: 16pt; margin: 0; }
+.bs-letterhead .addr { font-size: 9pt; color: #666; }
+.bs-title { text-align: center; font-size: 14pt; font-weight: 700; margin: 12px 0; letter-spacing: 1px; }
+.bs-meta { display: flex; justify-content: space-between; margin: 12px 0; }
+.bs-section { margin: 16px 0; }
+.bs-section h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #999; padding-bottom: 4px; margin: 0 0 8px; }
+.bs-items { width: 100%; border-collapse: collapse; }
+.bs-items th, .bs-items td { border: 1px solid #999; padding: 6px 8px; font-size: 10pt; }
+.bs-items th { background: #f0f0f0; }
+.bs-totals { margin-top: 8px; text-align: right; }
+.bs-totals .row { display: flex; justify-content: flex-end; gap: 16px; padding: 2px 0; }
+.bs-totals .balance { font-weight: 700; }
+.bs-tc { font-size: 9pt; }
+.bs-tc ol { padding-left: 16px; }
+.bs-sigs { display: flex; justify-content: space-between; margin-top: 32px; }
+.bs-sig { width: 45%; text-align: center; }
+.bs-sig .line { border-top: 1px solid #000; margin-top: 32px; padding-top: 4px; font-size: 9pt; }
+.bs-footer { text-align: center; font-size: 8pt; color: #999; margin-top: 16px; }
+.no-print { padding: 16px; background: #f5f5f5; text-align: center; }
+.no-print button { padding: 8px 16px; margin: 0 4px; cursor: pointer; font-size: 11pt; }
+`;
+
+    function opsOpenBookingSlip(bookingId) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      const cust = customers.find(c => c.id === bk.customer_id);
+      const batch = batches.find(b => b.id === bk.batch_id);
+      const variety = varieties.find(v => v.id === (batch && batch.variety_id));
+      const paid = paymentsByBooking[bk.id] || 0;
+      const balance = Math.max(0, Number(bk.total_amount) - paid);
+      const readyDate = batch && batch.date_planted ? addMonths(batch.date_planted, 10) : null;
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Booking ${esc(bk.id)} — ${esc((cust && cust.name) || '')}</title>
+<style>${SLIP_CSS}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
+</head><body>
+<div class="no-print">
+  <button onclick="window.print()">🖨️ Print</button>
+  <button onclick="shareSlip()">📤 Share via WhatsApp</button>
+</div>
+<div id="slip-content">
+  <div class="bs-letterhead">
+    <h1>TG Agribusiness Sdn Bhd</h1>
+    <div class="addr">Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak, Malaysia</div>
+  </div>
+  <div class="bs-title">BOOKING ORDER</div>
+  <div class="bs-meta">
+    <div><strong>Booking #:</strong> ${esc(bk.id)}</div>
+    <div><strong>Date:</strong> ${esc(fmtDate(bk.booking_date))}</div>
+  </div>
+  <div class="bs-section">
+    <h3>Customer</h3>
+    <div><strong>Name:</strong> ${esc((cust && cust.name) || '—')}</div>
+    ${cust && cust.contact_person ? `<div><strong>Contact:</strong> ${esc(cust.contact_person)}</div>` : ''}
+    ${cust && cust.phone ? `<div><strong>Phone:</strong> ${esc(fmtPhone(cust.phone))}</div>` : ''}
+    ${cust && cust.address ? `<div><strong>Address:</strong> ${esc(cust.address)}</div>` : ''}
+  </div>
+  <div class="bs-section">
+    <h3>Items</h3>
+    <table class="bs-items">
+      <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+      <tbody><tr>
+        <td>Oil Palm Seedlings — ${esc((variety && variety.name) || 'Unknown')} (Batch ${esc((batch && batch.batch_number) || bk.batch_id)})</td>
+        <td style="text-align:right">${esc(String(bk.booked_qty))}</td>
+        <td style="text-align:right">RM ${Number(bk.unit_price).toFixed(2)}</td>
+        <td style="text-align:right">RM ${Number(bk.total_amount).toFixed(2)}</td>
+      </tr></tbody>
+    </table>
+    <div class="bs-totals">
+      <div class="row"><div>Total Amount:</div><div>RM ${Number(bk.total_amount).toFixed(2)}</div></div>
+      <div class="row"><div>Paid:</div><div>RM ${paid.toFixed(2)}</div></div>
+      <div class="row balance"><div>Balance Due:</div><div>RM ${balance.toFixed(2)}</div></div>
+    </div>
+    ${readyDate ? `<div style="margin-top:8px;font-size:10pt"><strong>Expected Ready Date:</strong> ${esc(fmtDate(readyDate))}</div>` : ''}
+  </div>
+  <div class="bs-section bs-tc">
+    <h3>Terms &amp; Conditions</h3>
+    <ol>
+      <li>Deposit is non-refundable in case of customer cancellation without valid reason.</li>
+      <li>Customer must collect seedlings within 30 days of expected ready date.</li>
+      <li>Each collection requires presentation of this booking slip and identification.</li>
+    </ol>
+  </div>
+  <div class="bs-sigs">
+    <div class="bs-sig"><div class="line">Customer Signature</div><div style="margin-top:8px">Date: ____________</div></div>
+    <div class="bs-sig"><div class="line">Authorized By</div><div style="margin-top:8px">Date: ____________</div></div>
+  </div>
+  <div class="bs-footer">This is a computer-generated document.</div>
+</div>
+<script>
+async function shareSlip() {
+  try {
+    const slip = document.getElementById('slip-content');
+    const canvas = await html2canvas(slip, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 0.92));
+    const file = new File([blob], 'booking-${esc(bk.id)}.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Booking ${esc(bk.id)}' });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'booking-${esc(bk.id)}.png'; a.click();
+      URL.revokeObjectURL(url);
+      alert('Image downloaded. Send via WhatsApp manually.');
+    }
+  } catch (e) {
+    console.error('Share failed:', e);
+    alert('Share failed: ' + e.message);
+  }
+}
+</` + `script>
+</body></html>`;
+
+      const w = window.open('', '_blank', 'width=900,height=1100');
+      if (!w) { notify('Popup blocked. Allow popups to print.', 'error'); return; }
+      w.document.write(html);
+      w.document.close();
+    }
 
     // === Reassign Batch modal (Task 3.8) ===
     // Pre-flight: zero collections only. If any collections issued, must Cancel & re-book.
@@ -1647,7 +1776,7 @@
         showReassign       ? `<button class="btn btn-outline" onclick="opsOpenReassignModal('${esc(b.id)}')">Reassign Batch</button>` : '',
         showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal('${esc(b.id)}')" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
         showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal('${esc(b.id)}')">Mark Refund Paid</button>` : '',
-        showPrint          ? `<button class="btn btn-outline" onclick="opsOpenBookingSlip()">Print Booking Slip</button>` : '',
+        showPrint          ? `<button class="btn btn-outline" onclick="opsOpenBookingSlip('${esc(b.id)}')">Print Booking Slip</button>` : '',
         cust               ? `<button class="btn btn-outline" onclick="opsOpenCustomerModal('${esc(cust.id)}')">Edit Customer</button>` : ''
       ].filter(Boolean).join(' ');
 
