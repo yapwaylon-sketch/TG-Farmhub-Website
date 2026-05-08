@@ -312,18 +312,11 @@ CREATE POLICY oilpalm_collections_auth_update ON oilpalm_collections FOR UPDATE 
 CREATE POLICY oilpalm_collections_auth_delete ON oilpalm_collections FOR DELETE TO authenticated USING (true);
 
 -- ============================================================
--- PART 6: ID COUNTERS (seed initial counter rows for each new prefix)
+-- PART 6: ID COUNTERS — intentionally NOT seeded here.
+-- The next_id(p_prefix, p_company_code) RPC auto-creates counter rows on first
+-- call (prefix stored as e.g. 'AB-OS', company code embedded). Matches existing
+-- modules (sales/tender/seedlings) — none seed counters explicitly.
 -- ============================================================
-
-INSERT INTO id_counters (company_id, prefix, last_number) VALUES
-  ('tg_agribusiness', 'OS', 0),
-  ('tg_agribusiness', 'OB', 0),
-  ('tg_agribusiness', 'OE', 0),
-  ('tg_agribusiness', 'OC', 0),
-  ('tg_agribusiness', 'OK', 0),
-  ('tg_agribusiness', 'OP', 0),
-  ('tg_agribusiness', 'OL', 0)
-ON CONFLICT (company_id, prefix) DO NOTHING;
 
 -- ============================================================
 -- DONE
