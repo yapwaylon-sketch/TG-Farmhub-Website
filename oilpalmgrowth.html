@@ -122,6 +122,11 @@
         loadCollectionAggregates(),
         loadMidCullAggregates()
       ]);
+      // Task 1.8: scan selling-stage batches and flip to sold_out where available <= 0.
+      // Must run AFTER Promise.all (needs `batches` populated). Refresh `batches` after
+      // in case any flipped, so renderBatchesTab paints the correct stage badges.
+      await autoFlipSoldOut();
+      await loadBatches();
       renderBatchesTab();
     });
 
@@ -647,11 +652,175 @@
       notify('Transplant recorded — batch is now in Main Nursery', 'success');
     }
 
-    // Stub for next task (1.8)
-    function opgRenderMnSection(b)      { document.getElementById('opg-mn-section').innerHTML      = ''; }
+    // === Mid-MN cull events + stage transitions (Task 1.8) ===
+    async function opgRenderMnSection(b) {
+      if (!['main_nursery', 'selling', 'sold_out'].includes(b.status)) {
+        document.getElementById('opg-mn-section').innerHTML = '';
+        return;
+      }
 
-    function opgMarkSelling() { notify('TBD Task 1.8', 'info'); }
-    function opgCloseBatch()  { notify('TBD Task 1.8', 'info'); }
+      // oilpalm_batch_events has NO company_id column — DO NOT add filter
+      const events = await sbQuery(sb.from('oilpalm_batch_events').select('*').eq('batch_id', b.id).eq('event_type', 'cull').order('event_date', { ascending: false }));
+      const cullEvents = events || [];
+      const totalCulls = cullEvents.reduce((s, e) => s + (e.qty || 0), 0);
+      const collected  = collectionsByBatch[b.id] || 0;
+      const available  = Math.max(0, (b.qty_mn_start || 0) - totalCulls - collected);
+
+      document.getElementById('opg-mn-section').innerHTML = `
+        <div class="opg-section">
+          <h3>Main Nursery — Counts &amp; Culls</h3>
+          <div class="opg-mn-summary">
+            <div><strong>MN Start:</strong> ${b.qty_mn_start || 0}</div>
+            <div><strong>Mid-MN Culls:</strong> ${totalCulls}</div>
+            <div><strong>Collected:</strong> ${collected}</div>
+            <div><strong>Available:</strong> ${available}</div>
+          </div>
+          <button class="btn btn-tiny" onclick="opgOpenCullModal()">+ Add Cull Event</button>
+          <table class="data-table" style="margin-top:12px">
+            <thead><tr><th>Date</th><th>Qty</th><th>Reason</th><th>Logged By</th></tr></thead>
+            <tbody>
+              ${cullEvents.map(e => `
+                <tr>
+                  <td>${fmtDateDM(e.event_date)}</td>
+                  <td>${e.qty}</td>
+                  <td>${esc(e.reason || e.notes || '—')}</td>
+                  <td>${esc(e.logged_by || '—')}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">No mid-MN culls.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function opgOpenCullModal() {
+      showModal(`
+        <h3>Add Cull Event</h3>
+        <div class="form-grid">
+          <label>Qty Culled <input id="opg-cull-qty" type="number" min="1" /></label>
+          <label>Reason <input id="opg-cull-reason" placeholder="dead, abnormal, etc." /></label>
+          <label>Date <input id="opg-cull-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('opg-cull-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opgSaveCullEvent()">Save</button>
+        </div>
+      `, 'opg-cull-overlay');
+    }
+
+    async function opgSaveCullEvent() {
+      const id  = selectedBatchId;
+      const qty = parseInt(document.getElementById('opg-cull-qty').value, 10);
+      const reason = document.getElementById('opg-cull-reason').value.trim();
+      const date   = document.getElementById('opg-cull-date').value;
+      if (!qty || qty < 1) { notify('Qty required', 'error'); return; }
+      if (!date)           { notify('Date required', 'error'); return; }
+
+      const eventId = await dbNextId('OE');
+      if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
+      const result = await sbMutate(sb.from('oilpalm_batch_events').insert({
+        id: eventId,
+        batch_id: id,
+        event_type: 'cull',
+        qty,
+        reason: reason || null,
+        event_date: date,
+        logged_by: currentUser.username
+      }).select());
+      if (result === null) return;
+
+      await loadMidCullAggregates();
+      closeModal('opg-cull-overlay');
+      renderBatchesTab();
+      notify('Cull recorded', 'success');
+    }
+
+    async function opgMarkSelling() {
+      const id = selectedBatchId;
+      const b  = batches.find(x => x.id === id);
+      if (!b || b.status !== 'main_nursery') return;
+      const ok = await confirmAction('Mark batch as Selling? Bookings can now collect from this batch.', 'Confirm');
+      if (!ok) return;
+
+      showModal(`
+        <h3>Set Default Selling Price</h3>
+        <p class="muted">This is the per-seedling default. Bookings can override per-customer.</p>
+        <label>Default Price (RM) <input id="opg-sell-price" type="number" step="0.01" min="0" /></label>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal('opg-sellprice-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opgConfirmMarkSelling()">Mark as Selling</button>
+        </div>
+      `, 'opg-sellprice-overlay');
+    }
+
+    async function opgConfirmMarkSelling() {
+      const id    = selectedBatchId;
+      const price = parseFloat(document.getElementById('opg-sell-price').value);
+      if (!price || price <= 0) { notify('Default price must be positive', 'error'); return; }
+      const result = await sbMutate(sb.from('oilpalm_batches').update({ status: 'selling', default_price: price }).eq('id', id).select());
+      if (result === null) return;
+      await loadBatches();
+      closeModal('opg-sellprice-overlay');
+      renderBatchesTab();
+      notify('Batch is now Selling', 'success');
+    }
+
+    async function opgCloseBatch() {
+      const id = selectedBatchId;
+      const b  = batches.find(x => x.id === id);
+      if (!b) return;
+      const collected = collectionsByBatch[id] || 0;
+      const midCulls  = midCullsByBatch[id] || 0;
+      const remaining = Math.max(0, (b.qty_mn_start || 0) - midCulls - collected);
+
+      const ok = await confirmAction(
+        `Close this batch?<br/><br/>Remaining ${remaining} seedlings will be recorded as a final cull (reason: "Batch closed — leftover").<br/><br/>This cannot be undone.`,
+        'Close Batch'
+      );
+      if (!ok) return;
+
+      if (remaining > 0) {
+        const eventId = await dbNextId('OE');
+        if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
+        const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+          id: eventId,
+          batch_id: id,
+          event_type: 'cull',
+          qty: remaining,
+          reason: 'Batch closed — leftover',
+          event_date: new Date().toISOString().slice(0,10),
+          logged_by: currentUser.username
+        }).select());
+        if (evResult === null) return;
+      }
+
+      const result = await sbMutate(sb.from('oilpalm_batches').update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+        closed_by: currentUser.username
+      }).eq('id', id).select());
+      if (result === null) return;
+
+      await loadBatches();
+      await loadMidCullAggregates();
+      renderBatchesTab();
+      notify('Batch closed', 'success');
+    }
+
+    // Auto-flip selling-stage batches to sold_out when available <= 0.
+    // Called from DOMContentLoaded after Promise.all (so aggregates + batches are in memory).
+    // NOT called from inside loadCollectionAggregates (per gotcha G11) — needs `batches` populated first.
+    // Sales-side collection inserts on Day 2 will also call this after loadCollectionAggregates.
+    async function autoFlipSoldOut() {
+      for (const b of batches.filter(x => x.status === 'selling')) {
+        const midC = midCullsByBatch[b.id] || 0;
+        const col  = collectionsByBatch[b.id] || 0;
+        const avail = (b.qty_mn_start || 0) - midC - col;
+        if (avail <= 0) {
+          await sbMutate(sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', b.id).select());
+        }
+      }
+    }
 
     // === New Batch modal (Task 1.4) ===
     async function opgOpenNewBatchModal() {
