@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="assets/logo-agribusiness.png">
+  <title>Oil Palm Growth — TG FarmHub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css?v=2" />
+  <link rel="stylesheet" href="oilpalmgrowth.css?v=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <script src="shared.js?v=2"></script>
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+  <div id="offline-banner" class="offline-banner" hidden>You're offline. Changes will retry.</div>
+
+  <aside class="sidebar" aria-label="Module navigation">
+    <a href="index.html" class="sidebar-brand">
+      <img src="assets/logo-agribusiness.png" alt="TG Agribusiness" class="sidebar-logo" />
+      <div class="sidebar-title">
+        <span class="brand-name">Oil Palm Growth</span>
+        <span class="brand-back">&lt; TG FarmHub</span>
+      </div>
+    </a>
+    <div id="company-switcher"></div>
+    <nav aria-label="Tabs">
+      <button class="tab-btn active" data-tab="batches" onclick="switchTab('batches')">Batches</button>
+      <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">Suppliers</button>
+      <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">Reports</button>
+    </nav>
+    <div class="sidebar-user">
+      <span id="sidebar-user-name"></span>
+      <button class="btn btn-ghost" onclick="doLogout()">Logout</button>
+    </div>
+  </aside>
+
+  <main id="main" role="main" class="content">
+    <div id="tab-batches" class="tab-pane active"></div>
+    <div id="tab-suppliers" class="tab-pane"></div>
+    <div id="tab-reports" class="tab-pane"></div>
+  </main>
+
+  <div id="modal-host"></div>
+
+  <script>
+    // === Supabase init ===
+    const SUPABASE_URL = 'https://qwlagcriiyoflseduvvc.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bGFnY3JpaXlvZmxzZWR1dnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNDgxNDYsImV4cCI6MjA4NzkyNDE0Nn0.OJvzNykb_JjejFlWlEy7QUKJjL7bfiaQI0pPx62P5YA';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // === State ===
+    let currentUser = null;
+    let currentTab = 'batches';
+    let suppliers = [];
+    let batches = [];
+    let varieties = [];
+    let collectionsByBatch = {};  // {batch_id: total_collected_qty}
+    let midCullsByBatch = {};     // {batch_id: total_mid_mn_cull_qty}
+
+    // === Init ===
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Session guard — match the codebase pattern (shared.js does NOT export ensureSession/currentUser)
+      const userData = localStorage.getItem('tgfarmhub_user');
+      if (!userData) { location.href = 'index.html'; return; }
+      try { currentUser = JSON.parse(userData); } catch (e) { location.href = 'index.html'; return; }
+
+      // Force company to Agribusiness for this module
+      setCompanyId('tg_agribusiness');
+
+      // Inject company switcher (redirect to hub if Agro Fruits selected)
+      if (typeof injectCompanySwitcher === 'function') {
+        injectCompanySwitcher();
+        document.querySelectorAll('.company-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var cid = btn.getAttribute('data-company');
+            if (cid !== 'tg_agribusiness') {
+              setCompanyId(cid);
+              location.href = 'index.html';
+            }
+          });
+        });
+      }
+
+      // Inject user badge / start inactivity timer (graceful no-op if helpers absent)
+      if (typeof injectUserBadge === 'function') injectUserBadge(currentUser);
+      if (typeof startInactivityTimer === 'function') startInactivityTimer();
+
+      const nameEl = document.getElementById('sidebar-user-name');
+      if (nameEl) nameEl.textContent = currentUser.displayName || currentUser.username || currentUser.name || '';
+
+      await Promise.all([
+        loadSuppliers(),
+        loadBatches(),
+        loadVarieties(),
+        loadCollectionAggregates(),
+        loadMidCullAggregates()
+      ]);
+      renderBatchesTab();
+    });
+
+    function doLogout() {
+      try { localStorage.removeItem('tgfarmhub_user'); } catch (e) {}
+      try { localStorage.removeItem('tg_session'); } catch (e) {}
+      location.href = 'index.html';
+    }
+
+    function switchTab(name) {
+      currentTab = name;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      if (name === 'batches')   renderBatchesTab();
+      if (name === 'suppliers') renderSuppliersTab();
+      if (name === 'reports')   renderReportsTab();
+    }
+
+    // === Loaders (stub) ===
+    async function loadSuppliers() {
+      const data = await sbQuery(sb.from('oilpalm_suppliers').select('*').eq('company_id', getCompanyId()).order('name'));
+      suppliers = data || [];
+    }
+    async function loadBatches() {
+      const data = await sbQuery(sb.from('oilpalm_batches').select('*').eq('company_id', getCompanyId()).order('created_at', { ascending: false }));
+      batches = data || [];
+    }
+    async function loadVarieties() {
+      // crop_varieties is shared. Filter by oil palm crop.
+      const crops = await sbQuery(sb.from('crops').select('id,name'));
+      const oilPalm = (crops || []).find(c => /oil\s*palm/i.test(c.name));
+      if (!oilPalm) { varieties = []; return; }
+      const data = await sbQuery(sb.from('crop_varieties').select('id,name,crop_id').eq('crop_id', oilPalm.id).order('name'));
+      varieties = data || [];
+    }
+    async function loadCollectionAggregates() {
+      // oilpalm_collections HAS company_id — filter scoped per company
+      const data = await sbQuery(sb.from('oilpalm_collections').select('batch_id,qty').eq('company_id', getCompanyId()));
+      collectionsByBatch = {};
+      (data || []).forEach(c => { collectionsByBatch[c.batch_id] = (collectionsByBatch[c.batch_id] || 0) + c.qty; });
+    }
+    async function loadMidCullAggregates() {
+      // oilpalm_batch_events has NO company_id column (per CLAUDE.md "Tables WITHOUT company_id" pattern) — DO NOT add the filter
+      const data = await sbQuery(sb.from('oilpalm_batch_events').select('batch_id,event_type,qty').eq('event_type', 'cull'));
+      midCullsByBatch = {};
+      (data || []).forEach(e => { midCullsByBatch[e.batch_id] = (midCullsByBatch[e.batch_id] || 0) + e.qty; });
+    }
+
+    // === Render stubs (filled in later tasks) ===
+    function renderBatchesTab()   { document.getElementById('tab-batches').innerHTML = '<p>Batches — TODO</p>'; }
+    function renderSuppliersTab() { document.getElementById('tab-suppliers').innerHTML = '<p>Suppliers — TODO</p>'; }
+    function renderReportsTab()   { document.getElementById('tab-reports').innerHTML = '<p>Reports — TODO</p>'; }
+  </script>
+</body>
+</html>
