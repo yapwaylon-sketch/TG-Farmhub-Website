@@ -92,6 +92,9 @@
     // Bookings tab filter state (Task 3.4)
     let bookingsFilter = { status: 'all', customer: '', batch: 'all' };
 
+    // Selected booking for the detail page (Task 3.6). null = list view.
+    let selectedBookingId = null;
+
     // === Init ===
     document.addEventListener('DOMContentLoaded', async () => {
       // Session guard — match the codebase pattern (shared.js does NOT export ensureSession/currentUser)
@@ -590,8 +593,369 @@
     }
     // === End New Booking modal ===
 
-    // Booking detail page — STUB until Task 3.6 builds the real view.
-    function opsOpenBookingDetail(id) { notify('Booking detail TBD Task 3.6', 'info'); }
+    // Booking detail page — replaces the bookings tab content (NOT a modal).
+    // Mirrors the customer detail pattern (selectedCustomerId / opsRenderCustomerDetail).
+    function opsOpenBookingDetail(id) {
+      selectedBookingId = id;
+      renderBookingsTab();
+    }
+    function opsCloseBookingDetail() {
+      selectedBookingId = null;
+      renderBookingsTab();
+    }
+
+    // Stubs for action buttons — real handlers land in later tasks.
+    function opsOpenReassignModal()         { notify('Reassign Batch — TBD Task 3.8', 'info'); }
+    function opsOpenCancelModal()           { notify('Cancel Booking — TBD Task 3.8', 'info'); }
+    function opsOpenMarkRefundPaidModal()   { notify('Mark Refund Paid — TBD Task 3.8', 'info'); }
+    function opsOpenBookingSlip()           { notify('Booking Slip — TBD Task 3.11', 'info'); }
+    function opsOpenRecordCollectionModal() { notify('Record Collection — TBD Task 3.7', 'info'); }
+
+    // === Booking detail page (Task 3.6) ===
+    function opsRenderBookingDetail() {
+      const b = bookings.find(x => x.id === selectedBookingId);
+      if (!b) {
+        // Booking missing/deleted — bail back to list
+        selectedBookingId = null;
+        renderBookingsTab();
+        return;
+      }
+
+      const cust    = customers.find(c => c.id === b.customer_id);
+      const batch   = batches.find(x => x.id === b.batch_id);
+      const variety = batch ? varieties.find(v => v.id === batch.variety_id) : null;
+
+      const myPayments = payments
+        .filter(p => p.booking_id === b.id)
+        .sort((a, c) => new Date(c.payment_date) - new Date(a.payment_date));
+      const myCollections = collections
+        .filter(c => c.booking_id === b.id)
+        .sort((a, c) => new Date(c.collection_date) - new Date(a.collection_date));
+
+      const booked    = Number(b.booked_qty || 0);
+      const collectedQty = myCollections.reduce((s, c) => s + Number(c.qty || 0), 0);
+      const remaining = Math.max(0, booked - collectedQty);
+      const total     = Number(b.total_amount || 0);
+      const paid      = myPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
+      const balance   = Math.max(0, total - paid);
+
+      // Status badge — mirror Bookings tab logic
+      let statusInfo;
+      if (b.status === 'completed') statusInfo = { label: 'Completed', cls: 'ops-status-completed' };
+      else if (b.status === 'cancelled') {
+        if (b.refund_status === 'pending')   statusInfo = { label: 'Refund Pending', cls: 'ops-status-refund-pending' };
+        else if (b.refund_status === 'paid') statusInfo = { label: 'Refund Done',    cls: 'ops-status-refund-paid' };
+        else                                  statusInfo = { label: 'Cancelled',      cls: 'ops-status-cancelled' };
+      } else {
+        // active
+        statusInfo = collectedQty > 0
+          ? { label: 'Partial', cls: 'ops-status-partial' }
+          : { label: 'Active',  cls: 'ops-status-active' };
+      }
+
+      // Action button visibility (per spec G11)
+      const hasNoCollections = myCollections.length === 0;
+      const showReassign     = b.status === 'active' && hasNoCollections;
+      const showCancel       = b.status === 'active';
+      const showPrint        = b.status !== 'cancelled';
+      const showMarkRefundPaid = b.status === 'cancelled' && b.refund_status === 'pending';
+
+      const actionButtons = [
+        showReassign       ? `<button class="btn btn-outline" onclick="opsOpenReassignModal()">Reassign Batch</button>` : '',
+        showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal()" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
+        showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal()">Mark Refund Paid</button>` : '',
+        showPrint          ? `<button class="btn btn-outline" onclick="opsOpenBookingSlip()">Print Booking Slip</button>` : '',
+        cust               ? `<button class="btn btn-outline" onclick="opsOpenCustomerModal('${esc(cust.id)}')">Edit Customer</button>` : ''
+      ].filter(Boolean).join(' ');
+
+      // === Payments table ===
+      const paymentsRows = myPayments.map(p => {
+        const slipCell = p.slip_url
+          ? `<a href="${esc(p.slip_url)}" target="_blank">${/\.pdf(\?|$)/i.test(p.slip_url) ? 'PDF ↗' : 'Image ↗'}</a>`
+          : '<span class="muted">—</span>';
+        return `
+          <tr>
+            <td>${fmtDate(p.payment_date)}</td>
+            <td style="text-align:right;">${formatRM(p.amount || 0)}</td>
+            <td>${esc(p.method || '—')}</td>
+            <td>${esc(p.reference || '—')}</td>
+            <td>${slipCell}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--text-muted);">No payments yet.</td></tr>';
+
+      // === Collections table ===
+      const collectionsRows = myCollections.map(c => {
+        const photos = [];
+        if (c.l3_photo_url)         photos.push(`<a href="${esc(c.l3_photo_url)}" target="_blank">L3.1 ↗</a>`);
+        if (c.collection_photo_url) photos.push(`<a href="${esc(c.collection_photo_url)}" target="_blank">Photo ↗</a>`);
+        const photosCell = photos.length ? photos.join(' · ') : '<span class="muted">—</span>';
+        return `
+          <tr>
+            <td>${fmtDate(c.collection_date)}</td>
+            <td>${esc(c.l3_form_no || '—')}</td>
+            <td style="text-align:right;">${Number(c.qty || 0).toLocaleString()}</td>
+            <td>${esc(c.vehicle_plate || '—')}</td>
+            <td>${photosCell}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--text-muted);">No collections yet.</td></tr>';
+
+      // === Reassignment history (only if non-empty array) ===
+      let reassignSection = '';
+      const rh = b.reassignment_history;
+      if (Array.isArray(rh) && rh.length > 0) {
+        const batchLabel = (bid) => {
+          const found = batches.find(x => x.id === bid);
+          return found ? esc(found.batch_number || found.id) : esc(bid || '—');
+        };
+        const rhRows = rh.map(r => `
+          <tr>
+            <td>${batchLabel(r.from_batch_id)}</td>
+            <td>${batchLabel(r.to_batch_id)}</td>
+            <td>${r.date ? fmtDate(r.date) : '—'}</td>
+            <td>${esc(r.by_user || '—')}</td>
+            <td>${esc(r.reason || '—')}</td>
+            <td>${formatRM(r.old_price || 0)} → ${formatRM(r.new_price || 0)}</td>
+          </tr>
+        `).join('');
+        reassignSection = `
+          <div class="ops-section">
+            <h3>Reassignment History</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>From batch</th>
+                    <th>To batch</th>
+                    <th>Date</th>
+                    <th>By user</th>
+                    <th>Reason</th>
+                    <th>Price change</th>
+                  </tr>
+                </thead>
+                <tbody>${rhRows}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      // === Refund details (only if cancelled) ===
+      let refundSection = '';
+      if (b.status === 'cancelled') {
+        let refundBadge;
+        if (b.refund_status === 'paid')           refundBadge = '<span class="ops-status-badge ops-status-refund-paid">Paid</span>';
+        else if (b.refund_status === 'pending')   refundBadge = '<span class="ops-status-badge ops-status-refund-pending">Pending</span>';
+        else if (b.refund_status === 'forfeited') refundBadge = '<span class="ops-status-badge ops-status-cancelled">Forfeited</span>';
+        else                                       refundBadge = '<span class="ops-status-badge ops-status-cancelled">—</span>';
+
+        const owed = Math.max(0, paid); // owed to customer = what they paid (minus already-refunded if tracked)
+        let paidDetails = '';
+        if (b.refund_status === 'paid') {
+          const slipLink = b.refund_slip_url
+            ? ` · <a href="${esc(b.refund_slip_url)}" target="_blank">${/\.pdf(\?|$)/i.test(b.refund_slip_url) ? 'PDF ↗' : 'Slip ↗'}</a>`
+            : '';
+          paidDetails = `
+            <div><strong>Refund amount:</strong> ${formatRM(b.refund_amount || 0)}</div>
+            <div><strong>Method:</strong> ${esc(b.refund_method || '—')}</div>
+            <div><strong>Reference:</strong> ${esc(b.refund_reference || '—')}</div>
+            <div><strong>Paid date:</strong> ${b.refund_paid_date ? fmtDate(b.refund_paid_date) : '—'}</div>
+            <div><strong>Paid by:</strong> ${esc(b.refund_paid_by || '—')}${slipLink}</div>
+          `;
+        }
+
+        refundSection = `
+          <div class="ops-section">
+            <h3>Refund Details</h3>
+            <div class="form-grid">
+              <div class="full"><strong>Cancel reason:</strong> ${esc(b.cancel_reason || '—')}</div>
+              <div><strong>Refund status:</strong> ${refundBadge}</div>
+              <div><strong>Owed to customer:</strong> ${formatRM(owed)}</div>
+              ${paidDetails}
+            </div>
+          </div>
+        `;
+      }
+
+      const createdDate = b.created_at ? fmtDate(b.created_at) : '—';
+      const bookingDate = b.booking_date ? fmtDate(b.booking_date) : '—';
+
+      document.getElementById('tab-bookings').innerHTML = `
+        <div class="page-header">
+          <button class="btn btn-outline" onclick="opsCloseBookingDetail()">← Back to Bookings</button>
+        </div>
+
+        <div class="ops-section ops-booking-header">
+          <div class="ops-booking-header-row">
+            <h2>${esc(b.id)}</h2>
+            <span class="ops-status-badge ${statusInfo.cls}">${esc(statusInfo.label)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+            <div style="font-size:13px;line-height:1.6;">
+              <div><strong>${cust ? esc(cust.name) : '<span class="muted">— customer missing —</span>'}</strong>${cust && cust.phone ? ' · ' + esc(fmtPhone(cust.phone)) : ''}</div>
+              <div class="muted">Created ${createdDate}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${actionButtons}</div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Customer Info</h3>
+          <div class="form-grid">
+            <div><strong>Name:</strong> ${cust ? esc(cust.name) : '<span class="muted">— customer missing —</span>'}</div>
+            <div><strong>Type:</strong> ${cust ? (cust.customer_type === 'walkin' ? 'Walk-in' : 'Booking') : '—'}</div>
+            <div><strong>Contact:</strong> ${cust ? esc(cust.contact_person || '—') : '—'}</div>
+            <div><strong>Phone:</strong> ${cust && cust.phone ? esc(fmtPhone(cust.phone)) : '—'}</div>
+            <div class="full"><strong>Address:</strong> ${cust ? esc(cust.address || '—') : '—'}</div>
+            <div class="full"><strong>Notes:</strong> ${cust ? esc(cust.notes || '—') : '—'}</div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <h3>Booking Summary</h3>
+          <div class="form-grid">
+            <div><strong>Batch:</strong> ${batch ? esc(batch.batch_number || batch.id) : '<span class="muted">— missing —</span>'}</div>
+            <div><strong>Variety:</strong> ${variety ? esc(variety.name) : '<span class="muted">—</span>'}</div>
+            <div><strong>Booking date:</strong> ${bookingDate}</div>
+            <div><strong>Booked qty:</strong> ${booked.toLocaleString()}</div>
+            <div><strong>Unit price:</strong> ${formatRM(b.unit_price || 0)}</div>
+            <div><strong>Total amount:</strong> ${formatRM(total)}</div>
+            <div><strong>Total paid:</strong> ${formatRM(paid)}</div>
+            <div><strong>Balance:</strong> <span style="${balance > 0 && b.status === 'active' ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</span></div>
+            <div><strong>Total collected:</strong> ${collectedQty.toLocaleString()}</div>
+            <div><strong>Remaining qty:</strong> ${remaining.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="margin:0;">Payments</h3>
+            <button class="btn btn-primary btn-sm" onclick="opsOpenAddPaymentModal('${esc(b.id)}')">+ Add Payment</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th style="text-align:right;">Amount</th>
+                  <th>Method</th>
+                  <th>Reference</th>
+                  <th>Slip</th>
+                </tr>
+              </thead>
+              <tbody>${paymentsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ops-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="margin:0;">Collections</h3>
+            <button class="btn btn-primary btn-sm" onclick="opsOpenRecordCollectionModal()">+ Record Collection</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>L3.1 #</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th>Plate</th>
+                  <th>Photos</th>
+                </tr>
+              </thead>
+              <tbody>${collectionsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        ${reassignSection}
+        ${refundSection}
+      `;
+    }
+
+    // === Add Payment modal (Task 3.6) ===
+    function opsOpenAddPaymentModal(bookingId) {
+      const today = new Date().toISOString().slice(0, 10);
+      showModal(`
+        <h3>+ Add Payment</h3>
+        <div class="form-grid">
+          <label>Amount (RM) <input id="ops-addpay-amt" type="number" step="0.01" min="0.01" /></label>
+          <label>Method
+            <select id="ops-addpay-method">
+              <option value="cash">Cash</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </label>
+          <label class="full">Reference <input id="ops-addpay-ref" /></label>
+          <label class="full">Slip (optional) <input type="file" id="ops-addpay-slip" accept="image/*,application/pdf" /></label>
+          <label>Date <input id="ops-addpay-date" type="date" value="${today}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-addpay-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveAddPayment('${esc(bookingId)}')">Save Payment</button>
+        </div>
+      `, 'ops-addpay-overlay');
+    }
+
+    async function opsSaveAddPayment(bookingId) {
+      const amount = parseFloat(document.getElementById('ops-addpay-amt').value);
+      const method = document.getElementById('ops-addpay-method').value || 'cash';
+      const ref    = (document.getElementById('ops-addpay-ref').value || '').trim();
+      const dateVal = (document.getElementById('ops-addpay-date').value || '').trim();
+      const slipFileEl = document.getElementById('ops-addpay-slip');
+      const slipFile   = slipFileEl && slipFileEl.files && slipFileEl.files[0] ? slipFileEl.files[0] : null;
+
+      if (!amount || amount <= 0) { notify('Amount must be > 0', 'error'); return; }
+      if (!dateVal)               { notify('Date is required', 'error'); return; }
+
+      // 1. Generate payment ID
+      const payId = await dbNextId('OP');
+      if (!payId) { notify('Failed to generate payment ID', 'error'); return; }
+
+      // 2. Upload slip if provided (failure is non-fatal — payment still saves)
+      let slipUrl = null;
+      if (slipFile) {
+        const ext  = slipFile.name.split('.').pop();
+        const path = `payments/${bookingId}/${payId}.${ext}`;
+        try {
+          const up = await sb.storage.from('oilpalm-photos').upload(path, slipFile, { upsert: true, contentType: slipFile.type });
+          if (up.error) {
+            console.warn('[ops-addpay] slip upload failed:', up.error.message);
+            notify('Slip upload failed (' + up.error.message + ') — payment saved without slip', 'warning');
+          } else {
+            slipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+          }
+        } catch (e) {
+          console.warn('[ops-addpay] slip upload threw:', e);
+          notify('Slip upload error — payment saved without slip', 'warning');
+        }
+      }
+
+      // 3. Insert payment row (NO company_id — table doesn't have one)
+      const payInsert = {
+        id: payId,
+        booking_id: bookingId,
+        collection_id: null,
+        amount,
+        method,
+        payment_date: dateVal,
+        reference: ref || null,
+        slip_url: slipUrl,
+        logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+      };
+      const result = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+      if (result === null) return;
+
+      // 4. Refresh + close + re-render
+      await loadPayments();
+      closeModal('ops-addpay-overlay');
+      renderBookingsTab();
+      notify('Payment ' + payId + ' added', 'success');
+    }
+    // === End booking detail page ===
 
     // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
     function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
@@ -599,6 +963,9 @@
 
     // === Bookings tab (Task 3.4) ===
     function renderBookingsTab() {
+      // If a booking is selected, show its detail page instead of the list (Task 3.6)
+      if (selectedBookingId) { opsRenderBookingDetail(); return; }
+
       const customerMap = Object.fromEntries(customers.map(c => [c.id, c]));
       const batchMap    = Object.fromEntries(batches.map(b => [b.id, b]));
 
