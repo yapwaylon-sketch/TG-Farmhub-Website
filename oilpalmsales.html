@@ -609,7 +609,328 @@
     function opsOpenCancelModal()           { notify('Cancel Booking — TBD Task 3.8', 'info'); }
     function opsOpenMarkRefundPaidModal()   { notify('Mark Refund Paid — TBD Task 3.8', 'info'); }
     function opsOpenBookingSlip()           { notify('Booking Slip — TBD Task 3.11', 'info'); }
-    function opsOpenRecordCollectionModal() { notify('Record Collection — TBD Task 3.7', 'info'); }
+
+    // === Record Collection modal (Task 3.7 — booking-driven) ===
+    // Walk-in collections live in Task 3.9 (different entry path, no booking, no payment cap).
+
+    // Compute the max qty the customer is currently allowed to collect on this booking.
+    // Formula: floor((existingPaid + additionalNow) / unit_price) - alreadyCollected.
+    // Used both for the live "Can collect N more" hint AND for the save-time cap check.
+    function opsCalcMaxCollectable(bookingId, additionalPayAmt) {
+      additionalPayAmt = additionalPayAmt || 0;
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) return 0;
+      const paid = (paymentsByBooking[bookingId] || 0) + additionalPayAmt;
+      const collected = collections
+        .filter(c => c.booking_id === bookingId)
+        .reduce((s, c) => s + Number(c.qty || 0), 0);
+      const unit = Number(bk.unit_price) || 0;
+      if (unit <= 0) return 0;
+      return Math.max(0, Math.floor(paid / unit) - collected);
+    }
+
+    // Mirrors oilpalmgrowth.html's autoFlipSoldOut() but scoped to a single batch.
+    // Sales side has no mid-MN cull data (Growth owns batch_events), so the formula is
+    // qty_mn_start − collections only. If a batch's cull-adjusted available is what
+    // really matters, Growth's full scan on its next load will catch it. Best-effort.
+    async function opsAutoFlipBatchSoldOut(batchId) {
+      const b = batches.find(x => x.id === batchId);
+      if (!b || b.status !== 'selling') return;
+      const collectedAfter = collections
+        .filter(c => c.batch_id === batchId)
+        .reduce((s, c) => s + Number(c.qty || 0), 0);
+      const avail = (Number(b.qty_mn_start) || 0) - collectedAfter;
+      if (avail <= 0) {
+        await sbMutate(sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', batchId).select());
+      }
+    }
+
+    function opsOpenRecordCollectionModal(bookingId) {
+      // bookingId optional — fall back to selectedBookingId (we're on booking detail page).
+      bookingId = bookingId || selectedBookingId;
+      if (!bookingId) { notify('No booking selected', 'error'); return; }
+
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      const batch = batches.find(b => b.id === bk.batch_id);
+      // Pre-flight: batch must be in Selling stage to collect
+      if (!batch || batch.status !== 'selling') {
+        notify('Batch must be in Selling stage to collect', 'error');
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const booked    = Number(bk.booked_qty || 0);
+      const collected = collections
+        .filter(c => c.booking_id === bookingId)
+        .reduce((s, c) => s + Number(c.qty || 0), 0);
+      const remaining = Math.max(0, booked - collected);
+      const paid      = paymentsByBooking[bookingId] || 0;
+      const canCollect = opsCalcMaxCollectable(bookingId, 0);
+
+      const cust = customers.find(c => c.id === bk.customer_id);
+      const custLabel = cust ? esc(cust.name) : '—';
+
+      showModal(`
+        <h3>+ Record Collection</h3>
+        <div class="info-box" id="ops-coll-info" style="background:rgba(212,175,55,0.1);border:1px solid var(--gold);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.6;">
+          <div><strong>Booking:</strong> ${esc(bookingId)} · <strong>${custLabel}</strong></div>
+          <div>Booked <strong>${booked.toLocaleString()}</strong> · Collected <strong>${collected.toLocaleString()}</strong> already · Remaining <strong>${remaining.toLocaleString()}</strong></div>
+          <div>Customer paid <strong>${formatRM(paid)}</strong> · Unit price <strong>${formatRM(bk.unit_price || 0)}</strong></div>
+          <div id="ops-coll-cancollect" style="margin-top:4px;font-weight:600;color:#2D5224;">Can collect <strong>${canCollect.toLocaleString()}</strong> more right now.</div>
+        </div>
+
+        <div class="form-grid">
+          <label>Quantity <input id="ops-coll-qty" type="number" min="1" step="1" max="${remaining}" oninput="opsCollRecalcHint()" /></label>
+          <label>Date <input id="ops-coll-date" type="date" value="${today}" /></label>
+          <label class="full">L3.1 Form # <input id="ops-coll-l3" placeholder="From physical MPOB booklet" /></label>
+          <label class="full">L3.1 Photo (required) <input type="file" id="ops-coll-l3-photo" accept="image/*,application/pdf" /></label>
+          <label class="full">Collection Photo (required) <input type="file" id="ops-coll-photo" accept="image/*" /></label>
+          <label class="full">Car Plate # <input id="ops-coll-plate" /></label>
+
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;margin-top:4px;">Additional Payment Now (optional)</label>
+          <label>Amount (RM) <input id="ops-coll-pay-amt" type="number" step="0.01" min="0" oninput="opsCollRecalcHint()" /></label>
+          <label>Method
+            <select id="ops-coll-pay-method">
+              <option value="cash">Cash</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </label>
+          <label>Reference <input id="ops-coll-pay-ref" /></label>
+          <label class="full">Slip (optional) <input type="file" id="ops-coll-pay-slip" accept="image/*,application/pdf" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-collect-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveCollection('${esc(bookingId)}')">Save Collection</button>
+        </div>
+      `, 'ops-collect-overlay');
+    }
+
+    // Live update of the "Can collect N more" hint as user types qty / additional payment.
+    function opsCollRecalcHint() {
+      // selectedBookingId is the booking we're on (modal is opened from booking detail page).
+      const bookingId = selectedBookingId;
+      if (!bookingId) return;
+      const addAmtEl = document.getElementById('ops-coll-pay-amt');
+      const addAmt   = addAmtEl ? (parseFloat(addAmtEl.value) || 0) : 0;
+      const max = opsCalcMaxCollectable(bookingId, addAmt);
+      const hint = document.getElementById('ops-coll-cancollect');
+      if (!hint) return;
+      const qtyEl = document.getElementById('ops-coll-qty');
+      const qty   = qtyEl ? (parseInt(qtyEl.value, 10) || 0) : 0;
+      // Color the hint red if user has typed a qty exceeding max
+      const over = qty > 0 && qty > max;
+      hint.style.color = over ? 'var(--red)' : '#2D5224';
+      hint.innerHTML = over
+        ? `Qty ${qty.toLocaleString()} exceeds payment-controlled cap. Can collect <strong>${max.toLocaleString()}</strong> more — record more payment first or reduce qty.`
+        : `Can collect <strong>${max.toLocaleString()}</strong> more right now.`;
+    }
+
+    async function opsSaveCollection(bookingId) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+
+      // Re-check batch stage (race window between modal open and save)
+      const batch = batches.find(b => b.id === bk.batch_id);
+      if (!batch || batch.status !== 'selling') {
+        notify('Batch must be in Selling stage to collect', 'error');
+        return;
+      }
+
+      const qty       = parseInt(document.getElementById('ops-coll-qty').value, 10);
+      const dateVal   = (document.getElementById('ops-coll-date').value || '').trim();
+      const l3        = (document.getElementById('ops-coll-l3').value || '').trim();
+      const plate     = (document.getElementById('ops-coll-plate').value || '').trim();
+      const l3PhotoEl = document.getElementById('ops-coll-l3-photo');
+      const collPhotoEl = document.getElementById('ops-coll-photo');
+      const l3PhotoFile   = l3PhotoEl   && l3PhotoEl.files   && l3PhotoEl.files[0]   ? l3PhotoEl.files[0]   : null;
+      const collPhotoFile = collPhotoEl && collPhotoEl.files && collPhotoEl.files[0] ? collPhotoEl.files[0] : null;
+
+      // Optional additional payment
+      const payAmt    = parseFloat(document.getElementById('ops-coll-pay-amt').value);
+      const payMethod = document.getElementById('ops-coll-pay-method').value || 'cash';
+      const payRef    = (document.getElementById('ops-coll-pay-ref').value || '').trim();
+      const paySlipEl = document.getElementById('ops-coll-pay-slip');
+      const paySlipFile = paySlipEl && paySlipEl.files && paySlipEl.files[0] ? paySlipEl.files[0] : null;
+      const hasPayment = isFinite(payAmt) && payAmt > 0;
+
+      // === Validation (block on missing required fields) ===
+      if (!qty || qty < 1)     { notify('Quantity must be at least 1', 'error'); return; }
+      if (!dateVal)            { notify('Date is required', 'error'); return; }
+      if (!l3)                 { notify('L3.1 Form # is required', 'error'); return; }
+      if (!l3PhotoFile)        { notify('L3.1 photo required', 'error'); return; }
+      if (!collPhotoFile)      { notify('Collection photo required', 'error'); return; }
+      if (!plate)              { notify('Car Plate # is required', 'error'); return; }
+
+      const booked    = Number(bk.booked_qty || 0);
+      const collected = collections
+        .filter(c => c.booking_id === bookingId)
+        .reduce((s, c) => s + Number(c.qty || 0), 0);
+      const remaining = Math.max(0, booked - collected);
+      if (qty > remaining) {
+        notify('Qty ' + qty + ' exceeds remaining ' + remaining + ' on this booking', 'error');
+        return;
+      }
+
+      // === Guardrail 1: L3.1 dup check (DB has UNIQUE index too — friendly error first) ===
+      const dupCheck = await sbQuery(sb.from('oilpalm_collections').select('id,l3_form_no').eq('l3_form_no', l3));
+      if (dupCheck && dupCheck.length > 0) {
+        notify('L3.1 #' + l3 + ' was already used. Cannot reuse.', 'error');
+        return;
+      }
+
+      // === Guardrail 2: Payment-controlled cap ===
+      // currentlyPaid INCLUDES the new payment about to be recorded (per spec).
+      const additionalNow = hasPayment ? payAmt : 0;
+      const maxCollectable = opsCalcMaxCollectable(bookingId, additionalNow);
+      if (qty > maxCollectable) {
+        const unit = Number(bk.unit_price) || 0;
+        const paidNow = (paymentsByBooking[bookingId] || 0) + additionalNow;
+        const paidFor = unit > 0 ? Math.floor(paidNow / unit) : 0;
+        notify(
+          'Customer paid for ' + paidFor.toLocaleString() + ' seedlings, already collected ' +
+          collected.toLocaleString() + ', can collect ' + maxCollectable.toLocaleString() +
+          ' more. Either reduce qty or record payment first.',
+          'error'
+        );
+        return;
+      }
+
+      // === Atomic insert (CS047 pattern — money/photos first, then collection row) ===
+
+      // Step 1: Generate collection ID
+      const collectionId = await dbNextId('OL');
+      if (!collectionId) { notify('Failed to generate collection ID', 'error'); return; }
+
+      // Step 2: Upload BOTH photos (mandatory — abort if either fails)
+      // L3.1 photo can be image OR PDF
+      let l3Url = null;
+      try {
+        const ext = l3PhotoFile.name.split('.').pop();
+        const path = `collections/${collectionId}/l3.${ext}`;
+        const up = await sb.storage.from('oilpalm-photos').upload(path, l3PhotoFile, { upsert: true, contentType: l3PhotoFile.type });
+        if (up.error) {
+          console.warn('[ops-coll] L3.1 photo upload failed:', up.error.message);
+          notify('L3.1 photo upload failed: ' + up.error.message, 'error');
+          return;
+        }
+        l3Url = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      } catch (e) {
+        console.warn('[ops-coll] L3.1 photo upload threw:', e);
+        notify('L3.1 photo upload error — collection NOT recorded', 'error');
+        return;
+      }
+
+      // Collection photo — image only per spec (G7)
+      let collUrl = null;
+      try {
+        const ext = collPhotoFile.name.split('.').pop();
+        const path = `collections/${collectionId}/seedlings.${ext}`;
+        const up = await sb.storage.from('oilpalm-photos').upload(path, collPhotoFile, { upsert: true, contentType: collPhotoFile.type });
+        if (up.error) {
+          console.warn('[ops-coll] collection photo upload failed:', up.error.message);
+          notify('Collection photo upload failed: ' + up.error.message, 'error');
+          return;
+        }
+        collUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+      } catch (e) {
+        console.warn('[ops-coll] collection photo upload threw:', e);
+        notify('Collection photo upload error — collection NOT recorded', 'error');
+        return;
+      }
+
+      // Step 3: If additional payment > 0, record it BEFORE the collection row.
+      // (Money-first ordering — CS047 pattern. If collection insert later fails, we still
+      //  have the payment on file and operator can re-attempt the collection.)
+      if (hasPayment) {
+        let paySlipUrl = null;
+        if (paySlipFile) {
+          const ext = paySlipFile.name.split('.').pop();
+          const path = `payments/${bookingId}/${collectionId}.${ext}`;
+          try {
+            const up = await sb.storage.from('oilpalm-photos').upload(path, paySlipFile, { upsert: true, contentType: paySlipFile.type });
+            if (up.error) {
+              // Slip upload failure is non-fatal per G12 — record payment without slip
+              console.warn('[ops-coll] slip upload failed:', up.error.message);
+              notify('Slip upload failed (' + up.error.message + ') — payment will be recorded without slip', 'warning');
+            } else {
+              paySlipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+            }
+          } catch (e) {
+            console.warn('[ops-coll] slip upload threw:', e);
+            notify('Slip upload error — payment will be recorded without slip', 'warning');
+          }
+        }
+
+        const payId = await dbNextId('OP');
+        if (!payId) { notify('Failed to generate payment ID — collection NOT recorded', 'error'); return; }
+
+        const payInsert = {
+          id: payId,
+          booking_id: bookingId,
+          collection_id: collectionId,   // payment is tied to the collection we're about to insert
+          amount: payAmt,
+          method: payMethod,
+          payment_date: dateVal,
+          reference: payRef || null,
+          slip_url: paySlipUrl,
+          logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+        };
+        const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+        if (payResult === null) {
+          notify('Payment insert failed — collection NOT recorded', 'error');
+          return;
+        }
+      }
+
+      // Step 4: Insert collection row (HAS company_id)
+      const collInsert = {
+        id: collectionId,
+        company_id: getCompanyId(),
+        customer_id: bk.customer_id,
+        booking_id: bookingId,
+        batch_id: bk.batch_id,             // denormalized — locked from booking's CURRENT batch
+        qty,
+        unit_price: bk.unit_price,         // denormalized — locked from booking's CURRENT price
+        subtotal: qty * Number(bk.unit_price || 0),
+        l3_form_no: l3,
+        l3_photo_url: l3Url,
+        collection_photo_url: collUrl,
+        plate_no: plate,
+        collection_date: dateVal,
+        logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
+      };
+      const collResult = await sbMutate(sb.from('oilpalm_collections').insert(collInsert).select());
+      if (collResult === null) {
+        // Photos + payment are now orphaned, but per G14 we don't try to delete them.
+        notify('Collection insert failed — payment (if any) was recorded; please retry the collection', 'error');
+        return;
+      }
+
+      // Step 5: Best-effort booking completion flip (don't await — it's a side effect)
+      if ((collected + qty) >= booked) {
+        sbMutate(sb.from('oilpalm_bookings').update({ status: 'completed' }).eq('id', bookingId).select())
+          .catch(e => console.warn('[ops-coll] booking completion flip failed:', e));
+      }
+
+      // Step 6: Reload state + render. Reload collections FIRST so opsAutoFlipBatchSoldOut
+      // sees the new row when it computes the post-collection available count.
+      await Promise.all([loadCollections(), loadPayments(), loadBookings(), loadBatches()]);
+
+      // Best-effort batch sold_out auto-flip
+      try { await opsAutoFlipBatchSoldOut(bk.batch_id); } catch (e) { console.warn('[ops-coll] auto-flip threw:', e); }
+      // Reload batches once more if we may have flipped it
+      await loadBatches();
+
+      closeModal('ops-collect-overlay');
+      if (currentTab === 'bookings')      renderBookingsTab();
+      else if (currentTab === 'summary')  renderSummaryTab();
+      else if (currentTab === 'collections') renderCollectionsTab();
+
+      notify('Collection recorded — L3.1 ' + l3, 'success');
+    }
+    // === End Record Collection modal ===
 
     // === Booking detail page (Task 3.6) ===
     function opsRenderBookingDetail() {
@@ -852,7 +1173,7 @@
         <div class="ops-section">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 style="margin:0;">Collections</h3>
-            <button class="btn btn-primary btn-sm" onclick="opsOpenRecordCollectionModal()">+ Record Collection</button>
+            <button class="btn btn-primary btn-sm" onclick="opsOpenRecordCollectionModal('${esc(b.id)}')">+ Record Collection</button>
           </div>
           <div class="table-wrap">
             <table class="data-table">
