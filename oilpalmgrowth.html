@@ -12,8 +12,9 @@
   <script src="shared.js?v=2"></script>
 </head>
 <body>
-  <a href="#main" class="skip-link">Skip to main content</a>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
+  <div id="app">
   <div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <a href="index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
@@ -48,11 +49,12 @@
     </div>
   </div>
 
-  <main id="main" role="main" class="content">
-    <div id="tab-batches" class="tab-pane active"></div>
-    <div id="tab-suppliers" class="tab-pane" style="display:none"></div>
-    <div id="tab-reports" class="tab-pane" style="display:none"></div>
+  <main id="main-content" role="main" class="main-content">
+    <div id="tab-batches" class="page active"></div>
+    <div id="tab-suppliers" class="page"></div>
+    <div id="tab-reports" class="page"></div>
   </main>
+  </div><!-- /#app -->
 
   <div id="modal-host"></div>
 
@@ -122,11 +124,7 @@
     function switchTab(name) {
       currentTab = name;
       document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
-      document.querySelectorAll('.tab-pane').forEach(p => {
-        const isActive = (p.id === 'tab-' + name);
-        p.classList.toggle('active', isActive);
-        p.style.display = isActive ? '' : 'none';
-      });
+      document.querySelectorAll('.main-content > .page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
       if (name === 'batches')   renderBatchesTab();
       if (name === 'suppliers') renderSuppliersTab();
       if (name === 'reports')   renderReportsTab();
