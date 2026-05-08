@@ -14,30 +14,44 @@
 <body>
   <a href="#main" class="skip-link">Skip to main content</a>
 
-  <aside class="sidebar" aria-label="Module navigation">
-    <a href="index.html" class="sidebar-brand">
-      <img src="assets/logo-agribusiness.png" alt="TG Agribusiness" class="sidebar-logo" />
-      <div class="sidebar-title">
-        <span class="brand-name">Oil Palm Growth</span>
-        <span class="brand-back">&lt; TG FarmHub</span>
-      </div>
-    </a>
-    <div id="company-switcher"></div>
-    <nav aria-label="Tabs">
-      <button class="tab-btn active" data-tab="batches" onclick="switchTab('batches')">Batches</button>
-      <button class="tab-btn" data-tab="suppliers" onclick="switchTab('suppliers')">Suppliers</button>
-      <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">Reports</button>
-    </nav>
-    <div class="sidebar-user">
-      <span id="sidebar-user-name"></span>
-      <button class="btn btn-ghost" onclick="doLogout()">Logout</button>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;">
+        <div class="sidebar-logo"><img src="assets/logo-agribusiness.png" alt="TG"></div>
+        <div>
+          <div class="sidebar-brand-text">Oil Palm Growth</div>
+          <div style="font-size:10px;color:var(--text-muted);">&lt; TG FarmHub</div>
+        </div>
+      </a>
     </div>
-  </aside>
+    <div id="company-switcher"></div>
+    <nav class="sidebar-nav" aria-label="Module navigation">
+      <div class="nav-item active" data-page="batches" onclick="switchTab('batches')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
+        <span class="nav-label">Batches</span>
+      </div>
+      <div class="nav-item" data-page="suppliers" onclick="switchTab('suppliers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Suppliers</span>
+      </div>
+      <div class="nav-item" data-page="reports" onclick="switchTab('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="nav-label">Reports</span>
+      </div>
+    </nav>
+    <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+      <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);">
+        <span id="sidebar-user-name"></span>
+      </div>
+      <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">← Back to Hub</button>
+      <button onclick="doLogout()" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;color:var(--red);border-color:var(--red);">Logout</button>
+    </div>
+  </div>
 
   <main id="main" role="main" class="content">
     <div id="tab-batches" class="tab-pane active"></div>
-    <div id="tab-suppliers" class="tab-pane"></div>
-    <div id="tab-reports" class="tab-pane"></div>
+    <div id="tab-suppliers" class="tab-pane" style="display:none"></div>
+    <div id="tab-reports" class="tab-pane" style="display:none"></div>
   </main>
 
   <div id="modal-host"></div>
@@ -107,8 +121,12 @@
 
     function switchTab(name) {
       currentTab = name;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-      document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+      document.querySelectorAll('.tab-pane').forEach(p => {
+        const isActive = (p.id === 'tab-' + name);
+        p.classList.toggle('active', isActive);
+        p.style.display = isActive ? '' : 'none';
+      });
       if (name === 'batches')   renderBatchesTab();
       if (name === 'suppliers') renderSuppliersTab();
       if (name === 'reports')   renderReportsTab();
