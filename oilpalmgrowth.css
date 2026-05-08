@@ -116,6 +116,21 @@
   background: rgba(200, 68, 68, 0.08);
 }
 
+/* Batch detail page — header band + helpers */
+.opg-header { background: linear-gradient(180deg, #fff, #fbfaf6); }
+.opg-header-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.opg-header-row h2 { margin: 0; font-size: 22px; }
+.opg-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+/* Generic muted text utility (module-scoped to avoid colliding with shared.css). */
+.muted { color: var(--text-muted); font-size: 12px; }
+
 /* Mobile */
 @media (max-width: 720px) {
   .opg-doc-slot { grid-template-columns: 1fr; }
