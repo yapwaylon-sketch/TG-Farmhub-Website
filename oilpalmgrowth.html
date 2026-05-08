@@ -368,7 +368,7 @@
         data.status = 'received';
       }
 
-      const result = await sbMutate(sb.from('oilpalm_batches').update(data).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update(data).eq('id', id).select());
       if (result === null) return;
       await loadBatches();
       renderBatchesTab();
@@ -437,7 +437,7 @@
         payment_notes:     document.getElementById('opg-pay-notes').value.trim() || null
       };
 
-      const result = await sbMutate(sb.from('oilpalm_batches').update(data).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update(data).eq('id', id).select());
       if (result === null) return;
       await loadBatches();
       renderBatchesTab();
@@ -487,7 +487,7 @@
       const upload = await sb.storage.from('oilpalm-photos').upload(path, file, { upsert: true, contentType: file.type });
       if (upload.error) { notify('Upload failed: ' + upload.error.message, 'error'); btnLoading(btn, false); return; }
       const url = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
-      const result = await sbMutate(sb.from('oilpalm_batches').update({ [field]: url }).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({ [field]: url }).eq('id', id).select());
       if (result === null) { btnLoading(btn, false); return; }
       await loadBatches();
       renderBatchesTab();
@@ -496,7 +496,7 @@
 
     async function opgClearDoc(field) {
       const id = selectedBatchId;
-      const result = await sbMutate(sb.from('oilpalm_batches').update({ [field]: null }).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({ [field]: null }).eq('id', id).select());
       if (result === null) return;
       await loadBatches();
       renderBatchesTab();
@@ -563,7 +563,7 @@
 
       const eventId = await dbNextId('OE');
       if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
-      const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+      const evResult = await sbMutate(() => sb.from('oilpalm_batch_events').insert({
         id: eventId,
         batch_id: id,
         event_type: 'plant',
@@ -574,7 +574,7 @@
       }).select());
       if (evResult === null) return;
 
-      const result = await sbMutate(sb.from('oilpalm_batches').update({
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({
         status: 'pre_nursery',
         date_planted: date,
         seeds_received: rcvd,
@@ -626,7 +626,7 @@
 
       const eventId = await dbNextId('OE');
       if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
-      const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+      const evResult = await sbMutate(() => sb.from('oilpalm_batch_events').insert({
         id: eventId,
         batch_id: id,
         event_type: 'transplant',
@@ -637,7 +637,7 @@
       }).select());
       if (evResult === null) return;
 
-      const result = await sbMutate(sb.from('oilpalm_batches').update({
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({
         status: 'main_nursery',
         date_transplanted: date,
         transplant_culls: culls,
@@ -718,7 +718,7 @@
 
       const eventId = await dbNextId('OE');
       if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
-      const result = await sbMutate(sb.from('oilpalm_batch_events').insert({
+      const result = await sbMutate(() => sb.from('oilpalm_batch_events').insert({
         id: eventId,
         batch_id: id,
         event_type: 'cull',
@@ -757,7 +757,7 @@
       const id    = selectedBatchId;
       const price = parseFloat(document.getElementById('opg-sell-price').value);
       if (!price || price <= 0) { notify('Default price must be positive', 'error'); return; }
-      const result = await sbMutate(sb.from('oilpalm_batches').update({ status: 'selling', default_price: price }).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({ status: 'selling', default_price: price }).eq('id', id).select());
       if (result === null) return;
       await loadBatches();
       closeModal('opg-sellprice-overlay');
@@ -782,7 +782,7 @@
       if (remaining > 0) {
         const eventId = await dbNextId('OE');
         if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
-        const evResult = await sbMutate(sb.from('oilpalm_batch_events').insert({
+        const evResult = await sbMutate(() => sb.from('oilpalm_batch_events').insert({
           id: eventId,
           batch_id: id,
           event_type: 'cull',
@@ -794,7 +794,7 @@
         if (evResult === null) return;
       }
 
-      const result = await sbMutate(sb.from('oilpalm_batches').update({
+      const result = await sbMutate(() => sb.from('oilpalm_batches').update({
         status: 'closed',
         closed_at: new Date().toISOString(),
         closed_by: currentUser.username
@@ -817,7 +817,7 @@
         const col  = collectionsByBatch[b.id] || 0;
         const avail = (b.qty_mn_start || 0) - midC - col;
         if (avail <= 0) {
-          await sbMutate(sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', b.id).select());
+          await sbMutate(() => sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', b.id).select());
         }
       }
     }
@@ -876,7 +876,7 @@
       const id = await dbNextId('OB');
       if (!id) { notify('Failed to generate ID', 'error'); return; }
 
-      const result = await sbMutate(sb.from('oilpalm_batches').insert({
+      const result = await sbMutate(() => sb.from('oilpalm_batches').insert({
         id,
         company_id: getCompanyId(),
         batch_number: bn,
@@ -980,14 +980,14 @@
         notes: document.getElementById('os-notes').value.trim() || null
       };
       if (id) {
-        const result = await sbMutate(sb.from('oilpalm_suppliers').update(data).eq('id', id).select());
+        const result = await sbMutate(() => sb.from('oilpalm_suppliers').update(data).eq('id', id).select());
         if (result === null) return;
       } else {
         const newId = await dbNextId('OS');
         if (!newId) { notify('Failed to generate ID', 'error'); return; }
         data.id = newId;
         data.company_id = getCompanyId();
-        const result = await sbMutate(sb.from('oilpalm_suppliers').insert(data).select());
+        const result = await sbMutate(() => sb.from('oilpalm_suppliers').insert(data).select());
         if (result === null) return;
       }
       await loadSuppliers();
@@ -997,7 +997,7 @@
     }
 
     async function osToggleSupplier(id, makeActive) {
-      const result = await sbMutate(sb.from('oilpalm_suppliers').update({ is_active: makeActive }).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_suppliers').update({ is_active: makeActive }).eq('id', id).select());
       if (result === null) return;
       await loadSuppliers();
       renderSuppliersTab();

@@ -423,7 +423,7 @@
           customer_type: 'walkin',
           is_active: true
         };
-        const custResult = await sbMutate(sb.from('oilpalm_customers').insert(custInsert).select());
+        const custResult = await sbMutate(() => sb.from('oilpalm_customers').insert(custInsert).select());
         if (custResult === null) { notify('Customer insert failed — sale NOT recorded', 'error'); return; }
         customerId = newCustId;
       }
@@ -502,7 +502,7 @@
         slip_url: paySlipUrl,
         logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
       };
-      const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+      const payResult = await sbMutate(() => sb.from('oilpalm_payments').insert(payInsert).select());
       if (payResult === null) {
         notify('Payment insert failed — sale NOT recorded', 'error');
         return;
@@ -525,7 +525,7 @@
         collection_date: dateVal,
         logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
       };
-      const collResult = await sbMutate(sb.from('oilpalm_collections').insert(collInsert).select());
+      const collResult = await sbMutate(() => sb.from('oilpalm_collections').insert(collInsert).select());
       if (collResult === null) {
         // Photos + payment now orphaned, but per the codebase pattern we don't try to delete them.
         notify('Collection insert failed — payment was recorded; please retry the collection', 'error');
@@ -766,7 +766,7 @@
         phone: phoneRead.value || null,
         is_active: true
       };
-      const result = await sbMutate(sb.from('oilpalm_customers').insert(insertData).select());
+      const result = await sbMutate(() => sb.from('oilpalm_customers').insert(insertData).select());
       if (result === null) return;
 
       // Tear down iti before swapping the DOM
@@ -870,7 +870,7 @@
           booking_date: new Date().toISOString().slice(0, 10),
           status: 'active'
         };
-        const bkResult = await sbMutate(sb.from('oilpalm_bookings').insert(bkInsert).select());
+        const bkResult = await sbMutate(() => sb.from('oilpalm_bookings').insert(bkInsert).select());
         if (bkResult === null) return;
 
         // 3. Upload slip if provided (failure logged, doesn't abort the payment)
@@ -906,7 +906,7 @@
           slip_url: slipUrl,
           logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
         };
-        const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+        const payResult = await sbMutate(() => sb.from('oilpalm_payments').insert(payInsert).select());
         if (payResult === null) return;
 
         // 5. Refresh in-memory state + close + re-render current tab
@@ -1205,7 +1205,7 @@ async function shareSlip() {
         total_amount: newTotal,
         reassignment_history: history
       };
-      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      const result = await sbMutate(() => sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
       if (result === null) { notify('Reassign failed — please retry', 'error'); return; }
 
       await loadBookings();
@@ -1281,7 +1281,7 @@ async function shareSlip() {
         refund_status: numOwed > 0 ? 'pending' : 'forfeited',
         refund_owed: numOwed
       };
-      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      const result = await sbMutate(() => sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
       if (result === null) { notify('Cancel failed — please retry', 'error'); return; }
 
       await loadBookings();
@@ -1389,7 +1389,7 @@ async function shareSlip() {
         refund_paid_by: currentUser ? (currentUser.username || currentUser.name || null) : null,
         refund_notes: notes || null
       };
-      const result = await sbMutate(sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      const result = await sbMutate(() => sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
       if (result === null) { notify('Refund save failed — please retry', 'error'); return; }
 
       await loadBookings();
@@ -1432,7 +1432,7 @@ async function shareSlip() {
         .reduce((s, c) => s + Number(c.qty || 0), 0);
       const avail = (Number(b.qty_mn_start) || 0) - collectedAfter;
       if (avail <= 0) {
-        await sbMutate(sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', batchId).select());
+        await sbMutate(() => sb.from('oilpalm_batches').update({ status: 'sold_out' }).eq('id', batchId).select());
       }
     }
 
@@ -1668,7 +1668,7 @@ async function shareSlip() {
           slip_url: paySlipUrl,
           logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
         };
-        const payResult = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+        const payResult = await sbMutate(() => sb.from('oilpalm_payments').insert(payInsert).select());
         if (payResult === null) {
           notify('Payment insert failed — collection NOT recorded', 'error');
           return;
@@ -1692,7 +1692,7 @@ async function shareSlip() {
         collection_date: dateVal,
         logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
       };
-      const collResult = await sbMutate(sb.from('oilpalm_collections').insert(collInsert).select());
+      const collResult = await sbMutate(() => sb.from('oilpalm_collections').insert(collInsert).select());
       if (collResult === null) {
         // Photos + payment are now orphaned, but per G14 we don't try to delete them.
         notify('Collection insert failed — payment (if any) was recorded; please retry the collection', 'error');
@@ -1701,7 +1701,7 @@ async function shareSlip() {
 
       // Step 5: Best-effort booking completion flip (don't await — it's a side effect)
       if ((collected + qty) >= booked) {
-        sbMutate(sb.from('oilpalm_bookings').update({ status: 'completed' }).eq('id', bookingId).select())
+        sbMutate(() => sb.from('oilpalm_bookings').update({ status: 'completed' }).eq('id', bookingId).select())
           .catch(e => console.warn('[ops-coll] booking completion flip failed:', e));
       }
 
@@ -2058,7 +2058,7 @@ async function shareSlip() {
         slip_url: slipUrl,
         logged_by: currentUser ? (currentUser.username || currentUser.name || null) : null
       };
-      const result = await sbMutate(sb.from('oilpalm_payments').insert(payInsert).select());
+      const result = await sbMutate(() => sb.from('oilpalm_payments').insert(payInsert).select());
       if (result === null) return;
 
       // 4. Refresh + close + re-render
@@ -2831,13 +2831,13 @@ async function shareSlip() {
       };
 
       if (id) {
-        const result = await sbMutate(sb.from('oilpalm_customers').update(data).eq('id', id).select());
+        const result = await sbMutate(() => sb.from('oilpalm_customers').update(data).eq('id', id).select());
         if (result === null) return;
       } else {
         const newId = await dbNextId('OC');
         if (!newId) { notify('Failed to generate ID', 'error'); return; }
         const insertData = Object.assign({}, data, { id: newId, company_id: getCompanyId() });
-        const result = await sbMutate(sb.from('oilpalm_customers').insert(insertData).select());
+        const result = await sbMutate(() => sb.from('oilpalm_customers').insert(insertData).select());
         if (result === null) return;
       }
 
@@ -2849,7 +2849,7 @@ async function shareSlip() {
     }
 
     async function opsToggleCustomer(id, makeActive) {
-      const result = await sbMutate(sb.from('oilpalm_customers').update({ is_active: makeActive }).eq('id', id).select());
+      const result = await sbMutate(() => sb.from('oilpalm_customers').update({ is_active: makeActive }).eq('id', id).select());
       if (result === null) return;
       await loadCustomers();
       renderCustomersTab();
