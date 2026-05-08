@@ -146,8 +146,108 @@
 
     // === Render stubs (filled in later tasks) ===
     function renderBatchesTab()   { document.getElementById('tab-batches').innerHTML = '<p>Batches — TODO</p>'; }
-    function renderSuppliersTab() { document.getElementById('tab-suppliers').innerHTML = '<p>Suppliers — TODO</p>'; }
     function renderReportsTab()   { document.getElementById('tab-reports').innerHTML = '<p>Reports — TODO</p>'; }
+
+    // === Modal helper (module-local) ===
+    // shared.js exposes openModal(id)/closeModal(id) for pre-defined modal HTML, but the plan
+    // for this module uses dynamic modal HTML. We inject into #modal-host wrapped in the
+    // standard .modal-overlay/.modal-box structure so shared CSS applies, and reuse
+    // closeModal('os-modal-overlay') so focus-trap teardown still runs.
+    function showModal(innerHtml) {
+      const host = document.getElementById('modal-host');
+      host.innerHTML = `
+        <div id="os-modal-overlay" class="modal-overlay" style="display:flex;">
+          <div class="modal-box" style="max-width:520px;">
+            ${innerHtml}
+          </div>
+        </div>
+      `;
+      // openModal handles focus-trap + display
+      openModal('os-modal-overlay');
+    }
+
+    // === Suppliers tab ===
+    function renderSuppliersTab() {
+      const tbody = suppliers.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${esc(s.name)}</td>
+          <td>${esc(s.contact_person || '—')}</td>
+          <td>${fmtPhone(s.phone) || '—'}</td>
+          <td>${esc(s.address || '—')}</td>
+          <td>${s.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>'}</td>
+          <td class="actions">
+            <button class="btn btn-tiny" onclick="osOpenSupplierModal('${s.id}')">Edit</button>
+            <button class="btn btn-tiny ${s.is_active ? 'danger' : ''}" onclick="osToggleSupplier('${s.id}', ${!s.is_active})">${s.is_active ? 'Deactivate' : 'Activate'}</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--muted)">No suppliers yet.</td></tr>';
+
+      document.getElementById('tab-suppliers').innerHTML = `
+        <div class="page-header">
+          <h2>Suppliers</h2>
+          <button class="btn btn-primary" onclick="osOpenSupplierModal()">+ Add Supplier</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>#</th><th>Name</th><th>Contact</th><th>Phone</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      `;
+    }
+
+    function osOpenSupplierModal(id) {
+      const s = id ? suppliers.find(x => x.id === id) : { name: '', contact_person: '', phone: '', address: '', notes: '' };
+      if (!s) return;
+      showModal(`
+        <h3>${id ? 'Edit' : 'Add'} Supplier</h3>
+        <div class="form-grid">
+          <label>Name <input id="os-name" value="${esc(s.name)}" /></label>
+          <label>Contact Person <input id="os-contact" value="${esc(s.contact_person || '')}" /></label>
+          <label>Phone <input id="os-phone" value="${esc(s.phone || '')}" /></label>
+          <label class="full">Address <textarea id="os-addr">${esc(s.address || '')}</textarea></label>
+          <label class="full">Notes <textarea id="os-notes">${esc(s.notes || '')}</textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('os-modal-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="osSaveSupplier('${id || ''}')">Save</button>
+        </div>
+      `);
+    }
+
+    async function osSaveSupplier(id) {
+      const name = document.getElementById('os-name').value.trim();
+      if (!name) { notify('Name is required', 'error'); return; }
+      const data = {
+        name,
+        contact_person: document.getElementById('os-contact').value.trim() || null,
+        phone: document.getElementById('os-phone').value.trim() || null,
+        address: document.getElementById('os-addr').value.trim() || null,
+        notes: document.getElementById('os-notes').value.trim() || null
+      };
+      if (id) {
+        const result = await sbMutate(sb.from('oilpalm_suppliers').update(data).eq('id', id).select());
+        if (result === null) return;
+      } else {
+        const newId = await dbNextId('OS');
+        if (!newId) { notify('Failed to generate ID', 'error'); return; }
+        data.id = newId;
+        data.company_id = getCompanyId();
+        const result = await sbMutate(sb.from('oilpalm_suppliers').insert(data).select());
+        if (result === null) return;
+      }
+      await loadSuppliers();
+      closeModal('os-modal-overlay');
+      renderSuppliersTab();
+      notify(id ? 'Supplier updated' : 'Supplier added', 'success');
+    }
+
+    async function osToggleSupplier(id, makeActive) {
+      const result = await sbMutate(sb.from('oilpalm_suppliers').update({ is_active: makeActive }).eq('id', id).select());
+      if (result === null) return;
+      await loadSuppliers();
+      renderSuppliersTab();
+      notify(makeActive ? 'Supplier activated' : 'Supplier deactivated', 'success');
+    }
   </script>
 </body>
 </html>
