@@ -57,6 +57,7 @@
     let varieties = [];
     let collectionsByBatch = {};  // {batch_id: total_collected_qty}
     let midCullsByBatch = {};     // {batch_id: total_mid_mn_cull_qty}
+    let batchesFilter = { stage: 'all', supplier: 'all', variety: 'all' };
 
     // === Init ===
     document.addEventListener('DOMContentLoaded', async () => {
@@ -144,8 +145,102 @@
       (data || []).forEach(e => { midCullsByBatch[e.batch_id] = (midCullsByBatch[e.batch_id] || 0) + e.qty; });
     }
 
-    // === Render stubs (filled in later tasks) ===
-    function renderBatchesTab()   { document.getElementById('tab-batches').innerHTML = '<p>Batches — TODO</p>'; }
+    // === Batches tab ===
+    function renderBatchesTab() {
+      const supplierMap = Object.fromEntries(suppliers.map(s => [s.id, s.name]));
+      const varietyMap  = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      const filtered = batches.filter(b => {
+        if (batchesFilter.stage !== 'all' && b.status !== batchesFilter.stage) return false;
+        if (batchesFilter.supplier !== 'all' && b.supplier_id !== batchesFilter.supplier) return false;
+        if (batchesFilter.variety !== 'all' && b.variety_id !== batchesFilter.variety) return false;
+        return true;
+      });
+
+      const rows = filtered.map(b => {
+        const planted = b.qty_planted || 0;
+        const mn      = b.qty_mn_start || 0;
+        const collected = collectionsByBatch[b.id] || 0;
+        const midCulls  = midCullsByBatch[b.id] || 0;
+        const available = mn > 0 ? Math.max(0, mn - midCulls - collected) : 0;
+        const age = b.date_planted ? Math.floor((Date.now() - new Date(b.date_planted).getTime()) / 86400000) : null;
+        const ready = b.date_planted ? addMonths(b.date_planted, 10) : null;
+
+        return `
+          <tr onclick="opgOpenBatchDetail('${b.id}')" style="cursor:pointer">
+            <td>${esc(b.batch_number)}</td>
+            <td>${esc(supplierMap[b.supplier_id] || '—')}</td>
+            <td>${esc(varietyMap[b.variety_id] || '—')}</td>
+            <td><span class="opg-stage-badge opg-stage-${b.status}">${stageLabel(b.status)}</span></td>
+            <td>${b.ordered_qty || 0}</td>
+            <td>${planted || '—'}</td>
+            <td>${mn || '—'}</td>
+            <td>${available || '—'}</td>
+            <td>${age != null ? age + 'd' : '—'}</td>
+            <td>${ready ? fmtDate(ready) : '—'}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted)">No batches yet.</td></tr>';
+
+      document.getElementById('tab-batches').innerHTML = `
+        <div class="page-header">
+          <h2>Batches</h2>
+          <button class="btn btn-primary" onclick="opgOpenNewBatchModal()">+ New Batch</button>
+        </div>
+        <div class="filters-bar">
+          <select onchange="batchesFilter.stage=this.value; renderBatchesTab()">
+            <option value="all">All stages</option>
+            <option value="ordered">Ordered</option>
+            <option value="received">Received</option>
+            <option value="pre_nursery">Pre-Nursery</option>
+            <option value="main_nursery">Main Nursery</option>
+            <option value="selling">Selling</option>
+            <option value="sold_out">Sold Out</option>
+            <option value="closed">Closed</option>
+          </select>
+          <select onchange="batchesFilter.supplier=this.value; renderBatchesTab()">
+            <option value="all">All suppliers</option>
+            ${suppliers.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+          </select>
+          <select onchange="batchesFilter.variety=this.value; renderBatchesTab()">
+            <option value="all">All varieties</option>
+            ${varieties.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}
+          </select>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Batch #</th><th>Supplier</th><th>Variety</th><th>Stage</th>
+            <th>Ordered</th><th>Planted</th><th>MN qty</th><th>Available</th><th>Age</th><th>Ready Date</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      // Restore filter values (innerHTML rewrite resets <select> defaults)
+      const sels = document.querySelectorAll('#tab-batches .filters-bar select');
+      if (sels[0]) sels[0].value = batchesFilter.stage;
+      if (sels[1]) sels[1].value = batchesFilter.supplier;
+      if (sels[2]) sels[2].value = batchesFilter.variety;
+    }
+
+    function stageLabel(s) {
+      return ({
+        ordered: 'Ordered', received: 'Received', pre_nursery: 'Pre-Nursery', main_nursery: 'Main Nursery',
+        selling: 'Selling', sold_out: 'Sold Out', closed: 'Closed'
+      })[s] || s;
+    }
+
+    function addMonths(d, m) {
+      const x = new Date(d);
+      x.setMonth(x.getMonth() + m);
+      return x.toISOString().slice(0, 10);
+    }
+
+    // Stubs — implemented in Tasks 1.4 and 1.5
+    function opgOpenBatchDetail(id) { notify('Batch detail page TBD next task', 'info'); }
+    function opgOpenNewBatchModal()  { notify('New batch modal TBD next task', 'info'); }
+
+    // === Other tab render stubs (filled in later tasks) ===
     function renderReportsTab()   { document.getElementById('tab-reports').innerHTML = '<p>Reports — TODO</p>'; }
 
     // === Modal helper (module-local) ===
