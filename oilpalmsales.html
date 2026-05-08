@@ -92,6 +92,11 @@
     // Bookings tab filter state (Task 3.4)
     let bookingsFilter = { status: 'all', customer: '', batch: 'all' };
 
+    // Collections tab filter state (Task 3.10) — default last 90 days.
+    const _ops_today_iso = new Date().toISOString().slice(0, 10);
+    const _ops_ago90_iso = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    let collectionsFilter = { from: _ops_ago90_iso, to: _ops_today_iso, batch: 'all', type: 'all', customer: '' };
+
     // Selected booking for the detail page (Task 3.6). null = list view.
     let selectedBookingId = null;
 
@@ -1936,8 +1941,248 @@
     // === End booking detail page ===
 
     // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
-    function renderCollectionsTab() { document.getElementById('tab-collections').innerHTML = '<p class="muted">Collections — TODO Task 3.10</p>'; }
     function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+
+    // === Collections tab (Task 3.10) ===
+    function renderCollectionsTab() {
+      const customerMap = Object.fromEntries(customers.map(c => [c.id, c]));
+      const batchMap    = Object.fromEntries(batches.map(b => [b.id, b]));
+      const varietyMap  = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      // Apply filters
+      const term = (collectionsFilter.customer || '').trim().toLowerCase();
+      const termDigits = phoneDigitsOnly(term).replace(/^0+/, '');
+      const fromDate = collectionsFilter.from || '';
+      const toDate   = collectionsFilter.to   || '';
+
+      const filtered = collections.filter(c => {
+        // Date range filter (collection_date is ISO yyyy-mm-dd, plain string compare works)
+        if (fromDate && (c.collection_date || '') < fromDate) return false;
+        if (toDate   && (c.collection_date || '') > toDate)   return false;
+
+        // Batch filter
+        if (collectionsFilter.batch !== 'all') {
+          if (c.batch_id !== collectionsFilter.batch) return false;
+        }
+
+        // Type filter (booking-driven vs walk-in)
+        if (collectionsFilter.type === 'booking') {
+          if (!c.booking_id) return false;
+        } else if (collectionsFilter.type === 'walkin') {
+          if (c.booking_id) return false;
+        }
+
+        // Customer search — match name OR phone digits
+        if (term) {
+          const cust = customerMap[c.customer_id];
+          if (!cust) return false;
+          const nameMatch = (cust.name || '').toLowerCase().includes(term);
+          const phoneStored = phoneDigitsOnly(cust.phone || '').replace(/^0+/, '');
+          const phoneMatch = termDigits && phoneStored.includes(termDigits);
+          if (!nameMatch && !phoneMatch) return false;
+        }
+        return true;
+      });
+
+      // Sort: collection_date desc, then created_at desc
+      filtered.sort((a, b) => {
+        const dA = a.collection_date || '';
+        const dB = b.collection_date || '';
+        if (dA !== dB) return dA < dB ? 1 : -1;
+        const cA = a.created_at || '';
+        const cB = b.created_at || '';
+        if (cA !== cB) return cA < cB ? 1 : -1;
+        return 0;
+      });
+
+      const tbody = filtered.map(c => {
+        const cust  = customerMap[c.customer_id];
+        const batch = batchMap[c.batch_id];
+        const isBooking = !!c.booking_id;
+        const typeBadge = isBooking
+          ? '<span class="ops-status-badge ops-status-active">BOOKING</span>'
+          : '<span class="ops-status-badge ops-status-walkin">WALK-IN</span>';
+        return `
+          <tr onclick="opsOpenCollectionDetail('${esc(c.id)}')" style="cursor:pointer;">
+            <td>${fmtDate(c.collection_date)}</td>
+            <td>${esc(c.l3_form_no || '—')}</td>
+            <td>${cust ? esc(cust.name) : '<span class="muted">—</span>'}</td>
+            <td>${batch ? esc(batch.batch_number || batch.id) : '<span class="muted">—</span>'}</td>
+            <td style="text-align:right;">${Number(c.qty || 0).toLocaleString()}</td>
+            <td>${typeBadge}</td>
+            <td>${esc(c.plate_no || '—')}</td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No collections in this range.</td></tr>';
+
+      // Batch dropdown — only batches that have at least one collection
+      const batchIdsWithCollections = new Set(collections.map(c => c.batch_id).filter(Boolean));
+      const batchOpts = batches
+        .filter(b => batchIdsWithCollections.has(b.id))
+        .slice()
+        .sort((a, b) => (a.batch_number || '').localeCompare(b.batch_number || ''))
+        .map(b => `<option value="${esc(b.id)}" ${collectionsFilter.batch === b.id ? 'selected' : ''}>${esc(b.batch_number || b.id)}</option>`)
+        .join('');
+
+      const filtersDirty =
+        collectionsFilter.from !== _ops_ago90_iso ||
+        collectionsFilter.to   !== _ops_today_iso ||
+        collectionsFilter.batch !== 'all' ||
+        collectionsFilter.type  !== 'all' ||
+        collectionsFilter.customer;
+
+      document.getElementById('tab-collections').innerHTML = `
+        <div class="page-header">
+          <h2>Collections</h2>
+        </div>
+
+        <div class="filters-bar">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">From
+            <input type="date" id="ops-co-from" value="${esc(collectionsFilter.from)}" onchange="opsCoFilterFrom(this.value)" />
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">To
+            <input type="date" id="ops-co-to" value="${esc(collectionsFilter.to)}" onchange="opsCoFilterTo(this.value)" />
+          </label>
+          <select id="ops-co-batch" onchange="opsCoFilterBatch(this.value)">
+            <option value="all" ${collectionsFilter.batch === 'all' ? 'selected' : ''}>All batches</option>
+            ${batchOpts}
+          </select>
+          <select id="ops-co-type" onchange="opsCoFilterType(this.value)">
+            <option value="all"     ${collectionsFilter.type === 'all'     ? 'selected' : ''}>All types</option>
+            <option value="booking" ${collectionsFilter.type === 'booking' ? 'selected' : ''}>Booking-driven</option>
+            <option value="walkin"  ${collectionsFilter.type === 'walkin'  ? 'selected' : ''}>Walk-in</option>
+          </select>
+          <input type="text" id="ops-co-cust" placeholder="Search customer name or phone..." value="${esc(collectionsFilter.customer)}" oninput="opsCoFilterCustomer(this.value)" style="min-width:220px;" />
+          ${filtersDirty ? `<button class="btn-tiny" onclick="opsCoClearFilters()">Clear filters</button>` : ''}
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>L3.1 #</th>
+                <th>Customer</th>
+                <th>Batch</th>
+                <th style="text-align:right;">Qty</th>
+                <th>Type</th>
+                <th>Plate</th>
+              </tr>
+            </thead>
+            <tbody>${tbody}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function opsCoFilterFrom(v) {
+      collectionsFilter.from = v || '';
+      renderCollectionsTab();
+    }
+    function opsCoFilterTo(v) {
+      collectionsFilter.to = v || '';
+      renderCollectionsTab();
+    }
+    function opsCoFilterBatch(v) {
+      collectionsFilter.batch = v || 'all';
+      renderCollectionsTab();
+    }
+    function opsCoFilterType(v) {
+      collectionsFilter.type = v || 'all';
+      renderCollectionsTab();
+    }
+    function opsCoFilterCustomer(v) {
+      collectionsFilter.customer = v || '';
+      renderCollectionsTab();
+      // Re-focus the input + put cursor at end (renderCollectionsTab destroyed the DOM)
+      const el = document.getElementById('ops-co-cust');
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        try { el.setSelectionRange(len, len); } catch (e) {}
+      }
+    }
+    function opsCoClearFilters() {
+      collectionsFilter = { from: _ops_ago90_iso, to: _ops_today_iso, batch: 'all', type: 'all', customer: '' };
+      renderCollectionsTab();
+    }
+
+    // ----- Collection detail modal -----
+    function opsOpenCollectionDetail(id) {
+      const c = collections.find(x => x.id === id);
+      if (!c) { notify('Collection not found', 'error'); return; }
+
+      const cust  = customers.find(x => x.id === c.customer_id);
+      const batch = batches.find(x => x.id === c.batch_id);
+      const varietyName = batch ? (varieties.find(v => v.id === batch.variety_id) || {}).name || '—' : '—';
+      const isBooking = !!c.booking_id;
+      const qty = Number(c.qty || 0);
+      const unitPrice = Number(c.unit_price || 0);
+      const subtotal = c.subtotal != null ? Number(c.subtotal) : qty * unitPrice;
+
+      // Photo thumbnails — render as clickable thumbnails or PDF links.
+      function photoCell(url, label) {
+        if (!url) return `<div style="font-size:11px;color:var(--text-muted);">${esc(label)}: —</div>`;
+        const isPdf = (url || '').toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+          return `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${esc(label)}</div>
+            <a href="${esc(url)}" target="_blank" rel="noopener" style="color:#6B4C8A;font-weight:600;text-decoration:none;">PDF ↗</a></div>`;
+        }
+        return `<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${esc(label)}</div>
+          <a href="${esc(url)}" target="_blank" rel="noopener">
+            <img src="${esc(url)}" alt="${esc(label)}" style="max-height:80px;max-width:100%;border:1px solid var(--border);border-radius:4px;display:block;" />
+          </a></div>`;
+      }
+
+      const bookingLine = isBooking
+        ? `Booking: <a href="javascript:void(0)" onclick="opsCollDetailGoBooking('${esc(c.booking_id)}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.booking_id)} ↗</a>`
+        : `<span class="muted">Walk-in sale (no booking)</span>`;
+
+      const customerCell = cust
+        ? `<a href="javascript:void(0)" onclick="opsCollDetailGoCustomer('${esc(cust.id)}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(cust.name)}</a>`
+        : '<span class="muted">—</span>';
+
+      showModal(`
+        <h3 style="margin-bottom:4px;">L3.1 # ${esc(c.l3_form_no || '—')}</h3>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Collection ${esc(c.id)}</div>
+
+        <div class="info-box" style="background:rgba(212,175,55,0.08);border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.7;">
+          <div><strong>Date:</strong> ${fmtDate(c.collection_date)} &nbsp;·&nbsp; <strong>Customer:</strong> ${customerCell} &nbsp;·&nbsp; <strong>Plate:</strong> ${esc(c.plate_no || '—')}</div>
+          <div><strong>Batch:</strong> ${batch ? esc(batch.batch_number || batch.id) : '<span class="muted">—</span>'} &nbsp;·&nbsp; <strong>Variety:</strong> ${esc(varietyName)}</div>
+          <div><strong>Qty:</strong> ${qty.toLocaleString()} &nbsp;·&nbsp; <strong>Unit Price:</strong> ${formatRM(unitPrice)} &nbsp;·&nbsp; <strong>Subtotal:</strong> ${formatRM(subtotal)}</div>
+          <div>${bookingLine}</div>
+          <div><strong>Type:</strong> ${isBooking
+            ? '<span class="ops-status-badge ops-status-active">BOOKING</span>'
+            : '<span class="ops-status-badge ops-status-walkin">WALK-IN</span>'}</div>
+        </div>
+
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+          ${photoCell(c.l3_photo_url, 'L3.1 Photo')}
+          ${photoCell(c.collection_photo_url, 'Collection Photo')}
+        </div>
+
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;">
+          <div><strong>Logged by:</strong> ${esc(c.logged_by || '—')}</div>
+          <div><strong>Notes:</strong> ${esc(c.notes || '—')}</div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-coldetail-overlay')">Close</button>
+        </div>
+      `, 'ops-coldetail-overlay');
+    }
+
+    function opsCollDetailGoCustomer(customerId) {
+      closeModal('ops-coldetail-overlay');
+      switchTab('customers');
+      opsOpenCustomerDetail(customerId);
+    }
+
+    function opsCollDetailGoBooking(bookingId) {
+      closeModal('ops-coldetail-overlay');
+      switchTab('bookings');
+      opsOpenBookingDetail(bookingId);
+    }
 
     // === Bookings tab (Task 3.4) ===
     function renderBookingsTab() {
