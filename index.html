@@ -389,15 +389,19 @@ const MODULES = [
     ]
   },
   {
-    key: "seedlinggrowth",
+    key: "oilpalmgrowth",
     name: "Oil Palm Growth",
     icon: "🌴",
     category: "operations",
-    desc: "Monitor oil palm seedling growth stages and nursery health",
-    url: null,
-    active: false,
+    desc: "Procurement, planting, main nursery — supply pipeline for Oil Palm Sales",
+    url: "oilpalmgrowth.html",
+    active: true,
     permissions: [
-      { key: "view", label: "View seedling growth data" },
+      { key: "view", label: "View batches" },
+      { key: "editBatch", label: "Create / edit batches" },
+      { key: "manageSuppliers", label: "Manage suppliers" },
+      { key: "recordCounts", label: "Record planting / transplant / cull counts" },
+      { key: "markStage", label: "Advance stage (Selling / Close)" },
     ]
   },
   {

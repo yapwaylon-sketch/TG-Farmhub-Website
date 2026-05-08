@@ -433,7 +433,7 @@ const MODULE_COMPANY = {
   growthtracker: 'tg_agribusiness',
   farmconfig: 'shared',
   seedlings: 'tg_agribusiness',
-  seedlinggrowth: 'tg_agribusiness',
+  oilpalmgrowth: 'tg_agribusiness',
   staffclaims: 'tg_agribusiness',
   tender: 'tg_agribusiness'
 };
