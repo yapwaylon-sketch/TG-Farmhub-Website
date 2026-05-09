@@ -27,12 +27,100 @@ These are non-negotiable patterns to apply on EVERY task on this project. Establ
 
 3. **Verify deployed behaviour before saying "try it".** Don't push code, deploy, and put the testing burden on the user. After any non-trivial frontend deploy: at minimum `curl` the deployed HTML/JS and grep for the change to confirm it's live; for library integrations, also fetch the CDN file and grep its API surface to confirm the lib actually exposes what we depend on. Better: write a tiny test page that exercises the new code path, deploy it alongside, hit it, then remove. The user-facing claim should be "verified working at <evidence>" — never "try it" as a substitute for verification.
 
+4. **Browser console FIRST when user reports "page broken" or "nothing works".** Established 2026-05-08. When user reports a UI symptom ("clicks don't register", "blank page", "nothing happens"), the FIRST move is to ask for the DevTools Console output. NOT to guess at layout, CSS, or JS issues based on the symptom. Every guess-fix without the console error wastes a deploy cycle. Today's session burned ~20 minutes on 4 wrong fixes (offline banner, layout wrapper, sidebar pattern, etc.) before asking for the console — which immediately revealed a `SyntaxError: Identifier 'SUPABASE_URL' has already been declared` that killed the entire script block. The console error tells you the exact line; theories don't.
+
+5. **Before creating or modifying ANY `*.html` module file, read the "Module Build Gotchas" section below.** Every gotcha there has bitten this codebase at least once. Pretending they don't apply is the same as ignoring rules 1-4.
+
 - Project syncs between two Windows PCs (main PC + secondary PC) via git/GitHub — migrated off OneDrive on 2026-04-09
   - Both PCs: `C:\dev\TG-Farmhub-Website` (and `C:\dev\TG-Nanas-Growth-TV` as a sibling)
   - Daily workflow: `git pull --ff-only origin main` when sitting down, `git push origin main` when standing up
   - Shell aliases `gitpull` and `gitpush` set up on both PCs in Git Bash (`~/.bashrc`), PowerShell (`$PROFILE`), and CMD (doskey via `HKCU AutoRun` → `C:\Users\yapwa\cmd-aliases.cmd`). User prefers typing `gitpull`/`gitpush` over the full commands. Claude's Bash tool still uses the full form because it runs in a non-interactive shell that doesn't load user profiles.
   - Never work on both PCs at the same time on the same repo
   - If `git pull --ff-only` errors with "non-fast-forward", you forgot to push from the other PC — push from there first
+
+## Module Build Gotchas (READ BEFORE WRITING ANY HTML PAGE)
+
+These 10 gotchas are the **non-obvious, codebase-specific rules** that the implementer must apply on every new or substantially-modified HTML module. Each one was discovered the hard way (most during the 2026-05-08 oilpalm modules rebuild). All claims here have been verified against the live codebase. If a future plan or subagent prompt contradicts any of these, **the codebase wins** — these are facts, not opinions. Mental pre-flight checklist before shipping any module:
+
+### 1. DO NOT redeclare Supabase globals
+`shared.js` already declares `var SUPABASE_URL`, `var SUPABASE_KEY`, `var sb = supabase.createClient(...)` at lines 8-10. **Re-declaring any of these in a module's inline `<script>` throws `SyntaxError: Identifier 'SUPABASE_URL' has already been declared` and kills the entire script block** — page renders with the static HTML (sidebar, etc.) but every `onclick` handler is undefined and the page appears unclickable. Use the global `sb` directly.
+
+### 2. Layout MUST be wrapped in `<div id="app">` + `<main class="main-content" id="main-content">` + `.page` panes
+- `shared.css:52` defines `#app { display: flex; height: 100vh; }`. Without this wrapper, the sidebar + main pane don't lay out side-by-side and `body { overflow: hidden }` clips the main pane off-screen.
+- `<main class="main-content">` (NOT `class="content"`) gives `flex: 1; overflow: auto; padding: 24px 28px`.
+- Inner panes use `class="page"` (NOT `class="tab-pane"`) — `.page { display:none } .page.active { display:block }` (shared.css:217-218). Toggling the `active` class shows/hides.
+- Skip-link target: `<a href="#main-content" class="skip-link">`.
+
+### 3. Sidebar uses `.nav-item` divs with SVG icons, not `<button class="tab-btn">`
+shared.css has 9 rules for `.nav-item` and **zero** for `.tab-btn`. Pattern (from `tender.html`):
+```html
+<nav class="sidebar-nav" aria-label="Module navigation">
+  <div class="nav-item active" data-page="X" onclick="switchTab('X')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">...</svg>
+    <span class="nav-label">Label</span>
+  </div>
+</nav>
+```
+Active state via `.nav-item.active` (purple left-border + tinted bg).
+
+### 4. `fmtDateDM()` does NOT exist in shared.js
+shared.js exports `fmtDate` (DD/MM/YY, project default), `fmtDateShort` (alias), `fmtDateLong` (4-digit year), `fmtDateNice`. The `fmtDateDM` name is **sales.html-internal only** — using it from any other module gives `ReferenceError`. Use `fmtDate(d)` for table cells; `fmtDateLong(d)` for formal documents.
+
+### 5. `showModal(html, overlayId)` is module-local — shared.js only has `openModal(id)` / `closeModal(id)`
+shared.js's modal helpers operate on **pre-defined modal HTML** (statically present in the page). For dynamic modals, every module must define its own `showModal(innerHtml, overlayId)` helper that injects into `#modal-host` wrapped in `.modal-overlay > .modal-box` and delegates to `openModal(id)` for focus-trap. Use unique `overlayId` per modal type (e.g. `'os-modal-overlay'`, `'opg-plant-overlay'`). **`closeModal()` with no arg silently no-ops** — always pass the overlay ID arg.
+
+### 6. `confirmAction(title, message, onConfirm, danger)` is callback-based, NOT Promise-based
+shared.js:313 signature is `function confirmAction(title, message, onConfirm, danger)`. Callers must use the **callback form**:
+```javascript
+confirmAction('Title', 'Message?', () => doSomething(), /*danger*/ true);
+```
+NOT `if (await confirmAction(...)) { ... }` — that always evaluates falsy and silently swallows the call.
+
+### 7. `esc()` does NOT escape double quotes
+shared.js:50 implementation is `textContent → innerHTML`, which escapes only `<`, `>`, `&`. **Single and double quotes pass through unescaped.** This means `<div onclick="fn('${esc(name)}')">` and `<div data-name="${esc(name)}">` both break if `name` contains a quote.
+
+Two safe patterns:
+- For `onclick` strings: use `data-*` attributes + event delegation: `<div data-cid="${esc(id)}" onclick="handlerFromEvent(event)">`, then read `event.currentTarget.dataset.cid` in the handler.
+- For attribute values: post-process with `.replace(/"/g, '&quot;')` after `esc()`.
+
+### 8. `sbMutate` needs a thunk; `sbQuery` accepts the builder directly
+**Asymmetric API in shared.js** — every implementer subagent has tripped on this:
+- `sbQuery(queryPromise, loadingMsg)` — pass the builder/promise directly (re-awaits internally for retry).
+- `sbMutate(queryFn, loadingMsg)` — pass a **function** that returns the query (calls `await queryFn()` internally). Passing the builder directly throws `TypeError: queryFn is not a function`.
+
+**Right:**
+```javascript
+const data = await sbQuery(sb.from('x').select('*').eq('id', id));
+const result = await sbMutate(() => sb.from('x').insert(payload).select());
+```
+
+### 9. `id_counters` table has only `(prefix, last_number)` — no `company_id` column
+Convention: company code is **embedded in the prefix string** (e.g. `prefix='AB-OS'`, `prefix='AF-SO'`). Migrations must NOT seed counter rows with a `company_id` value — that 400-errors. Counter rows lazy-create on first `next_id(p_prefix, p_company_code)` call, so seeding is unnecessary anyway.
+
+Other tables WITHOUT `company_id` (do NOT add `.eq('company_id', ...)` filters or `company_id:` insert payloads to these): `app_config`, `audit_log`, `block_crops`, `companies`, `crop_statuses`, `crop_varieties`, `crops`, `id_counters`, `oilpalm_batch_events`, `oilpalm_payments`, `payroll_entries`, `payroll_responsibilities`, `pnd_block_statuses`, `pnd_blocks`, `sales_drivers`, `task_entries`, `task_units`, `users`. Adding the filter on these silently breaks the call (PostgREST 400 → `sbQuery` returns null).
+
+### 10. Storage bucket `public: true` only governs READ
+WRITE access (INSERT/UPDATE/DELETE on `storage.objects`) requires an explicit RLS policy on the bucket. New buckets need:
+```sql
+CREATE POLICY <bucket>_all ON storage.objects FOR ALL
+  USING (bucket_id = '<bucket-name>')
+  WITH CHECK (bucket_id = '<bucket-name>');
+```
+Without this, anon role uploads return HTTP 400 even though the bucket is "public". Pattern matches existing `sales_photos_all` and `tender-documents` policies on production.
+
+### Pre-flight checklist (mental tick before shipping any module)
+- [ ] No `const SUPABASE_URL` / `const SUPABASE_KEY` / `const sb` redeclaration?
+- [ ] Wrapped in `<div id="app">`? `<main class="main-content">`? Inner panes use `.page`?
+- [ ] Sidebar uses `.nav-item` divs (not `tab-btn` buttons)?
+- [ ] Date display uses `fmtDate` (not `fmtDateDM`)?
+- [ ] Modal helper local to module (or copied from existing module)? Unique `overlayId` per modal type? `closeModal` always called with the overlay ID?
+- [ ] All `confirmAction` calls use callback form?
+- [ ] No raw user-controlled string interpolated into HTML attribute (`data-*` + event delegation OR `.replace(/"/g, '&quot;')`)?
+- [ ] Every `sbMutate(...)` call wraps the query in `() =>`? Every `sbQuery(...)` does NOT?
+- [ ] No `company_id` column referenced for tables in the no-company_id list?
+- [ ] If module uploads to a new storage bucket, has the corresponding `<bucket>_all` RLS policy been created on `storage.objects`?
+
+If any answer is "no" or "unsure", verify before deploying.
 
 ## Project Overview
 Farm management web application for TG Group / Ladang PND (pineapple farm, Malaysia). Static HTML/CSS/JS frontend hosted on Netlify, with Supabase (PostgreSQL) backend.
