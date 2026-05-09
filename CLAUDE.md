@@ -64,8 +64,10 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 | `sales.css` | Sales module styles (cards, badges, timeline, aging) |
 | `delivery.html` | Mobile driver delivery page (phone-only, PIN login, mark delivered, print DO/CS) |
 | `display-sales.html` | TV display for packing station (token auth, auto-refresh, status-grouped orders) |
-| `seedlings.html` | Oil Palm Seedlings module (batches, bookings, collections, L3.1 tracking, reports) |
-| `seedlings.css` | Seedlings module styles |
+| `oilpalmgrowth.html` | Oil Palm Growth module (procurement, planting, MN, ready-for-sale) |
+| `oilpalmgrowth.css` | Growth module styles |
+| `oilpalmsales.html` | Oil Palm Sales module (bookings, walk-ins, L3.1 collections, customers) |
+| `oilpalmsales.css` | Sales module styles |
 | `tender.html` | Tender Monitoring module (dashboard, local orders, documents, reports, AI LO import) |
 | `tender.css` | Tender module styles |
 | `shared.css` | Shared styles (sidebar, layout, variables, offline banner) |
@@ -122,12 +124,12 @@ Farm management web application for TG Group / Ladang PND (pineapple farm, Malay
 9. **TV Display (Sales)** — `display-sales.html`, read-only packing station display, password gate (session-based), auto-refresh 60s, auto-rotate pages
 
 ### Coming Soon (Not Built)
-- **Oil Palm Seedlings Growth** — Monitor oil palm seedling growth stages and nursery health
 - **Staff Claims** — Personal expense claims, approvals, and reimbursement tracking
 
 ### Recently Built
-10. **Oil Palm Seedlings** (`seedlings.html` + `seedlings.css`) — Batch lifecycle management, booking with deposit/payment tracking, collection with L3.1 certificate tracking, walk-in cash sales, printable booking slips, MPOB monthly reports, batch summary, cash flow projection. Under TG Agribusiness. 7 DB tables (`seedling_suppliers`, `seedling_batches`, `seedling_batch_events`, `seedling_customers`, `seedling_bookings`, `seedling_payments`, `seedling_collections`). Supabase storage bucket: `seedling-photos`. Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`, Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
-11. **Tender Monitoring** (`tender.html` + `tender.css`) — Government tender tracking for LPNM pineapple sucker supply contracts. Dashboard with key metrics (qty/value/payment/expiry alerts), Local Order tracking grouped by batch with status workflow (pending→preparing→delivering→delivered→invoiced→paid), document management (SST/contract/bond/LO/submissions grouped by type), 3 reports (summary/batch completion/payment status). AI-powered LO PDF import via Claude API (pdf.js renders → Claude Vision extracts fields → editable preview → batch save). Under TG Agribusiness, Projects Monitoring category. 3 DB tables (`tenders`, `tender_los`, `tender_documents`) + `app_config` for API key storage. Supabase storage bucket: `tender-documents`.
+10. **Oil Palm Growth** (`oilpalmgrowth.html` + `oilpalmgrowth.css`) — Procurement → planting → main nursery → ready-for-sale. 7-stage lifecycle (Ordered → Received → PN → MN → Selling → Sold Out → Closed). Supplier directory, single-payment per batch, 5 fixed document slots (proforma, K3 chit, airwaybill, official invoice, phyto cert), event-based count tracking (plant, transplant, mid-MN cull). Auto sold_out flip when available=0. Under TG Agribusiness. Built 2026-05-08.
+11. **Oil Palm Sales** (`oilpalmsales.html` + `oilpalmsales.css`) — Bookings, walk-ins, L3.1 collections, customer management. 50% bookable cap (soft warning), no zero-deposit bookings, payment-controlled collection cap (`floor(paid/price) - collected`), L3.1 form# system-wide unique block, batch_id swap reassignment (zero-collections only), two-stage cancellation (cancel immediately frees qty, refund stays pending until finance updates). Walk-in flow skips booking entirely. Booking slip print + WhatsApp share. Under TG Agribusiness. Replaced legacy `seedlings.html`. Built 2026-05-08.
+12. **Tender Monitoring** (`tender.html` + `tender.css`) — Government tender tracking for LPNM pineapple sucker supply contracts. Dashboard with key metrics (qty/value/payment/expiry alerts), Local Order tracking grouped by batch with status workflow (pending→preparing→delivering→delivered→invoiced→paid), document management (SST/contract/bond/LO/submissions grouped by type), 3 reports (summary/batch completion/payment status). AI-powered LO PDF import via Claude API (pdf.js renders → Claude Vision extracts fields → editable preview → batch save). Under TG Agribusiness, Projects Monitoring category. 3 DB tables (`tenders`, `tender_los`, `tender_documents`) + `app_config` for API key storage. Supabase storage bucket: `tender-documents`.
 
 ## Architecture — Growth Data Flow
 
@@ -346,29 +348,46 @@ DB values → Display labels: `pending` → "Order Received", `preparing` → "P
 - Phase 1 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase1.md`
 - Phase 2 plan: `docs/superpowers/plans/2026-03-21-sales-module-phase2.md`
 
-## Seedlings Module — Architecture
+## Oil Palm Modules — Architecture
+Built 2026-05-08 to replace the legacy `seedlings.html` monolith. Two HTML files share one schema:
+- **`oilpalmgrowth.html`** — Procurement → planting → MN → ready-for-sale (supply pipeline)
+- **`oilpalmsales.html`** — Bookings, walk-ins, L3.1 collections (customer-facing)
 
-### Tables (7)
-| Table | Purpose |
-|-------|---------|
-| `seedling_suppliers` | Seed producers (IOI, FELDA, Sawit Kinabalu, etc.) |
-| `seedling_batches` | Seed batches — lifecycle from planting to sold out, allocation tracking |
-| `seedling_batch_events` | Inventory events: transplant, cull, doubleton gain, adjustment |
-| `seedling_customers` | Seedling buyers — estates, smallholders, agents. Cross-company link to `sales_customers` |
-| `seedling_bookings` | Customer reservations with deposit/payment/collection tracking |
-| `seedling_payments` | Payment records for deposits, top-ups, collection payments |
-| `seedling_collections` | Collection events — each = one L3.1 certificate issued |
+### Tables (7, all `oilpalm_*`)
+| Table | Has company_id | Purpose |
+|-------|---|---------|
+| `oilpalm_suppliers` | yes | Seed producers (CRUD in Growth) |
+| `oilpalm_batches` | yes | One row per procurement; tracks 7-stage lifecycle, qty, prices, dates, payment, 5 doc URLs |
+| `oilpalm_batch_events` | **no** | Count events: `plant`, `transplant`, `cull` (deltas with reasons) |
+| `oilpalm_customers` | yes | `customer_type` enum: `booking` / `walkin`. Standalone (no cross-link to `sales_customers`) |
+| `oilpalm_bookings` | yes | Bookings (NOT used for walk-ins). `reassignment_history` JSONB log. `refund_*` fields for two-stage cancellation |
+| `oilpalm_payments` | **no** | Payments tied to `booking_id` OR `collection_id` (CHECK ensures one) |
+| `oilpalm_collections` | yes | Every L3.1 issuance. `booking_id` nullable (null = walk-in). `batch_id` denormalized at collection time (locks to issuing batch — survives reassignments). UNIQUE on `l3_form_no` (system-wide dup block) |
 
-### Batch Lifecycle
-`pre_nursery` → `main_nursery` (transplant at ~4 months) → `selling` (manual, 10+ months) → `sold_out` (auto when available = 0) → `closed` (manual)
+Varieties: shared `crop_varieties` filtered by Oil Palm crop_id (managed via Farm Configuration). Oil Palm crop seeded with one default variety `DxP`.
+
+### Lifecycle (7 stages, on `oilpalm_batches.status`)
+`Ordered` → `Received` → `Pre-Nursery` → `Main Nursery` → `Selling` → `Sold Out` → `Closed`
+
+Transitions:
+- **Ordered → Received**: filling `actual_delivery_date` in Procurement section flips it (one-way idempotent — clearing the date does NOT reverse).
+- **Received → Pre-Nursery**: supervisor records Plant event (seeds_received − seeds_damaged = qty_planted).
+- **PN → MN**: supervisor records Transplant event (qty_planted − culls + multi-germination_extras = qty_mn_start).
+- **MN → Selling**: manual button "Mark as Selling" + prompt for `default_price`.
+- **Selling → Sold Out**: auto when computed `Available = 0`. Helper `autoFlipSoldOut()` runs in Growth init + after each collection insert in Sales.
+- **Any → Closed**: manual "Close Batch" button. Remaining MN qty becomes a final `cull` event with reason "Batch closed — leftover".
 
 ### Key Business Rules
-- **Allocation**: default 50% of seeds = bookable cap (configurable per batch)
-- **Payment-controlled collection**: customer can only collect `floor(total_paid / price) - total_collected`
-- **L3.1**: one per collection, pre-printed serial from MPOB booklet, system tracks usage
-- **Doubletons/tripletons**: split and kept, increase count above seeds planted
-- **MN only**: no pre-nursery sales, minimum 10 months
-- **Pricing**: default per batch, overridable per booking
+- **Bookings allowed from Pre-Nursery onwards** (after planting). Pre-PN stages hidden from sales pickers.
+- **50% bookable cap** (per-batch, configurable via `bookable_pct`, default 50). Exceeding shows warning + override confirmation.
+- **No zero-deposit bookings** — initial payment must be > 0.
+- **Walk-ins skip booking entirely** — direct customer + collection + payment, no booking row.
+- **Collections only in `selling` stage** — even if booking exists earlier.
+- **Payment-controlled collection cap**: `max_collectable = floor(total_paid / unit_price) - already_collected`. Enforced before save with friendly error.
+- **L3.1 form# unique system-wide** — UNIQUE index + pre-flight check before save.
+- **Reassignment** (`zero collections only`): batch_id swap on `oilpalm_bookings`. Past collections stay tagged to old batch via denormalized `batch_id`. History logged in `reassignment_history` JSONB.
+- **Cancellation two-stage**: Cancel button releases reserved qty immediately + sets `refund_status='pending'` with auto-calc `refund_owed = paid - (collected × unit_price)`. Finance later opens Mark Refund Paid modal to record actual amount + slip + date → `refund_status='paid'`. Forfeit path: `refund_status='forfeited'` if owed=0.
+- **Pricing**: per-batch default (`oilpalm_batches.default_price`), overridable per booking. Reassignment offers "keep original" (default) or "use new batch's default".
 
 ### Company Addresses
 - **Office** (booking slips): Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak
@@ -378,30 +397,45 @@ DB values → Display labels: `pending` → "Order Received", `preparing` → "P
 ### ID Prefixes (company code AB-)
 | Entity | Prefix | Example |
 |--------|--------|---------|
-| Supplier | SS | AB-SS001 |
-| Batch | SB | AB-SB001 |
-| Batch Event | SE | AB-SE001 |
-| Customer | SC | AB-SC001 |
-| Booking | BK | AB-BK001 |
-| Payment | SP | AB-SP001 |
-| Collection | CL | AB-CL001 |
+| Supplier | OS | AB-OS001 |
+| Batch | OB | AB-OB001 |
+| Batch Event | OE | AB-OE001 |
+| Customer | OC | AB-OC001 |
+| Booking | OK | AB-OK001 |
+| Payment | OP | AB-OP001 |
+| Collection (L3.1) | OL | AB-OL001 |
 
-Batch display number is separate: `1-2026`, `2-2026` (sequential within year).
+Batch display number is separate: `1-2026`, `2-2026` (sequential within year, free-text on `batch_number`).
 
-### Sidebar Tabs (6)
-Batches, Bookings, Collections, Customers, Suppliers, Reports
+### Sidebar Tabs
+- **Growth** (3): Batches · Suppliers · Reports
+- **Sales** (5): Summary · Bookings · Collections · Customers · Reports
 
-### Reports (3)
-1. **MPOB Monthly**: seeds planted, transplanted, culled, doubletons, sold (with L3.1), balance
-2. **Batch Summary**: all batches with full qty breakdown + totals
-3. **Cash Flow Projection**: monthly booking payments + cash sales + projected due
+### Reports (Phase 4 — currently stubbed; planned)
+**Growth**: Procurement Summary · Batch Lifecycle.
+**Sales**: MPOB Monthly · Sales Summary · Outstanding Balances · Cash Flow Projection.
 
-### Booking Slip
-Printable/shareable document — office address header, items table, deposit/balance, customer contact, batch/variety, expected ready date, T&C (3 terms), signature lines. Print + WhatsApp share.
+### Storage
+Bucket `oilpalm-photos` (public, no MIME allowlist — supports PDF + images, 10MB cap). Paths:
+- `procurement/{batch_id}/proforma|k3_chit|airwaybill|official_invoice|phyto_cert.<ext>`
+- `procurement/{batch_id}/payment-slip.<ext>`
+- `payments/{booking_id}/{payment_id}.<ext>` (booking-tied payment slips)
+- `payments/walkin/{collection_id}.<ext>` (walk-in payment slips)
+- `collections/{collection_id}/l3.<ext>` + `seedlings.<ext>` (L3.1 form + collection photos)
+- `refunds/{booking_id}/slip.<ext>`
+
+**RLS for storage**: bucket needs explicit `storage.objects` policy `oilpalm_photos_all FOR ALL USING (bucket_id = 'oilpalm-photos')`. Without this, anon role gets 400 on uploads even though `public: true` is set on the bucket (that flag only affects READ).
+
+### Booking Slip (Sales)
+Printable A4 — TG Agribusiness Sdn Bhd letterhead with office address, BOOKING ORDER title, customer block, items table, totals (Total/Paid/Balance), Expected Ready Date (= date_planted + 10 months), 3-term T&C, signature lines, footer note. Print button + WhatsApp share via html2canvas + Web Share API (file fallback for unsupported browsers).
+
+### Migration
+- `supabase/oilpalm_migration.sql` (327 lines) — drops 7 legacy `seedling_*` tables CASCADE, creates 7 new `oilpalm_*` tables + indexes + triggers + 56 RLS policies. id_counters NOT seeded (legacy table doesn't have `company_id` column — counters auto-create on first `next_id()` call with prefix like `AB-OB`).
+- Storage migration: dropped `seedling-photos` bucket, created `oilpalm-photos` (separate REST call via Supabase Storage API).
 
 ### Design Docs
-- Spec: `docs/superpowers/specs/2026-04-09-seedlings-module-design.md`
-- Plan: `docs/superpowers/plans/2026-04-09-seedlings-module-plan.md`
+- Plan: `docs/superpowers/plans/2026-05-08-oilpalm-modules-plan.md`
+- Spec: skipped per user preference (`feedback_skip_spec_doc.md`) — design walked through brainstorming skill section-by-section before plan.
 
 ## Tender Monitoring Module — Architecture
 
@@ -431,7 +465,7 @@ Each transition prompts for relevant fields: delivering/delivered→DO number+da
 
 ### Hub Category Banners (TG Agribusiness)
 Modules grouped under 3 banners via `MODULE_CATEGORIES` in index.html:
-- **Operations**: Pineapple Spray, Pineapple Growth, Oil Palm Sales, Oil Palm Growth (coming soon), Inventory
+- **Operations**: Pineapple Spray, Pineapple Growth, Oil Palm Sales, Oil Palm Growth, Inventory
 - **Management**: Worker Management, Staff Claims (coming soon)
 - **Projects Monitoring**: Tender
 
@@ -500,7 +534,6 @@ Everything lives in one repo, one Netlify site, one Supabase project, one domain
 - [ ] **`display-spray.html`** — TV display for Spray Tracker (KIV, needs spec)
 - [x] **Seedlings Module** (`seedlings.html`) — Batch lifecycle, booking/collection, L3.1 tracking, MPOB monthly reports, cash flow projection, booking slips (2026-04-10)
 - [x] **Tender Monitoring** (`tender.html`) — Government tender tracking, LO workflow, document management, AI PDF import (2026-04-10)
-- [ ] **Oil Palm Seedlings Growth** — Monitor seedling growth stages and nursery health (coming soon)
 - [ ] **Staff Claims** — Personal expense claims, approvals, reimbursement tracking (coming soon)
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
@@ -792,3 +825,43 @@ Pre-existing footgun: CS / DO numbers were generated at `soSaveOrder` CREATE bra
 - **Counter waste eliminated going forward**: cancelled-before-completion orders no longer consume a CS/DO counter. Sequential CS sequence stays clean. Counters are now real receipt counters, not order counters.
 - **What's UNTOUCHED** (verified via grep): all status-workflow code (Start Preparing, Mark Prepared, etc), payment recording (`invPaySave` + the in-detail Record Payment flows), returns/CN flow, invoicing tab (only pulls completed DOs which by definition have doc_numbers), reports (filter by `status='completed'`), customer detail "All Orders" (mixes pending which now show SO id — fine), display-sales TV (uses `doc_number || id` already), `soGenerateDoc(orderId)` (called immediately after each completion path's UPDATE, by which point doc_number is committed). No regression risk to active money flows.
 - **Audit-style verification before deploy**: 16-check Node script confirmed all edits applied (helper + 4 completion paths wired + WhatsApp + DRAFT banner + lock + wizard guard + display hint). Live-verified on tgfarmhub.com after deploy via `curl | grep` for the new symbols (8 hits in sales.html, 1 in delivery.html — matches expected). No spec doc per `feedback_skip_spec_doc.md`; brainstorming skill walked through 8 sections to user approval before TaskCreate + build.
+
+
+## Oil Palm Modules Rebuild (2026-05-08)
+Replaced legacy `seedlings.html` (built 2026-04-10) with two focused modules sharing one schema. Single session, ~32 commits, ~3 hours. Subagent-driven implementation per the plan at `docs/superpowers/plans/2026-05-08-oilpalm-modules-plan.md` (3,133 lines). Schema, lifecycle, and design rules in the new "Oil Palm Modules — Architecture" section above. This entry captures the build process + lessons.
+
+### What shipped
+- **Phase 0 — Migration & Setup**: `oilpalm_migration.sql` (drops 7 `seedling_*` empty tables CASCADE → creates 7 `oilpalm_*` tables + 16 indexes + 4 triggers + 56 RLS policies). New storage bucket `oilpalm-photos` (public, no MIME allowlist for PDF support, 10MB cap). Plus a critical `storage.objects` policy `oilpalm_photos_all FOR ALL USING (bucket_id = oilpalm-photos)` — the bucket-level `public: true` flag only governs READ; WRITE needs explicit RLS. Without this policy, anon uploads fail with HTTP 400 (caught after deploy when user tried to attach a payment slip).
+- **Phase 1 — Growth module** (`oilpalmgrowth.html` + `oilpalmgrowth.css`): suppliers CRUD (Add/Edit/Deactivate); batches list with stage/supplier/variety filters; new-batch modal; batch detail page (single-page data sheet, NOT wizard) with 6 sections — header band (with auto-calc Ready Date = date_planted + 10 months), procurement, single-payment, 5 fixed document slots (proforma/K3/AWB/invoice/phyto), receipt+plant event, transplant event, mid-MN cull section, Mark Selling + Close Batch transitions. `autoFlipSoldOut()` runs in init.
+- **Phase 3 — Sales module** (`oilpalmsales.html` + `oilpalmsales.css`): customers CRUD with intl-tel-input (E.164 phone storage); summary dashboard (5 cards + per-batch table — initially "selling-only" but user requested ALL batches with stage column, shipped same session); bookings list with status filter (active/partial/completed/cancelled/refund pending/refund done); new-booking modal with inline new-customer flow + 50% cap soft-warn override + atomic payment-first save; booking detail page (data sheet); record-collection modal with L3.1 dup check + payment-controlled cap guardrail + atomic photo+payment+collection insert; reassign + cancel + mark-refund-paid flows; walk-in sale modal (one-shot customer + collection + payment, no booking row); collections tab (unified booking + walk-in list with date range/batch/type/customer filters + detail modal with photo thumbnails); A4 booking slip with print + WhatsApp share via html2canvas + Web Share API.
+- **Hub wiring**: Replaced `oilpalmseedling` MODULES entry with `oilpalmsales` (re-pointed to `oilpalmsales.html`). New `oilpalmgrowth` MODULES entry. Both under TG Agribusiness > Operations. Updated `MODULE_COMPANY` in shared.js. Deleted `seedlings.html` + `seedlings.css` + `supabase/seedlings_migration.sql` from repo (preserved in git history).
+- **Reports** (Phase 2 + Phase 4): NOT shipped — currently stubbed in both modules. 6 planned (2 Growth + 4 Sales). Deferred to follow-up session.
+
+### Plan-vs-codebase gotchas (every implementer subagent caught these — flag for future modules)
+The plan was written in isolation against design notes; the codebase has accumulated patterns the plan didn't respect. Each subagent had to deviate from the literal plan code to make it work. Lessons:
+1. **`SUPABASE_URL` / `SUPABASE_KEY` / `sb` are GLOBALS from shared.js.** New modules MUST NOT redeclare them. The plan included `const SUPABASE_URL = "..."` per-page; copy-pasted, this throws `SyntaxError: Identifier already declared` and the entire `<script>` block dies — page renders with sidebar but every onclick is undefined (silently). **First-time symptom**: clicks don't register, console shows the SyntaxError. The fix: delete the redeclaration block, rely on the global.
+2. **Layout MUST be wrapped in `<div id="app">`.** `shared.css:52` defines `#app { display: flex; height: 100vh }`. Without this wrapper, sidebar + main don't lay out side-by-side and `body { overflow: hidden }` clips the main pane off-screen. Sidebar appears but the right side is blank cream — clicks on the sidebar may still work but content area is empty.
+3. **Sidebar uses `.nav-item` divs with SVG icons, NOT `.tab-btn` buttons.** shared.css has zero rules for `.tab-btn`. Pattern from `tender.html`: `<div class="nav-item" data-page="X" onclick="switchTab(X)"><svg>...</svg><span class="nav-label">...</span></div>` inside `<nav class="sidebar-nav">`. Then `<main class="main-content" id="main-content">` (NOT `class="content"`) with `.page` panes (NOT `.tab-pane`) — `.page { display:none } .page.active { display:block }`.
+4. **`fmtDateDM()` is sales.html-internal** — does NOT exist in shared.js. Use `fmtDate()` (DD/MM/YY) or `fmtDateLong()`.
+5. **`showModal(html, overlayId)` is module-local, not shared.** Each new module needs its own copy of the helper that injects into `#modal-host` and delegates to shared.js's `openModal(id)` for focus-trap. Always pass a unique overlay ID per modal type. `closeModal(id)` requires the explicit overlay ID arg — calling `closeModal()` no-ops silently.
+6. **`confirmAction(title, message, onConfirm, danger)` is callback-based, NOT Promise-based.** Some plan code pattern-matches against a Promise (`if (await confirmAction(...))`) — that always evaluates falsy. Use the callback form.
+7. **`esc()` does NOT escape double quotes** — only `<>&`. For HTML attribute values containing user-controlled strings, either use data attributes + event delegation, or `.replace(/"/g, "&quot;")` after `esc()`.
+8. **`sbMutate(queryFn)` expects a THUNK; `sbQuery(queryPromise)` accepts the builder directly.** Asymmetric API in shared.js — every implementer subagent passed the builder to `sbMutate` (mirroring `sbQuery`) which threw `TypeError: queryFn is not a function` at runtime. Caught only when user tried to save a supplier — 34 calls across both modules had to be wrapped post-hoc with a regex script. **Going forward**: every `sbMutate(sb.from(...).insert(...).select())` must be `sbMutate(() => sb.from(...).insert(...).select())`.
+9. **`id_counters` table has no `company_id` column.** Convention: prefix is `AB-OS`, `AF-SO`, etc. (company code embedded in the prefix string). The plan attempted `INSERT INTO id_counters (company_id, prefix, last_number) VALUES ...` which 400-errors. Fix: don't seed counter rows in migrations — `next_id(prefix, company_code)` lazy-creates them on first call. Same applies to other no-company_id tables: `payroll_entries`, `pnd_blocks`, `crop_varieties`, etc. (full list documented above in this CLAUDE.md).
+10. **The 5-doc-slot pattern uses `<input type="file" hidden>` triggered by a button**, with display showing "PDF ↗" or "Image ↗" link based on URL extension. Don't show the raw file input.
+
+### Lessons specific to this session (worth keeping in memory)
+- **When user reports "page broken" / "nothing clickable", the FIRST diagnostic move is browser DevTools Console.** Multiple guess-fixes (offline banner, layout wrapper, sidebar pattern) wasted ~20 minutes before asking the user to screenshot the console — which immediately revealed the SUPABASE_URL SyntaxError. Patterns like the 4-fix detour today should not happen again.
+- **Subagent-driven implementation works well for repetitive UI tasks** (suppliers CRUD, bookings list, etc.) but the plan must include codebase gotchas explicitly per task. Without them, every subagent rediscovers the same 9 issues. Solution: maintain a "codebase gotchas" appendix in plans that get included verbatim in every subagent prompt.
+- **Plan inaccuracies are systemic, not random**. The plan-writer (me) should have verified each assumed shared.js helper / CSS class / DB column existed before pasting plan code. Better workflow: read shared.js + a representative existing module (`tender.html`) BEFORE writing the plan, not after subagents fail.
+- **Subagents can self-flag legitimate fixes**. Multiple implementer reports during this session correctly identified plan bugs and adapted (e.g., callback-vs-Promise on `confirmAction`, `esc()` quote escaping). The two-stage-review pattern from `subagent-driven-development` skill was streamlined to "implementer + my spot-check" without spec/code-quality reviewer subagents — appropriate for static-HTML codebase with no test framework.
+
+### What user verified during the session
+Added an Oil Palm crop + DxP variety to `crop_varieties` (precondition for the Growth module batch creation). Added one supplier. Smoke-tested the full new-booking + record-collection flow. Confirmed working post-fixes: SUPABASE_URL redecl, layout wrapper, sbMutate thunks, storage RLS, customer-id null guard.
+
+### Future work
+- Phase 2 (Growth Reports): Procurement Summary + Batch Lifecycle
+- Phase 4 (Sales Reports): MPOB Monthly + Sales Summary + Outstanding Balances + Cash Flow Projection
+- Permissions wiring on hub (currently every entry is admin-only by default — needs `perm` keys exposed in User Management UI for non-admins)
+- New Oil Palm Growth icon (still using a placeholder; could generate via Gemini Flash with the same 3D clay style used for the rest of the icon set)
+- "Manage Varieties" affordance in Sales/Growth (currently lives in Farm Configuration only — works but requires hub navigation)
