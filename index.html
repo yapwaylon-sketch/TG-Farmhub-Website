@@ -927,31 +927,64 @@ async function loadCompanyOverview() {
   var container = document.getElementById('company-overview-cards');
   if (!container) return;
 
-  var [ordersAF, workersAB, jobsAB] = await Promise.all([
-    // Excludes cancelled orders. Revenue counts all non-cancelled; Outstanding is
-    // completed-only (matches Customer Detail page convention) so pipeline orders
-    // (pending/preparing/prepared/delivering) don't inflate AR.
-    sbQuery(sb.from('sales_orders').select('id,status,grand_total,amount_paid,payment_status').eq('company_id', 'tg_agro_fruits').neq('status', 'cancelled')),
+  var [ordersAF, invoicesAF, workersAB, jobsAB] = await Promise.all([
+    // Completed orders only (matches "sales" semantics — revenue is realized at completion).
+    // completed_at drives month bucketing; doc_type distinguishes CS from DO for outstanding.
+    sbQuery(sb.from('sales_orders').select('id,status,doc_type,grand_total,amount_paid,payment_status,completed_at').eq('company_id', 'tg_agro_fruits').eq('status', 'completed')),
+    // Issued invoices for INV outstanding. Drafts excluded (not yet billed to customer).
+    sbQuery(sb.from('sales_invoices').select('id,status,grand_total,credit_total,amount_paid,payment_status').eq('company_id', 'tg_agro_fruits').eq('status', 'issued')),
     sbQuery(sb.from('workers').select('id').eq('company_id', 'tg_agribusiness').eq('active', true)),
     sbQuery(sb.from('pnd_jobs').select('id').eq('company_id', 'tg_agribusiness').eq('status', 'active'))
   ]);
 
   var afOrders = ordersAF || [];
-  var afRevenue = afOrders.reduce(function(sum, o) { return sum + (parseFloat(o.grand_total) || 0); }, 0);
-  var afOutstanding = afOrders
-    .filter(function(o) { return o.status === 'completed' && o.payment_status !== 'paid'; })
+  var afInvoices = invoicesAF || [];
+
+  // Month boundaries (local time)
+  var now = new Date();
+  var curYear = now.getFullYear();
+  var curMonth = now.getMonth(); // 0-indexed
+  var lastMonthDate = new Date(curYear, curMonth - 1, 1);
+  var lastYear = lastMonthDate.getFullYear();
+  var lastMonth = lastMonthDate.getMonth();
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function orderMonth(o) {
+    if (!o.completed_at) return null;
+    var d = new Date(o.completed_at);
+    return { y: d.getFullYear(), m: d.getMonth() };
+  }
+
+  var afLifetime = 0, afCurMonth = 0, afLastMonth = 0;
+  afOrders.forEach(function(o) {
+    var amt = parseFloat(o.grand_total) || 0;
+    afLifetime += amt;
+    var bucket = orderMonth(o);
+    if (!bucket) return;
+    if (bucket.y === curYear && bucket.m === curMonth) afCurMonth += amt;
+    else if (bucket.y === lastYear && bucket.m === lastMonth) afLastMonth += amt;
+  });
+
+  // Outstanding = unpaid CS balance + unpaid issued-invoice balance
+  var afCSOutstanding = afOrders
+    .filter(function(o) { return o.doc_type !== 'delivery_order' && o.payment_status !== 'paid'; })
     .reduce(function(sum, o) {
-      var grand = parseFloat(o.grand_total) || 0;
-      var paid = parseFloat(o.amount_paid) || 0;
-      return sum + Math.max(0, grand - paid);
+      return sum + Math.max(0, (parseFloat(o.grand_total) || 0) - (parseFloat(o.amount_paid) || 0));
     }, 0);
+  var afInvOutstanding = afInvoices
+    .filter(function(i) { return i.payment_status !== 'paid'; })
+    .reduce(function(sum, i) {
+      return sum + Math.max(0, (parseFloat(i.grand_total) || 0) - (parseFloat(i.credit_total) || 0) - (parseFloat(i.amount_paid) || 0));
+    }, 0);
+  var afOutstanding = afCSOutstanding + afInvOutstanding;
 
   container.innerHTML =
     '<div style="background:var(--bg-card);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
       '<div style="font-weight:700;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><img src="assets/logo.png?v=2" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;"> TG Agro Fruits</div>' +
-      '<div style="font-size:13px;color:var(--text-muted);">Orders: <b style="color:var(--text);">' + afOrders.length + '</b></div>' +
-      '<div style="font-size:13px;color:var(--text-muted);">Revenue: <b style="color:var(--text);">RM ' + afRevenue.toFixed(2) + '</b></div>' +
-      '<div style="font-size:13px;color:var(--text-muted);">Outstanding: <b style="color:var(--gold);">RM ' + afOutstanding.toFixed(2) + '</b></div>' +
+      '<div style="font-size:13px;color:var(--text-muted);">Lifetime Sales: <b style="color:var(--text);">' + formatRM(afLifetime) + '</b></div>' +
+      '<div style="font-size:13px;color:var(--text-muted);">' + monthNames[lastMonth] + ' Sales: <b style="color:var(--text);">' + formatRM(afLastMonth) + '</b></div>' +
+      '<div style="font-size:13px;color:var(--text-muted);">' + monthNames[curMonth] + ' Sales: <b style="color:var(--text);">' + formatRM(afCurMonth) + '</b></div>' +
+      '<div style="font-size:13px;color:var(--text-muted);">Total Outstanding (CS + INV): <b style="color:var(--gold);">' + formatRM(afOutstanding) + '</b></div>' +
     '</div>' +
     '<div style="background:var(--bg-card);border-radius:10px;padding:16px;border:1px solid var(--border);">' +
       '<div style="font-weight:700;color:var(--green);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><img src="assets/logo-agribusiness.png" alt="" style="width:22px;height:22px;object-fit:contain;border-radius:4px;"> TG Agribusiness</div>' +
