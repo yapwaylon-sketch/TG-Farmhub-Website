@@ -131,6 +131,18 @@ body { height: auto; min-height: 100vh; overflow: auto; }
   border-bottom: 1px solid var(--border); margin-bottom: 16px;
 }
 .module-category-banner:first-child { margin-top: 0; }
+.module-subgroup-banner {
+  font-size: 11px; font-weight: 700; color: var(--purple);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 0; margin: -4px 0 12px 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.module-subgroup-banner::before {
+  content: ""; width: 12px; height: 1px; background: var(--purple); opacity: 0.4;
+}
+.module-subgroup-banner::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
 .module-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
   padding: 28px 24px; cursor: pointer; transition: all 0.25s;

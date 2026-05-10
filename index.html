@@ -290,7 +290,17 @@
 // MODULE DEFINITIONS — add new modules here in the future
 // ============================================================
 const MODULE_CATEGORIES = {
-  operations: { label: "Operations", order: 1 },
+  operations: {
+    label: "Operations",
+    order: 1,
+    // Sub-groups inside Operations. Order here drives render order.
+    // Each module assigned to a group via its `group` field below.
+    groups: [
+      { key: "pineapple", label: "Pineapple" },
+      { key: "oilpalm",   label: "Oil Palm" },
+      { key: "inventory", label: "Inventory" }
+    ]
+  },
   management: { label: "Management", order: 2 },
   projects: { label: "Projects Monitoring", order: 3 }
 };
@@ -320,6 +330,7 @@ const MODULES = [
     icon: "🌿",
     iconImg: "icons/modules/spray-tracker.png",
     category: "operations",
+    group: "pineapple",
     desc: "Log and manage fungicide & pesticide spray applications across all farm blocks",
     url: "spraytracker.html",
     active: true,
@@ -335,6 +346,7 @@ const MODULES = [
     icon: "🌱",
     iconImg: "icons/modules/growth-tracker.png",
     category: "operations",
+    group: "pineapple",
     desc: "Monitor block growth, induction schedules, and harvest planning",
     url: "growthtracker.html",
     active: true,
@@ -370,11 +382,29 @@ const MODULES = [
     ]
   },
   {
+    key: "oilpalmgrowth",
+    name: "Oil Palm Growth",
+    icon: "🌴",
+    category: "operations",
+    group: "oilpalm",
+    desc: "Procurement, planting, main nursery — supply pipeline for Oil Palm Sales",
+    url: "oilpalmgrowth.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View batches" },
+      { key: "editBatch", label: "Create / edit batches" },
+      { key: "manageSuppliers", label: "Manage suppliers" },
+      { key: "recordCounts", label: "Record planting / transplant / cull counts" },
+      { key: "markStage", label: "Advance stage (Selling / Close)" },
+    ]
+  },
+  {
     key: "oilpalmsales",
     name: "Oil Palm Sales",
     icon: "🌴",
     iconImg: "icons/modules/seedlings.png",
     category: "operations",
+    group: "oilpalm",
     desc: "Bookings, walk-in sales, L3.1 collections, and customer management",
     url: "oilpalmsales.html",
     active: true,
@@ -388,27 +418,12 @@ const MODULES = [
     ]
   },
   {
-    key: "oilpalmgrowth",
-    name: "Oil Palm Growth",
-    icon: "🌴",
-    category: "operations",
-    desc: "Procurement, planting, main nursery — supply pipeline for Oil Palm Sales",
-    url: "oilpalmgrowth.html",
-    active: true,
-    permissions: [
-      { key: "view", label: "View batches" },
-      { key: "editBatch", label: "Create / edit batches" },
-      { key: "manageSuppliers", label: "Manage suppliers" },
-      { key: "recordCounts", label: "Record planting / transplant / cull counts" },
-      { key: "markStage", label: "Advance stage (Selling / Close)" },
-    ]
-  },
-  {
     key: "inventory",
     name: "Inventory",
     icon: "📦",
     iconImg: "icons/modules/inventory.png",
     category: "operations",
+    group: "inventory",
     desc: "Track farm inputs — stock in, stock out, suppliers, reports, and stock checks",
     url: "inventory.html",
     active: true,
@@ -928,16 +943,33 @@ function renderModuleCards() {
     return;
   }
 
-  // Group by category, maintaining defined order within Operations:
-  // pineapple spray, pineapple growth, inventory, oil palm sales, oil palm growth
+  // Group by category. Operations also has nested sub-groups (Pineapple, Oil
+  // Palm, Inventory) defined via MODULE_CATEGORIES.operations.groups; each
+  // module is tagged with its `group` key.
   const catOrder = Object.keys(MODULE_CATEGORIES).sort((a, b) => MODULE_CATEGORIES[a].order - MODULE_CATEGORIES[b].order);
   let html = "";
   catOrder.forEach(cat => {
     const catModules = visible.filter(m => m.category === cat);
     if (!catModules.length) return;
-    const label = MODULE_CATEGORIES[cat].label;
-    html += '<div class="module-category-banner">' + label + '</div>';
-    html += '<div class="module-grid-inner">' + catModules.map(m => renderModuleCard(m)).join("") + '</div>';
+    const catConf = MODULE_CATEGORIES[cat];
+    html += '<div class="module-category-banner">' + catConf.label + '</div>';
+
+    if (catConf.groups && catConf.groups.length) {
+      // Sub-grouped: render each sub-banner + its modules in defined order
+      catConf.groups.forEach(g => {
+        const groupModules = catModules.filter(m => m.group === g.key);
+        if (!groupModules.length) return;
+        html += '<div class="module-subgroup-banner">' + g.label + '</div>';
+        html += '<div class="module-grid-inner">' + groupModules.map(m => renderModuleCard(m)).join("") + '</div>';
+      });
+      // Modules in this category that don't have a group — fallback at the bottom
+      const ungrouped = catModules.filter(m => !m.group);
+      if (ungrouped.length) {
+        html += '<div class="module-grid-inner">' + ungrouped.map(m => renderModuleCard(m)).join("") + '</div>';
+      }
+    } else {
+      html += '<div class="module-grid-inner">' + catModules.map(m => renderModuleCard(m)).join("") + '</div>';
+    }
   });
 
   // Uncategorized modules (shouldn't happen for Agribusiness, but safety)
