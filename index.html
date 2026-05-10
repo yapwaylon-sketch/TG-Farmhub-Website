@@ -325,6 +325,21 @@ const MODULES = [
     ]
   },
   {
+    key: "growthtracker",
+    name: "Pineapple Growth",
+    icon: "🌱",
+    iconImg: "icons/modules/growth-tracker.png",
+    category: "operations",
+    group: "pineapple",
+    desc: "Monitor block growth, induction schedules, and harvest planning",
+    url: "growthtracker.html",
+    active: true,
+    permissions: [
+      { key: "view", label: "View growth data & harvest schedules" },
+      { key: "manageGrowth", label: "Set induction dates & adjust harvest days" },
+    ]
+  },
+  {
     key: "spraytracker",
     name: "Pineapple Spray",
     icon: "🌿",
@@ -338,21 +353,6 @@ const MODULES = [
       { key: "view", label: "View spray logs & block status" },
       { key: "log", label: "Log completed spray applications" },
       { key: "manageProducts", label: "Add / edit spray products" },
-    ]
-  },
-  {
-    key: "growthtracker",
-    name: "Pineapple Growth",
-    icon: "🌱",
-    iconImg: "icons/modules/growth-tracker.png",
-    category: "operations",
-    group: "pineapple",
-    desc: "Monitor block growth, induction schedules, and harvest planning",
-    url: "growthtracker.html",
-    active: true,
-    permissions: [
-      { key: "view", label: "View growth data & harvest schedules" },
-      { key: "manageGrowth", label: "Set induction dates & adjust harvest days" },
     ]
   },
   {
@@ -396,6 +396,22 @@ const MODULES = [
       { key: "manageSuppliers", label: "Manage suppliers" },
       { key: "recordCounts", label: "Record planting / transplant / cull counts" },
       { key: "markStage", label: "Advance stage (Selling / Close)" },
+    ]
+  },
+  {
+    key: "oilpalmspray",
+    name: "Oil Palm Spray",
+    icon: "🌿",
+    iconImg: "icons/modules/spray-tracker.png",
+    category: "operations",
+    group: "oilpalm",
+    desc: "Log fungicide & pesticide spray applications across oil palm nursery and field",
+    url: null,
+    active: false,
+    permissions: [
+      { key: "view", label: "View spray logs" },
+      { key: "log", label: "Log completed spray applications" },
+      { key: "manageProducts", label: "Add / edit spray products" },
     ]
   },
   {
