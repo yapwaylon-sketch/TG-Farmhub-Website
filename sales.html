@@ -1445,7 +1445,8 @@ window.addEventListener('beforeunload', function(e) {
 
   await loadAllData();
   document.getElementById("tg-loading").style.display = "none";
-  renderCurrentTab();
+  // Default landing tab is Orders. switchTab handles class toggling, soEnterOrders, and renderCurrentTab.
+  switchTab('orders', true);
 })();
 
 // TAB SWITCHING
@@ -1495,12 +1496,12 @@ window.addEventListener('popstate', function(e) {
     }
     switchTab(e.state.tab, true);
   } else {
-    // No more history — stay on dashboard
-    switchTab('dashboard', true);
+    // No more history — stay on orders (the default landing tab)
+    switchTab('orders', true);
   }
 });
 // Set initial history state
-history.replaceState({ tab: 'dashboard' }, '', '#dashboard');
+history.replaceState({ tab: 'orders' }, '', '#orders');
 
 function renderCurrentTab() {
   switch(currentTab) {

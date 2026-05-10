@@ -608,6 +608,7 @@ async function doLogin() {
   if (user.forcePinUpdate) {
     openForcePinUpdate();
   } else {
+    if (tryRedirectToSales()) return;
     showHub();
   }
   startInactivityTimer();
@@ -718,6 +719,34 @@ async function doLogout() {
   localStorage.removeItem("tgfarmhub_user");
   await sb.auth.signOut().catch(() => {});
   location.reload();
+}
+
+// ============================================================
+// AUTO-REDIRECT TO SALES > ORDERS
+// ============================================================
+// Sends users with Sales access straight to sales.html (which now lands on
+// the Orders tab) when they "open" tgfarmhub.com — i.e. typed URL, bookmark,
+// or fresh tab. Internal navigation back to the hub (brand link from a module
+// page) is detected via same-origin document.referrer and skipped, so users
+// can still reach the hub when they click the back-to-hub button. Belt-and-
+// braces: ?hub=1 in the URL also bypasses (in case referrer is stripped).
+function tryRedirectToSales() {
+  if (!currentUser) return false;
+  // Explicit opt-out via URL: tgfarmhub.com/?hub=1
+  try { if (new URLSearchParams(location.search).has('hub')) return false; } catch(e) {}
+  // Came from another page on the same origin (e.g. brand link from sales.html)
+  if (document.referrer) {
+    try {
+      var ref = new URL(document.referrer);
+      if (ref.origin === location.origin) return false;
+    } catch(e) {}
+  }
+  // Permission gate: admin always passes; others need sales.view
+  var hasSales = currentUser.role === 'admin' ||
+    (currentUser.permissions && currentUser.permissions.sales && currentUser.permissions.sales.view);
+  if (!hasSales) return false;
+  window.location.replace('sales.html');
+  return true;
 }
 
 // ============================================================
@@ -1292,16 +1321,18 @@ async function init() {
     // Check for Google OAuth redirect first
     const oauthSuccess = await handleOAuthRedirect();
     if (oauthSuccess) {
-      showHub();
       startInactivityTimer();
+      if (tryRedirectToSales()) return;
+      showHub();
     } else if (tryRestoreSession()) {
       if (currentUser.forcePinUpdate) {
         currentUser = null;
         localStorage.removeItem("tgfarmhub_user");
         document.getElementById("login-screen").style.display = "flex";
       } else {
-        showHub();
         startInactivityTimer();
+        if (tryRedirectToSales()) return;
+        showHub();
       }
     } else {
       var tgl = document.getElementById("tg-loading"); if (tgl) tgl.remove();
