@@ -107,6 +107,7 @@
         </div>
       </div>
       <div class="stat-grid" id="worker-stats"></div>
+      <div id="worker-status-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px;"></div>
       <div class="card">
         <div style="display:flex;justify-content:flex-end;padding:0 4px 8px;">
           <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="toggleHiddenCols()">
@@ -470,7 +471,22 @@
     </div>
     <div class="form-row">
       <div class="form-field"><label>Join Date</label><input type="date" id="w-joindate"></div>
-      <div class="form-field"><label>Status</label><select id="w-status"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+      <div class="form-field"></div>
+    </div>
+    <div class="form-field" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:rgba(0,0,0,0.02);">
+      <label style="margin-bottom:8px;">Employment Status</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border);font-size:13px;">
+          <input type="radio" name="w-status" value="active" onchange="renderWorkerStatusFields()"> Active
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border);font-size:13px;">
+          <input type="radio" name="w-status" value="on_leave" onchange="renderWorkerStatusFields()"> On Leave
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;background:var(--bg-card);border:1px solid var(--border);font-size:13px;">
+          <input type="radio" name="w-status" value="departed" onchange="renderWorkerStatusFields()"> Departed
+        </label>
+      </div>
+      <div id="w-status-fields" style="margin-top:10px;"></div>
     </div>
     <div class="form-field"><label>Notes</label><textarea id="w-notes" rows="2" placeholder="Optional notes..."></textarea></div>
     <div class="modal-actions">
@@ -899,6 +915,7 @@ let taskUnits = [];
 let workerLoans = [];
 let loanRepayments = [];
 let employmentStints = [];
+let workerLeavePeriods = [];
 let salaryAdvances = [];
 let profileWorkerId = null;
 let workerSortCol = 'name';
@@ -1077,6 +1094,35 @@ function getWorkerLoanBalance(workerId) {
   return workerLoans.filter(l => l.worker_id === workerId && l.status === "active").reduce((s, l) => s + (parseFloat(l.balance) || 0), 0);
 }
 
+// === EMPLOYMENT STATUS HELPERS ===
+// employment_status defaults to 'active'. The DB sync trigger keeps `active`
+// boolean aligned, so existing .eq('active', true) callers across modules
+// keep working unchanged.
+function workerStatusOf(w) {
+  if (!w) return 'active';
+  return w.employment_status || (w.active ? 'active' : 'departed');
+}
+function workerStatusLabel(s) {
+  return s === 'active' ? 'Active' : s === 'on_leave' ? 'On Leave' : s === 'departed' ? 'Departed' : s;
+}
+function workerStatusBadgeClass(s) {
+  return s === 'active' ? 'badge-active' : s === 'on_leave' ? 'badge-leave' : 'badge-departed';
+}
+function workerDepartureLabel(t) {
+  return t === 'resigned' ? 'Resigned' : t === 'terminated' ? 'Terminated' : t === 'ran_away' ? 'Ran Away' : t === 'other' ? 'Other' : (t || '—');
+}
+function getWorkerOpenLeavePeriod(workerId) {
+  return workerLeavePeriods.find(p => p.worker_id === workerId && !p.end_date);
+}
+// Total debt at departure = ALL pending advances (any period) + active loan balance.
+// Used to populate bad_debt_writeoff_amount when marking departed.
+function getWorkerTotalDebt(workerId) {
+  var advTotal = salaryAdvances
+    .filter(a => a.worker_id === workerId && a.status === 'pending')
+    .reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  return roundMoney(advTotal + getWorkerLoanBalance(workerId));
+}
+
 function getWorkerPendingAdvances(workerId) {
   const pid = getCurrentPeriodId();
   return salaryAdvances.filter(a => a.worker_id === workerId && a.status === 'pending' && a.period_id === pid).reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
@@ -1116,7 +1162,9 @@ async function loadAllData() {
     return data || [];
   }
 
-  const [w, tt, rt, pp, wr, tu, wl, lr, es, sa, wdr] = await Promise.all([
+  // worker_leave_periods has no company_id (workers are shared across companies,
+  // see CLAUDE.md "Tables WITHOUT company_id"). Linked via worker FK.
+  const [w, tt, rt, pp, wr, tu, wl, lr, es, sa, wdr, wlp] = await Promise.all([
     safeLoad(sb.from("workers").select("*").eq("company_id", getCompanyId()).order("name")),
     safeLoad(sb.from("task_types").select("*").eq("company_id", getCompanyId()).order("sort_order")),
     safeLoad(sb.from("responsibility_types").select("*").eq("company_id", getCompanyId()).order("name")),
@@ -1128,10 +1176,11 @@ async function loadAllData() {
     safeLoad(sb.from("employment_stints").select("*").eq("company_id", getCompanyId()).order("start_date", { ascending: false })),
     safeLoad(sb.from("salary_advances").select("*").eq("company_id", getCompanyId()).order("date_given", { ascending: false })),
     safeLoad(sb.from("worker_default_responsibilities").select("*").eq("company_id", getCompanyId())),
+    safeLoad(sb.from("worker_leave_periods").select("*").order("start_date", { ascending: false })),
   ]);
   workers = w; taskTypes = tt; responsibilityTypes = rt; payrollPeriods = pp;
   workerRoles = wr; taskUnits = tu; workerLoans = wl; loanRepayments = lr; employmentStints = es;
-  salaryAdvances = sa; workerDefaultResps = wdr;
+  salaryAdvances = sa; workerDefaultResps = wdr; workerLeavePeriods = wlp;
   console.log("Data loaded:", { workers: workers.length, loans: workerLoans.length, stints: employmentStints.length, advances: salaryAdvances.length });
 }
 
@@ -1157,15 +1206,37 @@ function renderWorkerList() {
   if (titleEl) titleEl.textContent = "Workers Management — " + MONTH_NAMES[now.getMonth() + 1] + " " + now.getFullYear();
 
   const search = (document.getElementById("worker-search").value || "").toLowerCase();
-  var filtered = workers.filter(w => !search || w.name.toLowerCase().includes(search));
-  const active = workers.filter(w => w.active);
+  // Status filter pill state
+  if (typeof window.workerStatusFilter === 'undefined') window.workerStatusFilter = 'active';
+  var statusFilter = window.workerStatusFilter;
+  var filtered = workers.filter(function(w) {
+    if (search && !w.name.toLowerCase().includes(search)) return false;
+    if (statusFilter !== 'all' && workerStatusOf(w) !== statusFilter) return false;
+    return true;
+  });
 
-  // Sort — inactive workers always at bottom, then by selected column
+  // Counts (always computed from full workers list, not filtered)
+  var cActive = 0, cLeave = 0, cDeparted = 0, cTotal = workers.length;
+  var depBreakdown = { resigned: 0, terminated: 0, ran_away: 0, other: 0 };
+  var totalBadDebt = 0;
+  workers.forEach(function(w) {
+    var s = workerStatusOf(w);
+    if (s === 'active') cActive++;
+    else if (s === 'on_leave') cLeave++;
+    else if (s === 'departed') {
+      cDeparted++;
+      var t = w.departure_type || 'other';
+      if (depBreakdown[t] != null) depBreakdown[t]++;
+      totalBadDebt += parseFloat(w.bad_debt_writeoff_amount) || 0;
+    }
+  });
+
+  // Sort — non-active sink under active within the same filter view
   var dir = workerSortAsc ? 1 : -1;
   filtered.sort(function(a, b) {
-    // Inactive always at the bottom
-    if (a.active && !b.active) return -1;
-    if (!a.active && b.active) return 1;
+    var sa = workerStatusOf(a), sb_ = workerStatusOf(b);
+    if (sa === 'active' && sb_ !== 'active') return -1;
+    if (sa !== 'active' && sb_ === 'active') return 1;
     var va, vb;
     switch (workerSortCol) {
       case "name": va = a.name.toLowerCase(); vb = b.name.toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0;
@@ -1181,17 +1252,39 @@ function renderWorkerList() {
       case "carryFwd": return (getWorkerAdvByCat(a.id, 'Carried Forward') - getWorkerAdvByCat(b.id, 'Carried Forward')) * dir;
       case "totalAdv": return (getWorkerPendingAdvances(a.id) - getWorkerPendingAdvances(b.id)) * dir;
       case "loan": return (getWorkerLoanBalance(a.id) - getWorkerLoanBalance(b.id)) * dir;
-      case "active": va = a.active ? 0 : 1; vb = b.active ? 0 : 1; return (va - vb) * dir;
+      case "active": va = sa === 'active' ? 0 : sa === 'on_leave' ? 1 : 2; vb = sb_ === 'active' ? 0 : sb_ === 'on_leave' ? 1 : 2; return (va - vb) * dir;
       default: return 0;
     }
   });
 
-  document.getElementById("worker-stats").innerHTML = `
-    <div class="stat-card"><div class="stat-label">Total Workers</div><div class="stat-value">${workers.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:var(--good);">${active.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:var(--critical);">${workers.length - active.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Avg Pay Rate</div><div class="stat-value">RM ${active.length ? fmtNum2(active.reduce((s,w) => s + (parseFloat(w.pay_rate)||0), 0) / active.length) : "0.00"}</div></div>
-  `;
+  // Stat cards: Active / On Leave / Departed (with breakdown) / Total Ever
+  var depBreakdownStr = [];
+  if (depBreakdown.resigned)    depBreakdownStr.push(depBreakdown.resigned + ' resigned');
+  if (depBreakdown.terminated)  depBreakdownStr.push(depBreakdown.terminated + ' terminated');
+  if (depBreakdown.ran_away)    depBreakdownStr.push(depBreakdown.ran_away + ' ran away');
+  if (depBreakdown.other)       depBreakdownStr.push(depBreakdown.other + ' other');
+  var depBreakdownLine = depBreakdownStr.length ? depBreakdownStr.join(' · ') : '—';
+  var badDebtLine = totalBadDebt > 0 ? '<div style="font-size:11px;color:var(--critical);margin-top:4px;">Bad debt: RM ' + fmtNum2(totalBadDebt) + '</div>' : '';
+  document.getElementById("worker-stats").innerHTML =
+    '<div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:var(--good);">' + cActive + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">On Leave</div><div class="stat-value" style="color:var(--gold);">' + cLeave + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Departed</div><div class="stat-value" style="color:var(--purple);">' + cDeparted + '</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + depBreakdownLine + '</div>' + badDebtLine + '</div>' +
+    '<div class="stat-card"><div class="stat-label">Total Ever</div><div class="stat-value">' + cTotal + '</div></div>';
+
+  // Status filter pills — render inside the stats container's parent (we
+  // inject above the table via a dedicated div #worker-status-pills).
+  var pillsBox = document.getElementById('worker-status-pills');
+  if (pillsBox) {
+    var pillHtml = '';
+    [['all','All',cTotal],['active','Active',cActive],['on_leave','On Leave',cLeave],['departed','Departed',cDeparted]].forEach(function(p) {
+      var key = p[0], label = p[1], count = p[2];
+      var isActive = (statusFilter === key);
+      var bg = isActive ? 'var(--purple)' : 'var(--bg-card)';
+      var color = isActive ? '#fff' : 'var(--text-muted)';
+      pillHtml += '<button type="button" onclick="window.workerStatusFilter=\'' + key + '\';renderWorkerList();" style="padding:5px 11px;border-radius:14px;border:1px solid var(--border);background:' + bg + ';color:' + color + ';font-size:12px;font-weight:600;cursor:pointer;">' + label + ' <span style="opacity:0.7;font-weight:500;">' + count + '</span></button>';
+    });
+    pillsBox.innerHTML = pillHtml;
+  }
 
   // Sort indicators
   ["name","gender","pay_rate","role","resp","canteen","cigs","salAdv","overpay","carryFwd","totalAdv","tenure","loan","active"].forEach(function(c) {
@@ -1242,7 +1335,12 @@ function renderWorkerList() {
       <td style="${totalAdvBg}font-weight:700;">${totalAdv > 0 ? '<span style="color:var(--critical);">RM ' + fmtNum2(totalAdv) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
       <td style="font-size:11px;color:var(--text-muted);">${getWorkerTenure(w.id)}</td>
       <td>${loanBal > 0 ? '<span style="color:var(--critical);font-weight:600;">RM ' + fmtNum2(loanBal) + '</span>' : '<span style="color:var(--text-dim);">—</span>'}</td>
-      <td><span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span></td>
+      <td>${(function(){
+        var s = workerStatusOf(w);
+        var sub = '';
+        if (s === 'departed' && w.departure_type) sub = '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + workerDepartureLabel(w.departure_type) + '</div>';
+        return '<span class="badge ' + workerStatusBadgeClass(s) + '">' + workerStatusLabel(s) + '</span>' + sub;
+      })()}</td>
       <td style="text-align:right;white-space:nowrap;" onclick="event.stopPropagation();">
         <button class="btn btn-outline btn-sm" onclick="openEditWorker('${w.id}')">Edit</button>
         ${!w.active && isAdminUser ? '<button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="openDeleteWorker(\'' + w.id + '\')">Delete</button>' : ''}
@@ -1332,9 +1430,66 @@ function openWorkerModal(w) {
   document.getElementById("w-phone").value = w ? (w.phone || "") : "";
   document.getElementById("w-ic").value = w ? (w.ic_number || "") : "";
   document.getElementById("w-joindate").value = w ? (w.join_date || "") : "";
-  document.getElementById("w-status").value = w ? String(w.active) : "true";
+  // Set status radio. New worker defaults to active.
+  var status = w ? workerStatusOf(w) : 'active';
+  document.querySelectorAll('input[name="w-status"]').forEach(function(r) {
+    r.checked = (r.value === status);
+  });
   document.getElementById("w-notes").value = w ? (w.notes || "") : "";
+  // Stash existing departure context for the conditional-fields renderer to
+  // pre-populate (so editing a departed worker shows their existing values).
+  window._wEditingWorker = w || null;
+  renderWorkerStatusFields();
   document.getElementById("worker-modal").style.display = "flex";
+}
+
+// Conditional fields shown under the status radio group. Re-rendered every
+// time the user clicks a different radio.
+function renderWorkerStatusFields() {
+  var box = document.getElementById('w-status-fields');
+  if (!box) return;
+  var status = (document.querySelector('input[name="w-status"]:checked') || {}).value || 'active';
+  var w = window._wEditingWorker;
+  var html = '';
+  if (status === 'active') {
+    if (w && workerStatusOf(w) === 'on_leave') {
+      html += '<div style="font-size:11px;color:var(--text-muted);font-style:italic;">Saving will close the open leave period (end date set to today).</div>';
+    } else if (w && workerStatusOf(w) === 'departed') {
+      html += '<div style="font-size:11px;color:var(--gold);font-style:italic;">Re-employing this worker. Their previous departure record stays as history on the profile.</div>';
+    }
+  } else if (status === 'on_leave') {
+    var existingReason = '';
+    var openLeave = w ? getWorkerOpenLeavePeriod(w.id) : null;
+    if (openLeave) existingReason = openLeave.reason || '';
+    html += '<div class="form-field" style="margin:0;">';
+    html += '<label style="font-size:11px;">Reason for leave (optional)</label>';
+    html += '<input type="text" id="w-leave-reason" value="' + esc(existingReason) + '" placeholder="e.g. Kampung visit, medical, family matter">';
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:6px;">A leave period will open today. The worker will be excluded from \"Initialize All Workers\" until you mark them Active again.</div>';
+  } else if (status === 'departed') {
+    var debt = w ? getWorkerTotalDebt(w.id) : 0;
+    var existingType = (w && w.departure_type) || '';
+    var existingDate = (w && w.departure_date) || (new Date().toISOString().slice(0, 10));
+    var existingNotes = (w && w.departure_notes) || '';
+    html += '<div class="form-row" style="margin:0;">';
+    html += '<div class="form-field"><label style="font-size:11px;">Departure type</label>';
+    html += '<select id="w-dep-type">';
+    ['','resigned','terminated','ran_away','other'].forEach(function(v) {
+      html += '<option value="' + v + '"' + (v === existingType ? ' selected' : '') + '>' + (v === '' ? '— Select —' : workerDepartureLabel(v)) + '</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="form-field"><label style="font-size:11px;">Departure date</label>';
+    html += '<input type="date" id="w-dep-date" value="' + esc(existingDate) + '"></div>';
+    html += '</div>';
+    html += '<div class="form-field" style="margin-top:8px;"><label style="font-size:11px;">Notes (optional)</label>';
+    html += '<input type="text" id="w-dep-notes" value="' + esc(existingNotes) + '" placeholder="e.g. last seen Apr 30, owed RM 500"></div>';
+    if (debt > 0 && (!w || workerStatusOf(w) !== 'departed')) {
+      html += '<div style="margin-top:10px;padding:8px 10px;border:1px solid var(--critical);border-radius:6px;background:rgba(232,96,96,0.08);font-size:12px;color:var(--critical);">';
+      html += '<b>Outstanding hutang: RM ' + fmtNum2(debt) + '</b> — will be written off as bad debt on save. Use the Reverse Write-Off button on the profile if the worker returns and pays back.';
+      html += '</div>';
+    }
+  }
+  box.innerHTML = html;
 }
 
 function openEditWorker(id) { const w = workers.find(x => x.id === id); if (w) openWorkerModal(w); }
@@ -1350,19 +1505,55 @@ async function saveWorker() {
   const phone = document.getElementById("w-phone").value.trim();
   const ic_number = document.getElementById("w-ic").value.trim();
   const join_date = document.getElementById("w-joindate").value || null;
-  const active = document.getElementById("w-status").value === "true";
+  const status = (document.querySelector('input[name="w-status"]:checked') || {}).value || 'active';
   const notes = document.getElementById("w-notes").value.trim();
 
   if (!name) { notify("Name is required", "warning"); return; }
   if (pay_rate <= 0) { notify("Pay rate must be greater than 0", "warning"); return; }
 
+  // Read status-specific fields
+  var leaveReason = '';
+  var depType = null, depDate = null, depNotes = '';
+  if (status === 'on_leave') {
+    leaveReason = (document.getElementById("w-leave-reason") || {}).value || '';
+  } else if (status === 'departed') {
+    depType  = (document.getElementById("w-dep-type") || {}).value || '';
+    depDate  = (document.getElementById("w-dep-date") || {}).value || (new Date().toISOString().slice(0,10));
+    depNotes = (document.getElementById("w-dep-notes") || {}).value || '';
+    if (!depType) { notify("Choose departure type", "warning"); return; }
+    if (!depDate) { notify("Departure date required", "warning"); return; }
+  }
+
   if (btn) btnLoading(btn, true);
-  const data = { name, gender: gender || null, pay_rate, role, phone, ic_number, join_date, active, notes, updated_at: new Date().toISOString() };
+  // employment_status is the source of truth; the DB trigger keeps `active`
+  // synced, so we don't write `active` from JS anymore.
+  const data = { name, gender: gender || null, pay_rate, role, phone, ic_number, join_date,
+    employment_status: status, notes, updated_at: new Date().toISOString() };
+  // Departure fields only set on the save that flips into 'departed'. On
+  // transitions AWAY from departed we INTENTIONALLY leave them as historical
+  // record (per user choice — visible on profile).
+  if (status === 'departed') {
+    data.departure_type = depType;
+    data.departure_date = depDate;
+    data.departure_notes = depNotes;
+  }
 
   if (editId) {
     // Track changes before overwriting
     const old = workers.find(w => w.id === editId);
-    const changesStr = old ? diffChanges(old, data, ["name", "gender", "pay_rate", "role", "phone", "ic_number", "active"]) : "";
+    const changesStr = old ? diffChanges(old, data, ["name", "gender", "pay_rate", "role", "phone", "ic_number", "employment_status"]) : "";
+
+    // Detect status transitions (used after the core save to fire side effects).
+    const oldStatus = old ? workerStatusOf(old) : 'active';
+    const transitioningToDeparted = old && oldStatus !== 'departed' && status === 'departed';
+    let writeOffAmt = 0;
+    if (transitioningToDeparted) {
+      writeOffAmt = getWorkerTotalDebt(editId);
+      if (writeOffAmt > 0) {
+        data.bad_debt_writeoff_amount = writeOffAmt;
+        data.bad_debt_writeoff_at = new Date().toISOString();
+      }
+    }
 
     // INTERCEPT: if pay_rate changed AND this worker has any payroll entries, defer the
     // save to the Apply Rate Change modal so the user can pick an effective period and
@@ -1396,6 +1587,9 @@ async function saveWorker() {
     const idx = workers.findIndex(w => w.id === editId);
     if (idx >= 0) {
       const oldName = workers[idx].name;
+      // Trigger sets `active` server-side; mirror it in the local cache so
+      // any code reading `w.active` stays consistent without a re-fetch.
+      data.active = (status === 'active');
       Object.assign(workers[idx], data);
       // Cascade rename worker name to payroll entries (use worker_id to avoid race condition with duplicate names)
       if (oldName !== name) {
@@ -1406,6 +1600,45 @@ async function saveWorker() {
         await auditLog("workers", editId, "update", changesStr, workers[idx]);
         await sbQuery(sb.from("workers").update({ notes: workers[idx].notes }).eq("id", editId).select());
       }
+
+      // === Status transition side effects ===
+      var todayIso = new Date().toISOString().slice(0, 10);
+      // Active|Departed -> On Leave: open a new leave period
+      if (oldStatus !== 'on_leave' && status === 'on_leave') {
+        var lpId = await dbNextId("WLP");
+        var lpData = { id: lpId, worker_id: editId, start_date: todayIso, end_date: null,
+          reason: leaveReason || null, notes: null,
+          created_at: new Date().toISOString(),
+          created_by: currentUser ? currentUser.id : null };
+        await sbQuery(sb.from("worker_leave_periods").insert(lpData).select());
+        workerLeavePeriods.unshift(lpData);
+        await auditLog("workers", editId, "leave_start", "On leave from " + todayIso + (leaveReason ? " · " + leaveReason : ""));
+      }
+      // On Leave -> Active|Departed: close the open leave period
+      if (oldStatus === 'on_leave' && status !== 'on_leave') {
+        var open = getWorkerOpenLeavePeriod(editId);
+        if (open) {
+          await sbQuery(sb.from("worker_leave_periods").update({ end_date: todayIso }).eq("id", open.id).select());
+          open.end_date = todayIso;
+          if (status === 'active') await auditLog("workers", editId, "leave_end", "Returned from leave on " + todayIso);
+        }
+      }
+      // Transition INTO departed: write off bad debt + audit
+      if (transitioningToDeparted) {
+        var depMsg = "Departed (" + workerDepartureLabel(depType) + ") on " + depDate;
+        if (writeOffAmt > 0) depMsg += " · Bad debt RM " + fmtNum2(writeOffAmt) + " written off";
+        if (depNotes) depMsg += " · " + depNotes;
+        await auditLog("workers", editId, "departure", depMsg);
+      }
+      // Transition AWAY from departed (re-employment): keep departure_* + bad_debt as history
+      if (oldStatus === 'departed' && status !== 'departed') {
+        await auditLog("workers", editId, "re_employment", "Re-employed on " + todayIso + " (previous departure: " + workerDepartureLabel(old.departure_type) + " " + (old.departure_date || '') + ")");
+        // Open a new employment stint to mark the new spell.
+        var stintId2 = await dbNextId("ES");
+        var stintData2 = { id: stintId2, worker_id: editId, start_date: todayIso, end_date: null, is_current: true, leave_reason: "", company_id: getCompanyId() };
+        await sbQuery(sb.from("employment_stints").insert(stintData2).select());
+        employmentStints.unshift(stintData2);
+      }
     }
     notify(name + " updated" + (changesStr ? " — " + changesStr : ""));
   } else {
@@ -1415,10 +1648,11 @@ async function saveWorker() {
     data.company_id = getCompanyId();
     var result = await sbQuery(sb.from("workers").insert(data).select());
     if (result === null) { if (btn) btnLoading(btn, false, 'Save'); return; }
+    data.active = (status === 'active');
     workers.push(data);
     await auditLog("workers", data.id, "create", "New worker: " + name + ", rate RM " + pay_rate);
     // Create initial employment stint
-    if (active && join_date) {
+    if (status === 'active' && join_date) {
       const stintId = await dbNextId("ES");
       const stintData = { id: stintId, worker_id: newId, start_date: join_date, end_date: null, is_current: true, leave_reason: "", company_id: getCompanyId() };
       await sbQuery(sb.from("employment_stints").insert(stintData).select());
@@ -1518,6 +1752,72 @@ async function confirmReactivate() {
   notify(w.name + " reactivated — new stint started");
   renderWorkerList();
   if (profileWorkerId === id) renderWorkerProfile();
+}
+
+// ============================================================
+// REVERSE WRITE-OFF (re-instate bad debt as recoverable advance)
+// ============================================================
+function openReverseWriteOff(workerId) {
+  var w = workers.find(x => x.id === workerId);
+  if (!w) return;
+  var amt = parseFloat(w.bad_debt_writeoff_amount) || 0;
+  if (amt <= 0) { notify("No write-off to reverse", "warning"); return; }
+  confirmAction(
+    'Reverse Write-Off — ' + w.name,
+    'Bring <b>RM ' + fmtNum2(amt) + '</b> back as a recoverable advance? It will be added as an Overpayment-style advance on the current payroll period and deducted from ' + w.name + '\'s next salary.',
+    function() { confirmReverseWriteOff(workerId); },
+    false
+  );
+}
+
+async function confirmReverseWriteOff(workerId) {
+  var w = workers.find(x => x.id === workerId);
+  if (!w) return;
+  var amt = roundMoney(parseFloat(w.bad_debt_writeoff_amount) || 0);
+  if (amt <= 0) return;
+  // 1. Find or create the current period
+  var pid = getCurrentPeriodId();
+  if (!pid) {
+    var now = new Date();
+    pid = "PP-" + now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    var existing = payrollPeriods.find(p => p.id === pid);
+    if (!existing) {
+      var pp = await sbQuery(sb.from("payroll_periods").insert({ id: pid, year: now.getFullYear(), month: now.getMonth() + 1, status: "open", company_id: getCompanyId() }).select());
+      if (pp) payrollPeriods.push({ id: pid, year: now.getFullYear(), month: now.getMonth() + 1, status: "open" });
+    }
+  }
+  // 2. Create the recoverable advance
+  var saId = await dbNextId("SA");
+  var saData = {
+    id: saId, worker_id: workerId, amount: amt,
+    date_given: new Date().toISOString().slice(0, 10),
+    period_id: pid,
+    reason: 'Reversed write-off from previous departure (' + workerDepartureLabel(w.departure_type) + (w.departure_date ? ' on ' + w.departure_date : '') + ')',
+    category: 'Reinstated Debt',
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    company_id: getCompanyId()
+  };
+  var saRes = await sbQuery(sb.from("salary_advances").insert(saData).select());
+  if (saRes === null) { notify("Failed to create advance — write-off NOT reversed", "error"); return; }
+  salaryAdvances.unshift(saData);
+
+  // 3. Clear the write-off on the worker
+  var upd = await sbQuery(sb.from("workers").update({ bad_debt_writeoff_amount: 0, bad_debt_writeoff_at: null }).eq("id", workerId).select());
+  if (upd === null) {
+    // Roll back the advance to keep books consistent
+    await sbQuery(sb.from("salary_advances").delete().eq("id", saId).select());
+    salaryAdvances = salaryAdvances.filter(a => a.id !== saId);
+    notify("Failed to clear write-off — advance rolled back. Retry.", "error");
+    return;
+  }
+  w.bad_debt_writeoff_amount = 0;
+  w.bad_debt_writeoff_at = null;
+
+  await auditLog("workers", workerId, "reverse_writeoff", "Reversed bad-debt write-off RM " + fmtNum2(amt) + " — added as recoverable advance " + saId);
+  notify("Write-off reversed — RM " + fmtNum2(amt) + " added as advance for current period");
+  renderWorkerList();
+  if (profileWorkerId === workerId) renderWorkerProfile();
 }
 
 // ============================================================
@@ -2724,7 +3024,10 @@ async function confirmPayWorker() {
   const period = payrollPeriods.find(p => p.id === pe.period_id);
   const periodLabel = period ? MONTH_NAMES[period.month] + " " + period.year : "";
   const netPay = parseFloat(pe.final_pay) || 0;
-  const cashHanded = netPay < 0 ? 0 : (parseFloat(document.getElementById("pay-cash").value) || 0);
+  // Round cash to cents at write time. Prevents sub-cent values (e.g. accidental
+  // 0.005 keystroke or paste) from snowballing through the overpay-advance →
+  // next-month-deduct cycle that bit Lili & Mahmud (see CLAUDE.md 2026-05-10).
+  const cashHanded = netPay < 0 ? 0 : roundMoney(parseFloat(document.getElementById("pay-cash").value) || 0);
 
   if (netPay > 0 && cashHanded <= 0) { notify("Enter cash handed amount", "warning"); return; }
 
@@ -2750,9 +3053,11 @@ async function confirmPayWorker() {
     await createCarryForward(pe, Math.abs(netPay));
   }
 
-  // Handle overpayment — carry forward
+  // Handle overpayment — carry forward (skip sub-cent residue that would
+  // round to zero anyway and create a phantom 0.01 advance cycle).
   if (cashHanded > 0 && cashHanded > netPay) {
-    await createOverpaymentAdvance(pe, cashHanded - netPay);
+    var overpayDelta = roundMoney(cashHanded - netPay);
+    if (overpayDelta >= 0.01) await createOverpaymentAdvance(pe, overpayDelta);
   }
 
   // Process loan repayments
@@ -2895,6 +3200,10 @@ async function createCarryForward(pe, amount) {
 
 // Helper: create overpayment advance for next month
 async function createOverpaymentAdvance(pe, overpayAmt) {
+  // Defensive guard: any caller passing sub-cent residue creates a phantom
+  // 0.01 advance that snowballs (Lili/Mahmud history). Round + skip < 1 sen.
+  overpayAmt = roundMoney(overpayAmt);
+  if (overpayAmt < 0.01) return;
   const curPeriod = payrollPeriods.find(p => p.id === pe.period_id);
   if (!curPeriod) return;
   const nextMonth = curPeriod.month === 12 ? 1 : curPeriod.month + 1;
@@ -2994,7 +3303,10 @@ function printPayrollList() {
 
 async function initPayrollForAll() {
   if (!currentPeriodId) return;
-  const activeWorkers = workers.filter(w => w.active);
+  // employment_status='active' only — On Leave + Departed workers excluded.
+  // The DB trigger keeps w.active synced so we filter on either; using the
+  // explicit status check makes the intent obvious to future readers.
+  const activeWorkers = workers.filter(w => workerStatusOf(w) === 'active');
 
   // Check DB directly for existing entries (not just in-memory) to avoid duplicate key errors
   const dbExisting = await sbQuery(sb.from("payroll_entries").select("worker_id").eq("period_id", currentPeriodId));
@@ -3596,9 +3908,15 @@ async function renderWorkerProfile() {
 
     const loanBal = getWorkerLoanBalance(w.id);
     const currentStint = getCurrentStint(w.id);
-    const statusBtn = w.active
-      ? '<button class="btn btn-danger btn-sm" onclick="toggleWorkerStatus(\'' + w.id + '\')">Deactivate</button>'
-      : '<button class="btn btn-primary btn-sm" onclick="toggleWorkerStatus(\'' + w.id + '\')">Reactivate</button>';
+    const wStatus = workerStatusOf(w);
+    const wBadge = '<span class="badge ' + workerStatusBadgeClass(wStatus) + '">' + workerStatusLabel(wStatus) + (wStatus === 'departed' && w.departure_type ? ' \u00b7 ' + workerDepartureLabel(w.departure_type) : '') + '</span>';
+    // Reverse Write-Off available when there's an existing write-off recorded.
+    // (Worker may currently be Active again \u2014 re-employment kept the write-off
+    // as history; user can reverse it any time to bring debt back into payable.)
+    const writeOffAmt = parseFloat(w.bad_debt_writeoff_amount) || 0;
+    const reverseBtn = writeOffAmt > 0
+      ? '<button class="btn btn-outline btn-sm" style="border-color:var(--gold);color:var(--gold);" onclick="openReverseWriteOff(\'' + w.id + '\')">Reverse Write-Off (RM ' + fmtNum2(writeOffAmt) + ')</button>'
+      : '';
 
     // Header
     document.getElementById("profile-header").innerHTML = `
@@ -3606,13 +3924,12 @@ async function renderWorkerProfile() {
         <div>
           <div style="font-size:22px;font-weight:700;color:var(--white);">${w.name}</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-            ${w.role || '\u2014'} \u00b7 RM ${fmtNum2(w.pay_rate)}/day \u00b7 
-            <span class="badge ${w.active ? 'badge-active' : 'badge-inactive'}">${w.active ? 'Active' : 'Inactive'}</span>
+            ${w.role || '\u2014'} \u00b7 RM ${fmtNum2(w.pay_rate)}/day \u00b7 ${wBadge}
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" onclick="openEditWorker('${w.id}')">Edit</button>
-          ${statusBtn}
+          <button class="btn btn-outline btn-sm" onclick="openEditWorker('${w.id}')">Edit / Change Status</button>
+          ${reverseBtn}
         </div>
       </div>
     `;
@@ -3633,9 +3950,21 @@ async function renderWorkerProfile() {
     detailsHtml += detailRow("Role", w.role || "\u2014");
     detailsHtml += detailRow("Current Pay Rate", "RM " + fmtNum2(w.pay_rate) + " / day");
     detailsHtml += detailRow("First Joined", fmtDate(w.join_date));
-    detailsHtml += detailRow("Status", w.active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>');
+    detailsHtml += detailRow("Status", wBadge);
     detailsHtml += detailRow("Current Stint", currentStint ? fmtDate(currentStint.start_date) + " \u2014 Present (<strong style=\"color:var(--gold-light);\">" + getWorkerTenure(w.id) + "</strong>)" : "\u2014");
     detailsHtml += detailRow("Total Service", '<strong style="color:var(--gold-light);">' + getTotalService(w.id) + '</strong>');
+    // Departure record \u2014 visible when departure fields are populated (kept on
+    // re-employment as history per design).
+    if (w.departure_type || w.departure_date) {
+      detailsHtml += detailRow("Last Departure", workerDepartureLabel(w.departure_type) + (w.departure_date ? ' on ' + fmtDate(w.departure_date) : ''));
+      if (w.departure_notes) detailsHtml += detailRow("Departure Notes", esc(w.departure_notes));
+      if (writeOffAmt > 0) detailsHtml += detailRow("Bad Debt Written Off", '<strong style="color:var(--critical);">RM ' + fmtNum2(writeOffAmt) + '</strong>' + (w.bad_debt_writeoff_at ? ' on ' + fmtDate(w.bad_debt_writeoff_at.substring(0,10)) : ''));
+    }
+    // Open leave period (if currently on leave)
+    var openLeave = getWorkerOpenLeavePeriod(w.id);
+    if (openLeave) {
+      detailsHtml += detailRow("On Leave Since", fmtDate(openLeave.start_date) + (openLeave.reason ? ' \u2014 ' + esc(openLeave.reason) : ''));
+    }
     detailsHtml += '</div></div>';
 
     // Financial Info

@@ -433,6 +433,8 @@ tr.clickable:hover { background:var(--bg-hover); }
 .badge-out { background:var(--critical-bg); color:var(--critical); }
 .badge-active { background:var(--good-bg); color:var(--good); }
 .badge-inactive { background:var(--critical-bg); color:var(--critical); }
+.badge-leave { background:rgba(212,175,55,0.15); color:#8A6D1F; }
+.badge-departed { background:rgba(107,76,138,0.12); color:var(--purple); }
 
 /* ============================================================
    MODALS
