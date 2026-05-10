@@ -548,6 +548,15 @@ function formatRM(val) {
   return "RM " + (val || 0).toLocaleString("en-MY", { minimumFractionDigits:2, maximumFractionDigits:2 });
 }
 
+// Round a money value to cent-precision (2 decimals). Use BEFORE writing any
+// monetary value to the DB to keep money columns at integer-cents resolution
+// and avoid sub-cent FP residue (e.g. 13.15 * 3.50 = 46.025) leaking into
+// grand_total — which makes payment-status comparisons fail. See AF-CS086 /
+// AF-INV008 history in CLAUDE.md.
+function roundMoney(v) {
+  return Math.round((parseFloat(v) || 0) * 100) / 100;
+}
+
 // Phone display formatter — E.164 ("+60123456789") → "+60 12-345 6789".
 // Falls back to as-is on pages where intl-tel-input utils aren't loaded
 // (so non-sales modules render legacy phones unchanged).

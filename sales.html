@@ -1408,6 +1408,17 @@ var soDetailOrderId = null;
 var soOpenedFromCustomer = null;
 var soEditOrderId = null;
 
+// Completed-orders drill-down state (Year -> Month -> Day, plus Last 5 days shortcut)
+// State is in-memory only; not preserved across reloads (matches the rest of Orders tab).
+var soCompletedView = 'year';                       // 'year' | 'month' | 'day' | 'last5'
+var soCompletedYear = (new Date()).getFullYear();   // 4-digit year currently displayed
+var soCompletedMonth = null;                        // 0-11 (null when not in month/day view)
+var soCompletedDay = null;                          // 1-31 (null when not in day view)
+var SO_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var SO_MONTH_ABBR  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var SO_DAY_ABBR    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var SO_DAY_FULL    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
 // Unsaved data protection
 var salesFormDirty = false;
 window.addEventListener('beforeunload', function(e) {
@@ -1755,16 +1766,19 @@ async function invRecomputeInvoice(invoiceId) {
     });
   });
 
-  // Insert new invoice items
+  // Insert new invoice items. Round each aggregated line_total to cents so FP
+  // residue from summing many DO line_totals doesn't leak into the invoice.
   var newItems = [];
   var subtotal = 0;
   var pLines = Object.values(productAgg);
   for (var j = 0; j < pLines.length; j++) {
     var p = pLines[j];
+    p.line_total = roundMoney(p.line_total);
     subtotal += p.line_total;
     var iid = await dbNextId('II');
     newItems.push({ id: iid, invoice_id: invoiceId, product_id: p.product_id, product_name: p.product_name, quantity: p.quantity, unit_price: p.unit_price, line_total: p.line_total, company_id: getCompanyId() });
   }
+  subtotal = roundMoney(subtotal);
   if (newItems.length) {
     var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
     if (iResult) iResult.forEach(function(ii) { invoiceItems.push(ii); });
@@ -2246,12 +2260,18 @@ function renderOrders() {
   document.getElementById('orders-header-actions').innerHTML =
     salesCan('createOrder') ? '<button class="btn btn-primary" onclick="openNewOrderModal()">+ New Order</button>' : '';
 
-  var body = document.getElementById('orders-body');
+  // Filter bar moved into the Completed & Cancelled section (active orders no
+  // longer filtered — they're a small list driven by urgency-sort).
+  document.getElementById('orders-body').innerHTML = '<div id="so-cards-container"></div>';
+  renderOrderCards();
+}
 
-  // Filter bar (collapsible on mobile)
+// Filter bar HTML — rendered inside the Completed section. Active orders are
+// no longer filtered. Filters apply at day-detail / last-5-days; year + month
+// grids ignore them and always show full totals (with a hint shown there).
+function soRenderCompletedFilterBar() {
   var activeFilterCount = soCountActiveFilters();
   var filtersCollapsed = (typeof soFiltersOpen === 'undefined' || soFiltersOpen === null) ? null : !soFiltersOpen;
-  // Default: collapsed on mobile (null -> auto via CSS); explicit open/close once user toggles
   var collapseClass = filtersCollapsed === true ? ' collapsed' : (filtersCollapsed === false ? ' expanded' : ' auto');
 
   var fHtml = '<button type="button" class="filters-toggle-btn" onclick="soToggleFilters()">';
@@ -2260,9 +2280,10 @@ function renderOrders() {
   fHtml += ' <span class="ftb-arrow">▾</span></button>';
 
   fHtml += '<div class="sales-filters' + collapseClass + '">';
+  // Status dropdown limited to terminal statuses (we're inside Completed & Cancelled).
   fHtml += '<select onchange="soFilterStatus=this.value;renderOrderCards()" style="min-width:120px;">';
   fHtml += '<option value=""' + (soFilterStatus === '' ? ' selected' : '') + '>All Status</option>';
-  ['pending','preparing','prepared','delivering','completed','cancelled'].forEach(function(s) {
+  ['completed','cancelled'].forEach(function(s) {
     fHtml += '<option value="' + s + '"' + (soFilterStatus === s ? ' selected' : '') + '>' + statusLabel(s) + '</option>';
   });
   fHtml += '</select>';
@@ -2280,26 +2301,13 @@ function renderOrders() {
   fHtml += '<option value="paid"' + (soFilterPayment === 'paid' ? ' selected' : '') + '>Paid</option>';
   fHtml += '</select>';
 
-  fHtml += '<input type="date" value="' + soFilterDateFrom + '" onchange="soFilterDateFrom=this.value;renderOrderCards()" title="Date From" placeholder="From">';
-  fHtml += '<input type="date" value="' + soFilterDateTo + '" onchange="soFilterDateTo=this.value;renderOrderCards()" title="Date To" placeholder="To">';
-
   fHtml += '<input type="text" placeholder="Search customer..." value="' + esc(soFilterCustomer) + '" oninput="soFilterCustomer=this.value;renderOrderCards()" style="flex:1;min-width:150px;">';
-
-  fHtml += '<select onchange="soFilterSort=this.value;renderOrderCards()" style="min-width:130px;">';
-  fHtml += '<option value="newest"' + (soFilterSort === 'newest' ? ' selected' : '') + '>Newest First</option>';
-  fHtml += '<option value="oldest"' + (soFilterSort === 'oldest' ? ' selected' : '') + '>Oldest First</option>';
-  fHtml += '<option value="customer"' + (soFilterSort === 'customer' ? ' selected' : '') + '>Customer A\u2013Z</option>';
-  fHtml += '</select>';
 
   if (soHasActiveFilters()) {
     fHtml += '<button class="btn btn-outline btn-sm" onclick="soClearFilters()">Clear Filters</button>';
   }
-
   fHtml += '</div>';
-  fHtml += '<div id="so-cards-container"></div>';
-
-  body.innerHTML = fHtml;
-  renderOrderCards();
+  return fHtml;
 }
 
 function soRenderCard(o, status, color, label) {
@@ -2379,170 +2387,570 @@ function soRenderCard(o, status, color, label) {
   return h;
 }
 
+// =================================================================
+// COMPLETED-ORDERS DRILL-DOWN  (Year -> Month -> Day, plus Last 5)
+// =================================================================
+// Uses completed_at as the bucket date for completed orders, falling
+// back to updated_at then order_date — mirrors the convention used
+// elsewhere in the codebase (see CLAUDE.md "Order sorting").
+function soGetCompletedDateKey(o) {
+  var src = o.completed_at || o.updated_at || o.order_date;
+  if (!src) return null;
+  return src.substring(0, 10);  // YYYY-MM-DD
+}
+
+// Returns { min, max } year range. min = earliest year with completed/cancelled
+// orders; max = current year (orders are past events). Both default to current
+// year when no data exists yet.
+function soCmpAvailableYearRange() {
+  var yrs = [];
+  for (var i = 0; i < orders.length; i++) {
+    var o = orders[i];
+    if (o.status !== 'completed' && o.status !== 'cancelled') continue;
+    var key = soGetCompletedDateKey(o);
+    if (key) yrs.push(parseInt(key.substring(0, 4), 10));
+  }
+  var cur = (new Date()).getFullYear();
+  if (!yrs.length) return { min: cur, max: cur };
+  return { min: Math.min.apply(null, yrs), max: Math.max(cur, Math.max.apply(null, yrs)) };
+}
+
+// Calendar day cells use the full formatRM() format ("RM 1,240.50") — there's
+// enough room at desktop widths and the consistency reads cleaner than the
+// previous truncated integer form.
+
+// Day-detail filter. Skip date range (you're already looking at one specific
+// day). Status / doc_type / payment / customer-search all apply, so the user
+// can hide cancellations, isolate DOs, etc. while inside the day view.
+function soDayDetailFilter(o) {
+  if (soFilterStatus && o.status !== soFilterStatus) return false;
+  if (soFilterDocType && o.doc_type !== soFilterDocType) return false;
+  if (soFilterPayment && o.payment_status !== soFilterPayment) return false;
+  if (soFilterCustomer) {
+    var custName = getCustomerName(o.customer_id).toLowerCase();
+    if (custName.indexOf(soFilterCustomer.toLowerCase()) < 0) return false;
+  }
+  return true;
+}
+
+// Navigation handlers — update state then re-render. We intentionally don't
+// push a hash; sub-level state isn't preserved across reloads (matches the
+// existing Orders tab convention).
+function soCmpGoYear() {
+  soCompletedView = 'year';
+  soCompletedMonth = null;
+  soCompletedDay = null;
+  renderOrderCards();
+  soScrollToCompletedSection();
+}
+function soCmpGoMonth(year, month) {
+  soCompletedView = 'month';
+  soCompletedYear = year;
+  soCompletedMonth = month;
+  soCompletedDay = null;
+  renderOrderCards();
+  soScrollToCompletedSection();
+}
+function soCmpGoDay(year, month, day) {
+  soCompletedView = 'day';
+  soCompletedYear = year;
+  soCompletedMonth = month;
+  soCompletedDay = day;
+  renderOrderCards();
+  soScrollToCompletedSection();
+}
+function soCmpGoLast5() {
+  soCompletedView = 'last5';
+  soCompletedMonth = null;
+  soCompletedDay = null;
+  renderOrderCards();
+  soScrollToCompletedSection();
+}
+function soCmpBack() {
+  if (soCompletedView === 'day') {
+    soCompletedView = 'month';
+    soCompletedDay = null;
+  } else if (soCompletedView === 'month' || soCompletedView === 'last5') {
+    soCompletedView = 'year';
+    soCompletedMonth = null;
+    soCompletedDay = null;
+  }
+  renderOrderCards();
+  soScrollToCompletedSection();
+}
+function soCmpYearChange(delta) {
+  var range = soCmpAvailableYearRange();
+  var newY = soCompletedYear + delta;
+  if (newY < range.min || newY > range.max) return;
+  soCompletedYear = newY;
+  renderOrderCards();
+}
+function soScrollToCompletedSection() {
+  // Only scroll if user is below the section already — avoids jarring upward
+  // scroll on first render.
+  setTimeout(function() {
+    var el = document.querySelector('.so-completed-section');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 0);
+}
+
+function soRenderCompletedTopBar() {
+  var view = soCompletedView;
+  var html = '<div class="so-cmp-bar">';
+  html += '<div class="so-cmp-nav">';
+  if (view !== 'year') {
+    html += '<button type="button" class="so-cmp-back" onclick="soCmpBack()">← Back</button>';
+  }
+  html += '<div class="so-cmp-crumb">';
+  if (view === 'year') {
+    html += '<span class="here">' + soCompletedYear + '</span>';
+  } else if (view === 'month') {
+    html += '<a onclick="soCmpGoYear()">' + soCompletedYear + '</a>';
+    html += '<span class="sep">/</span>';
+    html += '<span class="here">' + SO_MONTH_NAMES[soCompletedMonth] + '</span>';
+  } else if (view === 'day') {
+    html += '<a onclick="soCmpGoYear()">' + soCompletedYear + '</a>';
+    html += '<span class="sep">/</span>';
+    html += '<a onclick="soCmpGoMonth(' + soCompletedYear + ',' + soCompletedMonth + ')">' + SO_MONTH_NAMES[soCompletedMonth] + '</a>';
+    html += '<span class="sep">/</span>';
+    html += '<span class="here">' + soCompletedDay + '</span>';
+  } else if (view === 'last5') {
+    html += '<span class="here">⚡ Last 5 days</span>';
+  }
+  html += '</div>';
+  html += '</div>';
+  if (view !== 'last5') {
+    html += '<button type="button" class="so-cmp-last5" onclick="soCmpGoLast5()">⚡ Last 5 days</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function soRenderCompletedYear(allCompleted) {
+  var year = soCompletedYear;
+  var range = soCmpAvailableYearRange();
+  var today = new Date();
+  var curYear = today.getFullYear();
+  var curMonth = today.getMonth();
+
+  var months = [];
+  for (var m = 0; m < 12; m++) months.push({ total: 0, count: 0, hasCancelled: false });
+  var yearTotal = 0, yearCount = 0;
+  for (var i = 0; i < allCompleted.length; i++) {
+    var o = allCompleted[i];
+    var key = soGetCompletedDateKey(o);
+    if (!key) continue;
+    var y = parseInt(key.substring(0, 4), 10);
+    if (y !== year) continue;
+    var mIdx = parseInt(key.substring(5, 7), 10) - 1;
+    if (o.status === 'completed') {
+      var amt = parseFloat(o.grand_total) || 0;
+      months[mIdx].total += amt;
+      months[mIdx].count++;
+      yearTotal += amt;
+      yearCount++;
+    } else if (o.status === 'cancelled') {
+      months[mIdx].hasCancelled = true;
+    }
+  }
+
+  var html = '';
+  // Year navigator + total chip
+  html += '<div class="so-cmp-bar">';
+  html += '<div class="so-cmp-nav">';
+  html += '<div class="so-yearnav">';
+  html += '<button type="button" class="so-yearbtn" onclick="soCmpYearChange(-1)"' + (year <= range.min ? ' disabled' : '') + ' title="Previous year">‹</button>';
+  html += '<span class="so-cmp-year">' + year + '</span>';
+  html += '<button type="button" class="so-yearbtn" onclick="soCmpYearChange(1)"' + (year >= range.max ? ' disabled' : '') + ' title="Next year">›</button>';
+  html += '</div>';
+  html += '</div>';
+  html += '<span class="so-cmp-yeartotal">' + year + ' Total <b>' + formatRM(yearTotal) + '</b> &middot; ' + yearCount + ' ' + (yearCount === 1 ? 'order' : 'orders') + '</span>';
+  html += '</div>';
+
+  html += '<div class="so-mgrid">';
+  for (var i = 0; i < 12; i++) {
+    var bucket = months[i];
+    var isFuture = (year > curYear) || (year === curYear && i > curMonth);
+    var isCurrent = (year === curYear && i === curMonth);
+    var isEmpty = bucket.count === 0 && !bucket.hasCancelled;
+    var classes = 'so-mcard';
+    if (isFuture) classes += ' so-mcard-future';
+    else if (isEmpty) classes += ' so-mcard-empty';
+    if (isCurrent && !isFuture) classes += ' so-mcard-current';
+
+    var clickable = !isFuture && (bucket.count > 0 || bucket.hasCancelled);
+    var openTag = clickable
+      ? '<button type="button" class="' + classes + '" onclick="soCmpGoMonth(' + year + ',' + i + ')">'
+      : '<div class="' + classes + '">';
+    var closeTag = clickable ? '</button>' : '</div>';
+
+    html += openTag;
+    html += '<div class="so-mcard-header">';
+    html += '<span class="so-mcard-name">' + SO_MONTH_NAMES[i] + '</span>';
+    html += '<span class="so-mcard-num">\'' + String(year).substring(2) + (isCurrent ? ' ← current' : '') + '</span>';
+    html += '</div>';
+    if (bucket.hasCancelled) html += '<span class="so-mcard-cancel" title="Has cancellations"></span>';
+    if (isFuture) {
+      html += '<div class="so-mcard-rm">—</div>';
+      html += '<div class="so-mcard-cnt">Upcoming</div>';
+    } else if (isEmpty) {
+      html += '<div class="so-mcard-rm">—</div>';
+      html += '<div class="so-mcard-cnt">No orders</div>';
+    } else if (bucket.count === 0 && bucket.hasCancelled) {
+      // Cancelled-only month: skip RM 0 to avoid the misleading "RM 0.00 · 0 orders"
+      html += '<div class="so-mcard-rm">—</div>';
+      html += '<div class="so-mcard-cnt">Cancelled only</div>';
+    } else {
+      html += '<div class="so-mcard-rm">' + formatRM(bucket.total) + '</div>';
+      html += '<div class="so-mcard-cnt">' + bucket.count + ' ' + (bucket.count === 1 ? 'order' : 'orders') + '</div>';
+    }
+    html += closeTag;
+  }
+  html += '</div>';
+  return html;
+}
+
+function soRenderCompletedMonth(allCompleted) {
+  var year = soCompletedYear;
+  var month = soCompletedMonth;
+  var today = new Date();
+  var todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
+
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  // First-of-month weekday (0=Sun..6=Sat). Convert to Mon-first index (0=Mon..6=Sun).
+  var firstDay = new Date(year, month, 1).getDay();
+  var firstDayMon = (firstDay + 6) % 7;
+
+  var days = {};
+  for (var d = 1; d <= daysInMonth; d++) {
+    days[d] = { total: 0, count: 0, hasCancelled: false };
+  }
+  var monthTotal = 0, monthCount = 0;
+  for (var i = 0; i < allCompleted.length; i++) {
+    var o = allCompleted[i];
+    var key = soGetCompletedDateKey(o);
+    if (!key) continue;
+    var y = parseInt(key.substring(0, 4), 10);
+    var m = parseInt(key.substring(5, 7), 10) - 1;
+    if (y !== year || m !== month) continue;
+    var dd = parseInt(key.substring(8, 10), 10);
+    if (!days[dd]) continue;
+    if (o.status === 'completed') {
+      var amt = parseFloat(o.grand_total) || 0;
+      days[dd].total += amt;
+      days[dd].count++;
+      monthTotal += amt;
+      monthCount++;
+    } else if (o.status === 'cancelled') {
+      days[dd].hasCancelled = true;
+    }
+  }
+  var daysWithOrders = 0;
+  for (var k in days) if (days[k].count > 0) daysWithOrders++;
+  var avg = daysWithOrders > 0 ? (monthTotal / daysWithOrders) : 0;
+
+  var html = '';
+  html += '<div class="so-month-summary">';
+  html += '<div class="so-msum"><div class="so-msum-label">Total Sales</div><div class="so-msum-val">' + formatRM(monthTotal) + '</div></div>';
+  html += '<div class="so-msum"><div class="so-msum-label">Orders</div><div class="so-msum-val">' + monthCount + '</div></div>';
+  html += '<div class="so-msum"><div class="so-msum-label">Avg / Order Day</div><div class="so-msum-val">' + (avg > 0 ? formatRM(avg) : '—') + '</div></div>';
+  html += '</div>';
+
+  html += '<div class="so-cal">';
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(h) {
+    html += '<div class="so-cal-h">' + h + '</div>';
+  });
+  for (var b = 0; b < firstDayMon; b++) {
+    html += '<div class="so-day so-day-blank"></div>';
+  }
+  for (var dn = 1; dn <= daysInMonth; dn++) {
+    var bucket2 = days[dn];
+    var isToday = (year === todayY && month === todayM && dn === todayD);
+    var isFuture2 = (year > todayY) || (year === todayY && month > todayM) || (year === todayY && month === todayM && dn > todayD);
+    var hasData = bucket2.count > 0 || bucket2.hasCancelled;
+    var classes2 = 'so-day';
+    if (isFuture2 || !hasData) classes2 += ' so-day-empty';
+    if (isToday) classes2 += ' so-day-today';
+
+    var clickable2 = hasData && !isFuture2;
+    var openTag2 = clickable2
+      ? '<button type="button" class="' + classes2 + '" onclick="soCmpGoDay(' + year + ',' + month + ',' + dn + ')">'
+      : '<div class="' + classes2 + '">';
+    var closeTag2 = clickable2 ? '</button>' : '</div>';
+
+    html += openTag2;
+    html += '<div class="so-day-num">' + dn + '</div>';
+    if (bucket2.count > 0) {
+      html += '<div class="so-day-rm">' + formatRM(bucket2.total) + '</div>';
+      html += '<div class="so-day-cnt">' + bucket2.count + ' ' + (bucket2.count === 1 ? 'order' : 'orders') + '</div>';
+    } else if (bucket2.hasCancelled) {
+      // Cancelled-only day: red dot is the signal; show small label, not RM 0
+      html += '<div class="so-day-cnt" style="margin-top:6px;font-style:italic;">cancelled</div>';
+    }
+    if (bucket2.hasCancelled) html += '<span class="so-day-cancel" title="Has cancellations"></span>';
+    html += closeTag2;
+  }
+  html += '</div>';
+  return html;
+}
+
+function soRenderCompletedDay(allCompleted) {
+  var year = soCompletedYear;
+  var month = soCompletedMonth;
+  var day = soCompletedDay;
+  var today = new Date();
+  var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+
+  var dayOrders = allCompleted.filter(function(o) {
+    return soGetCompletedDateKey(o) === dateStr;
+  });
+  var filtered = dayOrders.filter(soDayDetailFilter);
+  filtered.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+
+  var grandTotal = 0, csTotal = 0, doTotal = 0, completedCount = 0;
+  for (var i = 0; i < filtered.length; i++) {
+    var o = filtered[i];
+    if (o.status !== 'completed') continue;
+    var amt = parseFloat(o.grand_total) || 0;
+    grandTotal += amt;
+    if (o.doc_type === 'delivery_order') doTotal += amt; else csTotal += amt;
+    completedCount++;
+  }
+
+  var d = new Date(year, month, day);
+  var yest = new Date(today); yest.setDate(today.getDate() - 1);
+  var isToday = (year === today.getFullYear() && month === today.getMonth() && day === today.getDate());
+  var isYest = (year === yest.getFullYear() && month === yest.getMonth() && day === yest.getDate());
+  var subLabel = isToday ? 'Today' : (isYest ? 'Yesterday' : '');
+
+  var html = '';
+  html += '<div class="so-day-head">';
+  html += '<div>';
+  html += '<div class="so-day-title">' + SO_DAY_FULL[d.getDay()] + ', ' + day + ' ' + SO_MONTH_NAMES[month] + ' ' + year + '</div>';
+  if (subLabel) html += '<div class="so-day-sub">' + subLabel + '</div>';
+  html += '</div>';
+  html += '<div class="so-day-totals">';
+  html += '<div class="so-day-grand">' + formatRM(grandTotal) + '</div>';
+  html += '<div class="so-day-split">' + completedCount + ' ' + (completedCount === 1 ? 'order' : 'orders');
+  if (csTotal > 0 || doTotal > 0) {
+    html += ' &middot; CS <b>' + formatRM(csTotal) + '</b> &middot; DO <b>' + formatRM(doTotal) + '</b>';
+  }
+  html += '</div>';
+  html += '</div>';
+  html += '</div>';
+
+  if (!filtered.length) {
+    var emptyMsg = dayOrders.length
+      ? 'No orders for this day match the current filters.'
+      : 'No orders for this day.';
+    html += '<div class="empty-state" style="padding:24px;">' + emptyMsg + '</div>';
+    return html;
+  }
+
+  html += '<div class="so-day-orders">';
+  html += '<div class="so-orow so-orow-head">';
+  html += '<span>Doc #</span><span>Customer</span><span>Type</span><span>Items</span><span style="text-align:right;">Total</span><span>Payment</span><span></span>';
+  html += '</div>';
+  filtered.forEach(function(o) {
+    var custName = getCustomerName(o.customer_id);
+    var itemCount = soItemsCount(o.id);
+    var total = parseFloat(o.grand_total) || 0;
+    var dLabel = docTypeLabel(o.doc_type);
+    var dBadge = docTypeBadgeClass(o.doc_type);
+    var isCancelled = o.status === 'cancelled';
+    var payClass, payLabel;
+    if (isCancelled) {
+      payClass = 'so-orow-pay-cancelled';
+      payLabel = 'CANCELLED';
+    } else {
+      payClass = 'so-orow-pay-' + (o.payment_status || 'unpaid');
+      payLabel = soPaymentLabel(o.payment_status);
+    }
+    html += '<div class="so-orow" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
+    html += '<span class="so-orow-doc">' + esc(o.doc_number || o.id) + '</span>';
+    html += '<span class="so-orow-cust">' + esc(custName) + '</span>';
+    html += '<span class="so-orow-type"><span class="badge ' + dBadge + '" style="font-size:10px;">' + dLabel + '</span></span>';
+    html += '<span class="so-orow-items">' + itemCount + ' ' + (itemCount === 1 ? 'item' : 'items') + '</span>';
+    html += '<span class="so-orow-total' + (isCancelled ? ' cancelled' : '') + '">' + formatRM(total) + '</span>';
+    html += '<span class="' + payClass + '">' + payLabel + '</span>';
+    html += '<span class="so-orow-chev">›</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function soRenderCompletedLast5(allCompleted) {
+  var today = new Date();
+  var days = [];
+  for (var i = 0; i < 5; i++) {
+    var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    days.push({ date: d, key: key, total: 0, count: 0, hasCancelled: false });
+  }
+  // Apply same filter rules as day-detail (skip status + date range).
+  var filtered = allCompleted.filter(soDayDetailFilter);
+  filtered.forEach(function(o) {
+    var key = soGetCompletedDateKey(o);
+    if (!key) return;
+    var match;
+    for (var j = 0; j < days.length; j++) {
+      if (days[j].key === key) { match = days[j]; break; }
+    }
+    if (!match) return;
+    if (o.status === 'completed') {
+      match.total += parseFloat(o.grand_total) || 0;
+      match.count++;
+    } else if (o.status === 'cancelled') {
+      match.hasCancelled = true;
+    }
+  });
+
+  var rangeStart = days[4], rangeEnd = days[0];
+  var combinedTotal = 0, combinedCount = 0;
+  for (var k = 0; k < days.length; k++) { combinedTotal += days[k].total; combinedCount += days[k].count; }
+
+  var html = '';
+  html += '<div style="font-size:11px;color:var(--text-muted);text-align:right;margin-bottom:10px;">';
+  html += rangeStart.date.getDate() + ' ' + SO_MONTH_ABBR[rangeStart.date.getMonth()] + ' → ';
+  html += rangeEnd.date.getDate() + ' ' + SO_MONTH_ABBR[rangeEnd.date.getMonth()] + ' &middot; ';
+  html += '<b style="color:var(--text);font-variant-numeric:tabular-nums;">' + formatRM(combinedTotal) + '</b> &middot; ';
+  html += combinedCount + ' ' + (combinedCount === 1 ? 'order' : 'orders');
+  html += '</div>';
+
+  html += '<div class="so-l5-stack">';
+  days.forEach(function(dd, idx) {
+    var label = SO_DAY_ABBR[dd.date.getDay()] + ', ' + dd.date.getDate() + ' ' + SO_MONTH_ABBR[dd.date.getMonth()] + ' ' + dd.date.getFullYear();
+    var rel = idx === 0 ? 'Today' : (idx === 1 ? 'Yesterday' : (idx + ' days ago'));
+    var hasData = dd.count > 0 || dd.hasCancelled;
+    var classes = 'so-l5-card' + (hasData ? '' : ' so-l5-empty');
+    var openTag = hasData
+      ? '<button type="button" class="' + classes + '" onclick="soCmpGoDay(' + dd.date.getFullYear() + ',' + dd.date.getMonth() + ',' + dd.date.getDate() + ')">'
+      : '<div class="' + classes + '">';
+    var closeTag = hasData ? '</button>' : '</div>';
+    html += openTag;
+    html += '<div><div class="so-l5-date">' + label + '</div><div class="so-l5-rel">' + rel + '</div></div>';
+    html += '<div>';
+    if (hasData) {
+      html += '<div class="so-l5-rm">' + formatRM(dd.total) + '</div>';
+      html += '<div class="so-l5-cnt">' + dd.count + ' ' + (dd.count === 1 ? 'order' : 'orders') + '</div>';
+    } else {
+      html += '<div class="so-l5-rm">—</div>';
+      html += '<div class="so-l5-cnt">No orders</div>';
+    }
+    html += '</div>';
+    html += '<span class="so-l5-arr"' + (hasData ? '' : ' style="opacity:0.3;"') + '>›</span>';
+    html += closeTag;
+  });
+  html += '</div>';
+  return html;
+}
+
+function soRenderCompletedSection(allCompleted) {
+  var html = '<div class="so-completed-section">';
+  html += '<div class="so-completed-title">Completed &amp; Cancelled</div>';
+  // Filter bar (always visible inside this section). Year + month ignore
+  // filters for their totals; day-detail and last-5 honour them.
+  html += soRenderCompletedFilterBar();
+  // Hint at year/month levels so user knows filters take effect when they
+  // drill into a day, not against the totals shown above.
+  if ((soCompletedView === 'year' || soCompletedView === 'month') && soHasActiveFilters()) {
+    html += '<div class="so-cmp-filter-note">Filters apply when you drill into a day. Totals above show all completed orders.</div>';
+  }
+  html += soRenderCompletedTopBar();
+  if (soCompletedView === 'year')       html += soRenderCompletedYear(allCompleted);
+  else if (soCompletedView === 'month') html += soRenderCompletedMonth(allCompleted);
+  else if (soCompletedView === 'day')   html += soRenderCompletedDay(allCompleted);
+  else if (soCompletedView === 'last5') html += soRenderCompletedLast5(allCompleted);
+  html += '</div>';
+  return html;
+}
+
 function renderOrderCards() {
   var container = document.getElementById('so-cards-container');
   if (!container) return;
 
-  // Filter
-  var filtered = orders.filter(function(o) {
+  // === ACTIVE ORDERS (pending..delivering) — full filter bar applies ===
+  var activeFiltered = orders.filter(function(o) {
+    if (o.status === 'completed' || o.status === 'cancelled') return false;
     if (soFilterStatus && o.status !== soFilterStatus) return false;
     if (soFilterDocType && o.doc_type !== soFilterDocType) return false;
     if (soFilterPayment && o.payment_status !== soFilterPayment) return false;
-    // Date filter: use completed_at for completed/cancelled, order_date for active
-    var filterDate = (o.status === 'completed' || o.status === 'cancelled')
-      ? (o.completed_at || o.updated_at || '').substring(0, 10) : o.order_date;
-    if (soFilterDateFrom && filterDate < soFilterDateFrom) return false;
-    if (soFilterDateTo && filterDate > soFilterDateTo) return false;
+    if (soFilterDateFrom && o.order_date < soFilterDateFrom) return false;
+    if (soFilterDateTo && o.order_date > soFilterDateTo) return false;
     if (soFilterCustomer) {
       var custName = getCustomerName(o.customer_id).toLowerCase();
       if (custName.indexOf(soFilterCustomer.toLowerCase()) < 0) return false;
     }
     return true;
   });
-
-  // Sort
   if (soFilterSort === 'newest') {
-    filtered.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+    activeFiltered.sort(function(a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
   } else if (soFilterSort === 'oldest') {
-    filtered.sort(function(a, b) { return (a.created_at || '').localeCompare(b.created_at || ''); });
+    activeFiltered.sort(function(a, b) { return (a.created_at || '').localeCompare(b.created_at || ''); });
   } else if (soFilterSort === 'customer') {
-    filtered.sort(function(a, b) { return getCustomerName(a.customer_id).localeCompare(getCustomerName(b.customer_id)); });
+    activeFiltered.sort(function(a, b) { return getCustomerName(a.customer_id).localeCompare(getCustomerName(b.customer_id)); });
   }
 
-  if (!filtered.length) {
-    container.innerHTML = '<div class="empty-state">' + (orders.length ? 'No orders match your filters.' : 'No orders yet. Click "+ New Order" to create your first order.') + '</div>';
-    return;
-  }
-
-  // Group by status
-  var statusOrder = ['pending', 'preparing', 'prepared', 'delivering', 'completed', 'cancelled'];
-  var statusColors = {
-    pending: '#3A7AC8', preparing: '#E8A020', prepared: '#4A7C3F',
-    delivering: '#8C5AD2', completed: '#3EC850', cancelled: '#8A8A8A'
-  };
+  var activeStatusOrder = ['pending', 'preparing', 'prepared', 'delivering'];
+  var statusColors = { pending: '#3A7AC8', preparing: '#E8A020', prepared: '#4A7C3F', delivering: '#8C5AD2' };
   var grouped = {};
-  statusOrder.forEach(function(s) { grouped[s] = []; });
-  filtered.forEach(function(o) {
+  activeStatusOrder.forEach(function(s) { grouped[s] = []; });
+  activeFiltered.forEach(function(o) {
     var s = o.status || 'pending';
-    if (!grouped[s]) grouped[s] = [];
-    grouped[s].push(o);
+    if (grouped[s]) grouped[s].push(o);
   });
 
   var html = '';
-  statusOrder.forEach(function(status) {
+  var renderedAnyActive = false;
+  activeStatusOrder.forEach(function(status) {
     var group = grouped[status];
     if (!group || !group.length) return;
-
+    renderedAnyActive = true;
     var color = statusColors[status] || '#888';
     var label = statusLabel(status);
-
-    // Section header
+    group.sort(function(a, b) {
+      var da = a.delivery_date || '9999-99-99';
+      var db = b.delivery_date || '9999-99-99';
+      if (da !== db) return da.localeCompare(db);
+      var ta = a.delivery_time || '99:99';
+      var tb = b.delivery_time || '99:99';
+      if (ta !== tb) return ta.localeCompare(tb);
+      return (a.order_date || '').localeCompare(b.order_date || '');
+    });
     html += '<div class="so-status-group">';
     html += '<div class="so-group-header" style="border-left-color:' + color + ';">';
     html += '<span class="so-group-title" style="color:' + color + ';">' + label + '</span>';
     html += '<span class="so-group-count" style="background:' + color + ';">' + group.length + '</span>';
     html += '</div>';
-
-    // Sort active statuses by delivery urgency (earliest date+time first, no date = bottom)
-    if (status !== 'completed' && status !== 'cancelled') {
-      group.sort(function(a, b) {
-        var da = a.delivery_date || '9999-99-99';
-        var db = b.delivery_date || '9999-99-99';
-        if (da !== db) return da.localeCompare(db);
-        var ta = a.delivery_time || '99:99';
-        var tb = b.delivery_time || '99:99';
-        if (ta !== tb) return ta.localeCompare(tb);
-        return (a.order_date || '').localeCompare(b.order_date || '');
-      });
-    }
-
-    // For completed/cancelled: sub-group by completion date (updated_at)
-    var needsDateGroup = (status === 'completed' || status === 'cancelled');
-
-    if (needsDateGroup && group.length > 0) {
-      // Group by completion date (completed_at, fallback updated_at)
-      var dateGroups = {};
-      var dateOrder = [];
-      group.forEach(function(o) {
-        var d = (o.completed_at || o.updated_at || '').substring(0, 10) || o.order_date || 'unknown';
-        if (!dateGroups[d]) { dateGroups[d] = []; dateOrder.push(d); }
-        dateGroups[d].push(o);
-      });
-      // Sort dates newest first
-      dateOrder.sort(function(a, b) { return b.localeCompare(a); });
-
-      var today = todayStr();
-      var SO_DATE_LIMIT = 7;
-      var visibleDateCount = 0;
-      var hiddenDateCount = dateOrder.length > SO_DATE_LIMIT ? dateOrder.length - SO_DATE_LIMIT : 0;
-      var moreId = 'date-more-' + status;
-      dateOrder.forEach(function(dateKey, dateIdx) {
-        var dateCards = dateGroups[dateKey];
-        visibleDateCount++;
-        // Hide dates beyond the limit inside a collapsible wrapper
-        if (visibleDateCount === SO_DATE_LIMIT + 1 && hiddenDateCount > 0) {
-          html += '<div id="' + moreId + '" style="display:none;">';
-        }
-        var isToday = dateKey === today;
-        var dateLabel = isToday ? 'Today — ' + fmtDate(dateKey) : fmtDate(dateKey);
-        var collapsed = !isToday;
-        var toggleId = 'date-grp-' + status + '-' + dateKey;
-
-        html += '<div class="so-date-group">';
-        html += '<div class="so-date-header' + (collapsed ? ' collapsed' : '') + '" onclick="this.classList.toggle(\'collapsed\');var g=document.getElementById(\'' + toggleId + '\');g.style.display=g.style.display===\'none\'?\'\':\'none\';">';
-        html += '<svg class="so-date-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>';
-        html += '<span>' + dateLabel + '</span>';
-        html += '<span class="so-date-count">' + dateCards.length + '</span>';
-        html += '</div>';
-
-        if (isToday) {
-          // Today: full cards
-          html += '<div id="' + toggleId + '" class="sales-cards-grid" style="">';
-          dateCards.forEach(function(o) {
-            html += soRenderCard(o, status, color, label);
-          });
-          html += '</div>';
-        } else {
-          // Past dates: compact table rows
-          html += '<div id="' + toggleId + '" style="display:none;">';
-          html += '<table class="so-compact-table"><thead><tr>';
-          html += '<th>Doc #</th><th>Customer</th><th>Type</th><th>Items</th><th>Total</th><th>Payment</th>';
-          html += '</tr></thead><tbody>';
-          dateCards.forEach(function(o) {
-            var custName = getCustomerName(o.customer_id);
-            var itemCount = soItemsCount(o.id);
-            var total = parseFloat(o.grand_total) || 0;
-            var dLabel = docTypeLabel(o.doc_type);
-            var dBadge = docTypeBadgeClass(o.doc_type);
-            html += '<tr class="so-compact-row" onclick="soOpenDetail(\'' + esc(o.id) + '\')">';
-            html += '<td class="so-compact-doc">' + esc(o.doc_number || o.id) + '</td>';
-            html += '<td>' + esc(custName) + '</td>';
-            html += '<td><span class="badge ' + dBadge + '" style="font-size:10px;">' + dLabel + '</span></td>';
-            html += '<td>' + itemCount + '</td>';
-            html += '<td class="so-compact-total">' + formatRM(total) + '</td>';
-            html += '<td><span class="badge badge-' + esc(o.payment_status || 'unpaid') + '" style="font-size:10px;">' + soPaymentLabel(o.payment_status) + '</span></td>';
-            html += '</tr>';
-          });
-          html += '</tbody></table>';
-          html += '</div>';
-        }
-        html += '</div>';
-      });
-      // Close hidden wrapper and add "Show more" button
-      if (hiddenDateCount > 0) {
-        html += '</div>';
-        html += '<button class="btn btn-outline btn-sm" style="margin:8px 0;" onclick="var el=document.getElementById(\'' + moreId + '\');el.style.display=\'\';this.style.display=\'none\';">Show ' + hiddenDateCount + ' more date' + (hiddenDateCount > 1 ? 's' : '') + '</button>';
-      }
-    } else {
-      // Active statuses: flat grid, no date grouping
-      html += '<div class="sales-cards-grid">';
-      group.forEach(function(o) {
-        html += soRenderCard(o, status, color, label);
-      });
-      html += '</div>';
-    }
+    html += '<div class="sales-cards-grid">';
+    group.forEach(function(o) {
+      html += soRenderCard(o, status, color, label);
+    });
+    html += '</div>';
     html += '</div>';
   });
+
+  // Empty-state messaging for the active section
+  if (!renderedAnyActive) {
+    var anyActiveExists = orders.some(function(o) { return o.status !== 'completed' && o.status !== 'cancelled'; });
+    var anyOrderExists = orders.length > 0;
+    if (!anyOrderExists) {
+      html += '<div class="empty-state">No orders yet. Click "+ New Order" to create your first order.</div>';
+    } else if (anyActiveExists) {
+      html += '<div class="empty-state" style="padding:20px;">No active orders match your filters.</div>';
+    } else {
+      html += '<div class="empty-state" style="padding:14px 20px;font-size:12px;">No active orders right now — see completed orders below.</div>';
+    }
+  }
+
+  // === COMPLETED & CANCELLED (drill-down) ===
+  var allCompleted = orders.filter(function(o) {
+    return o.status === 'completed' || o.status === 'cancelled';
+  });
+  if (allCompleted.length > 0) {
+    html += soRenderCompletedSection(allCompleted);
+  }
 
   container.innerHTML = html;
 }
@@ -3311,7 +3719,7 @@ function soPrepQtyConfirm() {
     var isPcsLine = inp.dataset.isPcs === '1';
     var newQty = parseFloat(inp.value) || 0;
     var price = parseFloat(inp.dataset.price) || 0;
-    var lineTotal = newQty * price;
+    var lineTotal = roundMoney(newQty * price);
 
     var itemData = { itemId: itemId, quantity: newQty, price: price, lineTotal: lineTotal };
     if (isPcsLine) {
@@ -3692,7 +4100,7 @@ function soDelQtyConfirm() {
       itemId: inp.dataset.itemId,
       quantity: parseFloat(inp.value) || 0,
       price: parseFloat(inp.dataset.price) || 0,
-      lineTotal: (parseFloat(inp.value) || 0) * (parseFloat(inp.dataset.price) || 0)
+      lineTotal: roundMoney((parseFloat(inp.value) || 0) * (parseFloat(inp.dataset.price) || 0))
     });
   }
   soDeliveryPending.items = pendingItems;
@@ -3881,7 +4289,7 @@ async function soDeliveryCommitAll() {
       var payData = {
         id: paymentId,
         order_id: orderId,
-        amount: pending.payment.amount,
+        amount: roundMoney(pending.payment.amount),
         payment_date: todayStr(),
         method: pending.payment.method,
         reference: pending.payment.reference,
@@ -3934,8 +4342,11 @@ async function soDeliveryCommitAll() {
       .filter(function(p) { return p.order_id === orderId; })
       .reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
     var paymentStatusFinal = 'unpaid';
-    if (newGrand > 0 && totalPaidFinal >= newGrand) paymentStatusFinal = 'paid';
-    else if (totalPaidFinal > 0) paymentStatusFinal = 'partial';
+    // Cents-comparison — see recalcPaymentStatus for context (AF-CS086 fix).
+    var paidCentsFinal = Math.round(totalPaidFinal * 100);
+    var grandCentsFinal = Math.round(newGrand * 100);
+    if (grandCentsFinal > 0 && paidCentsFinal >= grandCentsFinal) paymentStatusFinal = 'paid';
+    else if (paidCentsFinal > 0) paymentStatusFinal = 'partial';
 
     // Generate doc_number BEFORE the order UPDATE — null-check abort.
     // Idempotent: returns existing o.doc_number if already set (e.g. legacy order).
@@ -4033,7 +4444,7 @@ async function soWalkInConfirm() {
     var payData = {
       id: paymentId,
       order_id: orderId,
-      amount: total,
+      amount: roundMoney(total),
       payment_date: todayStr(),
       method: method,
       reference: reference || null,
@@ -5460,8 +5871,13 @@ function recalcPaymentStatus(orderId) {
   var totalPaid = payments.filter(function(p) { return p.order_id === orderId; }).reduce(function(s, p) { return s + (parseFloat(p.amount) || 0); }, 0);
   o.amount_paid = totalPaid;
   var grandTotal = parseFloat(o.grand_total) || 0;
-  if (grandTotal > 0 && totalPaid >= grandTotal) o.payment_status = 'paid';
-  else if (totalPaid > 0) o.payment_status = 'partial';
+  // Compare in cents (integer math) — avoids FP residue from sub-cent
+  // line_totals marking a fully-paid order as partial (AF-CS086 case).
+  // Mirrors recalcInvoicePaymentStatus, fixed 2026-05-03 for AF-INV008.
+  var paidCents = Math.round(totalPaid * 100);
+  var grandCents = Math.round(grandTotal * 100);
+  if (grandCents > 0 && paidCents >= grandCents) o.payment_status = 'paid';
+  else if (paidCents > 0) o.payment_status = 'partial';
   else o.payment_status = 'unpaid';
 }
 
@@ -5824,7 +6240,7 @@ function renderPaymentsInvoice() {
         var invAgeColor = invoiceAgingColor(inv);
 
         html += '<tr>';
-        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();invSubtab=\'invoices\';invSearchTerm=\'' + esc(inv.id) + '\';switchTab(\'invoicing\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
+        html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();invSubtab=\'invoices\';invStatusFilter=\'all\';invSearchTerm=\'' + esc(inv.id) + '\';switchTab(\'invoicing\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
         html += '<td>' + fmtDateShort(inv.invoice_date) + '</td>';
         html += '<td>' + fmtDateShort(inv.due_date) + '</td>';
         html += '<td><span style="color:' + invAgeColor + ';font-weight:600;">' + ageLabel + '</span></td>';
@@ -6078,7 +6494,7 @@ async function paySavePayment() {
       var payData = {
         id: paymentId,
         order_id: oid,
-        amount: payAmount,
+        amount: roundMoney(payAmount),
         payment_date: payDate,
         method: method,
         reference: reference || null,
@@ -7147,7 +7563,10 @@ function invPrintSummary() {
 }
 
 // ── Invoice List ──
-var invStatusFilter = 'all';
+// Default to Outstanding so the user lands on what needs attention, not a
+// paid-history wall. Cross-tab deep-links to a specific invoice override this
+// to 'all' so the search isn't filtered out.
+var invStatusFilter = 'outstanding';
 var invPeriodPreset = 'last-90';
 var invCustomDateFrom = '';
 var invCustomDateTo = '';
@@ -7455,7 +7874,7 @@ async function invPaySave() {
     var payData = {
       id: paymentId,
       invoice_id: invoiceId,
-      amount: amount,
+      amount: roundMoney(amount),
       payment_date: payDate,
       method: method,
       reference: reference || null,
@@ -8579,9 +8998,12 @@ async function invCreateDraftInvoice() {
       });
     });
 
+    // Round each aggregated line_total to cents so FP residue from summing
+    // many DO line_totals doesn't leak into the invoice subtotal/grand_total.
     var subtotal = 0;
     var productLines = Object.values(productAgg);
-    productLines.forEach(function(p) { subtotal += p.line_total; });
+    productLines.forEach(function(p) { p.line_total = roundMoney(p.line_total); subtotal += p.line_total; });
+    subtotal = roundMoney(subtotal);
     var grandTotal = subtotal;
 
     // 5. Insert sales_invoices
@@ -9874,7 +10296,7 @@ function soWizAddItem() {
     unit: p.unit || 'kg',
     indexMin: '',
     indexMax: '',
-    lineTotal: isPcs ? 0 : (qty * unitPrice),
+    lineTotal: isPcs ? 0 : roundMoney(qty * unitPrice),
     orderInPcs: isPcs,
     orderPcs: isPcs ? String(Math.round(qty)) : ''
   });
@@ -10296,13 +10718,13 @@ function soCalcTotals() {
         && item.productId === item.existingProductId
         && String(parseInt(item.orderPcs, 10) || 0) === String(parseInt(item.existingOrderPcs, 10) || 0);
       if (hasBaseline) {
-        item.lineTotal = (parseFloat(item.existingQuantity) || 0) * (parseFloat(item.unitPrice) || 0);
+        item.lineTotal = roundMoney((parseFloat(item.existingQuantity) || 0) * (parseFloat(item.unitPrice) || 0));
       } else {
         item.lineTotal = 0;
         if (parseInt(item.orderPcs, 10) > 0) pendingPcs++;
       }
     } else {
-      item.lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
+      item.lineTotal = roundMoney((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0));
     }
   });
   var subtotal = soItems.reduce(function(sum, i) { return sum + i.lineTotal; }, 0);
@@ -10409,7 +10831,7 @@ async function soSaveOrder() {
           product_id: item.productId,
           quantity: hasBaseline ? keptQty : (isPcs ? 0 : parseFloat(item.quantity)),
           unit_price: priceNum,
-          line_total: hasBaseline ? (keptQty * priceNum) : (isPcs ? 0 : item.lineTotal),
+          line_total: roundMoney(hasBaseline ? (keptQty * priceNum) : (isPcs ? 0 : item.lineTotal)),
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
           index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
           order_pcs: isPcs ? parseInt(item.orderPcs, 10) : null,
@@ -10486,7 +10908,7 @@ async function soSaveOrder() {
           product_id: item.productId,
           quantity: isPcs ? 0 : parseFloat(item.quantity),
           unit_price: parseFloat(item.unitPrice) || 0,
-          line_total: isPcs ? 0 : item.lineTotal,
+          line_total: isPcs ? 0 : roundMoney(item.lineTotal),
           index_min: item.indexMin !== '' ? parseInt(item.indexMin) : null,
           index_max: item.indexMax !== '' ? parseInt(item.indexMax) : null,
           order_pcs: isPcs ? parseInt(item.orderPcs, 10) : null,

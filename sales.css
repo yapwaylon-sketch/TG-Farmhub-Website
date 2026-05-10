@@ -2174,3 +2174,323 @@
   .inv-draft-actions { justify-content: flex-end; flex-wrap: wrap; }
   .inv-dock-fields { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   COMPLETED ORDERS — YEAR / MONTH / DAY DRILL-DOWN
+   ============================================================ */
+.so-completed-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 2px solid var(--border);
+}
+.so-completed-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 12px;
+}
+
+/* Top bar: back + breadcrumb + last5 */
+.so-cmp-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.so-cmp-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.so-cmp-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 6px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--purple); font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.so-cmp-back:hover { background: rgba(107,76,138,0.08); border-color: var(--purple); }
+.so-cmp-crumb { font-size: 12px; color: var(--text-muted); }
+.so-cmp-crumb a {
+  color: var(--purple); font-weight: 600; text-decoration: none;
+  cursor: pointer; padding: 2px 4px; border-radius: 3px;
+}
+.so-cmp-crumb a:hover { background: rgba(107,76,138,0.08); text-decoration: underline; }
+.so-cmp-crumb .sep { padding: 0 4px; color: #BFB6CB; }
+.so-cmp-crumb .here { color: var(--text); font-weight: 700; }
+.so-cmp-last5 {
+  padding: 6px 12px; border-radius: 18px;
+  background: #FFF8E5; border: 1.5px solid var(--gold);
+  color: #8A6D1F; font-size: 11px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.so-cmp-last5:hover { background: var(--gold); color: white; }
+.so-cmp-last5.active { background: var(--gold); color: white; }
+
+/* Year nav (compact prev/year/next) */
+.so-yearnav {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 22px; padding: 4px 8px;
+}
+.so-yearbtn {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(107,76,138,0.08); border: none;
+  color: var(--purple); font-weight: 800; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  font-family: inherit;
+}
+.so-yearbtn:hover:not(:disabled) { background: rgba(107,76,138,0.2); }
+.so-yearbtn:disabled { color: #BFB6CB; cursor: not-allowed; background: transparent; }
+.so-cmp-year {
+  font-size: 16px; font-weight: 800; color: var(--text);
+  min-width: 56px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.so-cmp-yeartotal {
+  font-size: 11px; color: var(--text-muted); font-weight: 600;
+  padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 14px; white-space: nowrap;
+}
+.so-cmp-yeartotal b {
+  color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; margin-left: 4px;
+}
+
+/* Year grid (4x3 month cards) */
+.so-mgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.so-mcard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 14px 16px;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  position: relative;
+  text-align: left;
+  font-family: inherit;
+}
+.so-mcard:hover {
+  transform: translateY(-2px);
+  border-color: var(--purple);
+  box-shadow: 0 4px 12px rgba(107,76,138,0.12);
+}
+.so-mcard-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.so-mcard-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.so-mcard-num { font-size: 11px; color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.so-mcard-rm { font-size: 19px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.so-mcard-cnt {
+  font-size: 10px; color: var(--text-muted); margin-top: 4px;
+  text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+}
+.so-mcard-cancel {
+  position: absolute; top: 10px; right: 10px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--red);
+}
+.so-mcard-current {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 2px rgba(107,76,138,0.18);
+}
+.so-mcard-empty {
+  background: rgba(0,0,0,0.02); cursor: default; opacity: 0.5;
+}
+.so-mcard-empty:hover {
+  transform: none; border-color: var(--border); box-shadow: none;
+}
+.so-mcard-empty .so-mcard-rm { color: #BFB6CB; }
+.so-mcard-future {
+  background: rgba(0,0,0,0.02); cursor: default; opacity: 0.45;
+  border-style: dashed;
+}
+.so-mcard-future:hover {
+  transform: none; border-color: var(--border); box-shadow: none;
+}
+
+/* Month summary cards (Total / Orders / Avg) */
+.so-month-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+.so-msum {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+.so-msum-label {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+}
+.so-msum-val {
+  font-size: 18px; font-weight: 700; color: var(--text);
+  margin-top: 2px; font-variant-numeric: tabular-nums;
+}
+
+/* Month calendar grid */
+.so-cal {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.so-cal-h {
+  font-size: 10px; color: var(--text-muted); text-align: center;
+  padding: 4px 0; font-weight: 700; text-transform: uppercase;
+}
+.so-day {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 6px 8px;
+  min-height: 64px;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+  position: relative;
+  text-align: left;
+  font-family: inherit;
+}
+.so-day:hover { transform: scale(1.04); border-color: var(--purple); }
+.so-day-blank {
+  background: transparent;
+  border: 1px dashed var(--border);
+  cursor: default;
+}
+.so-day-blank:hover { transform: none; border-color: var(--border); }
+.so-day-empty {
+  background: rgba(0,0,0,0.02); cursor: default;
+}
+.so-day-empty:hover { transform: none; border-color: var(--border); }
+.so-day-num { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.so-day-rm {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin-top: 4px; font-variant-numeric: tabular-nums;
+  /* Wrap "RM" onto its own line on narrow cells (mobile) instead of breaking
+     mid-number. On desktop the cell is wide enough to keep it all on one line. */
+  white-space: normal; word-spacing: -1px;
+}
+.so-day-cnt { font-size: 9px; color: var(--text-muted); margin-top: 2px; }
+.so-day-cancel {
+  position: absolute; top: 4px; right: 4px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--red);
+}
+.so-day-today {
+  outline: 2px solid var(--purple); outline-offset: -2px;
+}
+
+/* Day-detail header */
+.so-day-head {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 12px; align-items: center;
+}
+.so-day-title { font-size: 18px; font-weight: 800; color: var(--text); }
+.so-day-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.so-day-totals { text-align: right; }
+.so-day-grand {
+  font-size: 22px; font-weight: 800; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.so-day-split { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.so-day-split b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Day-detail order rows (table-style) */
+.so-day-orders {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.so-orow {
+  display: grid;
+  grid-template-columns: 110px 1fr 70px 80px 110px 110px 18px;
+  gap: 12px; padding: 11px 14px; align-items: center;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  transition: background 0.1s;
+}
+.so-orow:last-child { border-bottom: none; }
+.so-orow:hover { background: rgba(0,0,0,0.025); }
+.so-orow-head {
+  background: rgba(0,0,0,0.025);
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+  cursor: default;
+}
+.so-orow-head:hover { background: rgba(0,0,0,0.025); }
+.so-orow-doc {
+  font-size: 12px; font-weight: 700; color: var(--purple);
+  font-variant-numeric: tabular-nums;
+}
+.so-orow-cust {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.so-orow-items { font-size: 11px; color: var(--text-muted); }
+.so-orow-total {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.so-orow-total.cancelled { text-decoration: line-through; color: var(--text-muted); }
+.so-orow-pay-paid { color: #3EC850; font-weight: 700; font-size: 11px; }
+.so-orow-pay-partial { color: #E8A020; font-weight: 700; font-size: 11px; }
+.so-orow-pay-unpaid { color: var(--red); font-weight: 700; font-size: 11px; }
+.so-orow-pay-cancelled { color: var(--text-muted); font-weight: 700; font-size: 10px; text-transform: uppercase; }
+.so-orow-chev { color: #BFB6CB; font-size: 14px; text-align: right; }
+
+/* Last 5 days stack */
+.so-l5-stack { display: flex; flex-direction: column; gap: 8px; }
+.so-l5-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+  display: grid; grid-template-columns: 1fr auto auto; gap: 16px;
+  align-items: center; cursor: pointer;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.so-l5-card:hover { border-color: var(--purple); transform: translateX(2px); }
+.so-l5-date { font-size: 14px; font-weight: 700; color: var(--text); }
+.so-l5-rel {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.5px; font-weight: 600; margin-top: 2px;
+}
+.so-l5-rm {
+  font-size: 18px; font-weight: 800; color: var(--text);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.so-l5-cnt {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px; text-align: right;
+}
+.so-l5-arr { color: #BFB6CB; font-size: 16px; }
+.so-l5-empty {
+  background: rgba(0,0,0,0.02); opacity: 0.55; cursor: default;
+}
+.so-l5-empty:hover { transform: none; border-color: var(--border); }
+.so-l5-empty .so-l5-rm { color: #BFB6CB; }
+
+/* Filter hint shown on year/month (filters live below the bar but bypassed at these levels) */
+.so-cmp-filter-note {
+  font-size: 11px; color: var(--text-muted);
+  font-style: italic; padding: 6px 0; text-align: right;
+}
+
+/* Mobile — collapse columns */
+@media (max-width: 720px) {
+  .so-mgrid { grid-template-columns: repeat(2, 1fr); }
+  .so-cmp-bar { gap: 8px; }
+  .so-cmp-yeartotal { width: 100%; text-align: center; }
+  .so-day-head { grid-template-columns: 1fr; gap: 8px; }
+  .so-day-totals { text-align: left; }
+  .so-orow {
+    grid-template-columns: 1fr 80px;
+    grid-template-rows: auto auto;
+    gap: 4px;
+    padding: 10px 12px;
+  }
+  .so-orow > .so-orow-doc { grid-column: 1; grid-row: 1; }
+  .so-orow > .so-orow-total { grid-column: 2; grid-row: 1; }
+  .so-orow > .so-orow-cust { grid-column: 1 / span 2; grid-row: 2; }
+  .so-orow > .so-orow-type,
+  .so-orow > .so-orow-items,
+  .so-orow > .so-orow-pay,
+  .so-orow > .so-orow-chev { display: none; }
+  .so-orow-head { display: none; }
+  .so-day-rm { font-size: 11px; }
+  .so-day { min-height: 56px; }
+}
+

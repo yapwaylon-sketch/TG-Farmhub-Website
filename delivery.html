@@ -681,7 +681,7 @@ function delQtyConfirm() {
     pendingItems.push({
       id: inp.getAttribute('data-item-id'),
       quantity: qty,
-      line_total: qty * price
+      line_total: roundMoney(qty * price)
     });
   });
   delPending.items = pendingItems;
@@ -938,7 +938,7 @@ async function delCommitAll() {
       var payData = {
         id: pending.payment.id,
         order_id: orderId,
-        amount: pending.payment.amount,
+        amount: roundMoney(pending.payment.amount),
         payment_date: getTodayStr(),
         method: pending.payment.method,
         created_by: currentUser ? currentUser.id : null,
@@ -953,7 +953,9 @@ async function delCommitAll() {
 
       var totalPaid = (parseFloat(o.amount_paid) || 0) + pending.payment.amount;
       orderUpdate.amount_paid = totalPaid;
-      orderUpdate.payment_status = totalPaid >= newGrand ? 'paid' : 'partial';
+      // Cents-comparison: avoids sub-cent FP residue marking a fully-paid
+      // order as partial. See AF-CS086 / recalcPaymentStatus.
+      orderUpdate.payment_status = (Math.round(totalPaid * 100) >= Math.round(newGrand * 100)) ? 'paid' : 'partial';
     }
 
     // 6. Commit order status
