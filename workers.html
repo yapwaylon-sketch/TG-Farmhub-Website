@@ -1484,12 +1484,54 @@ function renderWorkerStatusFields() {
     html += '<div class="form-field" style="margin-top:8px;"><label style="font-size:11px;">Notes (optional)</label>';
     html += '<input type="text" id="w-dep-notes" value="' + esc(existingNotes) + '" placeholder="e.g. last seen Apr 30, owed RM 500"></div>';
     if (debt > 0 && (!w || workerStatusOf(w) !== 'departed')) {
-      html += '<div style="margin-top:10px;padding:8px 10px;border:1px solid var(--critical);border-radius:6px;background:rgba(232,96,96,0.08);font-size:12px;color:var(--critical);">';
-      html += '<b>Outstanding hutang: RM ' + fmtNum2(debt) + '</b> — will be written off as bad debt on save. Use the Reverse Write-Off button on the profile if the worker returns and pays back.';
+      // 3-way radio: write off (default — esp. for ran_away), paid full in cash,
+      // or partial split. The partial input auto-computes the remaining write-off.
+      html += '<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--critical);border-radius:6px;background:rgba(232,96,96,0.06);">';
+      html += '<div style="font-size:12px;font-weight:700;color:var(--critical);margin-bottom:6px;">Outstanding hutang: RM ' + fmtNum2(debt) + '</div>';
+      html += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">How is this being handled?</div>';
+      html += '<input type="hidden" id="w-debt-total" value="' + debt + '">';
+      // Choices
+      var choices = [
+        ['writeoff', 'Write off as bad debt'],
+        ['paid_full', 'Worker paid back fully in cash today'],
+        ['partial', 'Partial: paid some in cash, rest written off']
+      ];
+      choices.forEach(function(c) {
+        html += '<label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;font-size:12px;">';
+        html += '<input type="radio" name="w-debt-action" value="' + c[0] + '"' + (c[0] === 'writeoff' ? ' checked' : '') + ' onchange="renderDebtPartial()"> ' + c[1];
+        html += '</label>';
+      });
+      // Partial input + computed remainder (hidden until selected)
+      html += '<div id="w-debt-partial-box" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(0,0,0,0.03);border-radius:4px;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;font-size:12px;">';
+      html += '<span>Cash paid: RM</span>';
+      html += '<input type="number" id="w-debt-cash" step="0.01" min="0" max="' + debt + '" style="width:100px;padding:4px 6px;" oninput="renderDebtPartialRemainder()">';
+      html += '<span style="color:var(--text-muted);">→ Write off RM <b id="w-debt-remainder">' + fmtNum2(debt) + '</b></span>';
+      html += '</div></div>';
+      html += '<div style="font-size:10px;color:var(--text-muted);margin-top:6px;font-style:italic;">Pending advances will be closed and active loans settled regardless of choice. Use Reverse Write-Off on the profile if a written-off amount needs to come back later.</div>';
       html += '</div>';
     }
   }
   box.innerHTML = html;
+}
+
+// Show/hide the partial-amount input when the user picks "Partial".
+function renderDebtPartial() {
+  var pick = (document.querySelector('input[name="w-debt-action"]:checked') || {}).value;
+  var box = document.getElementById('w-debt-partial-box');
+  if (!box) return;
+  box.style.display = (pick === 'partial') ? '' : 'none';
+  if (pick === 'partial') renderDebtPartialRemainder();
+}
+
+// Live update the "→ Write off RM X" remainder as the user types the cash amount.
+function renderDebtPartialRemainder() {
+  var total = parseFloat((document.getElementById('w-debt-total') || {}).value) || 0;
+  var cash = parseFloat((document.getElementById('w-debt-cash') || {}).value) || 0;
+  if (cash > total) cash = total;
+  var rem = roundMoney(total - cash);
+  var el = document.getElementById('w-debt-remainder');
+  if (el) el.textContent = fmtNum2(rem);
 }
 
 function openEditWorker(id) { const w = workers.find(x => x.id === id); if (w) openWorkerModal(w); }
@@ -1546,12 +1588,31 @@ async function saveWorker() {
     // Detect status transitions (used after the core save to fire side effects).
     const oldStatus = old ? workerStatusOf(old) : 'active';
     const transitioningToDeparted = old && oldStatus !== 'departed' && status === 'departed';
-    let writeOffAmt = 0;
+    // Departure debt-handling: read the radio + partial input, split the
+    // total debt into cash repaid vs written off, and stamp both onto the
+    // worker record.
+    let totalDebt = 0, cashRepaid = 0, writeOffAmt = 0, debtAction = 'writeoff';
     if (transitioningToDeparted) {
-      writeOffAmt = getWorkerTotalDebt(editId);
-      if (writeOffAmt > 0) {
-        data.bad_debt_writeoff_amount = writeOffAmt;
-        data.bad_debt_writeoff_at = new Date().toISOString();
+      totalDebt = getWorkerTotalDebt(editId);
+      if (totalDebt > 0) {
+        debtAction = (document.querySelector('input[name="w-debt-action"]:checked') || {}).value || 'writeoff';
+        if (debtAction === 'paid_full') {
+          cashRepaid = totalDebt;
+        } else if (debtAction === 'partial') {
+          var partialCash = roundMoney(parseFloat((document.getElementById('w-debt-cash') || {}).value) || 0);
+          if (partialCash <= 0) { notify("Enter the cash amount paid back, or pick a different option", "warning"); if (btn) btnLoading(btn, false, 'Save'); return; }
+          if (partialCash > totalDebt) partialCash = totalDebt;
+          cashRepaid = partialCash;
+        } // 'writeoff' leaves cashRepaid = 0
+        writeOffAmt = roundMoney(totalDebt - cashRepaid);
+        if (cashRepaid > 0) {
+          data.repayment_amount = cashRepaid;
+          data.repayment_at = new Date().toISOString();
+        }
+        if (writeOffAmt > 0) {
+          data.bad_debt_writeoff_amount = writeOffAmt;
+          data.bad_debt_writeoff_at = new Date().toISOString();
+        }
       }
     }
 
@@ -1623,10 +1684,53 @@ async function saveWorker() {
           if (status === 'active') await auditLog("workers", editId, "leave_end", "Returned from leave on " + todayIso);
         }
       }
-      // Transition INTO departed: write off bad debt + audit
+      // Transition INTO departed: settle outstanding hutang.
+      // Regardless of cash/writeoff split, the underlying advances + loans
+      // are CLOSED — they no longer represent active obligations. The split
+      // (how the closure was financed) lives on the worker record.
       if (transitioningToDeparted) {
+        if (totalDebt > 0) {
+          // Close pending advances (any period) — they're settled now.
+          var pendingAdvs = salaryAdvances.filter(function(a) { return a.worker_id === editId && a.status === 'pending'; });
+          for (var ai = 0; ai < pendingAdvs.length; ai++) {
+            var adv = pendingAdvs[ai];
+            await sbQuery(sb.from("salary_advances").update({ status: 'deducted' }).eq("id", adv.id).select());
+            adv.status = 'deducted';
+          }
+          // Close active loans — record a loan_repayment for each balance so
+          // ledger reconciles, then mark settled. Loan repayments are tagged
+          // with the cash/writeoff split via notes for traceability.
+          var activeLoans = workerLoans.filter(function(l) { return l.worker_id === editId && l.status === 'active'; });
+          var splitTag = debtAction === 'paid_full' ? 'cash repayment'
+                       : debtAction === 'partial'   ? 'partial cash + writeoff at departure'
+                       : 'written off at departure';
+          for (var li = 0; li < activeLoans.length; li++) {
+            var loan = activeLoans[li];
+            var bal = roundMoney(parseFloat(loan.balance) || 0);
+            if (bal > 0) {
+              var lrId = await dbNextId("LR");
+              var lrData = {
+                id: lrId, loan_id: loan.id, worker_id: editId, amount: bal,
+                date: new Date().toISOString().slice(0, 10),
+                notes: 'Loan closed at departure — ' + splitTag,
+                created_at: new Date().toISOString(),
+                company_id: getCompanyId()
+              };
+              await sbQuery(sb.from("loan_repayments").insert(lrData).select());
+              loanRepayments.unshift(lrData);
+            }
+            await sbQuery(sb.from("worker_loans").update({ status: 'settled', balance: 0 }).eq("id", loan.id).select());
+            loan.status = 'settled'; loan.balance = 0;
+          }
+        }
         var depMsg = "Departed (" + workerDepartureLabel(depType) + ") on " + depDate;
-        if (writeOffAmt > 0) depMsg += " · Bad debt RM " + fmtNum2(writeOffAmt) + " written off";
+        if (totalDebt > 0) {
+          depMsg += " · Hutang RM " + fmtNum2(totalDebt) + " (";
+          var parts = [];
+          if (cashRepaid > 0) parts.push("RM " + fmtNum2(cashRepaid) + " repaid in cash");
+          if (writeOffAmt > 0) parts.push("RM " + fmtNum2(writeOffAmt) + " written off");
+          depMsg += parts.join(" · ") + ")";
+        }
         if (depNotes) depMsg += " · " + depNotes;
         await auditLog("workers", editId, "departure", depMsg);
       }
@@ -3958,6 +4062,10 @@ async function renderWorkerProfile() {
     if (w.departure_type || w.departure_date) {
       detailsHtml += detailRow("Last Departure", workerDepartureLabel(w.departure_type) + (w.departure_date ? ' on ' + fmtDate(w.departure_date) : ''));
       if (w.departure_notes) detailsHtml += detailRow("Departure Notes", esc(w.departure_notes));
+      var cashRepaid = parseFloat(w.repayment_amount) || 0;
+      if (cashRepaid > 0) {
+        detailsHtml += detailRow("Cash Repaid at Departure", '<strong style="color:var(--good);">RM ' + fmtNum2(cashRepaid) + '</strong>' + (w.repayment_at ? ' on ' + fmtDate(w.repayment_at.substring(0,10)) : ''));
+      }
       if (writeOffAmt > 0) detailsHtml += detailRow("Bad Debt Written Off", '<strong style="color:var(--critical);">RM ' + fmtNum2(writeOffAmt) + '</strong>' + (w.bad_debt_writeoff_at ? ' on ' + fmtDate(w.bad_debt_writeoff_at.substring(0,10)) : ''));
     }
     // Open leave period (if currently on leave)
