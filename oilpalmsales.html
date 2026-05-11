@@ -88,6 +88,7 @@
     let varieties = [];          // for display only
     let suppliers = [];          // for batch-row supplier-name lookups (e.g. on booking detail)
     let paymentsByBooking = {};  // {booking_id: total_paid}
+    let midCullsByBatch = {};    // {batch_id: total cull-event qty (mid-MN + batch-close, NOT transplant)}
 
     // Bookings tab filter state (Task 3.4)
     let bookingsFilter = { status: 'all', customer: '', batch: 'all' };
@@ -138,7 +139,8 @@
         loadPayments(),
         loadBatches(),
         loadVarieties(),
-        loadSuppliers()
+        loadSuppliers(),
+        loadMidCulls()
       ]);
       renderSummaryTab();
     });
@@ -194,6 +196,19 @@
       // so booking-side Available math works without joins.
       const data = await sbQuery(sb.from('oilpalm_batches').select('*').eq('company_id', getCompanyId()).order('created_at', { ascending: false }));
       batches = data || [];
+    }
+
+    async function loadMidCulls() {
+      // oilpalm_batch_events has NO company_id column — DO NOT filter by it
+      // (PostgREST 400 → swallowed by sbQuery → silent empty result; per CLAUDE.md).
+      // Transplant flow stores transplant-time culls on oilpalm_batches.transplant_culls
+      // and emits event_type='transplant' (NOT 'cull'). So summing event_type='cull' here
+      // gives ONLY mid-MN + batch-close culls — safe to add to transplant_culls without double-counting.
+      const data = await sbQuery(sb.from('oilpalm_batch_events').select('batch_id, qty, event_type').eq('event_type', 'cull'));
+      midCullsByBatch = {};
+      (data || []).forEach(e => {
+        midCullsByBatch[e.batch_id] = (midCullsByBatch[e.batch_id] || 0) + Number(e.qty || 0);
+      });
     }
 
     async function loadVarieties() {
@@ -2546,8 +2561,7 @@ async function shareSlip() {
       const todaysQty = todaysCols.reduce((s, c) => s + (Number(c.qty) || 0), 0);
 
       // Per-batch table — ALL batches, sorted by stage priority then batch number.
-      // For each stage, "Total" picks the most relevant qty (ordered_qty / qty_planted / qty_mn_start).
-      // Booked/Collected/Available only meaningful for stages that allow bookings or collections.
+      // 7 columns: Batch / Variety / Stage / Total Planted / Booked / Balance (less booking) / Actual Balance
       const STAGE_ORDER = { selling:1, main_nursery:2, pre_nursery:3, received:4, ordered:5, sold_out:6, closed:7 };
       const STAGE_LABEL = { ordered:'Ordered', received:'Received', pre_nursery:'Pre-Nursery', main_nursery:'Main Nursery', selling:'Selling', sold_out:'Sold Out', closed:'Closed' };
       const sortedBatches = [...batches].sort((a, b) => {
@@ -2556,33 +2570,56 @@ async function shareSlip() {
         return (a.batch_number || '').localeCompare(b.batch_number || '');
       });
 
+      // Pre-aggregate walk-in vs booking-collected per batch (collected = ALL collections; the
+      // earlier collectedByBatch already exists for top stat cards. Here we split by booking_id.)
+      const walkInByBatch = {};
+      const bookingCollByBatch = {};
+      collections.forEach(c => {
+        if (c.booking_id) {
+          bookingCollByBatch[c.batch_id] = (bookingCollByBatch[c.batch_id] || 0) + Number(c.qty || 0);
+        } else {
+          walkInByBatch[c.batch_id] = (walkInByBatch[c.batch_id] || 0) + Number(c.qty || 0);
+        }
+      });
+
       let batchRows = '';
       if (sortedBatches.length === 0) {
-        batchRows = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">No batches yet. Create one in Oil Palm Growth.</td></tr>';
+        batchRows = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No batches yet. Create one in Oil Palm Growth.</td></tr>';
       } else {
         batchRows = sortedBatches.map(b => {
-          // Pick "Total" relevant to stage
-          let total;
-          if (b.status === 'ordered' || b.status === 'received') total = Number(b.ordered_qty) || 0;
-          else if (b.status === 'pre_nursery')                    total = Number(b.qty_planted) || 0;
-          else                                                    total = Number(b.qty_mn_start) || 0;
+          const isPrePlanted = (b.status === 'ordered' || b.status === 'received');
+          const totalPlanted = Number(b.qty_planted) || 0;
 
-          const coll  = collectedByBatch[b.id] || 0;
-          const bkd   = bookedByBatch[b.id] || 0;
-          const isAvailableMeaningful = (b.status === 'selling');
-          const avail = isAvailableMeaningful ? Math.max(0, total - coll - bkd) : null;
-          const ready = b.date_planted ? addMonths(b.date_planted, 10) : null;
+          // Column 5 — Booked = outstanding (booked − collected) for ACTIVE bookings only.
+          // bookedByBatch is already computed above against bookings.filter(b => b.status === 'active').
+          const booked = bookedByBatch[b.id] || 0;
+
+          // Column 6 — Balance less booking
+          const balanceLessBooking = totalPlanted - booked;
+
+          // Column 7 — Actual Balance
+          //   = qty_planted − (transplant_culls + mid_culls) + transplant_extras − walk_in − booking_collected
+          // Transplant flow emits event_type='transplant' (not 'cull'), so midCullsByBatch already
+          // excludes transplant-time culls — safe to add transplant_culls without double-counting.
+          const transplantCulls = Number(b.transplant_culls) || 0;
+          const midCulls = midCullsByBatch[b.id] || 0;
+          const allCulls = transplantCulls + midCulls;
+          const extras   = Number(b.transplant_extras) || 0;
+          const walkIn   = walkInByBatch[b.id] || 0;
+          const bkColl   = bookingCollByBatch[b.id] || 0;
+          const actualBalance = totalPlanted - allCulls + extras - walkIn - bkColl;
+
+          const dash = '<span class="muted">—</span>';
 
           return `
             <tr>
               <td>${esc(b.batch_number || '—')}</td>
               <td>${esc(varietyMap[b.variety_id] || '—')}</td>
               <td><span class="ops-status-badge ops-status-${b.status}">${STAGE_LABEL[b.status] || b.status}</span></td>
-              <td style="text-align:right;">${total}</td>
-              <td style="text-align:right;">${bkd || '—'}</td>
-              <td style="text-align:right;">${coll || '—'}</td>
-              <td style="text-align:right;font-weight:${isAvailableMeaningful ? '600' : '400'};color:${isAvailableMeaningful ? 'inherit' : 'var(--text-muted)'};">${avail !== null ? avail : '—'}</td>
-              <td>${ready ? fmtDate(ready) : '—'}</td>
+              <td style="text-align:right;">${isPrePlanted ? dash : totalPlanted.toLocaleString()}</td>
+              <td style="text-align:right;">${isPrePlanted ? dash : booked.toLocaleString()}</td>
+              <td style="text-align:right;">${isPrePlanted ? dash : balanceLessBooking.toLocaleString()}</td>
+              <td style="text-align:right;font-weight:600;">${isPrePlanted ? dash : actualBalance.toLocaleString()}</td>
             </tr>
           `;
         }).join('');
@@ -2634,11 +2671,10 @@ async function shareSlip() {
                   <th>Batch #</th>
                   <th>Variety</th>
                   <th>Stage</th>
-                  <th style="text-align:right;">Total</th>
+                  <th style="text-align:right;">Total Planted</th>
                   <th style="text-align:right;">Booked</th>
-                  <th style="text-align:right;">Collected</th>
-                  <th style="text-align:right;">Available</th>
-                  <th>Ready Date</th>
+                  <th style="text-align:right;">Balance (less booking)</th>
+                  <th style="text-align:right;">Actual Balance</th>
                 </tr>
               </thead>
               <tbody>${batchRows}</tbody>
