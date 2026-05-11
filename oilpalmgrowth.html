@@ -319,9 +319,16 @@
             <label>Actual Delivery <input id="opg-d-add" type="date" value="${b.actual_delivery_date || ''}" /></label>
             <label>Ordered Qty <input id="opg-d-qty" type="number" min="0" value="${b.ordered_qty || 0}" /></label>
             <label>Unit Cost (RM) <input id="opg-d-uc" type="number" step="0.01" min="0" value="${b.unit_cost || 0}" /></label>
-            <label>Total Cost (RM) <input id="opg-d-tc" type="number" step="0.01" min="0" value="${(b.total_cost || 0)}" readonly /></label>
+            <label>Gross (Ordered × Unit, RM) <input id="opg-d-tc" type="number" step="0.01" min="0" value="${(b.total_cost || 0)}" readonly /></label>
+            <label>Cash Discount (RM) <input id="opg-d-disc" type="number" step="0.01" min="0" value="${(b.cash_discount || 0)}" /></label>
+            <label>Seeds Allowance (free extras) <input id="opg-d-allow" type="number" min="0" value="${(b.seeds_allowance || 0)}" /></label>
             <label class="full">Notes <textarea id="opg-d-notes">${esc(b.notes || '')}</textarea></label>
           </div>
+
+          <div id="opg-invoice-summary" style="margin:10px 0;padding:10px 12px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.4);border-radius:4px;font-size:13px;">
+            <!-- Filled by opgRecomputeInvoice() -->
+          </div>
+
           <div class="modal-actions"><button class="btn btn-primary" onclick="opgSaveProcurement()">Save Procurement</button></div>
         </div>
 
@@ -331,9 +338,11 @@
         <div id="opg-mn-section"></div>
       `;
 
-      // Auto-recompute total_cost when qty/unit_cost change
-      document.getElementById('opg-d-qty').addEventListener('input', opgRecomputeTotalCost);
-      document.getElementById('opg-d-uc').addEventListener('input', opgRecomputeTotalCost);
+      // Auto-recompute invoice + cost-per-seed when any procurement input changes
+      ['opg-d-qty','opg-d-uc','opg-d-disc','opg-d-allow'].forEach(id => {
+        document.getElementById(id).addEventListener('input', opgRecomputeInvoice);
+      });
+      opgRecomputeInvoice();  // initial render
 
       // Render the rest of the sections (filled in next tasks)
       opgRenderPaymentSection(b);
@@ -342,10 +351,28 @@
       opgRenderMnSection(b);
     }
 
-    function opgRecomputeTotalCost() {
-      const q = parseFloat(document.getElementById('opg-d-qty').value) || 0;
-      const u = parseFloat(document.getElementById('opg-d-uc').value) || 0;
-      document.getElementById('opg-d-tc').value = (q * u).toFixed(2);
+    function opgRecomputeInvoice() {
+      const q     = parseFloat(document.getElementById('opg-d-qty').value)   || 0;
+      const u     = parseFloat(document.getElementById('opg-d-uc').value)    || 0;
+      const disc  = parseFloat(document.getElementById('opg-d-disc').value)  || 0;
+      const allow = parseInt(document.getElementById('opg-d-allow').value, 10) || 0;
+
+      const gross   = q * u;
+      const invoice = Math.max(0, gross - disc);
+      const seeds   = q + allow;
+      const cps     = seeds > 0 ? (invoice / seeds) : 0;
+
+      document.getElementById('opg-d-tc').value = gross.toFixed(2);
+      document.getElementById('opg-invoice-summary').innerHTML = `
+        <div style="font-weight:700;color:var(--gold);margin-bottom:6px;">Invoice Summary</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline;">
+          <span class="muted">Gross invoice</span><span><strong>RM ${gross.toFixed(2)}</strong> &nbsp;<span class="muted">(${q.toLocaleString()} × RM ${u.toFixed(2)})</span></span>
+          <span class="muted">− Cash discount</span><span>RM ${disc.toFixed(2)}</span>
+          <span class="muted">Invoice total</span><span><strong style="color:var(--gold)">RM ${invoice.toFixed(2)}</strong> &nbsp;<span class="muted">(final supplier bill)</span></span>
+          <span class="muted">Seeds received</span><span><strong>${seeds.toLocaleString()}</strong> &nbsp;<span class="muted">(${q.toLocaleString()} ordered + ${allow.toLocaleString()} allowance)</span></span>
+          <span class="muted">Cost per seed</span><span><strong>RM ${cps.toFixed(2)}</strong></span>
+        </div>
+      `;
     }
 
     async function opgSaveProcurement() {
@@ -357,6 +384,8 @@
         ordered_qty: parseInt(document.getElementById('opg-d-qty').value, 10) || 0,
         unit_cost: parseFloat(document.getElementById('opg-d-uc').value) || 0,
         total_cost: parseFloat(document.getElementById('opg-d-tc').value) || 0,
+        cash_discount: parseFloat(document.getElementById('opg-d-disc').value) || 0,
+        seeds_allowance: parseInt(document.getElementById('opg-d-allow').value, 10) || 0,
         notes: document.getElementById('opg-d-notes').value.trim() || null
       };
 
@@ -528,11 +557,13 @@
     }
 
     function opgOpenPlantModal() {
+      const b = batches.find(x => x.id === selectedBatchId) || {};
+      const expectedReceived = (Number(b.ordered_qty) || 0) + (Number(b.seeds_allowance) || 0);
       showModal(`
         <h3>Record Planting</h3>
         <p class="muted">Stage: Received → Pre-Nursery.</p>
         <div class="form-grid">
-          <label>Seeds Received <input id="opg-plant-rcvd" type="number" min="1" /></label>
+          <label>Seeds Received <input id="opg-plant-rcvd" type="number" min="1" value="${expectedReceived || ''}" /></label>
           <label>Seeds Damaged <input id="opg-plant-dmg" type="number" min="0" value="0" /></label>
           <label>Total Planted <input id="opg-plant-total" readonly /></label>
           <label>Date Planted <input id="opg-plant-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></label>
@@ -549,6 +580,7 @@
       };
       document.getElementById('opg-plant-rcvd').addEventListener('input', recompute);
       document.getElementById('opg-plant-dmg').addEventListener('input', recompute);
+      recompute();  // initial Total Planted from pre-filled Seeds Received
     }
 
     async function opgSavePlantEvent() {
