@@ -1068,8 +1068,179 @@
       notify('Batch created', 'success');
     }
 
-    // === Other tab render stubs (filled in later tasks) ===
-    function renderReportsTab()   { document.getElementById('tab-reports').innerHTML = '<p>Reports — TODO</p>'; }
+    // === Reports tab — Phase 2: Procurement Summary + Batch Lifecycle ===
+    let opgReportsState = { type: 'procurement', from: '', to: '', supplier: 'all', variety: 'all' };
+
+    function renderReportsTab() {
+      const today = new Date().toISOString().slice(0, 10);
+      const ago90 = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      if (!opgReportsState.from) opgReportsState.from = ago90;
+      if (!opgReportsState.to)   opgReportsState.to   = today;
+
+      document.getElementById('tab-reports').innerHTML = `
+        <div class="page-header"><h2>Reports</h2></div>
+        <div class="filters-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:14px;">
+          <label>Report
+            <select id="opg-rpt-type" onchange="opgReportsState.type=this.value; renderReportsTab()">
+              <option value="procurement" ${opgReportsState.type === 'procurement' ? 'selected' : ''}>Procurement Summary</option>
+              <option value="lifecycle"   ${opgReportsState.type === 'lifecycle'   ? 'selected' : ''}>Batch Lifecycle</option>
+            </select>
+          </label>
+          <label>From <input type="date" id="opg-rpt-from" value="${opgReportsState.from}" onchange="opgReportsState.from=this.value" /></label>
+          <label>To   <input type="date" id="opg-rpt-to"   value="${opgReportsState.to}"   onchange="opgReportsState.to  =this.value" /></label>
+          <label>Supplier
+            <select id="opg-rpt-sup" onchange="opgReportsState.supplier=this.value">
+              <option value="all">All suppliers</option>
+              ${suppliers.map(s => `<option value="${esc(s.id)}" ${opgReportsState.supplier === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Variety
+            <select id="opg-rpt-var" onchange="opgReportsState.variety=this.value">
+              <option value="all">All varieties</option>
+              ${varieties.map(v => `<option value="${esc(v.id)}" ${opgReportsState.variety === v.id ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}
+            </select>
+          </label>
+          <button class="btn btn-primary" onclick="opgRunReport()">Run</button>
+          <button class="btn" onclick="window.print()">Print</button>
+          <button class="btn" onclick="opgExportReportCsv()">CSV</button>
+        </div>
+        <div id="opg-rpt-output"><p class="muted">Click <strong>Run</strong> to generate the report.</p></div>
+      `;
+    }
+
+    function opgRunReport() {
+      if (opgReportsState.type === 'procurement') opgRunProcurementReport();
+      else opgRunLifecycleReport();
+    }
+
+    function opgFilterBatchesForReport() {
+      const supplierMap = Object.fromEntries(suppliers.map(s => [s.id, s.name]));
+      const varietyMap  = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+      const from = opgReportsState.from, to = opgReportsState.to;
+      const filtered = batches.filter(b => {
+        // Use order_date for range filter; null order_date excluded from window-based reports.
+        if (!b.order_date) return false;
+        if (b.order_date < from || b.order_date > to) return false;
+        if (opgReportsState.supplier !== 'all' && b.supplier_id !== opgReportsState.supplier) return false;
+        if (opgReportsState.variety  !== 'all' && b.variety_id  !== opgReportsState.variety)  return false;
+        return true;
+      });
+      return { filtered, supplierMap, varietyMap };
+    }
+
+    function opgRunProcurementReport() {
+      const { filtered, supplierMap, varietyMap } = opgFilterBatchesForReport();
+      const totalQty   = filtered.reduce((s, b) => s + (Number(b.ordered_qty) || 0), 0);
+      const totalSpent = filtered.reduce((s, b) => s + (Number(b.total_cost)   || 0), 0);
+
+      document.getElementById('opg-rpt-output').innerHTML = `
+        <h3>Procurement Summary (${fmtDate(opgReportsState.from)} – ${fmtDate(opgReportsState.to)})</h3>
+        ${filtered.length === 0
+          ? '<p class="muted">No batches in range.</p>'
+          : `<div class="table-wrap"><table class="data-table">
+              <thead><tr>
+                <th>Order Date</th><th>Batch #</th><th>Supplier</th><th>Variety</th>
+                <th style="text-align:right;">Ordered Qty</th>
+                <th style="text-align:right;">Unit Cost</th>
+                <th style="text-align:right;">Total Cost</th>
+                <th>Stage</th><th>Delivery</th>
+              </tr></thead>
+              <tbody>
+                ${filtered.map(b => `
+                  <tr>
+                    <td>${fmtDate(b.order_date)}</td>
+                    <td>${esc(b.batch_number)}</td>
+                    <td>${esc(supplierMap[b.supplier_id] || '—')}</td>
+                    <td>${esc(varietyMap[b.variety_id] || '—')}</td>
+                    <td style="text-align:right;">${fmtNum(b.ordered_qty || 0)}</td>
+                    <td style="text-align:right;">${formatRM(b.unit_cost || 0)}</td>
+                    <td style="text-align:right;">${formatRM(b.total_cost || 0)}</td>
+                    <td><span class="opg-stage-badge opg-stage-${b.status}">${stageLabel(b.status)}</span></td>
+                    <td>${b.actual_delivery_date ? fmtDate(b.actual_delivery_date) : (b.estimated_delivery_date ? 'Est: ' + fmtDate(b.estimated_delivery_date) : '—')}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot><tr style="font-weight:700;">
+                <td colspan="4">Total</td>
+                <td style="text-align:right;">${fmtNum(totalQty)}</td>
+                <td></td>
+                <td style="text-align:right;">${formatRM(totalSpent)}</td>
+                <td colspan="2"></td>
+              </tr></tfoot>
+            </table></div>`
+        }
+      `;
+    }
+
+    async function opgRunLifecycleReport() {
+      const { filtered, supplierMap, varietyMap } = opgFilterBatchesForReport();
+
+      // Pull all batch events for the filtered batches in one query.
+      // oilpalm_batch_events has NO company_id column — do NOT filter by it.
+      const ids = filtered.map(b => b.id);
+      const events = ids.length
+        ? (await sbQuery(sb.from('oilpalm_batch_events').select('*').in('batch_id', ids).order('event_date', { ascending: true })) || [])
+        : [];
+      const eventsByBatch = Object.fromEntries(ids.map(id => [id, events.filter(e => e.batch_id === id)]));
+
+      document.getElementById('opg-rpt-output').innerHTML = `
+        <h3>Batch Lifecycle (${fmtDate(opgReportsState.from)} – ${fmtDate(opgReportsState.to)})</h3>
+        ${filtered.length === 0
+          ? '<p class="muted">No batches in range.</p>'
+          : filtered.map(b => {
+              const evs       = eventsByBatch[b.id] || [];
+              const collected = collectionsByBatch[b.id] || 0;
+              const midCulls  = midCullsByBatch[b.id] || 0;
+              const leftover  = Math.max(0, (b.qty_mn_start || 0) - midCulls - collected);
+              const cullEvents = evs.filter(e => e.event_type === 'cull');
+
+              const rows = [];
+              rows.push(`<tr><td>Ordered</td><td>${fmtDate(b.order_date)}</td><td style="text-align:right;">${fmtNum(b.ordered_qty || 0)}</td><td>—</td></tr>`);
+              if (b.actual_delivery_date) rows.push(`<tr><td>Received</td><td>${fmtDate(b.actual_delivery_date)}</td><td>—</td><td>—</td></tr>`);
+              if (b.date_planted)         rows.push(`<tr><td>Planted (PN)</td><td>${fmtDate(b.date_planted)}</td><td style="text-align:right;">${fmtNum(b.qty_planted || 0)}</td><td>${fmtNum(b.seeds_received || 0)} received, ${fmtNum(b.seeds_damaged || 0)} damaged</td></tr>`);
+              if (b.date_transplanted)    rows.push(`<tr><td>MN Start</td><td>${fmtDate(b.date_transplanted)}</td><td style="text-align:right;">${fmtNum(b.qty_mn_start || 0)}</td><td>${fmtNum(b.transplant_culls || 0)} culls, ${fmtNum(b.transplant_extras || 0)} extras</td></tr>`);
+              cullEvents.forEach(e => {
+                rows.push(`<tr><td>Mid-MN Cull</td><td>${fmtDate(e.event_date)}</td><td style="text-align:right;color:var(--red);">−${fmtNum(e.qty)}</td><td>${esc(e.reason || e.notes || '—')}</td></tr>`);
+              });
+              if (collected > 0)          rows.push(`<tr><td>Sold (cumulative)</td><td>—</td><td style="text-align:right;color:var(--red);">−${fmtNum(collected)}</td><td>Across all L3.1 collections</td></tr>`);
+              if (b.closed_at && leftover > 0) rows.push(`<tr><td>Closed</td><td>${fmtDate(b.closed_at)}</td><td style="text-align:right;color:var(--red);">−${fmtNum(leftover)}</td><td>Leftover recorded as final cull</td></tr>`);
+              else if (b.closed_at)       rows.push(`<tr><td>Closed</td><td>${fmtDate(b.closed_at)}</td><td>—</td><td>No leftover at close</td></tr>`);
+
+              return `
+                <div class="opg-lifecycle-block" style="margin-bottom:18px;padding:14px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);">
+                  <h4 style="margin:0 0 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                    <span>${esc(b.batch_number)}</span>
+                    <span class="muted">·</span>
+                    <span>${esc(supplierMap[b.supplier_id] || '—')}</span>
+                    <span class="muted">·</span>
+                    <span>${esc(varietyMap[b.variety_id] || '—')}</span>
+                    <span class="opg-stage-badge opg-stage-${b.status}">${stageLabel(b.status)}</span>
+                  </h4>
+                  <div class="table-wrap">
+                    <table class="data-table" style="margin:0;">
+                      <thead><tr><th>Stage</th><th>Date</th><th style="text-align:right;">Qty</th><th>Notes</th></tr></thead>
+                      <tbody>${rows.join('')}</tbody>
+                    </table>
+                  </div>
+                </div>
+              `;
+            }).join('')
+        }
+      `;
+    }
+
+    function opgExportReportCsv() {
+      const table = document.querySelector('#opg-rpt-output table');
+      if (!table) { notify('Run a report first', 'error'); return; }
+      const rows = [...table.querySelectorAll('tr')].map(tr =>
+        [...tr.querySelectorAll('th,td')].map(td => `"${(td.textContent || '').replace(/"/g, '""').trim()}"`).join(',')
+      ).join('\n');
+      const blob = new Blob([rows], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `oilpalm-${opgReportsState.type}-${opgReportsState.from}-${opgReportsState.to}.csv`;
+      a.click();
+    }
 
     // === Modal helper (module-local) ===
     // shared.js exposes openModal(id)/closeModal(id) for pre-defined modal HTML, but the plan
