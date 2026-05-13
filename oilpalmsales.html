@@ -394,7 +394,7 @@
       if (!dateVal)           { notify('Date is required', 'error'); return; }
       if (!isFinite(payAmt) || payAmt <= 0) { notify('Payment amount must be > 0', 'error'); return; }
       if (payAmt + 0.005 < total) {
-        notify('Walk-in sale requires full payment (RM ' + total.toFixed(2) + '). Add more or use a booking instead.', 'error');
+        notify('Walk-in sale requires full payment (' + formatRM(total) + '). Add more or use a booking instead.', 'error');
         return;
       }
 
@@ -1037,15 +1037,15 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
       <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
       <tbody><tr>
         <td>Oil Palm Seedlings — ${esc((variety && variety.name) || 'Unknown')} (Batch ${esc((batch && batch.batch_number) || bk.batch_id)})</td>
-        <td style="text-align:right">${esc(String(bk.booked_qty))}</td>
-        <td style="text-align:right">RM ${Number(bk.unit_price).toFixed(2)}</td>
-        <td style="text-align:right">RM ${Number(bk.total_amount).toFixed(2)}</td>
+        <td style="text-align:right">${fmtNum(bk.booked_qty)}</td>
+        <td style="text-align:right">${formatRM(bk.unit_price)}</td>
+        <td style="text-align:right">${formatRM(bk.total_amount)}</td>
       </tr></tbody>
     </table>
     <div class="bs-totals">
-      <div class="row"><div>Total Amount:</div><div>RM ${Number(bk.total_amount).toFixed(2)}</div></div>
-      <div class="row"><div>Paid:</div><div>RM ${paid.toFixed(2)}</div></div>
-      <div class="row balance"><div>Balance Due:</div><div>RM ${balance.toFixed(2)}</div></div>
+      <div class="row"><div>Total Amount:</div><div>${formatRM(bk.total_amount)}</div></div>
+      <div class="row"><div>Paid:</div><div>${formatRM(paid)}</div></div>
+      <div class="row balance"><div>Balance Due:</div><div>${formatRM(balance)}</div></div>
     </div>
     ${readyDate ? `<div style="margin-top:8px;font-size:10pt"><strong>Expected Ready Date:</strong> ${esc(fmtDate(readyDate))}</div>` : ''}
   </div>
@@ -2637,28 +2637,28 @@ async function shareSlip() {
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
           <div class="ops-summary-card">
             <div class="label">Pre-Nursery</div>
-            <div class="value">${preNurseryQty}</div>
+            <div class="value">${fmtNum(preNurseryQty)}</div>
             <div class="muted">seedlings planted</div>
           </div>
           <div class="ops-summary-card">
             <div class="label">Main Nursery</div>
-            <div class="value">${mainNurseryQty}</div>
+            <div class="value">${fmtNum(mainNurseryQty)}</div>
             <div class="muted">in MN stage</div>
           </div>
           <div class="ops-summary-card">
             <div class="label">Available (Total)</div>
-            <div class="value">${availableTotal}</div>
+            <div class="value">${fmtNum(availableTotal)}</div>
             <div class="muted">across selling batches</div>
           </div>
           <div class="ops-summary-card">
             <div class="label">Active Bookings</div>
             <div class="value">${activeBks.length}</div>
-            <div class="muted">${activeQty} qty · RM ${activeOwed.toFixed(2)} owed</div>
+            <div class="muted">${fmtNum(activeQty)} qty · ${formatRM(activeOwed)} owed</div>
           </div>
           <div class="ops-summary-card">
             <div class="label">Today's Activity</div>
             <div class="value">${todaysCols.length}</div>
-            <div class="muted">${todaysQty} seedlings collected</div>
+            <div class="muted">${fmtNum(todaysQty)} seedlings collected</div>
           </div>
         </div>
 

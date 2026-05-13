@@ -36,6 +36,72 @@
   padding-bottom: 8px;
 }
 
+/* Collapsible variant — used for Procurement, Payment, Documents */
+.opg-section.collapsible { padding: 0; }
+.opg-section.collapsible .opg-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 14px 20px;
+  user-select: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.opg-section.collapsible .opg-section-header:hover { background: rgba(212, 175, 55, 0.04); }
+.opg-section.collapsible h3 {
+  margin: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.opg-section.collapsible .opg-chevron {
+  color: #6B4C8A;
+  font-size: 14px;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+.opg-section.collapsible:not(.collapsed) .opg-chevron { transform: rotate(90deg); }
+.opg-section.collapsible .opg-section-body {
+  padding: 14px 20px 16px;
+  border-top: 1px solid var(--border);
+}
+.opg-section.collapsible.collapsed .opg-section-body { display: none; }
+
+/* Lock state — locked section gets a banner + lock badge in header */
+.opg-locked-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #8A6D1F;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.opg-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 4px;
+  font-size: 13px;
+  color: #6B4C8A;
+}
+.opg-locked-banner .opg-locked-icon { font-size: 16px; }
+.opg-locked-banner .opg-locked-text { flex: 1; }
+
 /* Document upload slots */
 .opg-doc-slot {
   display: grid;

@@ -27,7 +27,7 @@
     </div>
     <div id="company-switcher"></div>
     <nav class="sidebar-nav" aria-label="Module navigation">
-      <div class="nav-item active" data-page="batches" onclick="switchTab('batches')">
+      <div class="nav-item active" data-page="batches" onclick="opgGotoBatchesTab()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/></svg>
         <span class="nav-label">Batches</span>
       </div>
@@ -73,6 +73,10 @@
     let midCullsByBatch = {};     // {batch_id: total_mid_mn_cull_qty}
     let batchesFilter = { stage: 'all', supplier: 'all', variety: 'all' };
     let selectedBatchId = null;   // when set, renderBatchesTab delegates to opgRenderDetail
+    // Per-section unlock state. Resets every time opgRenderDetail runs (= every time
+    // the user opens a batch detail page). Admin-only "Unlock for edit" buttons flip
+    // the relevant flag and re-render that one section.
+    let opgUnlocked = { procurement: false, payment: false };
 
     // Document slots for batch detail Documents section. `slot` is used as the storage path stem
     // (procurement/{batch_id}/{slot}.{ext}), and `key` is the DB column on oilpalm_batches.
@@ -206,10 +210,10 @@
             <td>${esc(supplierMap[b.supplier_id] || '—')}</td>
             <td>${esc(varietyMap[b.variety_id] || '—')}</td>
             <td><span class="opg-stage-badge opg-stage-${b.status}">${stageLabel(b.status)}</span></td>
-            <td>${b.ordered_qty || 0}</td>
-            <td>${planted || '—'}</td>
-            <td>${mn || '—'}</td>
-            <td>${available || '—'}</td>
+            <td>${fmtNum(b.ordered_qty || 0)}</td>
+            <td>${planted ? fmtNum(planted) : '—'}</td>
+            <td>${mn ? fmtNum(mn) : '—'}</td>
+            <td>${available ? fmtNum(available) : '—'}</td>
             <td>${age != null ? age + 'd' : '—'}</td>
             <td>${ready ? fmtDate(ready) : '—'}</td>
           </tr>
@@ -286,6 +290,10 @@
       const b = batches.find(x => x.id === selectedBatchId);
       if (!b) { selectedBatchId = null; renderBatchesTab(); return; }
 
+      // Reset per-section unlock state every time the detail page renders.
+      // Admin unlock is intentionally session-local and per-batch-open.
+      opgUnlocked = { procurement: false, payment: false };
+
       const supplier = suppliers.find(s => s.id === b.supplier_id);
       const variety  = varieties.find(v => v.id === b.variety_id);
       const ready = b.date_planted ? addMonths(b.date_planted, 10) : null;
@@ -311,66 +319,134 @@
           </div>
         </div>
 
-        <div class="opg-section">
-          <h3>Procurement</h3>
-          <div class="form-grid">
-            <label>Order Date <input id="opg-d-od" type="date" value="${b.order_date || ''}" /></label>
-            <label>Estimated Delivery <input id="opg-d-edd" type="date" value="${b.estimated_delivery_date || ''}" /></label>
-            <label>Actual Delivery <input id="opg-d-add" type="date" value="${b.actual_delivery_date || ''}" /></label>
-            <label>Ordered Qty <input id="opg-d-qty" type="number" min="0" value="${b.ordered_qty || 0}" /></label>
-            <label>Unit Cost (RM) <input id="opg-d-uc" type="number" step="0.01" min="0" value="${b.unit_cost || 0}" /></label>
-            <label>Gross (Ordered × Unit, RM) <input id="opg-d-tc" type="number" step="0.01" min="0" value="${(b.total_cost || 0)}" readonly /></label>
-            <label>Cash Discount (RM) <input id="opg-d-disc" type="number" step="0.01" min="0" value="${(b.cash_discount || 0)}" /></label>
-            <label>Seeds Allowance (free extras) <input id="opg-d-allow" type="number" min="0" value="${(b.seeds_allowance || 0)}" /></label>
-            <label class="full">Notes <textarea id="opg-d-notes">${esc(b.notes || '')}</textarea></label>
-          </div>
-
-          <div id="opg-invoice-summary" style="margin:10px 0;padding:10px 12px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.4);border-radius:4px;font-size:13px;">
-            <!-- Filled by opgRecomputeInvoice() -->
-          </div>
-
-          <div class="modal-actions"><button class="btn btn-primary" onclick="opgSaveProcurement()">Save Procurement</button></div>
-        </div>
-
+        <div id="opg-procurement-section"></div>
         <div id="opg-payment-section"></div>
         <div id="opg-docs-section"></div>
         <div id="opg-receipt-section"></div>
         <div id="opg-mn-section"></div>
       `;
 
-      // Auto-recompute invoice + cost-per-seed when any procurement input changes
-      ['opg-d-qty','opg-d-uc','opg-d-disc','opg-d-allow'].forEach(id => {
-        document.getElementById(id).addEventListener('input', opgRecomputeInvoice);
-      });
-      opgRecomputeInvoice();  // initial render
-
-      // Render the rest of the sections (filled in next tasks)
+      opgRenderProcurementSection(b);
       opgRenderPaymentSection(b);
       opgRenderDocsSection(b);
       opgRenderReceiptSection(b);
       opgRenderMnSection(b);
     }
 
-    function opgRecomputeInvoice() {
-      const q     = parseFloat(document.getElementById('opg-d-qty').value)   || 0;
-      const u     = parseFloat(document.getElementById('opg-d-uc').value)    || 0;
-      const disc  = parseFloat(document.getElementById('opg-d-disc').value)  || 0;
-      const allow = parseInt(document.getElementById('opg-d-allow').value, 10) || 0;
+    function opgIsAdmin() {
+      return currentUser && currentUser.role === 'admin';
+    }
+
+    function opgUnlockSection(name) {
+      opgUnlocked[name] = true;
+      const b = batches.find(x => x.id === selectedBatchId);
+      if (!b) return;
+      if (name === 'procurement') opgRenderProcurementSection(b);
+      else if (name === 'payment') opgRenderPaymentSection(b);
+    }
+
+    function opgRenderProcurementSection(b) {
+      const locked = b.status !== 'ordered' && !opgUnlocked.procurement;
+      const ro = locked ? 'readonly' : '';
+      const unlockBtn = locked && opgIsAdmin()
+        ? `<button class="btn btn-tiny" onclick="opgUnlockSection('procurement')">🔓 Unlock for edit</button>`
+        : '';
+      const lockBanner = locked
+        ? `<div class="opg-locked-banner">
+             <span class="opg-locked-icon">🔒</span>
+             <span class="opg-locked-text">Batch is past the <strong>Ordered</strong> stage — procurement data is final.</span>
+             ${unlockBtn}
+           </div>`
+        : '';
+      const headerBadge = locked ? '<span class="opg-locked-badge">🔒 Locked</span>' : '';
+
+      // When LOCKED, qty/money fields render as type=text with formatted values so the
+      // user sees "5,000" and "RM 15,035.00" instead of raw "5000" / "15035".
+      // When UNLOCKED (admin editing), they switch back to type=number with raw values
+      // so the live recompute + save flow works (browsers reject commas in type=number).
+      const qtyField = (id, val) => locked
+        ? `<input id="${id}" type="text" value="${fmtNum(val || 0)}" readonly />`
+        : `<input id="${id}" type="number" min="0" value="${val || 0}" />`;
+      const moneyField = (id, val, ro2) => locked
+        ? `<input id="${id}" type="text" value="${formatRM(val || 0)}" readonly />`
+        : `<input id="${id}" type="number" step="0.01" min="0" value="${val || 0}" ${ro2 ? 'readonly' : ''} />`;
+
+      document.getElementById('opg-procurement-section').innerHTML = `
+        <div class="opg-section collapsible collapsed" id="opg-section-procurement">
+          <button class="opg-section-header" type="button" onclick="opgToggleSection('procurement')">
+            <h3>Procurement ${headerBadge}</h3>
+            <span class="opg-chevron">▸</span>
+          </button>
+          <div class="opg-section-body">
+            ${lockBanner}
+            <div class="form-grid">
+              <label>Order Date <input id="opg-d-od" type="date" value="${b.order_date || ''}" ${ro} /></label>
+              <label>Estimated Delivery <input id="opg-d-edd" type="date" value="${b.estimated_delivery_date || ''}" ${ro} /></label>
+              <label>Actual Delivery <input id="opg-d-add" type="date" value="${b.actual_delivery_date || ''}" ${ro} /></label>
+              <label>Ordered Qty ${qtyField('opg-d-qty', b.ordered_qty)}</label>
+              <label>Unit Cost (RM) ${moneyField('opg-d-uc', b.unit_cost)}</label>
+              <label>Gross (Ordered × Unit, RM) ${moneyField('opg-d-tc', b.total_cost, /*ro2*/true)}</label>
+              <label>Cash Discount (RM) ${moneyField('opg-d-disc', b.cash_discount)}</label>
+              <label>Seeds Allowance (free extras) ${qtyField('opg-d-allow', b.seeds_allowance)}</label>
+              <label class="full">Notes <textarea id="opg-d-notes" ${ro}>${esc(b.notes || '')}</textarea></label>
+            </div>
+
+            <div id="opg-invoice-summary" style="margin:10px 0;padding:10px 12px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.4);border-radius:4px;font-size:13px;">
+              <!-- Filled by opgRecomputeInvoice() -->
+            </div>
+
+            ${locked ? '' : '<div class="modal-actions"><button class="btn btn-primary" onclick="opgSaveProcurement()">Save Procurement</button></div>'}
+          </div>
+        </div>
+      `;
+
+      if (locked) {
+        // Inputs hold formatted strings — feed authoritative values from the batch row.
+        opgRecomputeInvoice({
+          q:     Number(b.ordered_qty)     || 0,
+          u:     Number(b.unit_cost)       || 0,
+          disc:  Number(b.cash_discount)   || 0,
+          allow: Number(b.seeds_allowance) || 0
+        });
+      } else {
+        ['opg-d-qty','opg-d-uc','opg-d-disc','opg-d-allow'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.addEventListener('input', () => opgRecomputeInvoice());
+        });
+        opgRecomputeInvoice();
+      }
+    }
+
+    function opgRecomputeInvoice(values) {
+      // values arg: { q, u, disc, allow } — used when inputs hold formatted strings (locked mode).
+      // Without it, read live from the unlocked numeric inputs.
+      let q, u, disc, allow;
+      if (values) {
+        q = values.q; u = values.u; disc = values.disc; allow = values.allow;
+      } else {
+        q     = parseFloat(document.getElementById('opg-d-qty').value)   || 0;
+        u     = parseFloat(document.getElementById('opg-d-uc').value)    || 0;
+        disc  = parseFloat(document.getElementById('opg-d-disc').value)  || 0;
+        allow = parseInt(document.getElementById('opg-d-allow').value, 10) || 0;
+      }
 
       const gross   = q * u;
       const invoice = Math.max(0, gross - disc);
       const seeds   = q + allow;
       const cps     = seeds > 0 ? (invoice / seeds) : 0;
 
-      document.getElementById('opg-d-tc').value = gross.toFixed(2);
+      // Locked mode: Gross input is type=text → write formatted "RM 15,035.00".
+      // Unlocked mode: type=number → write raw "15035.00" so step/min/max still validate.
+      const grossEl = document.getElementById('opg-d-tc');
+      if (grossEl) grossEl.value = values ? formatRM(gross) : gross.toFixed(2);
       document.getElementById('opg-invoice-summary').innerHTML = `
         <div style="font-weight:700;color:var(--gold);margin-bottom:6px;">Invoice Summary</div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline;">
-          <span class="muted">Gross invoice</span><span><strong>RM ${gross.toFixed(2)}</strong> &nbsp;<span class="muted">(${q.toLocaleString()} × RM ${u.toFixed(2)})</span></span>
-          <span class="muted">− Cash discount</span><span>RM ${disc.toFixed(2)}</span>
-          <span class="muted">Invoice total</span><span><strong style="color:var(--gold)">RM ${invoice.toFixed(2)}</strong> &nbsp;<span class="muted">(final supplier bill)</span></span>
-          <span class="muted">Seeds received</span><span><strong>${seeds.toLocaleString()}</strong> &nbsp;<span class="muted">(${q.toLocaleString()} ordered + ${allow.toLocaleString()} allowance)</span></span>
-          <span class="muted">Cost per seed</span><span><strong>RM ${cps.toFixed(2)}</strong></span>
+          <span class="muted">Gross invoice</span><span><strong>${formatRM(gross)}</strong> &nbsp;<span class="muted">(${fmtNum(q)} × ${formatRM(u)})</span></span>
+          <span class="muted">− Cash discount</span><span>${formatRM(disc)}</span>
+          <span class="muted">Invoice total</span><span><strong style="color:var(--gold)">${formatRM(invoice)}</strong> &nbsp;<span class="muted">(final supplier bill)</span></span>
+          <span class="muted">Seeds received</span><span><strong>${fmtNum(seeds)}</strong> &nbsp;<span class="muted">(${fmtNum(q)} ordered + ${fmtNum(allow)} allowance)</span></span>
+          <span class="muted">Cost per seed</span><span><strong>${formatRM(cps)}</strong></span>
         </div>
       `;
     }
@@ -415,28 +491,53 @@
         ? `<a href="${slipUrl}" target="_blank">${slipLabel} ↗</a>`
         : '<span class="muted">No slip uploaded</span>';
 
+      const locked = !!b.payment_date && !opgUnlocked.payment;
+      const ro = locked ? 'readonly' : '';
+      const dis = locked ? 'disabled' : '';
+      const unlockBtn = locked && opgIsAdmin()
+        ? `<button class="btn btn-tiny" onclick="opgUnlockSection('payment')">🔓 Unlock for edit</button>`
+        : '';
+      const lockBanner = locked
+        ? `<div class="opg-locked-banner">
+             <span class="opg-locked-icon">🔒</span>
+             <span class="opg-locked-text">Payment has been recorded — data is final.</span>
+             ${unlockBtn}
+           </div>`
+        : '';
+      const headerBadge = locked ? '<span class="opg-locked-badge">🔒 Locked</span>' : '';
+
+      const amountField = locked
+        ? `<input id="opg-pay-amount" type="text" value="${formatRM(b.payment_amount || 0)}" readonly />`
+        : `<input id="opg-pay-amount" type="number" step="0.01" min="0" value="${b.payment_amount != null ? b.payment_amount : ''}" />`;
+
       document.getElementById('opg-payment-section').innerHTML = `
-        <div class="opg-section">
-          <h3>Payment</h3>
-          <div class="form-grid">
-            <label>Date <input id="opg-pay-date" type="date" value="${b.payment_date || ''}" /></label>
-            <label>Amount (RM) <input id="opg-pay-amount" type="number" step="0.01" min="0" value="${b.payment_amount != null ? b.payment_amount : ''}" /></label>
-            <label>Method
-              <select id="opg-pay-method">
-                <option value="">—</option>
-                <option value="cash"   ${b.payment_method === 'cash'   ? 'selected' : ''}>Cash</option>
-                <option value="bank"   ${b.payment_method === 'bank'   ? 'selected' : ''}>Bank Transfer</option>
-                <option value="cheque" ${b.payment_method === 'cheque' ? 'selected' : ''}>Cheque</option>
-              </select>
-            </label>
-            <label>Reference <input id="opg-pay-ref" value="${esc(b.payment_reference || '')}" /></label>
-            <label class="full">Slip (image or PDF)
-              <input type="file" id="opg-pay-slip" accept="image/*,application/pdf" />
-              <div class="muted" style="font-size:12px;margin-top:4px">Current: ${slipLink}</div>
-            </label>
-            <label class="full">Notes <textarea id="opg-pay-notes">${esc(b.payment_notes || '')}</textarea></label>
+        <div class="opg-section collapsible collapsed" id="opg-section-payment">
+          <button class="opg-section-header" type="button" onclick="opgToggleSection('payment')">
+            <h3>Payment ${headerBadge}</h3>
+            <span class="opg-chevron">▸</span>
+          </button>
+          <div class="opg-section-body">
+            ${lockBanner}
+            <div class="form-grid">
+              <label>Date <input id="opg-pay-date" type="date" value="${b.payment_date || ''}" ${ro} /></label>
+              <label>Amount (RM) ${amountField}</label>
+              <label>Method
+                <select id="opg-pay-method" ${dis}>
+                  <option value="">—</option>
+                  <option value="cash"   ${b.payment_method === 'cash'   ? 'selected' : ''}>Cash</option>
+                  <option value="bank"   ${b.payment_method === 'bank'   ? 'selected' : ''}>Bank Transfer</option>
+                  <option value="cheque" ${b.payment_method === 'cheque' ? 'selected' : ''}>Cheque</option>
+                </select>
+              </label>
+              <label>Reference <input id="opg-pay-ref" value="${esc(b.payment_reference || '')}" ${ro} /></label>
+              <label class="full">Slip (image or PDF)
+                <input type="file" id="opg-pay-slip" accept="image/*,application/pdf" ${dis} />
+                <div class="muted" style="font-size:12px;margin-top:4px">Current: ${slipLink}</div>
+              </label>
+              <label class="full">Notes <textarea id="opg-pay-notes" ${ro}>${esc(b.payment_notes || '')}</textarea></label>
+            </div>
+            ${locked ? '' : '<div class="modal-actions"><button class="btn btn-primary" onclick="opgSavePayment()">Save Payment</button></div>'}
           </div>
-          <div class="modal-actions"><button class="btn btn-primary" onclick="opgSavePayment()">Save Payment</button></div>
         </div>
       `;
     }
@@ -498,11 +599,29 @@
       }).join('');
 
       document.getElementById('opg-docs-section').innerHTML = `
-        <div class="opg-section">
-          <h3>Documents</h3>
+        <div class="opg-section collapsible collapsed" id="opg-section-documents">
+          <button class="opg-section-header" type="button" onclick="opgToggleSection('documents')">
+            <h3>Documents</h3>
+            <span class="opg-chevron">▸</span>
+          </button>
+          <div class="opg-section-body">
           ${slotsHtml}
+          </div>
         </div>
       `;
+    }
+
+    function opgToggleSection(name) {
+      const el = document.getElementById('opg-section-' + name);
+      if (el) el.classList.toggle('collapsed');
+    }
+
+    // Clicking the Batches sidebar nav-item always returns to the list, even
+    // if a batch detail view is currently open.
+    function opgGotoBatchesTab() {
+      selectedBatchId = null;
+      renderBatchesTab();
+      switchTab('batches');
     }
 
     async function opgUploadDoc(field, file) {
@@ -544,10 +663,10 @@
                <button class="btn btn-primary" onclick="opgOpenPlantModal()">Record Planting</button>`
             : b.date_planted
             ? `<div class="form-grid">
-                 <label>Seeds Received <input value="${b.seeds_received || 0}" readonly /></label>
-                 <label>Seeds Damaged <input value="${b.seeds_damaged || 0}" readonly /></label>
-                 <label>Total Planted <input value="${planted}" readonly /></label>
-                 <label>Date Planted <input value="${fmtDateDM(b.date_planted)}" readonly /></label>
+                 <label>Seeds Received <input value="${fmtNum(b.seeds_received || 0)}" readonly /></label>
+                 <label>Seeds Damaged <input value="${fmtNum(b.seeds_damaged || 0)}" readonly /></label>
+                 <label>Total Planted <input value="${fmtNum(planted)}" readonly /></label>
+                 <label>Date Planted <input value="${fmtDate(b.date_planted)}" readonly /></label>
                </div>
                ${b.status === 'pre_nursery' ? `<button class="btn btn-primary" onclick="opgOpenTransplantModal()" style="margin-top:8px">Record Transplant (PN → MN)</button>` : ''}`
             : `<p class="muted">Awaiting delivery. Set Actual Delivery date in Procurement to advance.</p>`
@@ -576,7 +695,7 @@
       const recompute = () => {
         const r = parseInt(document.getElementById('opg-plant-rcvd').value, 10) || 0;
         const d = parseInt(document.getElementById('opg-plant-dmg').value, 10) || 0;
-        document.getElementById('opg-plant-total').value = Math.max(0, r - d);
+        document.getElementById('opg-plant-total').value = fmtNum(Math.max(0, r - d));
       };
       document.getElementById('opg-plant-rcvd').addEventListener('input', recompute);
       document.getElementById('opg-plant-dmg').addEventListener('input', recompute);
@@ -626,7 +745,7 @@
       const b = batches.find(x => x.id === selectedBatchId);
       showModal(`
         <h3>Record Transplant (Pre-Nursery → Main Nursery)</h3>
-        <p class="muted">Planted: ${b.qty_planted}</p>
+        <p class="muted">Planted: ${fmtNum(b.qty_planted)}</p>
         <div class="form-grid">
           <label>Culls (dead/abnormal) <input id="opg-tp-culls" type="number" min="0" value="0" /></label>
           <label>Multi-germination Extras <input id="opg-tp-extras" type="number" min="0" value="0" /></label>
@@ -641,7 +760,7 @@
       const recompute = () => {
         const c = parseInt(document.getElementById('opg-tp-culls').value, 10) || 0;
         const e = parseInt(document.getElementById('opg-tp-extras').value, 10) || 0;
-        document.getElementById('opg-tp-mn').value = Math.max(0, (b.qty_planted || 0) - c + e);
+        document.getElementById('opg-tp-mn').value = fmtNum(Math.max(0, (b.qty_planted || 0) - c + e));
       };
       document.getElementById('opg-tp-culls').addEventListener('input', recompute);
       document.getElementById('opg-tp-extras').addEventListener('input', recompute);
@@ -703,10 +822,10 @@
         <div class="opg-section">
           <h3>Main Nursery — Counts &amp; Culls</h3>
           <div class="opg-mn-summary">
-            <div><strong>MN Start:</strong> ${b.qty_mn_start || 0}</div>
-            <div><strong>Mid-MN Culls:</strong> ${totalCulls}</div>
-            <div><strong>Collected:</strong> ${collected}</div>
-            <div><strong>Available:</strong> ${available}</div>
+            <div><strong>MN Start:</strong> ${fmtNum(b.qty_mn_start || 0)}</div>
+            <div><strong>Mid-MN Culls:</strong> ${fmtNum(totalCulls)}</div>
+            <div><strong>Collected:</strong> ${fmtNum(collected)}</div>
+            <div><strong>Available:</strong> ${fmtNum(available)}</div>
           </div>
           <button class="btn btn-tiny" onclick="opgOpenCullModal()">+ Add Cull Event</button>
           <table class="data-table" style="margin-top:12px">
@@ -714,8 +833,8 @@
             <tbody>
               ${cullEvents.map(e => `
                 <tr>
-                  <td>${fmtDateDM(e.event_date)}</td>
-                  <td>${e.qty}</td>
+                  <td>${fmtDate(e.event_date)}</td>
+                  <td>${fmtNum(e.qty)}</td>
                   <td>${esc(e.reason || e.notes || '—')}</td>
                   <td>${esc(e.logged_by || '—')}</td>
                 </tr>
@@ -768,12 +887,11 @@
       notify('Cull recorded', 'success');
     }
 
-    async function opgMarkSelling() {
+    function opgMarkSelling() {
       const id = selectedBatchId;
       const b  = batches.find(x => x.id === id);
       if (!b || b.status !== 'main_nursery') return;
-      const ok = await confirmAction('Mark batch as Selling? Bookings can now collect from this batch.', 'Confirm');
-      if (!ok) return;
+      // Price modal below has Cancel + Mark-as-Selling buttons — that IS the confirmation step.
 
       showModal(`
         <h3>Set Default Selling Price</h3>
@@ -798,20 +916,39 @@
       notify('Batch is now Selling', 'success');
     }
 
-    async function opgCloseBatch() {
+    function opgCloseBatch() {
       const id = selectedBatchId;
       const b  = batches.find(x => x.id === id);
       if (!b) return;
       const collected = collectionsByBatch[id] || 0;
       const midCulls  = midCullsByBatch[id] || 0;
-      const remaining = Math.max(0, (b.qty_mn_start || 0) - midCulls - collected);
+      // Stage-aware: pre_nursery batches haven't been transplanted yet so
+      // qty_mn_start is 0 — count the planted PN seedlings instead. Post-transplant
+      // stages use qty_mn_start - midCulls - collected.
+      let remaining, stageNote;
+      if (b.status === 'pre_nursery') {
+        remaining = b.qty_planted || 0;
+        stageNote = `Stage: Pre-Nursery (not yet transplanted). `;
+      } else if (['main_nursery', 'selling', 'sold_out'].includes(b.status)) {
+        remaining = Math.max(0, (b.qty_mn_start || 0) - midCulls - collected);
+        stageNote = '';
+      } else {
+        remaining = 0;
+        stageNote = '';
+      }
 
-      const ok = await confirmAction(
-        `Close this batch?<br/><br/>Remaining ${remaining} seedlings will be recorded as a final cull (reason: "Batch closed — leftover").<br/><br/>This cannot be undone.`,
-        'Close Batch'
+      const cullLine = remaining > 0
+        ? `${stageNote}<strong>${fmtNum(remaining)}</strong> remaining seedling${remaining === 1 ? '' : 's'} will be recorded as a final cull (reason: <em>"Batch closed — leftover"</em>).`
+        : `${stageNote}This batch has <strong>0 remaining seedlings</strong> — no final cull will be recorded.`;
+
+      confirmAction(
+        `Close batch ${esc(b.batch_number)}?`,
+        `${cullLine}<br/><br/>The batch will be marked <strong>Closed</strong> and no further collections or bookings will be possible. <strong>This cannot be undone.</strong>`,
+        () => opgConfirmCloseBatch(id, remaining)
       );
-      if (!ok) return;
+    }
 
+    async function opgConfirmCloseBatch(id, remaining) {
       if (remaining > 0) {
         const eventId = await dbNextId('OE');
         if (!eventId) { notify('Failed to generate event ID', 'error'); return; }
