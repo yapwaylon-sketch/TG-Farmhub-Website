@@ -478,9 +478,9 @@ Transitions:
 - **Pricing**: per-batch default (`oilpalm_batches.default_price`), overridable per booking. Reassignment offers "keep original" (default) or "use new batch's default".
 
 ### Company Addresses
-- **Office** (booking slips): Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak
-- **Farm/License** (L3.1): Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak
-- MPOB License: 522231011000
+- **Farm / MPOB-licensed** (booking slips AND L3.1, as of 2026-05-14): Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak. Phone +60 12-843 6616. MPOB License No: 522231011000.
+- **Legacy office** (deprecated, paper-form era): Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak. Tel 085-615253 / Fax 085-616966. NOT used on any printed document — kept here for reference if you find this address on old paper bookings (No. 7208 etc).
+- Company name on printed documents: **"TG Agribusiness"** (NOT "TG Agribusiness Sdn Bhd" — shortened on 2026-05-14 to match how the business is being branded externally).
 
 ### ID Prefixes (company code AB-)
 | Entity | Prefix | Example |
@@ -953,6 +953,38 @@ Added an Oil Palm crop + DxP variety to `crop_varieties` (precondition for the G
 - Permissions wiring on hub (currently every entry is admin-only by default — needs `perm` keys exposed in User Management UI for non-admins)
 - New Oil Palm Growth icon (still using a placeholder; could generate via Gemini Flash with the same 3D clay style used for the rest of the icon set)
 - "Manage Varieties" affordance in Sales/Growth (currently lives in Farm Configuration only — works but requires hub navigation)
+
+## Oil Palm Sales — IC No field + Booking slip rework to match legacy paper form (2026-05-14)
+Follow-up to today's Notes field. User shared a photo of an old paper booking form (No. 7208, RM 54000 / 3000 seedlings, customer Bernard Lau Buong Hock) and asked whether the digital booking slip could serve the same customer-handoff role. The current Print Booking Slip already covered the basics (letterhead, items, totals, signature lines, T&C) so this session was about closing the gap to match what customers expect.
+
+- **DB migration** (`supabase/oilpalm_customer_ic_migration.sql`): added `ic_number TEXT NULL` to `oilpalm_customers`. Applied via Node `pg` script. Optional field — empty stays NULL.
+- **IC field in 3 customer-creation entry points**:
+  - **Customer modal** (`opsOpenCustomerModal`, oilpalmsales.html:2840): new input between Contact Person and Phone, pre-fills from `c.ic_number` on edit, persists via `opsSaveCustomer` payload.
+  - **Walk-in modal** (`opsOpenWalkInModal`, line 244): new input under Contact Person in the Customer Details section. `opsSaveWalkIn` saves `ic_number: ic || null` to `oilpalm_customers` for newly-created walk-in customers (existing-customer dedup path unchanged).
+  - **Inline new-customer in booking flow** (`opsBkOpenInlineNewCustomer`, line 699): new full-width input between Name and Phone in the dashed State-B card. `opsBkSaveInlineNewCustomer` reads it via guarded `icEl ? icEl.value.trim() : ''` (defensive null-check since the inline form re-injects HTML and could be in any state when save fires).
+- **IC display on 2 read views**:
+  - **Booking detail Customer Info** (`opsRenderBookingDetail`, line 1948): new "IC No" line between Contact and Phone. Shows `—` if missing.
+  - **Customer detail Customer Info** (`opsOpenCustomerDetail`, line 3031): new "IC No" line, same fallback.
+- **Booking slip rework** (`opsOpenBookingSlip`, line 1018-1063):
+  - **Letterhead**: "TG Agribusiness Sdn Bhd" → "TG Agribusiness" (user direction: drop the "Sdn Bhd" suffix). Address changed from office (Lot 1609, Kpg. Riam Jaya) to **farm/MPOB-licensed location** (Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak). New phone line: `Tel: +60 12-843 6616 · MPOB License No: 522231011000`. Putting MPOB License on the letterhead makes the slip read as a more "official" MPOB document, which matches how the user is positioning this with customers.
+  - **Customer block**: new `<div>IC No: ...</div>` between Contact and Phone, conditional render (`${cust && cust.ic_number ? ... : ''}`) so blank IC doesn't print a stray label.
+  - **T&C**: replaced the 3 generic clauses with the 3 from the paper form (verbatim wording, except the awkward line-break in the middle clause was merged into one sentence): (1) "Full payments are to be made upon collection/delivery of plants." (2) "If plants are not collected 1 month after the confirmed date, the delivery of plants will be based on availability basis, or postponed to a future date as the company sees fit." (3) "Any cancellation of bookings refund shall be made after 14 working days from the date of bookings."
+- **What the user explicitly skipped** for now:
+  - Transportation Charges row (paper had it as a separate row in the items table — always empty in the photo, so dropped from the digital version).
+  - MPOB issued/not + MPOB No row (paper had it; user said remove. MPOB tracking lives on the collection records via L3.1 form numbers in the new system, which is more accurate).
+- **Address policy change**: previously CLAUDE.md documented that booking slips use the office address (Lot 1609) and L3.1 forms use the farm address (Lot 174). User has now consolidated both onto the farm/MPOB-licensed address. Office address fully deprecated — kept in CLAUDE.md only as a "what to do if you find this on old paper" reference. The Company Addresses section above has been updated to reflect this.
+- **Pattern lesson**: When a user shares a photo of an existing form/document and asks "do I have something like this?", build a column-by-column comparison table (existing vs. paper, with ✓/✗/⚠️ status) and let them mark which gaps matter. Saved a lot of back-and-forth on a fairly mechanical "match the paper" task.
+
+## Oil Palm Sales — Booking notes field (2026-05-14)
+Tiny addition for paper-booking migration use case. User has small numbers of customers from the old paper system, dealing with them case-by-case (some have paid + not collected). Wanted a way to jot down old paper booking refs and other context on new bookings.
+
+- **No DB changes** — `oilpalm_bookings.notes TEXT` column already existed (from initial 2026-05-08 migration) but was never read or written by any code. Just wired it in.
+- **New Booking modal** (oilpalmsales.html:636-638): added optional `<textarea id="ops-bk-notes" rows="3">` below the payment slip field with placeholder text mentioning the migration use case ("old paper booking ref, special instructions, anything to remember"). Trimmed value saved as `notes` on `oilpalm_bookings`; empty trims to NULL.
+- **Booking detail page** (`opsRenderBookingDetail`, line 1927): added gold-tinted Notes section between header band and Customer Info, conditional on `b.notes` being non-empty. `white-space:pre-wrap` so multi-line notes display correctly.
+- **Booking slip print** (`opsOpenBookingSlip`, line 1034): added conditional `<div class="bs-section"><h3>Notes</h3>...` between the meta block (Booking #/Date) and the Customer section. Only renders when notes exist.
+- **What was rejected during brainstorming** (so we don't add it back): separate `legacy_ref` column with 4-digit format enforcement + unique constraint + cross-table dup-check across bookings AND walk-ins. User pivoted to "just give me a notes section" after design walk-through — much smaller scope, fits the "small numbers, case-by-case" workflow.
+- **Edit Booking still doesn't exist** — there's no UI to edit an existing booking's fields (only status transitions: cancel/reassign/mark-refund-paid). User parked editable notes for a future session. If they need to change a booking's notes today, only the DB path works.
+- **Pattern lesson**: before designing a new DB column, grep for whether the field already exists unused. `oilpalm_bookings.notes` was unused for 6 days. Saved a migration.
 
 ## Oil Palm Growth — L3.1 doc + Procurement math + Sales Summary rework (2026-05-11)
 Three small additive features on top of the 2026-05-08 oil palm rebuild. Brainstormed section-by-section → spec skipped per `feedback_skip_spec_doc` → plan at `docs/superpowers/plans/2026-05-11-oilpalm-growth-procurement-summary.md` → executed inline (4 commits + deploy). User had been working around the missing procurement fields by writing `"Discount/Surcharge : RM465.00, Total Amount : RM15,035.00"` into the `notes` column on AB-OB002 — now first-class.

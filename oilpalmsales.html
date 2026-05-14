@@ -263,6 +263,7 @@
           <label class="full" style="font-weight:700;color:var(--text);font-size:13px;">Customer Details</label>
           <label class="full">Name <input id="ops-wi-name" /></label>
           <label>Contact Person <input id="ops-wi-contact" /></label>
+          <label>IC No <input id="ops-wi-ic" placeholder="e.g. 800101-13-1234" /></label>
           <label>Phone <input id="ops-wi-phone" type="tel" /></label>
           <label class="full">Address <textarea id="ops-wi-address" rows="2"></textarea></label>
 
@@ -361,6 +362,7 @@
       // === Read all fields ===
       const name        = (document.getElementById('ops-wi-name').value || '').trim();
       const contact     = (document.getElementById('ops-wi-contact').value || '').trim();
+      const ic          = (document.getElementById('ops-wi-ic').value || '').trim();
       const address     = (document.getElementById('ops-wi-address').value || '').trim();
       const batchId     = (document.getElementById('ops-wi-batch').value || '').trim();
       const qty         = parseInt(document.getElementById('ops-wi-qty').value, 10);
@@ -433,6 +435,7 @@
           company_id: getCompanyId(),
           name,
           contact_person: contact || null,
+          ic_number: ic || null,
           phone: phoneVal || null,
           address: address || null,
           customer_type: 'walkin',
@@ -633,6 +636,10 @@
           <label>Reference <input id="ops-bk-pay-ref" /></label>
           <label class="full">Slip (optional) <input type="file" id="ops-bk-pay-slip" accept="image/*,application/pdf" /></label>
 
+          <label class="full" style="margin-top:8px;">Notes (optional)
+            <textarea id="ops-bk-notes" rows="3" placeholder="e.g. old paper booking ref, special instructions, anything to remember"></textarea>
+          </label>
+
           <div id="ops-bk-warning" class="warn-box" style="display:none;"></div>
         </div>
         <div class="modal-actions">
@@ -703,6 +710,7 @@
           <div style="font-size:12px;font-weight:700;color:#6B4C8A;margin-bottom:8px;">+ New Customer</div>
           <div class="form-grid" style="margin-bottom:8px;">
             <label class="full">Name <input id="ops-bk-newcust-name" /></label>
+            <label class="full">IC No <input id="ops-bk-newcust-ic" placeholder="e.g. 800101-13-1234" /></label>
             <label class="full">Phone <input id="ops-bk-newcust-phone" type="tel" /></label>
           </div>
           <div style="display:flex;gap:6px;justify-content:flex-end;">
@@ -767,6 +775,8 @@
     async function opsBkSaveInlineNewCustomer() {
       const name = (document.getElementById('ops-bk-newcust-name').value || '').trim();
       if (!name) { notify('Name is required', 'error'); return; }
+      const icEl = document.getElementById('ops-bk-newcust-ic');
+      const ic = icEl ? (icEl.value || '').trim() : '';
       const phoneRead = opsBkReadInlinePhone();
       if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
 
@@ -778,6 +788,7 @@
         company_id: getCompanyId(),
         name,
         customer_type: 'booking',
+        ic_number: ic || null,
         phone: phoneRead.value || null,
         is_active: true
       };
@@ -864,6 +875,8 @@
       const payRef    = (document.getElementById('ops-bk-pay-ref').value || '').trim();
       const slipFileEl = document.getElementById('ops-bk-pay-slip');
       const slipFile   = slipFileEl && slipFileEl.files && slipFileEl.files[0] ? slipFileEl.files[0] : null;
+      const notesEl   = document.getElementById('ops-bk-notes');
+      const notes     = notesEl ? (notesEl.value || '').trim() : '';
 
       if (!custId)               { notify('Customer required', 'error'); return; }
       if (!batchId)              { notify('Batch required', 'error'); return; }
@@ -891,7 +904,8 @@
           unit_price: price,
           total_amount: total,
           booking_date: new Date().toISOString().slice(0, 10),
-          status: 'active'
+          status: 'active',
+          notes: notes || null
         };
         const bkResult = await sbMutate(() => sb.from('oilpalm_bookings').insert(bkInsert).select());
         if (bkResult === null) return;
@@ -1016,18 +1030,21 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
 </div>
 <div id="slip-content">
   <div class="bs-letterhead">
-    <h1>TG Agribusiness Sdn Bhd</h1>
-    <div class="addr">Lot 1609, Kpg. Riam Jaya, 98000 Miri, Sarawak, Malaysia</div>
+    <h1>TG Agribusiness</h1>
+    <div class="addr">Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak</div>
+    <div class="addr">Tel: +60 12-843 6616 &nbsp;·&nbsp; MPOB License No: 522231011000</div>
   </div>
   <div class="bs-title">BOOKING ORDER</div>
   <div class="bs-meta">
     <div><strong>Booking #:</strong> ${esc(bk.id)}</div>
     <div><strong>Date:</strong> ${esc(fmtDate(bk.booking_date))}</div>
   </div>
+  ${bk.notes ? `<div class="bs-section"><h3>Notes</h3><div style="white-space:pre-wrap;font-size:10pt;">${esc(bk.notes)}</div></div>` : ''}
   <div class="bs-section">
     <h3>Customer</h3>
     <div><strong>Name:</strong> ${esc((cust && cust.name) || '—')}</div>
     ${cust && cust.contact_person ? `<div><strong>Contact:</strong> ${esc(cust.contact_person)}</div>` : ''}
+    ${cust && cust.ic_number ? `<div><strong>IC No:</strong> ${esc(cust.ic_number)}</div>` : ''}
     ${cust && cust.phone ? `<div><strong>Phone:</strong> ${esc(fmtPhone(cust.phone))}</div>` : ''}
     ${cust && cust.address ? `<div><strong>Address:</strong> ${esc(cust.address)}</div>` : ''}
   </div>
@@ -1052,9 +1069,9 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
   <div class="bs-section bs-tc">
     <h3>Terms &amp; Conditions</h3>
     <ol>
-      <li>Deposit is non-refundable in case of customer cancellation without valid reason.</li>
-      <li>Customer must collect seedlings within 30 days of expected ready date.</li>
-      <li>Each collection requires presentation of this booking slip and identification.</li>
+      <li>Full payments are to be made upon collection/delivery of plants.</li>
+      <li>If plants are not collected 1 month after the confirmed date, the delivery of plants will be based on availability basis, or postponed to a future date as the company sees fit.</li>
+      <li>Any cancellation of bookings refund shall be made after 14 working days from the date of bookings.</li>
     </ol>
   </div>
   <div class="bs-sigs">
@@ -1916,6 +1933,13 @@ async function shareSlip() {
       const createdDate = b.created_at ? fmtDate(b.created_at) : '—';
       const bookingDate = b.booking_date ? fmtDate(b.booking_date) : '—';
 
+      const notesSection = b.notes ? `
+        <div class="ops-section" style="background:rgba(212,175,55,0.08);border-left:3px solid var(--gold);">
+          <h3 style="margin-top:0;">Notes</h3>
+          <div style="white-space:pre-wrap;font-size:13px;line-height:1.5;">${esc(b.notes)}</div>
+        </div>
+      ` : '';
+
       document.getElementById('tab-bookings').innerHTML = `
         <div class="page-header">
           <button class="btn btn-outline" onclick="opsCloseBookingDetail()">← Back to Bookings</button>
@@ -1935,12 +1959,15 @@ async function shareSlip() {
           </div>
         </div>
 
+        ${notesSection}
+
         <div class="ops-section">
           <h3>Customer Info</h3>
           <div class="form-grid">
             <div><strong>Name:</strong> ${cust ? esc(cust.name) : '<span class="muted">— customer missing —</span>'}</div>
             <div><strong>Type:</strong> ${cust ? (cust.customer_type === 'walkin' ? 'Walk-in' : 'Booking') : '—'}</div>
             <div><strong>Contact:</strong> ${cust ? esc(cust.contact_person || '—') : '—'}</div>
+            <div><strong>IC No:</strong> ${cust ? esc(cust.ic_number || '—') : '—'}</div>
             <div><strong>Phone:</strong> ${cust && cust.phone ? esc(fmtPhone(cust.phone)) : '—'}</div>
             <div class="full"><strong>Address:</strong> ${cust ? esc(cust.address || '—') : '—'}</div>
             <div class="full"><strong>Notes:</strong> ${cust ? esc(cust.notes || '—') : '—'}</div>
@@ -2812,7 +2839,7 @@ async function shareSlip() {
     function opsOpenCustomerModal(id) {
       const c = id
         ? customers.find(x => x.id === id)
-        : { name: '', customer_type: 'booking', contact_person: '', phone: '', address: '', notes: '' };
+        : { name: '', customer_type: 'booking', contact_person: '', phone: '', address: '', notes: '', ic_number: '' };
       if (id && !c) { notify('Customer not found', 'error'); return; }
 
       showModal(`
@@ -2826,6 +2853,7 @@ async function shareSlip() {
             </select>
           </label>
           <label>Contact Person <input id="oc-contact" value="${esc(c.contact_person || '')}" /></label>
+          <label>IC No <input id="oc-ic" value="${esc(c.ic_number || '')}" placeholder="e.g. 800101-13-1234" /></label>
           <label class="full">Phone <input id="oc-phone" type="tel" /></label>
           <label class="full">Address <textarea id="oc-addr">${esc(c.address || '')}</textarea></label>
           <label class="full">Notes <textarea id="oc-notes">${esc(c.notes || '')}</textarea></label>
@@ -2888,6 +2916,7 @@ async function shareSlip() {
         name,
         customer_type: document.getElementById('oc-type').value || 'booking',
         contact_person: document.getElementById('oc-contact').value.trim() || null,
+        ic_number: document.getElementById('oc-ic').value.trim() || null,
         phone: phoneRead.value || null,
         address: document.getElementById('oc-addr').value.trim() || null,
         notes: document.getElementById('oc-notes').value.trim() || null
@@ -3017,6 +3046,7 @@ async function shareSlip() {
             <div><strong>Type:</strong> ${c.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
             <div><strong>Phone:</strong> ${c.phone ? esc(fmtPhone(c.phone)) : '—'}</div>
             <div><strong>Contact:</strong> ${esc(c.contact_person || '—')}</div>
+            <div><strong>IC No:</strong> ${esc(c.ic_number || '—')}</div>
             <div><strong>Status:</strong> ${c.is_active ? 'Active' : 'Inactive'}</div>
             <div class="full"><strong>Address:</strong> ${esc(c.address || '—')}</div>
             <div class="full"><strong>Notes:</strong> ${esc(c.notes || '—')}</div>
