@@ -237,6 +237,189 @@
       return x.toISOString().slice(0, 10);
     }
 
+    // === Customer entity-type helpers (2026-05-15) ===
+    // Malaysian states + 3 federal territories, alphabetical with W.P. grouped at bottom.
+    const OPS_MY_STATES = ['Johor','Kedah','Kelantan','Melaka','Negeri Sembilan','Pahang','Perak','Perlis','Pulau Pinang','Sabah','Sarawak','Selangor','Terengganu','W.P. Kuala Lumpur','W.P. Labuan','W.P. Putrajaya'];
+
+    // IC auto-format: strips non-digits, inserts dashes at positions 6 + 8, caps at 14 chars.
+    // Preserves caret position so paste + typing both feel natural.
+    function opsFmtIcInput(input) {
+      const prev = input.value;
+      const caret = input.selectionStart;
+      const digits = prev.replace(/\D/g, '').slice(0, 12);
+      let out = digits;
+      if (digits.length > 6) out = digits.slice(0,6) + '-' + digits.slice(6);
+      if (digits.length > 8) out = digits.slice(0,6) + '-' + digits.slice(6,8) + '-' + digits.slice(8);
+      input.value = out;
+      // Best-effort caret restore: digits added/removed relative to before caret.
+      const before = prev.slice(0, caret).replace(/\D/g, '').length;
+      let newCaret = 0, ds = 0;
+      for (let i = 0; i < out.length && ds < before; i++) {
+        if (/\d/.test(out[i])) ds++;
+        newCaret = i + 1;
+      }
+      try { input.setSelectionRange(newCaret, newCaret); } catch (e) {}
+    }
+
+    // Validate IC No format. Empty is allowed (optional field). Returns true if format matches
+    // xxxxxx-xx-xxxx (6-2-4 digits). Auto-format guarantees correctness if any digits were typed
+    // but on paste user could land a partial; this catches that.
+    function opsIcIsValid(v) {
+      const s = (v || '').trim();
+      if (!s) return true;
+      return /^\d{6}-\d{2}-\d{4}$/.test(s);
+    }
+
+    // Toggle entity-type sections. Called on radio change. `prefix` matches the field ID prefix
+    // used in opsRenderCustomerFieldsHtml (e.g. 'oc-', 'ops-bk-newcust-', 'ops-wi-').
+    function opsToggleEntityType(prefix, type) {
+      const root = document.getElementById(prefix + 'customer-fields');
+      if (!root) return;
+      const isComp = type === 'company';
+      root.querySelectorAll('.opsx-individual-only').forEach(el => { el.style.display = isComp ? 'none' : ''; });
+      root.querySelectorAll('.opsx-company-only').forEach(el => { el.style.display = isComp ? '' : 'none'; });
+      const nameLbl = root.querySelector('.opsx-lbl-name');
+      if (nameLbl) nameLbl.textContent = isComp ? 'Company Name' : 'Name';
+      const phoneLbl = root.querySelector('.opsx-lbl-phone');
+      if (phoneLbl) phoneLbl.textContent = isComp ? 'Contact Phone' : 'Phone';
+      // Pill visual state
+      root.querySelectorAll('.opsx-pill').forEach(p => {
+        const active = p.dataset.type === type;
+        p.style.background = active ? '#6B4C8A' : 'transparent';
+        p.style.color = active ? '#fff' : 'var(--text)';
+      });
+    }
+
+    // Build the customer-fields HTML block (entity toggle + dynamic fields + address rows).
+    // Used by all 3 customer entry points (customer modal, booking inline, walk-in modal).
+    // `prefix` → field ID prefix (e.g. 'oc-'). `c` → existing customer for edit pre-fill (optional).
+    // `opts` → { includeNotes: bool, includeContactForIndividual: bool }.
+    function opsRenderCustomerFieldsHtml(prefix, c, opts) {
+      c = c || {};
+      opts = opts || {};
+      const entity = c.entity_type || 'individual';
+      const isComp = entity === 'company';
+      const stateOpts = OPS_MY_STATES.map(s => `<option value="${esc(s)}" ${(c.address_state || 'Sarawak') === s ? 'selected' : ''}>${esc(s)}</option>`).join('');
+      // Legacy address banner: only shown on edit when broken-out fields are all empty AND legacy has data.
+      const hasBrokenOut = !!(c.address_street1 || c.address_street2 || c.address_postcode || c.address_district || c.address_state);
+      const showLegacyBanner = !!c.address && !hasBrokenOut;
+      return `
+<div id="${prefix}customer-fields" class="opsx-customer-fields">
+  <div class="opsx-entity-toggle" style="display:flex;gap:0;border:1px solid var(--border);border-radius:4px;padding:2px;background:rgba(0,0,0,0.03);margin-bottom:10px;width:fit-content;">
+    <label class="opsx-pill" data-type="individual" style="padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:3px;background:${!isComp ? '#6B4C8A' : 'transparent'};color:${!isComp ? '#fff' : 'var(--text)'};">
+      <input type="radio" name="${prefix}entity-type" value="individual" ${!isComp ? 'checked' : ''} onchange="opsToggleEntityType('${prefix}','individual')" style="display:none;" />Individual
+    </label>
+    <label class="opsx-pill" data-type="company" style="padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;border-radius:3px;background:${isComp ? '#6B4C8A' : 'transparent'};color:${isComp ? '#fff' : 'var(--text)'};">
+      <input type="radio" name="${prefix}entity-type" value="company" ${isComp ? 'checked' : ''} onchange="opsToggleEntityType('${prefix}','company')" style="display:none;" />Company
+    </label>
+  </div>
+
+  <div class="form-grid">
+    <label class="full">
+      <span class="opsx-lbl-name">${isComp ? 'Company Name' : 'Name'}</span>
+      <input id="${prefix}name" value="${esc(c.name || '')}" />
+    </label>
+    <label class="full opsx-company-only" style="display:${isComp ? '' : 'none'};">
+      Contact Person <input id="${prefix}contact" value="${esc(c.contact_person || '')}" />
+    </label>
+    <label class="full opsx-individual-only" style="display:${isComp ? 'none' : ''};">
+      IC No <input id="${prefix}ic" value="${esc(c.ic_number || '')}" placeholder="e.g. 800101-13-1234" oninput="opsFmtIcInput(this)" maxlength="14" />
+    </label>
+    <label class="full opsx-company-only" style="display:${isComp ? '' : 'none'};">
+      Company Number <input id="${prefix}company-no" value="${esc(c.company_number || '')}" placeholder="e.g. 123456-A or 202001012345" />
+    </label>
+    <label class="full">
+      <span class="opsx-lbl-phone">${isComp ? 'Contact Phone' : 'Phone'}</span>
+      <input id="${prefix}phone" type="tel" />
+    </label>
+  </div>
+
+  ${showLegacyBanner ? `
+  <div style="margin-top:10px;padding:8px 10px;border:1px dashed #D4AF37;border-radius:4px;background:rgba(212,175,55,0.08);font-size:11px;">
+    <div style="font-weight:700;color:#8A6D1F;margin-bottom:4px;">Existing address (legacy)</div>
+    <div style="white-space:pre-wrap;color:var(--text);">${esc(c.address)}</div>
+    <div style="margin-top:6px;color:var(--text-muted);font-style:italic;">Fill the rows below to migrate. Leaving them blank keeps this address as-is.</div>
+  </div>` : ''}
+
+  <div style="font-weight:700;font-size:12px;margin-top:10px;margin-bottom:4px;color:var(--text);">Address</div>
+  <div class="form-grid">
+    <label class="full">Street 1 <input id="${prefix}addr-street1" value="${esc(c.address_street1 || '')}" /></label>
+    <label class="full">Street 2 <input id="${prefix}addr-street2" value="${esc(c.address_street2 || '')}" /></label>
+    <label class="full">Postcode <input id="${prefix}addr-postcode" value="${esc(c.address_postcode || '')}" maxlength="5" inputmode="numeric" /></label>
+    <label class="full">District <input id="${prefix}addr-district" value="${esc(c.address_district || '')}" /></label>
+    <label class="full">State <select id="${prefix}addr-state">${stateOpts}</select></label>
+  </div>
+
+  ${opts.includeNotes ? `
+  <div class="form-grid" style="margin-top:6px;">
+    <label class="full">Notes <textarea id="${prefix}notes">${esc(c.notes || '')}</textarea></label>
+  </div>` : ''}
+</div>`;
+    }
+
+    // Read entity-type fields from DOM. Returns { entity_type, name, contact_person, ic_number,
+    // company_number, phone (raw), address_*, notes, _error }. Caller validates phone via iti
+    // separately and merges. _error set if a hard-required field is missing or IC malformed.
+    function opsReadCustomerFields(prefix, opts) {
+      opts = opts || {};
+      const radios = document.getElementsByName(prefix + 'entity-type');
+      let entity = 'individual';
+      for (const r of radios) { if (r.checked) { entity = r.value; break; } }
+      const name = (document.getElementById(prefix + 'name').value || '').trim();
+      if (!name) return { _error: entity === 'company' ? 'Company Name is required' : 'Name is required' };
+      const icEl = document.getElementById(prefix + 'ic');
+      const ic = icEl ? (icEl.value || '').trim() : '';
+      if (entity === 'individual' && ic && !opsIcIsValid(ic)) return { _error: 'IC No must be in format xxxxxx-xx-xxxx' };
+      const companyNoEl = document.getElementById(prefix + 'company-no');
+      const companyNo = companyNoEl ? (companyNoEl.value || '').trim() : '';
+      const contactEl = document.getElementById(prefix + 'contact');
+      const contact = contactEl ? (contactEl.value || '').trim() : '';
+      const postcodeEl = document.getElementById(prefix + 'addr-postcode');
+      const postcode = postcodeEl ? (postcodeEl.value || '').trim() : '';
+      if (postcode && !/^\d{5}$/.test(postcode)) return { _error: 'Postcode must be 5 digits' };
+      const get = id => { const el = document.getElementById(prefix + id); return el ? (el.value || '').trim() : ''; };
+      const notes = opts.includeNotes ? get('notes') : '';
+      return {
+        entity_type: entity,
+        name,
+        contact_person: (entity === 'company' ? contact : '') || null,
+        ic_number: (entity === 'individual' ? ic : '') || null,
+        company_number: (entity === 'company' ? companyNo : '') || null,
+        address_street1: get('addr-street1') || null,
+        address_street2: get('addr-street2') || null,
+        address_postcode: postcode || null,
+        address_district: get('addr-district') || null,
+        address_state: get('addr-state') || null,
+        notes: opts.includeNotes ? (notes || null) : undefined
+      };
+    }
+
+    // Format customer address for display. Returns array of lines (empty if no address).
+    // Prefers broken-out fields. Falls back to legacy `address` (split on newline) if all empty.
+    function opsFormatCustomerAddress(c) {
+      if (!c) return [];
+      const hasBrokenOut = !!(c.address_street1 || c.address_street2 || c.address_postcode || c.address_district || c.address_state);
+      if (hasBrokenOut) {
+        const lines = [];
+        if (c.address_street1) lines.push(c.address_street1);
+        if (c.address_street2) lines.push(c.address_street2);
+        const pcDist = [c.address_postcode, c.address_district].filter(Boolean).join(' ');
+        if (pcDist) lines.push(pcDist);
+        if (c.address_state) lines.push(c.address_state);
+        return lines;
+      }
+      if (c.address) return String(c.address).split('\n').map(s => s.trim()).filter(Boolean);
+      return [];
+    }
+
+    // Single-line entity chip for table cells / inline labels.
+    function opsEntityChip(c) {
+      const t = (c && c.entity_type) === 'company' ? 'COMP' : 'IND';
+      const bg = t === 'COMP' ? 'rgba(107,76,138,0.15)' : 'rgba(212,175,55,0.18)';
+      const col = t === 'COMP' ? '#6B4C8A' : '#8A6D1F';
+      return `<span style="display:inline-block;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:0.5px;background:${bg};color:${col};border-radius:2px;margin-left:6px;vertical-align:middle;">${t}</span>`;
+    }
+
     // === Walk-in Sale modal (Task 3.9) ===
     // One-shot: customer + collection + payment in a single save. NO booking row.
     let opscWalkinPhoneIti = null;
@@ -258,17 +441,13 @@
         <h3>+ New Walk-in Sale</h3>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Walk-ins pay full amount at counter. No booking row is created.</div>
 
-        <div class="form-grid">
-          <!-- Section A — Customer details -->
-          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;">Customer Details</label>
-          <label class="full">Name <input id="ops-wi-name" /></label>
-          <label>Contact Person <input id="ops-wi-contact" /></label>
-          <label>IC No <input id="ops-wi-ic" placeholder="e.g. 800101-13-1234" /></label>
-          <label>Phone <input id="ops-wi-phone" type="tel" /></label>
-          <label class="full">Address <textarea id="ops-wi-address" rows="2"></textarea></label>
+        <!-- Section A — Customer details -->
+        <div style="font-weight:700;color:var(--text);font-size:13px;margin-bottom:6px;">Customer Details</div>
+        ${opsRenderCustomerFieldsHtml('ops-wi-', null, { includeNotes: false })}
 
+        <div class="form-grid" style="margin-top:10px;">
           <!-- Section B — Collection details -->
-          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;margin-top:8px;">Collection Details</label>
+          <label class="full" style="font-weight:700;color:var(--text);font-size:13px;">Collection Details</label>
           <label class="full">Batch (Selling stage)
             <select id="ops-wi-batch" onchange="opsWiBatchChanged()">
               <option value="">— select —</option>
@@ -360,10 +539,9 @@
 
     async function opsSaveWalkIn() {
       // === Read all fields ===
-      const name        = (document.getElementById('ops-wi-name').value || '').trim();
-      const contact     = (document.getElementById('ops-wi-contact').value || '').trim();
-      const ic          = (document.getElementById('ops-wi-ic').value || '').trim();
-      const address     = (document.getElementById('ops-wi-address').value || '').trim();
+      const custFields  = opsReadCustomerFields('ops-wi-', { includeNotes: false });
+      if (custFields._error) { notify(custFields._error, 'error'); return; }
+      const name        = custFields.name;
       const batchId     = (document.getElementById('ops-wi-batch').value || '').trim();
       const qty         = parseInt(document.getElementById('ops-wi-qty').value, 10);
       const price       = parseFloat(document.getElementById('ops-wi-price').value);
@@ -384,7 +562,6 @@
       const paySlipFile = paySlipEl && paySlipEl.files && paySlipEl.files[0] ? paySlipEl.files[0] : null;
 
       // === Validation ===
-      if (!name)              { notify('Customer name is required', 'error'); return; }
       if (!batchId)           { notify('Batch is required', 'error'); return; }
       if (!qty || qty < 1)    { notify('Quantity must be at least 1', 'error'); return; }
       if (!price || price <= 0) { notify('Unit price must be > 0', 'error'); return; }
@@ -433,11 +610,17 @@
         const custInsert = {
           id: newCustId,
           company_id: getCompanyId(),
-          name,
-          contact_person: contact || null,
-          ic_number: ic || null,
+          name: custFields.name,
+          entity_type: custFields.entity_type,
+          contact_person: custFields.contact_person,
+          ic_number: custFields.ic_number,
+          company_number: custFields.company_number,
           phone: phoneVal || null,
-          address: address || null,
+          address_street1: custFields.address_street1,
+          address_street2: custFields.address_street2,
+          address_postcode: custFields.address_postcode,
+          address_district: custFields.address_district,
+          address_state: custFields.address_state,
           customer_type: 'walkin',
           is_active: true
         };
@@ -708,12 +891,8 @@
       area.innerHTML = `
         <div style="border:1px dashed var(--border);border-radius:4px;padding:10px;background:rgba(212,175,55,0.06);">
           <div style="font-size:12px;font-weight:700;color:#6B4C8A;margin-bottom:8px;">+ New Customer</div>
-          <div class="form-grid" style="margin-bottom:8px;">
-            <label class="full">Name <input id="ops-bk-newcust-name" /></label>
-            <label class="full">IC No <input id="ops-bk-newcust-ic" placeholder="e.g. 800101-13-1234" /></label>
-            <label class="full">Phone <input id="ops-bk-newcust-phone" type="tel" /></label>
-          </div>
-          <div style="display:flex;gap:6px;justify-content:flex-end;">
+          ${opsRenderCustomerFieldsHtml('ops-bk-newcust-', null, { includeNotes: false })}
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;">
             <button class="btn-tiny" type="button" onclick="opsBkCancelInlineNewCustomer()">Cancel</button>
             <button class="btn-tiny" type="button" onclick="opsBkSaveInlineNewCustomer()" style="background:#6B4C8A;color:#fff;border-color:#6B4C8A;">Save Customer</button>
           </div>
@@ -773,10 +952,8 @@
     }
 
     async function opsBkSaveInlineNewCustomer() {
-      const name = (document.getElementById('ops-bk-newcust-name').value || '').trim();
-      if (!name) { notify('Name is required', 'error'); return; }
-      const icEl = document.getElementById('ops-bk-newcust-ic');
-      const ic = icEl ? (icEl.value || '').trim() : '';
+      const fields = opsReadCustomerFields('ops-bk-newcust-', { includeNotes: false });
+      if (fields._error) { notify(fields._error, 'error'); return; }
       const phoneRead = opsBkReadInlinePhone();
       if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
 
@@ -786,10 +963,18 @@
       const insertData = {
         id: newId,
         company_id: getCompanyId(),
-        name,
+        name: fields.name,
+        entity_type: fields.entity_type,
         customer_type: 'booking',
-        ic_number: ic || null,
+        contact_person: fields.contact_person,
+        ic_number: fields.ic_number,
+        company_number: fields.company_number,
         phone: phoneRead.value || null,
+        address_street1: fields.address_street1,
+        address_street2: fields.address_street2,
+        address_postcode: fields.address_postcode,
+        address_district: fields.address_district,
+        address_state: fields.address_state,
         is_active: true
       };
       const result = await sbMutate(() => sb.from('oilpalm_customers').insert(insertData).select());
@@ -1042,11 +1227,28 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
   ${bk.notes ? `<div class="bs-section"><h3>Notes</h3><div style="white-space:pre-wrap;font-size:10pt;">${esc(bk.notes)}</div></div>` : ''}
   <div class="bs-section">
     <h3>Customer</h3>
-    <div><strong>Name:</strong> ${esc((cust && cust.name) || '—')}</div>
-    ${cust && cust.contact_person ? `<div><strong>Contact:</strong> ${esc(cust.contact_person)}</div>` : ''}
-    ${cust && cust.ic_number ? `<div><strong>IC No:</strong> ${esc(cust.ic_number)}</div>` : ''}
-    ${cust && cust.phone ? `<div><strong>Phone:</strong> ${esc(fmtPhone(cust.phone))}</div>` : ''}
-    ${cust && cust.address ? `<div><strong>Address:</strong> ${esc(cust.address)}</div>` : ''}
+    ${(() => {
+      if (!cust) return `<div><strong>Name:</strong> —</div>`;
+      const isComp = cust.entity_type === 'company';
+      const addrLines = opsFormatCustomerAddress(cust);
+      const addrHtml = addrLines.length
+        ? `<div style="display:grid;grid-template-columns:90px 1fr;align-items:start;"><div><strong>Address:</strong></div><div>${addrLines.map(l => esc(l)).join('<br>')}</div></div>`
+        : '';
+      if (isComp) {
+        return `
+          <div><strong>Company:</strong> ${esc(cust.name || '—')}</div>
+          <div><strong>Contact Person:</strong> ${esc(cust.contact_person || '—')}</div>
+          ${cust.company_number ? `<div><strong>Company No.:</strong> ${esc(cust.company_number)}</div>` : ''}
+          ${cust.phone ? `<div><strong>Phone:</strong> ${esc(fmtPhone(cust.phone))}</div>` : ''}
+          ${addrHtml}`;
+      }
+      return `
+        <div><strong>Name:</strong> ${esc(cust.name || '—')}</div>
+        ${cust.contact_person ? `<div><strong>Contact:</strong> ${esc(cust.contact_person)}</div>` : ''}
+        ${cust.ic_number ? `<div><strong>IC No:</strong> ${esc(cust.ic_number)}</div>` : ''}
+        ${cust.phone ? `<div><strong>Phone:</strong> ${esc(fmtPhone(cust.phone))}</div>` : ''}
+        ${addrHtml}`;
+    })()}
   </div>
   <div class="bs-section">
     <h3>Items</h3>
@@ -1962,15 +2164,32 @@ async function shareSlip() {
         ${notesSection}
 
         <div class="ops-section">
-          <h3>Customer Info</h3>
+          <h3>Customer Info ${cust ? opsEntityChip(cust) : ''}</h3>
           <div class="form-grid">
-            <div><strong>Name:</strong> ${cust ? esc(cust.name) : '<span class="muted">— customer missing —</span>'}</div>
-            <div><strong>Type:</strong> ${cust ? (cust.customer_type === 'walkin' ? 'Walk-in' : 'Booking') : '—'}</div>
-            <div><strong>Contact:</strong> ${cust ? esc(cust.contact_person || '—') : '—'}</div>
-            <div><strong>IC No:</strong> ${cust ? esc(cust.ic_number || '—') : '—'}</div>
-            <div><strong>Phone:</strong> ${cust && cust.phone ? esc(fmtPhone(cust.phone)) : '—'}</div>
-            <div class="full"><strong>Address:</strong> ${cust ? esc(cust.address || '—') : '—'}</div>
-            <div class="full"><strong>Notes:</strong> ${cust ? esc(cust.notes || '—') : '—'}</div>
+            ${(() => {
+              if (!cust) return `<div class="full"><span class="muted">— customer missing —</span></div>`;
+              const isComp = cust.entity_type === 'company';
+              const addrLines = opsFormatCustomerAddress(cust);
+              const addrHtml = addrLines.length ? addrLines.map(l => esc(l)).join('<br>') : '—';
+              if (isComp) {
+                return `
+                  <div><strong>Company:</strong> ${esc(cust.name)}</div>
+                  <div><strong>Type:</strong> ${cust.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
+                  <div><strong>Contact Person:</strong> ${esc(cust.contact_person || '—')}</div>
+                  <div><strong>Company No.:</strong> ${esc(cust.company_number || '—')}</div>
+                  <div><strong>Phone:</strong> ${cust.phone ? esc(fmtPhone(cust.phone)) : '—'}</div>
+                  <div class="full"><strong>Address:</strong> ${addrHtml}</div>
+                  <div class="full"><strong>Notes:</strong> ${esc(cust.notes || '—')}</div>`;
+              }
+              return `
+                <div><strong>Name:</strong> ${esc(cust.name)}</div>
+                <div><strong>Type:</strong> ${cust.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
+                <div><strong>Contact:</strong> ${esc(cust.contact_person || '—')}</div>
+                <div><strong>IC No:</strong> ${esc(cust.ic_number || '—')}</div>
+                <div><strong>Phone:</strong> ${cust.phone ? esc(fmtPhone(cust.phone)) : '—'}</div>
+                <div class="full"><strong>Address:</strong> ${addrHtml}</div>
+                <div class="full"><strong>Notes:</strong> ${esc(cust.notes || '—')}</div>`;
+            })()}
           </div>
         </div>
 
@@ -2767,13 +2986,17 @@ async function shareSlip() {
         const typeBadge = c.customer_type === 'walkin'
           ? '<span class="ops-status-badge ops-status-walkin">Walk-in</span>'
           : '<span class="ops-status-badge ops-status-active">Booking</span>';
+        const idNo = c.entity_type === 'company' ? (c.company_number || '—') : (c.ic_number || '—');
+        const addrLines = opsFormatCustomerAddress(c);
+        const addrCell = addrLines.length ? esc(addrLines.join(', ')) : '—';
         return `
           <tr>
             <td>${i + 1}</td>
-            <td><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a></td>
+            <td><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a>${opsEntityChip(c)}</td>
             <td>${typeBadge}</td>
             <td>${c.phone ? esc(fmtPhone(c.phone)) : '<span class="muted">—</span>'}</td>
-            <td>${esc(c.address || '—')}</td>
+            <td>${esc(idNo)}</td>
+            <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(addrLines.join(', '))}">${addrCell}</td>
             <td style="text-align:right;">${booked.toLocaleString()}</td>
             <td style="text-align:right;">${collected.toLocaleString()}</td>
             <td style="text-align:right;" ${owedClass}>${formatRM(owed)}</td>
@@ -2784,7 +3007,7 @@ async function shareSlip() {
             </td>
           </tr>
         `;
-      }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-muted);">No customers' + (term ? ' match this search.' : ' yet.') + '</td></tr>';
+      }).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-muted);">No customers' + (term ? ' match this search.' : ' yet.') + '</td></tr>';
 
       document.getElementById('tab-customers').innerHTML = `
         <div class="page-header">
@@ -2803,6 +3026,7 @@ async function shareSlip() {
                 <th>Name</th>
                 <th>Type</th>
                 <th>Phone</th>
+                <th>ID No</th>
                 <th>Address</th>
                 <th style="text-align:right;">Total Booked</th>
                 <th style="text-align:right;">Total Collected</th>
@@ -2839,24 +3063,19 @@ async function shareSlip() {
     function opsOpenCustomerModal(id) {
       const c = id
         ? customers.find(x => x.id === id)
-        : { name: '', customer_type: 'booking', contact_person: '', phone: '', address: '', notes: '', ic_number: '' };
+        : { name: '', customer_type: 'booking', entity_type: 'individual' };
       if (id && !c) { notify('Customer not found', 'error'); return; }
 
       showModal(`
         <h3>${id ? 'Edit' : 'Add'} Customer</h3>
-        <div class="form-grid">
-          <label class="full">Name <input id="oc-name" value="${esc(c.name || '')}" /></label>
+        ${opsRenderCustomerFieldsHtml('oc-', c, { includeNotes: true })}
+        <div class="form-grid" style="margin-top:6px;">
           <label>Customer Type
-            <select id="oc-type">
+            <select id="oc-cust-type">
               <option value="booking" ${c.customer_type === 'walkin' ? '' : 'selected'}>Booking</option>
               <option value="walkin" ${c.customer_type === 'walkin' ? 'selected' : ''}>Walk-in</option>
             </select>
           </label>
-          <label>Contact Person <input id="oc-contact" value="${esc(c.contact_person || '')}" /></label>
-          <label>IC No <input id="oc-ic" value="${esc(c.ic_number || '')}" placeholder="e.g. 800101-13-1234" /></label>
-          <label class="full">Phone <input id="oc-phone" type="tel" /></label>
-          <label class="full">Address <textarea id="oc-addr">${esc(c.address || '')}</textarea></label>
-          <label class="full">Notes <textarea id="oc-notes">${esc(c.notes || '')}</textarea></label>
         </div>
         <div class="modal-actions">
           <button class="btn" onclick="closeModal('ops-cust-overlay')">Cancel</button>
@@ -2906,21 +3125,31 @@ async function shareSlip() {
     }
 
     async function opsSaveCustomer(id) {
-      const name = document.getElementById('oc-name').value.trim();
-      if (!name) { notify('Name is required', 'error'); return; }
+      const fields = opsReadCustomerFields('oc-', { includeNotes: true });
+      if (fields._error) { notify(fields._error, 'error'); return; }
 
       const phoneRead = opsReadPhone(opscPhoneIti);
       if (phoneRead.error) { notify(phoneRead.error, 'error'); return; }
 
       const data = {
-        name,
-        customer_type: document.getElementById('oc-type').value || 'booking',
-        contact_person: document.getElementById('oc-contact').value.trim() || null,
-        ic_number: document.getElementById('oc-ic').value.trim() || null,
+        name: fields.name,
+        entity_type: fields.entity_type,
+        customer_type: (document.getElementById('oc-cust-type') || {}).value || 'booking',
+        contact_person: fields.contact_person,
+        ic_number: fields.ic_number,
+        company_number: fields.company_number,
         phone: phoneRead.value || null,
-        address: document.getElementById('oc-addr').value.trim() || null,
-        notes: document.getElementById('oc-notes').value.trim() || null
+        address_street1: fields.address_street1,
+        address_street2: fields.address_street2,
+        address_postcode: fields.address_postcode,
+        address_district: fields.address_district,
+        address_state: fields.address_state,
+        notes: fields.notes
       };
+      // If user filled any new address field on a legacy-address record, clear the legacy
+      // column so future reads see the new fields as source of truth.
+      const filledNewAddr = !!(data.address_street1 || data.address_street2 || data.address_postcode || data.address_district || data.address_state);
+      if (filledNewAddr) data.address = null;
 
       if (id) {
         const result = await sbMutate(() => sb.from('oilpalm_customers').update(data).eq('id', id).select());
@@ -3034,7 +3263,7 @@ async function shareSlip() {
         <div class="page-header">
           <div style="display:flex;align-items:center;gap:12px;">
             <button class="btn btn-outline" onclick="opsCloseCustomerDetail()">← Back</button>
-            <h2 style="margin:0;">${esc(c.name)}</h2>
+            <h2 style="margin:0;">${esc(c.name)}${opsEntityChip(c)}</h2>
             ${c.is_active ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>'}
           </div>
           <button class="btn btn-primary" onclick="opsOpenCustomerModal('${c.id}')">Edit Customer</button>
@@ -3043,13 +3272,29 @@ async function shareSlip() {
         <div class="ops-section">
           <h3>Customer Info</h3>
           <div class="form-grid">
-            <div><strong>Type:</strong> ${c.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
-            <div><strong>Phone:</strong> ${c.phone ? esc(fmtPhone(c.phone)) : '—'}</div>
-            <div><strong>Contact:</strong> ${esc(c.contact_person || '—')}</div>
-            <div><strong>IC No:</strong> ${esc(c.ic_number || '—')}</div>
-            <div><strong>Status:</strong> ${c.is_active ? 'Active' : 'Inactive'}</div>
-            <div class="full"><strong>Address:</strong> ${esc(c.address || '—')}</div>
-            <div class="full"><strong>Notes:</strong> ${esc(c.notes || '—')}</div>
+            ${(() => {
+              const isComp = c.entity_type === 'company';
+              const addrLines = opsFormatCustomerAddress(c);
+              const addrHtml = addrLines.length ? addrLines.map(l => esc(l)).join('<br>') : '—';
+              if (isComp) {
+                return `
+                  <div><strong>Type:</strong> ${c.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
+                  <div><strong>Phone:</strong> ${c.phone ? esc(fmtPhone(c.phone)) : '—'}</div>
+                  <div><strong>Contact Person:</strong> ${esc(c.contact_person || '—')}</div>
+                  <div><strong>Company No.:</strong> ${esc(c.company_number || '—')}</div>
+                  <div><strong>Status:</strong> ${c.is_active ? 'Active' : 'Inactive'}</div>
+                  <div class="full"><strong>Address:</strong> ${addrHtml}</div>
+                  <div class="full"><strong>Notes:</strong> ${esc(c.notes || '—')}</div>`;
+              }
+              return `
+                <div><strong>Type:</strong> ${c.customer_type === 'walkin' ? 'Walk-in' : 'Booking'}</div>
+                <div><strong>Phone:</strong> ${c.phone ? esc(fmtPhone(c.phone)) : '—'}</div>
+                <div><strong>Contact:</strong> ${esc(c.contact_person || '—')}</div>
+                <div><strong>IC No:</strong> ${esc(c.ic_number || '—')}</div>
+                <div><strong>Status:</strong> ${c.is_active ? 'Active' : 'Inactive'}</div>
+                <div class="full"><strong>Address:</strong> ${addrHtml}</div>
+                <div class="full"><strong>Notes:</strong> ${esc(c.notes || '—')}</div>`;
+            })()}
           </div>
         </div>
 
