@@ -1,0 +1,149 @@
+name: TG Farmhub Daily Backup
+
+on:
+  schedule:
+    # 03:00 Malaysia time = 19:00 UTC the previous day
+    - cron: '0 19 * * *'
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Public Supabase URL (not secret — already exposed in shared.js)
+  SUPABASE_URL: https://qwlagcriiyoflseduvvc.supabase.co
+  R2_BUCKET: tg-farmhub-backups
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set date variables (Malaysia time)
+        id: date
+        run: |
+          TODAY=$(TZ=Asia/Kuala_Lumpur date +%Y-%m-%d)
+          YEAR_MONTH=$(TZ=Asia/Kuala_Lumpur date +%Y-%m)
+          TODAY_DOM=$(TZ=Asia/Kuala_Lumpur date +%d)
+          LAST_DOM=$(TZ=Asia/Kuala_Lumpur date -d "$(TZ=Asia/Kuala_Lumpur date +%Y-%m-01) +1 month -1 day" +%d)
+          if [ "$TODAY_DOM" = "$LAST_DOM" ]; then IS_LAST=true; else IS_LAST=false; fi
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          echo "year_month=$YEAR_MONTH" >> "$GITHUB_OUTPUT"
+          echo "is_last_day=$IS_LAST" >> "$GITHUB_OUTPUT"
+          echo "Today (MYT): $TODAY  |  Year-Month: $YEAR_MONTH  |  Last day of month: $IS_LAST"
+
+      - name: Install PostgreSQL 15 client (for pg_dump)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-15
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          TODAY: ${{ steps.date.outputs.today }}
+        run: |
+          set -euo pipefail
+          DUMP_FILE="db-${TODAY}.sql.gz"
+          pg_dump "${SUPABASE_DB_URL}" \
+            --no-owner \
+            --no-acl \
+            --schema=public \
+            --format=plain \
+            --quote-all-identifiers \
+            | gzip > "${DUMP_FILE}"
+          SIZE=$(stat -c%s "${DUMP_FILE}")
+          echo "Dump size: ${SIZE} bytes ($((SIZE / 1024 / 1024)) MB)"
+          if [ "${SIZE}" -lt 1048576 ]; then
+            echo "::error::Dump file too small (${SIZE} bytes < 1 MB) — likely pg_dump failure. Aborting."
+            exit 1
+          fi
+          echo "DUMP_FILE=${DUMP_FILE}" >> "$GITHUB_ENV"
+
+      - name: Upload daily DB dump to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          TODAY: ${{ steps.date.outputs.today }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "${DUMP_FILE}" \
+            "s3://${R2_BUCKET}/db/${TODAY}.sql.gz" \
+            --endpoint-url "${R2_ENDPOINT_URL}"
+          echo "Daily dump uploaded: db/${TODAY}.sql.gz"
+
+      - name: Upload monthly DB dump to R2 (only on last day of month)
+        if: steps.date.outputs.is_last_day == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          YEAR_MONTH: ${{ steps.date.outputs.year_month }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "${DUMP_FILE}" \
+            "s3://${R2_BUCKET}/db-monthly/${YEAR_MONTH}.sql.gz" \
+            --endpoint-url "${R2_ENDPOINT_URL}"
+          echo "Monthly dump uploaded: db-monthly/${YEAR_MONTH}.sql.gz"
+
+      - name: Verify daily dump landed on R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          TODAY: ${{ steps.date.outputs.today }}
+        run: |
+          set -euo pipefail
+          REMOTE_SIZE=$(aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "db/${TODAY}.sql.gz" \
+            --endpoint-url "${R2_ENDPOINT_URL}" \
+            --query 'ContentLength' --output text)
+          LOCAL_SIZE=$(stat -c%s "${DUMP_FILE}")
+          if [ "${REMOTE_SIZE}" != "${LOCAL_SIZE}" ]; then
+            echo "::error::Size mismatch — local=${LOCAL_SIZE} remote=${REMOTE_SIZE}"
+            exit 1
+          fi
+          echo "Size verified: ${REMOTE_SIZE} bytes"
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Mirror Supabase Storage buckets to R2
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: node scripts/backup-files.mjs
+
+      - name: Summary
+        if: always()
+        env:
+          TODAY: ${{ steps.date.outputs.today }}
+          IS_LAST: ${{ steps.date.outputs.is_last_day }}
+        run: |
+          echo "=== Backup Summary ==="
+          echo "Date (MYT):     ${TODAY}"
+          echo "Monthly saved:  ${IS_LAST}"
+          echo "Status:         ${{ job.status }}"
