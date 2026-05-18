@@ -625,6 +625,7 @@ Everything lives in one repo, one Netlify site, one Supabase project, one domain
 - [ ] **Staff Claims** — Personal expense claims, approvals, reimbursement tracking (coming soon)
 - [ ] **Cross-Module Dashboard** — Hub page with at-a-glance metrics
 - [ ] **Notification System** — In-app alerts, optional WhatsApp/Telegram push
+- [ ] **Quarterly restore drill** — first drill due ~2026-08-18 (3 months after backup ships). Follow `docs/RESTORE.md` → "Quarterly restore drill" section. Repeat every 3 months. The only way to know backups work is to use them.
 
 ## Farm Map Module — Plan (Not Started)
 - **File**: `farmmap.html` (single HTML file like other modules)
@@ -999,3 +1000,59 @@ Three small additive features on top of the 2026-05-08 oil palm rebuild. Brainst
   - **Critical gotcha re-confirmed during execution**: the transplant flow at `oilpalmgrowth.html:665` emits `event_type: 'transplant'` (NOT `'cull'`), so summing `event_type='cull'` only counts mid-MN + batch-close culls. Adding `transplant_culls` from `oilpalm_batches` to this sum is the correct total — no double-counting. Verified via `grep "event_type:" oilpalmgrowth.html` before writing the formula. The plan flagged this as a conditional decision to make at execution time; ground truth was the second option in the plan.
 - **Deploy gotcha** (worth keeping): `netlify-cli deploy` with `--functions=netlify/functions` flag hit `Configuration error: Failed retrieving extensions for site … 403`. Dropping the explicit `--functions` flag let the deploy succeed — `netlify.toml` already declares `[build] functions = "netlify/functions"` so functions are honored from config without the CLI flag. Adding `--functions` triggers a different code path that pulls "extensions" (a Netlify build feature requiring elevated token scope this token lacks). Going forward: use `npx netlify-cli deploy --prod --dir=. --site=… --auth=…` without `--functions`. The `nfp_yaBfBRGpgUKcrKrEoZzWS2aY5cC6Ytqm4c26` token works fine for direct deploys; the 403 was specifically on extensions, not on the deploy itself.
 - **Commits**: `7b94a3b` (DB), `a6a3006` (Section A), `4aa90c5` (Section B), `7d163ac` (Section C). Plan at `6b538a5`.
+
+## Off-Supabase Backup → Cloudflare R2 (2026-05-18)
+Daily automated backup landed. Restoration playbook in `docs/RESTORE.md`. Plan in `docs/superpowers/plans/2026-05-18-supabase-backup-cloudflare-r2.md`.
+
+### Setup
+- **Cloudflare R2 bucket**: `tg-farmhub-backups`, APAC location, free tier (10 GB included). Account-level API token `tg-farmhub-github-backup` (Object Read & Write, scoped to this bucket only).
+- **R2 lifecycle rules** (auto-deletion of old DB snapshots): `db/` prefix → delete after 30 days; `db-monthly/` prefix → delete after 365 days. `files/` has NO rule → lives forever as a one-way live mirror (protects against accidental Supabase-side deletion).
+- **GitHub Actions workflow**: `.github/workflows/backup.yml` — runs `cron: '0 19 * * *'` UTC = 03:00 MYT daily. Manual trigger via Actions tab (`workflow_dispatch`) available.
+- **GitHub Secrets** (5): `SUPABASE_DB_URL` (session pooler conn string incl. password), `SUPABASE_SERVICE_ROLE_KEY`, `R2_ENDPOINT_URL` (no trailing slash, no bucket name appended), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. R2 endpoint format: `https://<account-id>.r2.cloudflarestorage.com`. Account ID is NOT stored separately (redundant with endpoint URL for AWS SDK v3).
+- **Mirror script**: `scripts/backup-files.mjs` — Node 20, uses `@supabase/supabase-js` + `@aws-sdk/client-s3`. Idempotent (HEAD-checks each file on R2 before download/upload, skips if size matches). Recurses into Supabase storage folders (Supabase `list()` returns folders + files; folders have null `metadata`, files have `metadata.size`).
+
+### Workflow details
+- **PG client version matters — Supabase upgraded to Postgres 17.6** (discovered 2026-05-18 during first run; older PG 16 client errored "server version mismatch"). Workflow installs `postgresql-client-17` via PGDG repo on Ubuntu 24.04 (Noble), then calls `/usr/lib/postgresql/17/bin/pg_dump` by full path to avoid PATH ambiguity. If Supabase upgrades to PG 18+, bump both the package name and the binary path in `.github/workflows/backup.yml`.
+- **pg_dump args**: `--no-owner --no-acl --schema=public --format=plain --quote-all-identifiers`. Schema-`public`-only by design — auth.users + storage.objects are managed by Supabase services, would conflict on restore. Restore instructions explain re-linking Google OAuth manually (~2 min).
+- **Date naming**: file names use `TZ=Asia/Kuala_Lumpur date +%Y-%m-%d` so the user-facing date matches the local business day (cron fires at 19:00 UTC which is 03:00 MYT the FOLLOWING day in UTC terms).
+- **Monthly snapshot**: on the last day of each month, the same dump is also uploaded to `db-monthly/YYYY-MM.sql.gz`. Last-day check uses `date -d "$(date +%Y-%m-01) +1 month -1 day" +%d`.
+- **Sanity checks**: dump size must be ≥ 1 MB (else workflow fails — likely silent pg_dump error). After R2 upload, `aws s3api head-object` verifies remote size = local size. Any step failure triggers GitHub's default workflow-failure email to yapwaylon@gmail.com.
+
+### First-run actuals (2026-05-18)
+- DB dump: 3,000,143 bytes (~2.86 MB) — public schema across all 60+ tables compressed
+- Buckets discovered: **4** — `product-images` (33 files / 16.07 MB), `sales-photos` (410 files / 98.35 MB), `tender-documents` (0 files / 0 MB — currently empty), `oilpalm-photos` (26 files / 7.16 MB)
+- Total transferred on first run: ~121 MB across 469 files. Subsequent daily runs only push deltas (idempotent skip).
+- Total R2 usage: ~121 MB → well under the 10 GB free tier; even at current growth rate (~5 MB/day uploads) we'd hit 10 GB only around 2030.
+
+### Buckets — observed structure (correction to earlier sections of this file)
+- `product-images/` — **previously undocumented**. Inventory/product catalog photos. Real, in use, 33 files.
+- `sales-photos/` — nested by sales-order ID (`SO001/`, `SO005/`, `SO046/`, …) plus legacy top-level `orders/` + `payment-slips/` folders.
+- `tender-documents/` — empty right now (tender PDFs may have been uploaded under a different path/bucket or not yet uploaded; worth verifying when the Tender module gets used next).
+- `oilpalm-photos/` — collection photos, supplier docs, L3.1 forms.
+
+### Restore mental model (full version in docs/RESTORE.md)
+- DB dumps are FULL snapshots, not incremental — yesterday's `db/YYYY-MM-DD.sql.gz` contains every table/row from project start through 03:00 MYT yesterday.
+- File mirror is a LIVE COPY (not snapshots) — if you accidentally delete a sales-photo from Supabase, it still sits on R2 indefinitely. Recover via Cloudflare dashboard → download → re-upload to Supabase.
+- Full-restore time budget: ~30 min single-handed (download dump → create fresh Supabase project → `psql < dump.sql` → re-link Google OAuth → `rclone copy` files back → update SUPABASE_URL/KEY in shared.js → deploy).
+- Maximum data loss = 24 hours (between last 03:00 backup and the disaster).
+- Cost: $0/month at current volumes (free R2 tier, free GitHub Actions tier).
+
+### Quarterly drill
+First drill ~2026-08-18. Process: pick a random recent dump, restore into a local Docker `postgres:15` container, run sanity COUNTs on `sales_orders`, `sales_customers`, `oilpalm_batches`, `tender_los`, plus `pg_policies` to confirm RLS restored. Tear down container. Logged in CLAUDE.md changelog. Skipping the drill means we don't actually know the backups work — just that the workflow exits 0.
+
+### What's deliberately out of scope (don't add without re-justifying)
+- Hot standby (second live Supabase project — would double the bill for marginal-RPO improvement)
+- Multi-region storage (R2 is already globally distributed)
+- Real-time / replication slots (daily RPO is sufficient for this business)
+- "Backup Now" button on the hub (cron is enough)
+- Automated restore testing on a hosted DB (manual quarterly drill is cheaper and more reliable than an automated test that no one looks at)
+- Per-table partial backups (handled at restore time in Scenario B of RESTORE.md)
+- Backup of Netlify deploy history / Cloudflare DNS (re-creatable from git + ~5 min of manual config)
+
+### Commits
+- `2256e08` chore(deps): @aws-sdk/client-s3
+- `1748ec0` feat(backup): scripts/backup-files.mjs
+- `8dc85ff` feat(backup): .github/workflows/backup.yml
+- `90227c9` docs(backup): docs/RESTORE.md
+- `b60b781` fix(backup): bump pg_dump v16 → v17 (Supabase upgraded to PG 17.6)
+- Plan: `2ec1c0f`
