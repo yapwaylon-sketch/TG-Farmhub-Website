@@ -753,16 +753,19 @@ async function doLogout() {
 }
 
 // ============================================================
-// AUTO-REDIRECT TO SALES > ORDERS
+// AUTO-REDIRECT TO SALES > ORDERS  (MOBILE ONLY)
 // ============================================================
-// Sends users with Sales access straight to sales.html (which now lands on
-// the Orders tab) when they "open" tgfarmhub.com — i.e. typed URL, bookmark,
-// or fresh tab. Internal navigation back to the hub (brand link from a module
-// page) is detected via same-origin document.referrer and skipped, so users
-// can still reach the hub when they click the back-to-hub button. Belt-and-
-// braces: ?hub=1 in the URL also bypasses (in case referrer is stripped).
+// On phones, send users with Sales access straight to sales.html when they
+// "open" tgfarmhub.com — typed URL, bookmark, or fresh tab. Desktop users
+// always see the hub. Internal navigation back to the hub (brand link from a
+// module page) is detected via same-origin document.referrer and skipped so
+// the back-to-hub button still works. Belt-and-braces: ?hub=1 in the URL also
+// bypasses (in case referrer is stripped).
 function tryRedirectToSales() {
   if (!currentUser) return false;
+  // Desktop / tablet: never auto-redirect — hub is the natural landing.
+  var isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  if (!isMobile) return false;
   // Explicit opt-out via URL: tgfarmhub.com/?hub=1
   try { if (new URLSearchParams(location.search).has('hub')) return false; } catch(e) {}
   // Came from another page on the same origin (e.g. brand link from sales.html)
@@ -776,6 +779,9 @@ function tryRedirectToSales() {
   var hasSales = currentUser.role === 'admin' ||
     (currentUser.permissions && currentUser.permissions.sales && currentUser.permissions.sales.view);
   if (!hasSales) return false;
+  // Sales module belongs to Agro Fruits — align localStorage so sales.html
+  // doesn't query with a stale Agribusiness company filter on first paint.
+  try { setCompanyId('tg_agro_fruits'); } catch(e) {}
   window.location.replace('sales.html');
   return true;
 }

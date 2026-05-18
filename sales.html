@@ -1441,6 +1441,13 @@ window.addEventListener('beforeunload', function(e) {
     });
   }
 
+  // Sales module is Agro Fruits — force-align localStorage before any
+  // company-scoped DB read. Without this, landing here with localStorage
+  // stuck on tg_agribusiness (e.g. via the mobile auto-redirect, or after
+  // viewing an Agribusiness module) makes loadAllData() filter every table
+  // by the wrong company_id and render an empty page.
+  setCompanyId('tg_agro_fruits');
+
   injectUserBadge(currentUser);
   injectCompanySwitcher();
   startInactivityTimer();
