@@ -211,6 +211,38 @@
       });
     }
 
+    // Plants available for a new booking/walk-in on this batch.
+    // = (planted − culls + doubleton extras) − walk-in collected − outstanding bookings
+    // Booking-collected portions are NOT subtracted separately — they're already
+    // netted out of "outstanding bookings" (active booked_qty minus their collected).
+    function opsBatchRemaining(batchId) {
+      const b = batches.find(x => x.id === batchId);
+      if (!b) return 0;
+      const totalPlanted = Number(b.qty_planted) || 0;
+      const transplantCulls = Number(b.transplant_culls) || 0;
+      const midCulls = midCullsByBatch[batchId] || 0;
+      const extras = Number(b.transplant_extras) || 0;
+
+      const collectedByBooking = {};
+      let walkIn = 0;
+      collections.forEach(c => {
+        if (c.batch_id !== batchId) return;
+        const q = Number(c.qty || 0);
+        if (c.booking_id) collectedByBooking[c.booking_id] = (collectedByBooking[c.booking_id] || 0) + q;
+        else walkIn += q;
+      });
+
+      let bookedOutstanding = 0;
+      bookings.forEach(bk => {
+        if (bk.batch_id !== batchId) return;
+        if (bk.status !== 'active') return;
+        const collected = collectedByBooking[bk.id] || 0;
+        bookedOutstanding += Math.max(0, Number(bk.booked_qty || 0) - collected);
+      });
+
+      return totalPlanted - (transplantCulls + midCulls) + extras - walkIn - bookedOutstanding;
+    }
+
     async function loadVarieties() {
       // crop_varieties is shared. Filter by oil palm crop.
       const crops = await sbQuery(sb.from('crops').select('id,name'));
@@ -431,8 +463,9 @@
 
       const batchOpts = sellingBatches.map(b => {
         const vname = varietyMap[b.variety_id] || '—';
+        const remaining = opsBatchRemaining(b.id);
         return `<option value="${esc(b.id)}"
-          data-price="${Number(b.default_price || 0)}">${esc(b.batch_number || b.id)} · ${esc(vname)}</option>`;
+          data-price="${Number(b.default_price || 0)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${remaining.toLocaleString()} left</option>`;
       }).join('');
 
       const today = new Date().toISOString().slice(0, 10);
@@ -772,11 +805,12 @@
 
       const batchOpts = eligibleBatches.map(b => {
         const vname = varietyMap[b.variety_id] || '—';
+        const remaining = opsBatchRemaining(b.id);
         // Embed price + cap math on data-* so opsBkRecalc can read without batches[] lookup
         return `<option value="${esc(b.id)}"
           data-price="${Number(b.default_price || 0)}"
           data-mn="${Number(b.qty_mn_start || 0)}"
-          data-pct="${Number(b.bookable_pct || 50)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)}</option>`;
+          data-pct="${Number(b.bookable_pct || 50)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)} · ${remaining.toLocaleString()} left</option>`;
       }).join('');
 
       showModal(`
@@ -1345,7 +1379,8 @@ async function shareSlip() {
         .concat(eligible.map(b => {
           const v = vMap[b.variety_id] || '—';
           const dp = Number(b.default_price || 0);
-          return `<option value="${esc(b.id)}" data-price="${dp}">${esc(b.batch_number || b.id)} · ${esc(v)} · ${sLabel(b.status)}${dp > 0 ? ' · ' + formatRM(dp) : ''}</option>`;
+          const remaining = opsBatchRemaining(b.id);
+          return `<option value="${esc(b.id)}" data-price="${dp}">${esc(b.batch_number || b.id)} · ${esc(v)} · ${sLabel(b.status)}${dp > 0 ? ' · ' + formatRM(dp) : ''} · ${remaining.toLocaleString()} left</option>`;
         }))
         .join('');
 
@@ -1458,6 +1493,146 @@ async function shareSlip() {
       notify('Booking reassigned to ' + (newBatch.batch_number || newBatchId), 'success');
     }
     // === End Reassign Batch modal ===
+
+    // === Edit Booking modal (admin only) ===
+    // Editable: customer, batch, booking date, booked qty, unit price, notes.
+    // Batch change requires zero collections (same rule as Reassign — collections are
+    // denormalized to batch_id). Booked qty must remain ≥ already-collected qty.
+    function opsOpenEditBookingModal(bookingId) {
+      bookingId = bookingId || selectedBookingId;
+      if (!currentUser || currentUser.role !== 'admin') { notify('Admin only', 'error'); return; }
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (bk.status !== 'active') { notify('Only active bookings can be edited', 'error'); return; }
+
+      const myCollections = collections.filter(c => c.booking_id === bookingId);
+      const collectedQty = myCollections.reduce((s, c) => s + Number(c.qty || 0), 0);
+      const hasCollections = myCollections.length > 0;
+
+      const customerOpts = customers
+        .filter(c => c.is_active !== false || c.id === bk.customer_id)
+        .sort((a, c) => (a.name || '').localeCompare(c.name || ''))
+        .map(c => {
+          const phone = c.phone ? ' · ' + esc(fmtPhone(c.phone)) : '';
+          return `<option value="${esc(c.id)}" ${c.id === bk.customer_id ? 'selected' : ''}>${esc(c.name || '—')}${phone}</option>`;
+        }).join('');
+
+      const varietyMap = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+      const stageLabel = (s) => ({ pre_nursery: 'PN', main_nursery: 'MN', selling: 'Selling' })[s] || s;
+      const eligibleBatches = batches.filter(b => ['pre_nursery', 'main_nursery', 'selling'].includes(b.status) || b.id === bk.batch_id);
+      const batchOpts = eligibleBatches.map(b => {
+        const vname = varietyMap[b.variety_id] || '—';
+        const remaining = opsBatchRemaining(b.id);
+        return `<option value="${esc(b.id)}" ${b.id === bk.batch_id ? 'selected' : ''}>${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)} · ${remaining.toLocaleString()} left</option>`;
+      }).join('');
+
+      const batchLockNote = hasCollections
+        ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">🔒 Batch locked — ${collectedQty.toLocaleString()} already collected. Use Reassign Batch instead (requires zero collections).</div>`
+        : '';
+      const qtyMinNote = hasCollections
+        ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Minimum: ${collectedQty.toLocaleString()} (already collected)</div>`
+        : '';
+
+      showModal(`
+        <h3>Edit Booking — ${esc(bk.id)}</h3>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Admin only. Changes apply immediately.</div>
+        <div class="form-grid">
+          <label class="full">Customer
+            <select id="ops-eb-cust">${customerOpts}</select>
+          </label>
+          <label class="full">Batch
+            <select id="ops-eb-batch" ${hasCollections ? 'disabled' : ''}>${batchOpts}</select>
+            ${batchLockNote}
+          </label>
+          <label>Booking Date <input id="ops-eb-date" type="date" value="${esc(bk.booking_date || '')}" /></label>
+          <label>Booked Qty <input id="ops-eb-qty" type="number" min="${hasCollections ? collectedQty : 1}" step="1" value="${Number(bk.booked_qty || 0)}" oninput="opsEditBookingRecalc()" />
+            ${qtyMinNote}
+          </label>
+          <label>Unit Price (RM) <input id="ops-eb-price" type="number" step="0.01" min="0.01" value="${Number(bk.unit_price || 0)}" oninput="opsEditBookingRecalc()" /></label>
+          <label class="full">Total Amount (RM) <input id="ops-eb-total" readonly value="${Number(bk.total_amount || 0).toFixed(2)}" /></label>
+          <label class="full">Notes <textarea id="ops-eb-notes" rows="3" placeholder="e.g. old paper booking ref, special instructions">${esc(bk.notes || '')}</textarea></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-eb-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveEditBooking('${esc(bookingId)}')">Save Changes</button>
+        </div>
+      `, 'ops-eb-overlay');
+    }
+
+    function opsEditBookingRecalc() {
+      const qty = Number(document.getElementById('ops-eb-qty').value || 0);
+      const price = Number(document.getElementById('ops-eb-price').value || 0);
+      document.getElementById('ops-eb-total').value = (qty * price).toFixed(2);
+    }
+
+    async function opsSaveEditBooking(bookingId) {
+      if (!currentUser || currentUser.role !== 'admin') { notify('Admin only', 'error'); return; }
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+
+      const customerId  = (document.getElementById('ops-eb-cust').value || '').trim();
+      const batchId     = (document.getElementById('ops-eb-batch').value || '').trim();
+      const bookingDate = (document.getElementById('ops-eb-date').value || '').trim();
+      const qty         = Number(document.getElementById('ops-eb-qty').value || 0);
+      const price       = Number(document.getElementById('ops-eb-price').value || 0);
+      const notes       = (document.getElementById('ops-eb-notes').value || '').trim();
+
+      if (!customerId)   { notify('Customer required', 'error'); return; }
+      if (!batchId)      { notify('Batch required', 'error'); return; }
+      if (!bookingDate)  { notify('Booking date required', 'error'); return; }
+      if (!(qty > 0))    { notify('Booked qty must be > 0', 'error'); return; }
+      if (!(price > 0))  { notify('Unit price must be > 0', 'error'); return; }
+
+      // Re-validate against current collections (race window)
+      const myCollections = collections.filter(c => c.booking_id === bookingId);
+      const collectedQty  = myCollections.reduce((s, c) => s + Number(c.qty || 0), 0);
+      if (qty < collectedQty) {
+        notify(`Booked qty (${qty.toLocaleString()}) cannot be less than already collected (${collectedQty.toLocaleString()})`, 'error');
+        return;
+      }
+      const batchChanged = batchId !== bk.batch_id;
+      if (batchChanged && myCollections.length > 0) {
+        notify('Cannot change batch — collections exist. Use Reassign Batch.', 'error');
+        return;
+      }
+
+      const updateData = {
+        customer_id:  customerId,
+        batch_id:     batchId,
+        booking_date: bookingDate,
+        booked_qty:   qty,
+        unit_price:   price,
+        total_amount: qty * price,
+        notes:        notes || null
+      };
+
+      // Log batch swap to reassignment_history for traceability (mirrors Reassign).
+      if (batchChanged) {
+        const history = Array.isArray(bk.reassignment_history) ? bk.reassignment_history.slice() : [];
+        history.push({
+          from_batch: bk.batch_id,
+          to_batch:   batchId,
+          date:       new Date().toISOString(),
+          by_user:    currentUser ? (currentUser.username || currentUser.name || null) : null,
+          reason:     'Admin edit',
+          kept_price: price === Number(bk.unit_price || 0),
+          old_price:  Number(bk.unit_price || 0),
+          new_price:  price
+        });
+        updateData.reassignment_history = history;
+      }
+
+      const result = await sbMutate(() => sb.from('oilpalm_bookings').update(updateData).eq('id', bookingId).select());
+      if (result === null) { notify('Save failed — please retry', 'error'); return; }
+
+      await loadBookings();
+      closeModal('ops-eb-overlay');
+      if (currentTab === 'bookings')     renderBookingsTab();
+      else if (currentTab === 'summary') renderSummaryTab();
+
+      notify('Booking updated', 'success');
+    }
+    // === End Edit Booking modal ===
 
     // === Cancel Booking modal (Task 3.8) ===
     // Auto-suggests refund owed = paid - (collected × unit_price).
@@ -2009,12 +2184,15 @@ async function shareSlip() {
 
       // Action button visibility (per spec G11)
       const hasNoCollections = myCollections.length === 0;
+      const isAdmin          = currentUser && currentUser.role === 'admin';
+      const showEdit         = isAdmin && b.status === 'active';
       const showReassign     = b.status === 'active' && hasNoCollections;
       const showCancel       = b.status === 'active';
       const showPrint        = b.status !== 'cancelled';
       const showMarkRefundPaid = b.status === 'cancelled' && b.refund_status === 'pending';
 
       const actionButtons = [
+        showEdit           ? `<button class="btn btn-primary" onclick="opsOpenEditBookingModal('${esc(b.id)}')">Edit Booking</button>` : '',
         showReassign       ? `<button class="btn btn-outline" onclick="opsOpenReassignModal('${esc(b.id)}')">Reassign Batch</button>` : '',
         showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal('${esc(b.id)}')" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
         showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal('${esc(b.id)}')">Mark Refund Paid</button>` : '',
