@@ -434,6 +434,7 @@ const MODULE_COMPANY = {
   farmconfig: 'shared',
   oilpalmsales: 'tg_agribusiness',
   oilpalmgrowth: 'tg_agribusiness',
+  oilpalmspray: 'tg_agribusiness',
   staffclaims: 'tg_agribusiness',
   tender: 'tg_agribusiness'
 };
