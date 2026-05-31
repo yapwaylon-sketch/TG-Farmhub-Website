@@ -9105,6 +9105,7 @@ var rptType = 'customer';
 var rptData = null; // {cols, rows, title}
 
 var RPT_TYPES = [
+  {id:'daily_log', name:'Daily Sales Log'},
   {id:'customer', name:'Sales by Customer'},
   {id:'product', name:'Sales by Product'},
   {id:'period', name:'Sales by Period'},
@@ -9159,7 +9160,10 @@ function rptRenderFilters() {
     '<input type="date" id="rpt-to" value="' + today + '">';
 
   var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
-  if (rptType === 'customer') {
+  if (rptType === 'daily_log') {
+    html += dateRange;
+    html += '<select id="rpt-daily-type"><option value="">All Types</option><option value="cs">Cash Sales only</option><option value="walkin">Walk-in only</option><option value="do">Delivery Orders only</option></select>';
+  } else if (rptType === 'customer') {
     html += dateRange;
     html += '<select id="rpt-customer"><option value="">All Customers</option>' + custOpts + '</select>';
   } else if (rptType === 'product') {
@@ -9199,6 +9203,7 @@ function rptGenerate() {
   var toEl = document.getElementById('rpt-to');
   var from = fromEl ? fromEl.value : '';
   var to = toEl ? toEl.value : '';
+  var summaryBlock = null;
 
   function ordersInRange() {
     return orders.filter(function(o) {
@@ -9221,7 +9226,174 @@ function rptGenerate() {
     return payments.filter(function(p) { return p.order_id === orderId; });
   }
 
-  if (type === 'customer') {
+  if (type === 'daily_log') {
+    title = 'Daily Sales Log';
+    var typeFilter = document.getElementById('rpt-daily-type') ? document.getElementById('rpt-daily-type').value : '';
+
+    // Filter: completed orders only, group by completion date
+    var filtered = orders.filter(function(o) {
+      if (o.status !== 'completed') return false;
+      if (!o.completed_at) return false;
+      var d = (o.completed_at || '').substring(0, 10);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+
+    function isWalkin(o) {
+      return o.channel === 'walkin' || o.fulfillment === 'walkin';
+    }
+    function orderType(o) {
+      if (o.doc_type === 'delivery_order') return 'do';
+      if (isWalkin(o)) return 'walkin';
+      return 'cs';
+    }
+
+    if (typeFilter) {
+      filtered = filtered.filter(function(o) { return orderType(o) === typeFilter; });
+    }
+
+    // Group by date
+    var byDate = {};
+    filtered.forEach(function(o) {
+      var d = (o.completed_at || '').substring(0, 10);
+      if (!byDate[d]) byDate[d] = { cs: [], walkin: [], do: [] };
+      byDate[d][orderType(o)].push(o);
+    });
+
+    cols = ['Doc No', 'Type', 'Customer', 'Amount (RM)', 'Cash (RM)', 'Bank (RM)', 'Balance (RM)', 'Status'];
+    rows = [];
+    var dates = Object.keys(byDate).sort();
+    var gOrders = 0, gAmount = 0, gCash = 0, gBank = 0, gBalance = 0;
+
+    // Split paid amount per order by payment method.
+    // Pure 'cash' → Cash column. Anything else (bank_transfer / cheque / split
+    // payments like 'cash+bank_transfer') → Bank column. Split payments lump
+    // into Bank because per-method amounts aren't stored on the DB row.
+    function dlPaidByMethod(orderId) {
+      var cash = 0, bank = 0;
+      payments.forEach(function(p) {
+        if (p.order_id !== orderId) return;
+        var amt = parseFloat(p.amount) || 0;
+        var method = (p.method || 'cash').toString();
+        if (method === 'cash') cash += amt;
+        else bank += amt;
+      });
+      return { cash: cash, bank: bank };
+    }
+
+    function dlMakeRow(o) {
+      var amt = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      var bal = amt - paid;
+      var split = dlPaidByMethod(o.id);
+      var status = (o.payment_status || 'unpaid').toUpperCase();
+      var tLabel = o.doc_type === 'delivery_order' ? 'DO' : (isWalkin(o) ? 'Walk-in' : 'CS');
+      var row = [
+        o.doc_number || o.id,
+        tLabel,
+        getCustomerName(o.customer_id),
+        formatRM(amt),
+        split.cash > 0 ? formatRM(split.cash) : '—',
+        split.bank > 0 ? formatRM(split.bank) : '—',
+        formatRM(bal),
+        status
+      ];
+      row._statusClass = status === 'PAID' ? 'rpt-status-paid'
+                       : status === 'PARTIAL' ? 'rpt-status-partial'
+                       : 'rpt-status-unpaid';
+      row._csvDate = (o.completed_at || '').substring(0, 10);
+      row._amt = amt; row._cash = split.cash; row._bank = split.bank; row._bal = bal;
+      return row;
+    }
+
+    function dlSubSummary(name, dataRows) {
+      var sAmt = 0, sCash = 0, sBank = 0, sBal = 0;
+      dataRows.forEach(function(r) { sAmt += r._amt; sCash += r._cash; sBank += r._bank; sBal += r._bal; });
+      var row = ['', '', name + ' subtotal (' + dataRows.length + ' order' + (dataRows.length !== 1 ? 's' : '') + ')',
+                 formatRM(sAmt),
+                 sCash > 0 ? formatRM(sCash) : '—',
+                 sBank > 0 ? formatRM(sBank) : '—',
+                 formatRM(sBal), ''];
+      row._subSummary = true;
+      return row;
+    }
+
+    dates.forEach(function(d) {
+      var dt = new Date(d + 'T00:00:00');
+      var dayLabel = dt.toLocaleDateString('en-MY', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+      var dayRow = [dayLabel];
+      dayRow._dayHeader = true;
+      dayRow._csvDate = d;
+      rows.push(dayRow);
+
+      var sec = byDate[d];
+      var dayOrders = 0, dayAmt = 0, dayCash = 0, dayBank = 0, dayBal = 0;
+
+      [['Cash Sales (CS)', sec.cs],
+       ['Walk-in', sec.walkin],
+       ['Delivery Orders (DO)', sec['do']]].forEach(function(pair) {
+        var name = pair[0], list = pair[1];
+        if (!list.length) return;
+        var hdrRow = [name];
+        hdrRow._typeHeader = true;
+        rows.push(hdrRow);
+
+        list.sort(function(a, b) { return (a.doc_number || a.id || '').localeCompare(b.doc_number || b.id || ''); });
+        var dataRows = list.map(dlMakeRow);
+        dataRows.forEach(function(r) {
+          rows.push(r);
+          dayOrders++;
+          dayAmt += r._amt;
+          dayCash += r._cash;
+          dayBank += r._bank;
+          dayBal += r._bal;
+        });
+        rows.push(dlSubSummary(name, dataRows));
+      });
+
+      var dayTotalRow = ['', '', 'Day Total (' + dayOrders + ' order' + (dayOrders !== 1 ? 's' : '') + ')',
+                        formatRM(dayAmt), formatRM(dayCash), formatRM(dayBank), formatRM(dayBal), ''];
+      dayTotalRow._summary = true;
+      dayTotalRow._csvDate = d;
+      rows.push(dayTotalRow);
+
+      gOrders += dayOrders;
+      gAmount += dayAmt;
+      gCash += dayCash;
+      gBank += dayBank;
+      gBalance += dayBal;
+    });
+
+    if (dates.length > 0) {
+      var grandRow = ['', '', 'GRAND TOTAL (' + gOrders + ' order' + (gOrders !== 1 ? 's' : '') + ')',
+                     formatRM(gAmount), formatRM(gCash), formatRM(gBank), formatRM(gBalance), ''];
+      grandRow._summary = true;
+      rows.push(grandRow);
+    }
+
+    // Build top-of-report summary block (per-category breakdown)
+    var sumByType = { cs: { count:0, amt:0, cash:0, bank:0, bal:0 },
+                      walkin: { count:0, amt:0, cash:0, bank:0, bal:0 },
+                      'do': { count:0, amt:0, cash:0, bank:0, bal:0 } };
+    filtered.forEach(function(o) {
+      var t = orderType(o);
+      var amt = parseFloat(o.grand_total) || 0;
+      var paid = parseFloat(o.amount_paid) || 0;
+      var split = dlPaidByMethod(o.id);
+      sumByType[t].count++;
+      sumByType[t].amt += amt;
+      sumByType[t].cash += split.cash;
+      sumByType[t].bank += split.bank;
+      sumByType[t].bal += (amt - paid);
+    });
+    summaryBlock = {
+      from: from, to: to,
+      byType: sumByType,
+      grand: { count: gOrders, amt: gAmount, cash: gCash, bank: gBank, bal: gBalance }
+    };
+
+  } else if (type === 'customer') {
     title = 'Sales by Customer';
     var custFilter = document.getElementById('rpt-customer') ? document.getElementById('rpt-customer').value : '';
     var filtered = ordersInRange();
@@ -9547,15 +9719,32 @@ function rptGenerate() {
 
   // Store report data
   rptData = { cols: cols, rows: rows, title: title };
+  if (summaryBlock) rptData._summaryBlock = summaryBlock;
   document.getElementById('rpt-count').textContent = rows.length + ' result' + (rows.length !== 1 ? 's' : '');
 
+  // Render summary block (Daily Sales Log only)
+  var html = '';
+  if (summaryBlock) {
+    html += rptBuildSummaryHtml(summaryBlock);
+  }
+
   // Render table
-  var html = '<table><thead><tr>' + cols.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  html += '<table><thead><tr>' + cols.map(function(c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
   if (!rows.length) {
     html += '<tr><td colspan="' + cols.length + '" class="empty-state">No data found</td></tr>';
   } else {
     rows.forEach(function(r) {
-      var trClass = r._summary ? ' class="rpt-summary-row"' : '';
+      // Daily Sales Log full-row section markers
+      if (r._dayHeader) {
+        html += '<tr class="rpt-day-header"><td colspan="' + cols.length + '">' + esc(String(r[0] || '')) + '</td></tr>';
+        return;
+      }
+      if (r._typeHeader) {
+        html += '<tr class="rpt-type-header"><td colspan="' + cols.length + '">' + esc(String(r[0] || '')) + '</td></tr>';
+        return;
+      }
+      var trClass = r._summary ? ' class="rpt-summary-row"'
+                  : r._subSummary ? ' class="rpt-sub-summary"' : '';
       html += '<tr' + trClass + '>';
       r.forEach(function(c, i) {
         var attrs = '';
@@ -9574,6 +9763,10 @@ function rptGenerate() {
         }
         // Invoice register status colors
         if (type === 'invoice_register' && i === 8 && r._statusClass && !r._summary) {
+          attrs = ' class="' + r._statusClass + '"';
+        }
+        // Daily log status column color
+        if (type === 'daily_log' && i === 7 && r._statusClass && !r._summary && !r._subSummary) {
           attrs = ' class="' + r._statusClass + '"';
         }
         // Right-align numeric/currency columns
@@ -9596,6 +9789,49 @@ function rptGenerate() {
   document.getElementById('rpt-print-info').textContent = title + ' — Generated ' + new Date().toLocaleDateString();
 }
 
+function rptBuildSummaryHtml(s) {
+  if (!s) return '';
+  var rangeLabel = '';
+  if (s.from && s.to) {
+    rangeLabel = ' (' + fmtDate(s.from) + ' – ' + fmtDate(s.to) + ')';
+  } else if (s.from) {
+    rangeLabel = ' (from ' + fmtDate(s.from) + ')';
+  } else if (s.to) {
+    rangeLabel = ' (up to ' + fmtDate(s.to) + ')';
+  }
+  var rowFor = function(label, d) {
+    var dash = '—';
+    return '<tr>'
+      + '<td>' + esc(label) + '</td>'
+      + '<td style="text-align:right;">' + d.count + '</td>'
+      + '<td style="text-align:right;">' + (d.amt > 0 ? formatRM(d.amt) : dash) + '</td>'
+      + '<td style="text-align:right;" class="rpt-cash-col">' + (d.cash > 0 ? formatRM(d.cash) : dash) + '</td>'
+      + '<td style="text-align:right;">' + (d.bank > 0 ? formatRM(d.bank) : dash) + '</td>'
+      + '<td style="text-align:right;" class="' + (d.bal > 0.005 ? 'rpt-status-unpaid' : '') + '">' + (d.bal > 0.005 ? formatRM(d.bal) : dash) + '</td>'
+      + '</tr>';
+  };
+  var html = '<div class="rpt-summary-block">';
+  html += '<div class="rpt-summary-title">Summary' + esc(rangeLabel) + '</div>';
+  html += '<table class="rpt-summary-table">';
+  html += '<thead><tr><th>Category</th><th style="text-align:right;">Orders</th><th style="text-align:right;">Total</th><th style="text-align:right;" class="rpt-cash-col">Cash</th><th style="text-align:right;">Bank</th><th style="text-align:right;">Outstanding</th></tr></thead>';
+  html += '<tbody>';
+  html += rowFor('Cash Sales (CS)', s.byType.cs);
+  html += rowFor('Walk-in', s.byType.walkin);
+  html += rowFor('Delivery Orders (DO)', s.byType['do']);
+  html += '<tr class="rpt-summary-row">'
+    + '<td>GRAND TOTAL</td>'
+    + '<td style="text-align:right;">' + s.grand.count + '</td>'
+    + '<td style="text-align:right;">' + formatRM(s.grand.amt) + '</td>'
+    + '<td style="text-align:right;" class="rpt-cash-col">' + formatRM(s.grand.cash) + '</td>'
+    + '<td style="text-align:right;">' + formatRM(s.grand.bank) + '</td>'
+    + '<td style="text-align:right;" class="' + (s.grand.bal > 0.005 ? 'rpt-status-unpaid' : '') + '">' + formatRM(s.grand.bal) + '</td>'
+    + '</tr>';
+  html += '</tbody></table>';
+  html += '<div class="rpt-summary-note">💡 <strong>Cash</strong> = payments marked as cash. <strong>Bank</strong> = bank transfers, cheques, and split payments. Use the Cash total to tally physical cash with your supervisor.</div>';
+  html += '</div>';
+  return html;
+}
+
 function rptExportCSV() {
   if (!salesCan('export')) { notify('No permission to export', 'warning'); return; }
   if (!rptData || !rptData.rows) return;
@@ -9603,10 +9839,38 @@ function rptExportCSV() {
     var s = String(v != null ? v : '');
     return (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
-  var csv = rptData.cols.map(escCSV).join(',') + '\n';
-  rptData.rows.forEach(function(r) {
-    csv += Array.prototype.slice.call(r).map(escCSV).join(',') + '\n';
-  });
+  var csv;
+  // Daily Sales Log: prepend summary block + Date column on data rows
+  if (rptType === 'daily_log') {
+    csv = '';
+    var s = rptData._summaryBlock;
+    if (s) {
+      var dash = '-';
+      csv += 'SUMMARY' + (s.from && s.to ? ' (' + s.from + ' to ' + s.to + ')' : '') + '\n';
+      csv += 'Category,Orders,Total (RM),Cash (RM),Bank (RM),Outstanding (RM)\n';
+      var sumLine = function(label, d) {
+        return escCSV(label) + ',' + d.count + ',' + (d.amt > 0 ? d.amt.toFixed(2) : dash) + ',' + (d.cash > 0 ? d.cash.toFixed(2) : dash) + ',' + (d.bank > 0 ? d.bank.toFixed(2) : dash) + ',' + (d.bal > 0.005 ? d.bal.toFixed(2) : dash) + '\n';
+      };
+      csv += sumLine('Cash Sales (CS)', s.byType.cs);
+      csv += sumLine('Walk-in', s.byType.walkin);
+      csv += sumLine('Delivery Orders (DO)', s.byType['do']);
+      csv += 'GRAND TOTAL,' + s.grand.count + ',' + s.grand.amt.toFixed(2) + ',' + s.grand.cash.toFixed(2) + ',' + s.grand.bank.toFixed(2) + ',' + s.grand.bal.toFixed(2) + '\n';
+      csv += '\n';
+    }
+    csv += ['Date'].concat(rptData.cols).map(escCSV).join(',') + '\n';
+    var currentDate = '';
+    rptData.rows.forEach(function(r) {
+      if (r._dayHeader) { currentDate = r._csvDate || ''; return; }
+      if (r._typeHeader) return;
+      var dateCol = r._csvDate || currentDate;
+      csv += escCSV(dateCol) + ',' + Array.prototype.slice.call(r).map(escCSV).join(',') + '\n';
+    });
+  } else {
+    csv = rptData.cols.map(escCSV).join(',') + '\n';
+    rptData.rows.forEach(function(r) {
+      csv += Array.prototype.slice.call(r).map(escCSV).join(',') + '\n';
+    });
+  }
   var blob = new Blob([csv], { type: 'text/csv' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -9619,7 +9883,7 @@ function rptPrint() {
   if (!tableHtml) return;
   var w = window.open('', '_blank');
   w.document.write('<!DOCTYPE html><html><head><title>' + esc(rptData ? rptData.title : 'Report') + '</title>');
-  w.document.write('<style>body{font-family:Arial,sans-serif;margin:20px;color:#222;}h2{margin:0 0 4px;}p{margin:0 0 16px;color:#666;font-size:13px;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}th{background:#f5f5f5;font-weight:700;}tr:nth-child(even){background:#fafafa;}.rpt-summary-row td{font-weight:700;background:#eee;border-top:2px solid #999;}.rpt-outstanding-green{color:#2d8a3e;}.rpt-outstanding-gold{color:#b8860b;}.rpt-outstanding-red{color:#c0392b;font-weight:700;}.return-rate-green{color:#2d8a3e;font-weight:700;}.return-rate-yellow{color:#b8860b;font-weight:700;}.return-rate-red{color:#c0392b;font-weight:700;}</style>');
+  w.document.write('<style>body{font-family:Arial,sans-serif;margin:20px;color:#222;}h2{margin:0 0 4px;}p{margin:0 0 16px;color:#666;font-size:13px;}table{width:100%;border-collapse:collapse;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;}th{background:#f5f5f5;font-weight:700;}tr:nth-child(even){background:#fafafa;}.rpt-summary-row td{font-weight:700;background:#eee;border-top:2px solid #999;}.rpt-outstanding-green{color:#2d8a3e;}.rpt-outstanding-gold{color:#b8860b;}.rpt-outstanding-red{color:#c0392b;font-weight:700;}.return-rate-green{color:#2d8a3e;font-weight:700;}.return-rate-yellow{color:#b8860b;font-weight:700;}.return-rate-red{color:#c0392b;font-weight:700;}.rpt-day-header td{background:#2A1A3E;color:#fff;font-weight:700;font-size:13px;padding:8px 12px;letter-spacing:0.3px;}.rpt-type-header td{background:#FAF0D8;color:#8A6D1F;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.6px;padding:5px 12px 5px 24px;}.rpt-sub-summary td{background:#F8F4EC;color:#666;font-style:italic;font-size:11px;padding:5px 8px;}.rpt-status-paid{color:#2d8a3e;font-weight:700;}.rpt-status-partial{color:#b8860b;font-weight:700;}.rpt-status-unpaid{color:#c0392b;font-weight:700;}.rpt-summary-block{margin-bottom:20px;page-break-inside:avoid;}.rpt-summary-title{font-size:13px;font-weight:700;color:#2A1A3E;margin-bottom:6px;padding:4px 0;border-bottom:2px solid #6B4C8A;}.rpt-summary-table{margin-bottom:8px;}.rpt-summary-table th{background:#F0E8D8;}.rpt-summary-table .rpt-cash-col{background:rgba(212,175,55,0.15);font-weight:700;}.rpt-summary-note{margin-top:8px;padding:6px 8px;background:#F0E8D8;border-radius:3px;font-size:10px;color:#666;line-height:1.4;}</style>');
   w.document.write('</head><body>');
   w.document.write('<h2>TG Agro Fruits Sdn Bhd</h2>');
   w.document.write('<p>' + esc(rptData ? rptData.title : 'Report') + ' — Generated ' + new Date().toLocaleDateString() + '</p>');

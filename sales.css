@@ -1652,6 +1652,90 @@
 .aging-90 { color:#c0392b; }
 .aging-90plus { color:#c0392b; font-weight:700; }
 
+/* Daily Sales Log row types */
+.rpt-day-header td {
+  background: var(--purple);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  padding: 8px 12px;
+  border-top: 2px solid var(--purple);
+}
+.rpt-type-header td {
+  background: var(--gold-pale);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 5px 12px 5px 24px;
+}
+.rpt-sub-summary td {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.rpt-status-paid { color: var(--good); font-weight: 700; }
+.rpt-status-partial { color: var(--gold-light); font-weight: 700; }
+.rpt-status-unpaid { color: var(--red); font-weight: 700; }
+
+/* Daily Sales Log — top-of-report summary block */
+.rpt-summary-block {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--purple);
+  border-radius: 6px;
+}
+.rpt-summary-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+.rpt-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rpt-summary-table th,
+.rpt-summary-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.rpt-summary-table th {
+  background: var(--bg-hover);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+.rpt-summary-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.rpt-summary-table .rpt-cash-col {
+  background: rgba(212,175,55,0.08);
+  font-weight: 700;
+}
+.rpt-summary-note {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 /* Calendar Picker */
 .cal-input {
   display:flex; align-items:center; justify-content:space-between;
