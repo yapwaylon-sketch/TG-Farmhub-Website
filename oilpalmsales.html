@@ -1021,7 +1021,7 @@
       await loadCustomers();
       // Restore State A then pre-select the new customer
       opsBkRestoreCustomerSearchArea();
-      opsBkSelectCustomer(newId, name);
+      opsBkSelectCustomer(newId, fields.name);
       notify('Customer added', 'success');
     }
 
@@ -2990,7 +2990,7 @@ async function shareSlip() {
             <option value="refund_pending" ${bookingsFilter.status === 'refund_pending' ? 'selected' : ''}>Refund Pending</option>
           </select>
           <input type="text" id="ops-bk-cust" placeholder="Search customer name or phone..." value="${esc(bookingsFilter.customer)}" oninput="opsBkFilterCustomer(this.value)" style="min-width:240px;" />
-          <select id="ops-bk-batch" onchange="opsBkFilterBatch(this.value)">
+          <select id="ops-bk-filter-batch" onchange="opsBkFilterBatch(this.value)">
             <option value="all" ${bookingsFilter.batch === 'all' ? 'selected' : ''}>All batches</option>
             ${batchOpts}
           </select>
