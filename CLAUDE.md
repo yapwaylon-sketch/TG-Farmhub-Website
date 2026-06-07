@@ -108,6 +108,9 @@ CREATE POLICY <bucket>_all ON storage.objects FOR ALL
 ```
 Without this, anon role uploads return HTTP 400 even though the bucket is "public". Pattern matches existing `sales_photos_all` and `tender-documents` policies on production.
 
+### 11. NEVER reuse an element `id` between a dynamic modal and an always-present filter/list
+`document.getElementById(x)` returns the FIRST match in DOM order. The `.page` panes (`#tab-bookings` etc.) sit at the TOP of `<body>` (before `#modal-host`), so a filter/list control rendered inside a pane comes BEFORE a modal's control in document order. If both share an id, the modal's save reads the **filter's** value, not the modal's. Real bug (2026-06-07, fixed `f914708`): oilpalmsales.html New Booking modal batch picker AND the Bookings-tab filter dropdown both used `id="ops-bk-batch"` → `opsSaveNewBooking` read the filter (default `"all"`) and inserted `batch_id="all"` → `oilpalm_bookings_batch_id_fkey` violation on every save (also silently broke the price auto-fill + bookable-cap check which read `dataset` on the wrong element). The id counter had quietly burned several values (one per failed attempt) before anyone noticed. **Rule**: namespace modal control ids distinctly from filter/list control ids (e.g. modal `ops-bk-batch` vs filter `ops-bk-filter-batch`). To audit a module: `grep -oE 'id="[^"]+"' file.html | sort | uniq -d` — but note duplicates across two *templates for the same slot* (e.g. a modal's initial HTML and its restore-state HTML) are safe because only one is in the live DOM at a time; only co-existing duplicates bite. **Debugging signature**: an insert fails an FK even though both a superuser SQL insert AND an anon PostgREST insert of the "same" value succeed → the browser is sending a different value than you think → suspect a wrong-element read (duplicate id) before stale cache.
+
 ### Pre-flight checklist (mental tick before shipping any module)
 - [ ] No `const SUPABASE_URL` / `const SUPABASE_KEY` / `const sb` redeclaration?
 - [ ] Wrapped in `<div id="app">`? `<main class="main-content">`? Inner panes use `.page`?
@@ -119,6 +122,7 @@ Without this, anon role uploads return HTTP 400 even though the bucket is "publi
 - [ ] Every `sbMutate(...)` call wraps the query in `() =>`? Every `sbQuery(...)` does NOT?
 - [ ] No `company_id` column referenced for tables in the no-company_id list?
 - [ ] If module uploads to a new storage bucket, has the corresponding `<bucket>_all` RLS policy been created on `storage.objects`?
+- [ ] No element `id` shared between a modal control and a filter/list control that co-exist in the live DOM (`grep -oE 'id="[^"]+"' file | sort | uniq -d`)?
 
 If any answer is "no" or "unsure", verify before deploying.
 
