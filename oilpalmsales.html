@@ -2141,6 +2141,13 @@ async function shareSlip() {
     // === End Record Collection modal ===
 
     // === Booking detail page (Task 3.6) ===
+    // Overpayment-aware balance split. over>0 means customer paid more than the
+    // booking total. Display only — does NOT affect collection/payment cap math.
+    function opsBalanceParts(total, paid) {
+      const diff = Number(total || 0) - Number(paid || 0);
+      return { balance: Math.max(0, diff), over: Math.max(0, -diff) };
+    }
+
     function opsRenderBookingDetail() {
       const b = bookings.find(x => x.id === selectedBookingId);
       if (!b) {
@@ -2166,7 +2173,7 @@ async function shareSlip() {
       const remaining = Math.max(0, booked - collectedQty);
       const total     = Number(b.total_amount || 0);
       const paid      = myPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
-      const balance   = Math.max(0, total - paid);
+      const { balance, over } = opsBalanceParts(total, paid);
 
       // Status badge — mirror Bookings tab logic
       let statusInfo;
@@ -2387,7 +2394,9 @@ async function shareSlip() {
             <div><strong>Unit price:</strong> ${formatRM(b.unit_price || 0)}</div>
             <div><strong>Total amount:</strong> ${formatRM(total)}</div>
             <div><strong>Total paid:</strong> ${formatRM(paid)}</div>
-            <div><strong>Balance:</strong> <span style="${balance > 0 && b.status === 'active' ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</span></div>
+            <div><strong>Balance:</strong> ${over > 0
+              ? `<span style="color:var(--red);font-weight:600;">(Overpayment) ${formatRM(over)}</span>`
+              : `<span style="${balance > 0 && b.status === 'active' ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</span>`}</div>
             <div><strong>Total collected:</strong> ${collectedQty.toLocaleString()}</div>
             <div><strong>Remaining qty:</strong> ${remaining.toLocaleString()}</div>
           </div>
@@ -2939,12 +2948,12 @@ async function shareSlip() {
         const remaining = Math.max(0, booked - collected);
         const total = Number(b.total_amount || 0);
         const paid = paymentsByBooking[b.id] || 0;
-        const balance = Math.max(0, total - paid);
+        const { balance, over } = opsBalanceParts(total, paid);
         const statusInfo = bookingDisplayStatus(b);
         const isActive = b.status === 'active';
-        const balanceStyle = balance > 0 && isActive
-          ? 'color:var(--red);font-weight:600;'
-          : (balance === 0 ? 'color:var(--text-muted);' : '');
+        const balanceCell = over > 0
+          ? `<span style="color:var(--red);font-weight:600;">−${formatRM(over)}</span>`
+          : `<span style="${balance > 0 && isActive ? 'color:var(--red);font-weight:600;' : (balance === 0 ? 'color:var(--text-muted);' : '')}">${formatRM(balance)}</span>`;
         return `
           <tr onclick="opsOpenBookingDetail('${esc(b.id)}')" style="cursor:pointer;">
             <td>${esc(b.id)}</td>
@@ -2953,7 +2962,7 @@ async function shareSlip() {
             <td>${booked.toLocaleString()} <span class="muted">(${collected.toLocaleString()} done · ${remaining.toLocaleString()} left)</span></td>
             <td style="text-align:right;">${formatRM(total)}</td>
             <td style="text-align:right;">${formatRM(paid)}</td>
-            <td style="text-align:right;${balanceStyle}">${formatRM(balance)}</td>
+            <td style="text-align:right;">${balanceCell}</td>
             <td><span class="ops-status-badge ${statusInfo.cls}">${esc(statusInfo.label)}</span></td>
           </tr>
         `;
@@ -3507,7 +3516,7 @@ async function shareSlip() {
 
       const bookingsRows = myBookings.map(b => {
         const paid = paymentsByBooking[b.id] || 0;
-        const balance = Math.max(0, Number(b.total_amount || 0) - paid);
+        const { balance, over } = opsBalanceParts(Number(b.total_amount || 0), paid);
         const statusCls = ({
           active: 'ops-status-active',
           completed: 'ops-status-completed',
@@ -3520,7 +3529,9 @@ async function shareSlip() {
             <td style="text-align:right;">${Number(b.booked_qty || 0).toLocaleString()}</td>
             <td style="text-align:right;">${formatRM(b.total_amount || 0)}</td>
             <td style="text-align:right;">${formatRM(paid)}</td>
-            <td style="text-align:right;${balance > 0 ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</td>
+            <td style="text-align:right;">${over > 0
+              ? `<span style="color:var(--red);font-weight:600;">−${formatRM(over)}</span>`
+              : `<span style="${balance > 0 ? 'color:var(--red);font-weight:600;' : ''}">${formatRM(balance)}</span>`}</td>
             <td><span class="ops-status-badge ${statusCls}">${esc(b.status || '')}</span></td>
           </tr>
         `;
