@@ -2201,20 +2201,26 @@ async function shareSlip() {
       ].filter(Boolean).join(' ');
 
       // === Payments table ===
+      const payColspan = isAdmin ? 6 : 5;
       const paymentsRows = myPayments.map(p => {
         const slipCell = p.slip_url
           ? `<a href="${esc(p.slip_url)}" target="_blank">${/\.pdf(\?|$)/i.test(p.slip_url) ? 'PDF ↗' : 'Image ↗'}</a>`
           : '<span class="muted">—</span>';
+        const actionsCell = isAdmin ? `
+            <td style="white-space:nowrap;text-align:right;">
+              <button class="btn btn-outline btn-sm" onclick="opsOpenEditPaymentModal('${esc(p.id)}')">Edit</button>
+              <button class="btn btn-outline btn-sm" style="border-color:var(--red);color:var(--red);" onclick="opsDeletePayment('${esc(p.id)}')">Delete</button>
+            </td>` : '';
         return `
           <tr>
             <td>${fmtDate(p.payment_date)}</td>
             <td style="text-align:right;">${formatRM(p.amount || 0)}</td>
             <td>${esc(p.method || '—')}</td>
             <td>${esc(p.reference || '—')}</td>
-            <td>${slipCell}</td>
+            <td>${slipCell}</td>${actionsCell}
           </tr>
         `;
-      }).join('') || '<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--text-muted);">No payments yet.</td></tr>';
+      }).join('') || `<tr><td colspan="${payColspan}" style="text-align:center;padding:14px;color:var(--text-muted);">No payments yet.</td></tr>`;
 
       // === Collections table ===
       const collectionsRows = myCollections.map(c => {
@@ -2401,6 +2407,7 @@ async function shareSlip() {
                   <th>Method</th>
                   <th>Reference</th>
                   <th>Slip</th>
+                  ${isAdmin ? '<th style="text-align:right;">Actions</th>' : ''}
                 </tr>
               </thead>
               <tbody>${paymentsRows}</tbody>
@@ -2513,6 +2520,107 @@ async function shareSlip() {
       closeModal('ops-addpay-overlay');
       renderBookingsTab();
       notify('Payment ' + payId + ' added', 'success');
+    }
+
+    // === Edit Payment modal (admin-only) ===
+    function opsOpenEditPaymentModal(payId) {
+      const p = payments.find(x => x.id === payId);
+      if (!p) { notify('Payment not found', 'error'); return; }
+      const dateVal = (p.payment_date || '').slice(0, 10);
+      const method = p.method || 'cash';
+      const slipLine = p.slip_url
+        ? `<div class="full" style="font-size:12px;color:var(--text-muted);">Current slip: <a href="${esc(p.slip_url)}" target="_blank">${/\.pdf(\?|$)/i.test(p.slip_url) ? 'PDF ↗' : 'Image ↗'}</a>
+             &nbsp;<label style="display:inline;font-weight:normal;"><input type="checkbox" id="ops-editpay-removeslip" /> remove</label></div>`
+        : '';
+      showModal(`
+        <h3>Edit Payment ${esc(p.id)}</h3>
+        <div class="form-grid">
+          <label>Amount (RM) <input id="ops-editpay-amt" type="number" step="0.01" min="0.01" value="${esc(String(p.amount || ''))}" /></label>
+          <label>Method
+            <select id="ops-editpay-method">
+              <option value="cash"${method === 'cash' ? ' selected' : ''}>Cash</option>
+              <option value="bank"${method === 'bank' ? ' selected' : ''}>Bank Transfer</option>
+              <option value="cheque"${method === 'cheque' ? ' selected' : ''}>Cheque</option>
+            </select>
+          </label>
+          <label class="full">Reference <input id="ops-editpay-ref" value="${esc(p.reference || '')}" /></label>
+          <label class="full">Replace slip (optional) <input type="file" id="ops-editpay-slip" accept="image/*,application/pdf" /></label>
+          ${slipLine}
+          <label>Date <input id="ops-editpay-date" type="date" value="${esc(dateVal)}" /></label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal('ops-editpay-overlay')">Cancel</button>
+          <button class="btn btn-primary" onclick="opsSaveEditPayment('${esc(p.id)}')">Save Changes</button>
+        </div>
+      `, 'ops-editpay-overlay');
+    }
+
+    async function opsSaveEditPayment(payId) {
+      const p = payments.find(x => x.id === payId);
+      if (!p) { notify('Payment not found', 'error'); return; }
+
+      const amount  = parseFloat(document.getElementById('ops-editpay-amt').value);
+      const method  = document.getElementById('ops-editpay-method').value || 'cash';
+      const ref     = (document.getElementById('ops-editpay-ref').value || '').trim();
+      const dateVal = (document.getElementById('ops-editpay-date').value || '').trim();
+      const removeEl = document.getElementById('ops-editpay-removeslip');
+      const removeSlip = removeEl && removeEl.checked;
+      const slipFileEl = document.getElementById('ops-editpay-slip');
+      const slipFile   = slipFileEl && slipFileEl.files && slipFileEl.files[0] ? slipFileEl.files[0] : null;
+
+      if (!amount || amount <= 0) { notify('Amount must be > 0', 'error'); return; }
+      if (!dateVal)               { notify('Date is required', 'error'); return; }
+
+      // Slip handling: new upload replaces; "remove" clears; otherwise keep existing
+      let slipUrl = p.slip_url || null;
+      if (slipFile) {
+        const ext  = slipFile.name.split('.').pop();
+        const path = `payments/${p.booking_id}/${payId}.${ext}`;
+        try {
+          const up = await sb.storage.from('oilpalm-photos').upload(path, slipFile, { upsert: true, contentType: slipFile.type });
+          if (up.error) {
+            notify('Slip upload failed (' + up.error.message + ') — other changes saved without new slip', 'warning');
+          } else {
+            slipUrl = sb.storage.from('oilpalm-photos').getPublicUrl(path).data.publicUrl;
+          }
+        } catch (e) {
+          notify('Slip upload error — other changes saved without new slip', 'warning');
+        }
+      } else if (removeSlip) {
+        slipUrl = null;
+      }
+
+      const updatePayload = {
+        amount,
+        method,
+        reference: ref || null,
+        payment_date: dateVal,
+        slip_url: slipUrl
+      };
+      const result = await sbMutate(() => sb.from('oilpalm_payments').update(updatePayload).eq('id', payId).select());
+      if (result === null) return;
+
+      await loadPayments();
+      closeModal('ops-editpay-overlay');
+      renderBookingsTab();
+      notify('Payment ' + payId + ' updated', 'success');
+    }
+
+    function opsDeletePayment(payId) {
+      const p = payments.find(x => x.id === payId);
+      if (!p) { notify('Payment not found', 'error'); return; }
+      confirmAction(
+        'Delete Payment ' + payId + '?',
+        'This will permanently remove the ' + formatRM(p.amount || 0) + ' payment record. This cannot be undone.',
+        async () => {
+          const result = await sbMutate(() => sb.from('oilpalm_payments').delete().eq('id', payId).select());
+          if (result === null) return;
+          await loadPayments();
+          renderBookingsTab();
+          notify('Payment ' + payId + ' deleted', 'success');
+        },
+        true /* danger */
+      );
     }
     // === End booking detail page ===
 
