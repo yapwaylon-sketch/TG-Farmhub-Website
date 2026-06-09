@@ -1479,6 +1479,9 @@ function switchTab(tab, skipHistory) {
   // "NEW order" bookkeeping: mark seen when leaving Orders, capture snapshot when entering
   if (currentTab === 'orders' && tab !== 'orders') soLeaveOrders();
   if (tab === 'orders' && currentTab !== 'orders') soEnterOrders();
+  // Reset payment filters on (re)entering Payments — they're persistent globals, otherwise a stale
+  // date range silently narrows the list (looked like "each customer has 1 invoice").
+  if (tab === 'payments' && currentTab !== 'payments') payResetAllFilters();
   // Reset detail views when switching tabs
   soDetailOrderId = null;
   scDetailCustomerId = null;
@@ -1673,7 +1676,10 @@ function docTypeBadgeClass(dt) {
 
 // INVOICE HELPERS
 function invoiceBalance(inv) {
-  return (inv.grand_total || 0) - (inv.credit_total || 0) - (inv.amount_paid || 0);
+  // Round to whole cents — grand_total can carry float noise (e.g. 436.45000000000005),
+  // which otherwise leaves a sub-cent "balance" that wrongly shows a Pay button + gold RM 0.00.
+  var raw = (inv.grand_total || 0) - (inv.credit_total || 0) - (inv.amount_paid || 0);
+  return Math.round(raw * 100) / 100;
 }
 
 async function recalcInvoicePaymentStatus(invoiceId) {
@@ -5898,6 +5904,18 @@ var invPayFilterStatus = 'outstanding';
 var invPayFilterFrom = '';
 var invPayFilterTo = '';
 
+// Reset all Payments-tab filters (CS + Invoice) to defaults. Called on tab entry.
+function payResetAllFilters() {
+  payFilterDateFrom = ''; payFilterDateTo = ''; payFilterStatus = 'outstanding'; payFilterSort = 'oldest';
+  invPayFilterCustomer = ''; invPayFilterStatus = 'outstanding'; invPayFilterFrom = ''; invPayFilterTo = '';
+}
+
+// Clear just the Invoice Payments section filters (Clear Filters button).
+function invPayClearFilters() {
+  invPayFilterCustomer = ''; invPayFilterStatus = 'outstanding'; invPayFilterFrom = ''; invPayFilterTo = '';
+  renderPayments();
+}
+
 function renderPayments() {
   var body = document.getElementById('page-payments').querySelector('.page-body');
   var html = '';
@@ -6159,6 +6177,8 @@ function renderPaymentsInvoice() {
   html += '<input type="date" value="' + esc(invPayFilterFrom) + '" onchange="invPayFilterFrom=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;"></div>';
   html += '<div class="form-field" style="min-width:120px;"><label style="font-size:10px;margin-bottom:2px;">TO</label>';
   html += '<input type="date" value="' + esc(invPayFilterTo) + '" onchange="invPayFilterTo=this.value;renderPayments()" style="width:100%;padding:6px 8px;font-size:12px;"></div>';
+  // Clear filters
+  html += '<div class="form-field" style="align-self:flex-end;"><button class="btn btn-outline btn-sm" onclick="invPayClearFilters()" style="padding:7px 14px;font-size:12px;white-space:nowrap;">Clear Filters</button></div>';
   html += '</div>';
 
   // Filter invoices
@@ -6200,8 +6220,12 @@ function renderPaymentsInvoice() {
     custGroups[cid].invoices.push(inv);
     if (inv.payment_status !== 'paid') custGroups[cid].totalOwed += bal;
     custGroups[cid].totalPaid += parseFloat(inv.amount_paid) || 0;
-    var ageDays = invoiceAgeDays(inv);
-    if (ageDays > custGroups[cid].oldestOverdueDays) custGroups[cid].oldestOverdueDays = ageDays;
+    // "Overdue" = still unpaid AND past due. Paid invoices never contribute, so a settled
+    // customer shows no red label even under SHOW=All.
+    if (isInvoiceOverdue(inv)) {
+      var ageDays = invoiceAgeDays(inv);
+      if (ageDays > custGroups[cid].oldestOverdueDays) custGroups[cid].oldestOverdueDays = ageDays;
+    }
   });
 
   var custList = Object.keys(custGroups).map(function(cid) {
@@ -6244,7 +6268,8 @@ function renderPaymentsInvoice() {
         var bal = invoiceBalance(inv);
         var ageDays = invoiceAgeDays(inv);
         var ageLabel = ageDays > 0 ? ageDays + 'd' : (ageDays === 0 ? 'Due' : Math.abs(ageDays) + 'd left');
-        var invAgeColor = invoiceAgingColor(inv);
+        // Paid invoices: show age muted, not red — they're settled, not a warning.
+        var invAgeColor = (inv.payment_status === 'paid') ? 'var(--text-muted)' : invoiceAgingColor(inv);
 
         html += '<tr>';
         html += '<td><a href="javascript:void(0)" onclick="event.stopPropagation();invSubtab=\'invoices\';invStatusFilter=\'all\';invSearchTerm=\'' + esc(inv.id) + '\';switchTab(\'invoicing\');" style="font-weight:600;color:var(--purple);text-decoration:none;">' + esc(inv.id) + '</a></td>';
