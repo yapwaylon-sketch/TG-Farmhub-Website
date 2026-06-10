@@ -1698,7 +1698,9 @@ async function recalcInvoicePaymentStatus(invoiceId) {
   else if (paidCents > 0) status = 'partial';
   inv.amount_paid = totalPaid;
   inv.payment_status = status;
-  await sbQuery(sb.from('sales_invoices').update({ amount_paid: totalPaid, payment_status: status }).eq('id', invoiceId).select());
+  var recalcRes = await sbQuery(sb.from('sales_invoices').update({ amount_paid: totalPaid, payment_status: status }).eq('id', invoiceId).select());
+  // Capture fresh updated_at (trigger bumps it) so later lock-protected ops on this invoice don't falsely fail
+  if (recalcRes && recalcRes[0] && recalcRes[0].updated_at) inv.updated_at = recalcRes[0].updated_at;
 
   // Sync payment_status to linked DOs — prorate amount_paid for partial
   var linkedOrderIds = invoiceOrders
@@ -1794,11 +1796,14 @@ async function invRecomputeInvoice(invoiceId) {
   subtotal = roundMoney(subtotal);
   if (newItems.length) {
     var iResult = await sbQuery(sb.from('sales_invoice_items').insert(newItems).select());
-    if (iResult) iResult.forEach(function(ii) { invoiceItems.push(ii); });
+    if (iResult === null) throw new Error('Failed to write invoice items — refresh and retry');
+    iResult.forEach(function(ii) { invoiceItems.push(ii); });
   }
 
   // Update invoice totals and capture new updated_at (so callers using sbUpdateWithLock don't get stale timestamp)
-  var grandTotal = subtotal - (parseFloat(inv.credit_total) || 0);
+  // grand_total is GROSS (= subtotal). Credits are subtracted at read time by invoiceBalance() /
+  // recalcInvoicePaymentStatus(); folding credit_total in here double-counted every credit note.
+  var grandTotal = subtotal;
   var updResult = await sbQuery(sb.from('sales_invoices').update({ subtotal: subtotal, grand_total: grandTotal }).eq('id', invoiceId).select());
   inv.subtotal = subtotal;
   inv.grand_total = grandTotal;
@@ -2314,13 +2319,31 @@ function soRenderCompletedFilterBar() {
   fHtml += '<option value="paid"' + (soFilterPayment === 'paid' ? ' selected' : '') + '>Paid</option>';
   fHtml += '</select>';
 
-  fHtml += '<input type="text" placeholder="Search customer..." value="' + esc(soFilterCustomer) + '" oninput="soFilterCustomer=this.value;renderOrderCards()" style="flex:1;min-width:150px;">';
+  fHtml += '<input type="text" id="so-filter-cust-search" placeholder="Search customer..." value="' + esc(soFilterCustomer).replace(/"/g, '&quot;') + '" oninput="soSetFilterCustomer(this.value)" style="flex:1;min-width:150px;">';
 
   if (soHasActiveFilters()) {
     fHtml += '<button class="btn btn-outline btn-sm" onclick="soClearFilters()">Clear Filters</button>';
   }
   fHtml += '</div>';
   return fHtml;
+}
+
+// Debounced customer-search: the filter bar lives inside the re-rendered cards container,
+// so re-rendering on every keystroke destroyed the input mid-typing (focus lost after one
+// character). Debounce 200ms, then restore focus + caret after the re-render — same
+// pattern as the Invoicing search (invSetSearch).
+function soSetFilterCustomer(v) {
+  soFilterCustomer = v;
+  clearTimeout(window._soCustSearchTO);
+  window._soCustSearchTO = setTimeout(function() {
+    renderOrderCards();
+    var el = document.getElementById('so-filter-cust-search');
+    if (el) {
+      el.focus();
+      var n = el.value.length;
+      try { el.setSelectionRange(n, n); } catch(e) {}
+    }
+  }, 200);
 }
 
 function soRenderCard(o, status, color, label) {
@@ -3437,9 +3460,11 @@ async function soUpdateStatus(orderId, newStatus, extraData) {
   if (extraData) Object.assign(updateData, extraData);
   var result = await sbQuery(sb.from('sales_orders').update(updateData).eq('id', orderId).select());
   if (result === null) return false;
-  // Update local array
+  // Update local array with the FRESH DB row (not just updateData) — the updated_at trigger
+  // bumps the timestamp on every UPDATE, and a stale local copy makes the Edit Order
+  // pre-flight lock check falsely report "modified by another user".
   var idx = orders.findIndex(function(x) { return x.id === orderId; });
-  if (idx >= 0) Object.assign(orders[idx], updateData);
+  if (idx >= 0) Object.assign(orders[idx], result[0] || updateData);
   return true;
 }
 
@@ -3820,13 +3845,9 @@ async function soPrepCommitAll() {
     var orderResult = await sbQuery(sb.from('sales_orders').update(orderUpdate).eq('id', orderId).select());
     if (orderResult === null) { notify('Failed to update order status', 'error'); soPrepPending = null; if (btn) btnLoading(btn, false, 'Mark Prepared'); return; }
 
-    // Update local
-    if (o) {
-      o.status = 'prepared';
-      o.subtotal = grandTotal;
-      o.grand_total = newGrand;
-      if (pending.photoUrl) o.prep_photo_url = pending.photoUrl;
-    }
+    // Update local with the fresh DB row (carries trigger-bumped updated_at + enforced totals);
+    // a stale updated_at here falsely blocks the next Edit Order with "modified by another user"
+    if (o) Object.assign(o, orderResult[0] || orderUpdate);
 
     if (btn) btnLoading(btn, false, 'Mark Prepared');
     notify('Order marked as prepared' + (pending.photoUrl ? ' with photo' : ''), 'success');
@@ -7133,7 +7154,8 @@ function renderCreateNewView(body) {
       var selectedInGroup = 0;
       custOrders.forEach(function(o) { if (invSelectedDOs[o.id]) selectedInGroup++; });
       var allSelected = selectedInGroup > 0 && selectedInGroup === custOrders.length;
-      var groupExpanded = selectedInGroup > 0;
+      // Explicit user toggle (invExpandedGroups) wins; otherwise auto-expand while the group has selections
+      var groupExpanded = (invExpandedGroups[custId] !== undefined) ? invExpandedGroups[custId] : (selectedInGroup > 0);
       var rowClass = 'inv-do-cust-row' + (selectedInGroup > 0 ? ' selected-some' : '');
 
       html += '<div class="' + rowClass + '" onclick="invToggleCustomer(\'' + esc(custId) + '\')">';
@@ -7265,84 +7287,26 @@ function invSelectedCustomerIds() {
   return Object.keys(seen);
 }
 
+// Per-customer expand/collapse override: true/false = user clicked the header;
+// undefined = auto (group expands while it has selected DOs). Survives re-renders.
+var invExpandedGroups = {};
+
 function invToggleCustomer(custId) {
   var el = document.getElementById('inv-dos-' + custId);
-  var chevron = document.getElementById('inv-chevron-' + custId);
-  if (!el) return;
-  if (el.style.display === 'none') {
-    el.style.display = 'block';
-    if (chevron) chevron.style.transform = 'rotate(180deg)';
-  } else {
-    el.style.display = 'none';
-    if (chevron) chevron.style.transform = '';
-  }
+  var isOpen = el && el.style.display !== 'none';
+  invExpandedGroups[custId] = !isOpen;
+  renderInvoicing();
 }
-
 
 function invToggleDO(orderId, custId, checked) {
-  var prevCusts = invSelectedCustomerIds();
   if (checked) invSelectedDOs[orderId] = true;
   else delete invSelectedDOs[orderId];
-  var nextCusts = invSelectedCustomerIds();
-
-  // If selection now spans multiple customers (or just dropped back to one),
-  // do a full re-render so the cross-customer warning banner + button state update.
-  var crossedBoundary = (prevCusts.length > 1) !== (nextCusts.length > 1);
-  if (crossedBoundary) {
-    renderInvoicing();
-    return;
-  }
-
-  invUpdateSelectAll(custId);
-  invUpdateButtons();
-  // Refresh header "N selected" badge without collapsing the group
-  invRefreshCustHeaderBadge(custId);
-}
-
-function invRefreshCustHeaderBadge(custId) {
-  // Lightweight header refresh: update the "N selected" badge in the customer header
-  // without re-rendering the whole section (which would collapse the open group).
-  var uninvoicedDOs = orders.filter(function(o) {
-    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed' && o.customer_id === custId;
-  });
-  var total = uninvoicedDOs.length;
-  var custTotal = 0;
-  uninvoicedDOs.forEach(function(o) { custTotal += parseFloat(o.grand_total) || 0; });
-  var selectedInGroup = 0;
-  uninvoicedDOs.forEach(function(o) { if (invSelectedDOs[o.id]) selectedInGroup++; });
-
-  var header = document.querySelector('#inv-dos-' + custId);
-  if (!header) return;
-  var group = header.parentElement;
-  if (!group) return;
-  var subline = group.querySelector('.inv-cust-header > div:first-child > div:last-child');
-  if (subline) {
-    var txt = total + ' DO' + (total !== 1 ? 's' : '') + ' \u00b7 ' + formatRM(custTotal);
-    if (selectedInGroup > 0) txt += ' \u00b7 <strong style="color:var(--gold);">' + selectedInGroup + ' selected</strong>';
-    subline.innerHTML = txt;
-  }
-}
-
-function invUpdateButtons() {
-  var selectedCount = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; }).length;
-  var btn = document.getElementById('inv-create-btn');
-  if (btn) {
-    btn.textContent = 'Create Draft Invoice (' + selectedCount + ' selected)';
-    btn.disabled = selectedCount === 0;
-    btn.style.opacity = selectedCount === 0 ? '0.5' : '';
-    btn.style.cursor = selectedCount === 0 ? 'not-allowed' : '';
-  }
-  var details = document.getElementById('inv-details');
-  if (details) details.style.display = selectedCount > 0 ? 'block' : 'none';
-  invRenderBillingSummary();
-}
-
-function invUpdateSelectAll(custId) {
-  var checkboxes = document.querySelectorAll('input[data-customer-id="' + custId + '"]');
-  var allChecked = true;
-  checkboxes.forEach(function(cb) { if (!cb.checked) allChecked = false; });
-  var selAll = document.getElementById('inv-selall-' + custId);
-  if (selAll) selAll.checked = allChecked;
+  // Full re-render: the sticky dock, header badges, select-all state and the
+  // cross-customer warning are all derived from invSelectedDOs at render time.
+  // (The old "lightweight refresh" path targeted pre-redesign elements that no
+  // longer exist — #inv-create-btn outside the dock, #inv-details,
+  // .inv-cust-header — so per-DO ticks never showed or updated the dock.)
+  renderInvoicing();
 }
 
 function invSelectAllCustomer(custId, checked) {
@@ -7354,106 +7318,9 @@ function invSelectAllCustomer(custId, checked) {
     if (checked) invSelectedDOs[o.id] = true;
     else delete invSelectedDOs[o.id];
   });
-  // Re-render — this auto-expands the group (groupExpanded = selectedInGroup > 0)
-  // and refreshes the header "N selected" badge + billing summary.
+  if (checked) invExpandedGroups[custId] = true; // selecting all should reveal the group
+  // Re-render — refreshes the dock, header badges and cross-customer warning.
   renderInvoicing();
-}
-
-function invRenderBillingSummary() {
-  var container = document.getElementById('inv-billing-summary');
-  if (!container) return;
-
-  var selectedIds = Object.keys(invSelectedDOs).filter(function(k) { return invSelectedDOs[k]; });
-  if (!selectedIds.length) { container.style.display = 'none'; return; }
-  container.style.display = 'block';
-
-  // Get selected orders and their items
-  var selectedOrders = [];
-  var doNumbers = [];
-  var custName = '';
-  selectedIds.forEach(function(id) {
-    var o = orders.find(function(x) { return x.id === id; });
-    if (!o) return;
-    selectedOrders.push(o);
-    doNumbers.push(o.doc_number || o.id);
-    if (!custName) {
-      var c = customers.find(function(c) { return c.id === o.customer_id; });
-      if (c) custName = c.name;
-    }
-  });
-
-  // Aggregate items: group by product_id + unit_price (different prices = separate lines)
-  var productAgg = {};
-  selectedOrders.forEach(function(o) {
-    var items = orderItems.filter(function(i) { return i.order_id === o.id; });
-    items.forEach(function(item) {
-      var unitPrice = parseFloat(item.unit_price) || 0;
-      var key = item.product_id + '_' + unitPrice.toFixed(2);
-      if (!productAgg[key]) {
-        var prod = salesProducts.find(function(p) { return p.id === item.product_id; });
-        var variety = soGetProductVariety(item.product_id);
-        var catLabel = prod ? spCategoryLabel(prod.category) : '';
-        productAgg[key] = {
-          product_id: item.product_id,
-          name: prod ? prod.name : '\u2014',
-          variety: variety !== '\u2014' ? variety : '',
-          category: catLabel,
-          unit: prod ? (prod.unit || '') : '',
-          quantity: 0,
-          totalAmount: 0,
-          unitPrice: unitPrice
-        };
-      }
-      productAgg[key].quantity += (item.quantity || 0);
-      productAgg[key].totalAmount += parseFloat(item.line_total) || 0;
-    });
-  });
-
-  var grandTotal = 0;
-  var productLines = Object.values(productAgg);
-  productLines.forEach(function(p) { grandTotal += p.totalAmount; });
-
-  // Build summary HTML
-  var html = '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-  html += '<div style="font-size:15px;font-weight:700;color:var(--text);">Billing Summary</div>';
-  html += '<div style="display:flex;gap:6px;">';
-  html += '<button class="btn btn-outline btn-sm" onclick="invCopySummary()" style="gap:4px;">';
-  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  html += 'Copy</button>';
-  html += '<button class="btn btn-outline btn-sm" onclick="invPrintSummary()" style="gap:4px;">';
-  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
-  html += 'Print</button>';
-  html += '</div></div>';
-
-  // Header info
-  html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">Customer: <strong style="color:var(--text);">' + esc(custName) + '</strong></div>';
-  html += '<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">DO No: <strong style="color:var(--text);">' + doNumbers.join(', ') + '</strong></div>';
-
-  // Product lines table
-  html += '<div class="table-wrap"><table class="data-table" style="margin:0;">';
-  html += '<thead><tr><th>#</th><th>Product</th><th style="text-align:right;">Qty</th><th>Unit</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
-
-  productLines.forEach(function(p, i) {
-    var desc = '';
-    if (p.variety) desc += p.variety + ' ';
-    desc += p.name;
-    html += '<tr>';
-    html += '<td>' + (i + 1) + '</td>';
-    html += '<td>' + esc(desc) + '</td>';
-    html += '<td style="text-align:right;">' + p.quantity + '</td>';
-    html += '<td>' + esc(p.unit) + '</td>';
-    html += '<td style="text-align:right;">' + formatRM(p.unitPrice) + '</td>';
-    html += '<td style="text-align:right;font-weight:600;">' + formatRM(p.totalAmount) + '</td>';
-    html += '</tr>';
-  });
-
-  html += '</tbody>';
-  html += '<tfoot><tr style="font-weight:800;font-size:15px;"><td colspan="5" style="text-align:right;padding-right:12px;">Total This Invoice</td><td style="text-align:right;color:var(--gold-light);">' + formatRM(grandTotal) + '</td></tr></tfoot>';
-  html += '</table></div>';
-  html += '</div>';
-
-  container.innerHTML = html;
 }
 
 function invBuildSummaryText() {
@@ -7669,9 +7536,13 @@ function invInsertDetail(invoiceId, rowEl) {
   var grand = parseFloat(inv.grand_total) || 0;
 
   var paymentTermsLabelStr = (function() {
-    var d = parseInt(inv.payment_terms_days, 10);
-    if (isNaN(d) || d === 0) return 'COD';
-    return 'Net ' + d + ' days';
+    // Invoices store payment_terms as a code string ('cod', '30days', ...) —
+    // payment_terms_days is a CUSTOMER-table field that never exists on invoice rows.
+    var t = inv.payment_terms;
+    if (!t || t === 'cod') return 'COD';
+    var m = /^(\d+)days$/.exec(t);
+    if (m) return 'Net ' + m[1] + ' days';
+    return esc(t);
   })();
 
   var html = '<div class="inv-detail" id="inv-detail-' + esc(invoiceId) + '">';
@@ -7888,8 +7759,10 @@ async function invPaySave() {
   var inv = invoices.find(function(i) { return i.id === invoiceId; });
   if (!inv) { notify('Invoice not found', 'warning'); return; }
   var balance = invoiceBalance(inv);
-  if (amount > balance && balance > 0) {
+  // Compare in cents (house rule) and BLOCK — a warning without return saved the overpayment anyway
+  if (Math.round(amount * 100) > Math.round(balance * 100)) {
     notify('Amount exceeds outstanding balance (' + formatRM(balance) + ')', 'warning');
+    return;
   }
 
   btnLoading(btn, true);
@@ -8099,8 +7972,11 @@ async function cnSave() {
     var totalCredits = creditNotes
       .filter(function(cn) { return cn.invoice_id === invoiceId; })
       .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
-    await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+    var ctRes = await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+    if (ctRes === null) { btnLoading(btn, false, 'Save Credit Note'); notify('Credit note saved but invoice total update failed — refresh and retry.', 'error'); return; }
     inv.credit_total = totalCredits;
+    // Capture fresh updated_at (trigger bumps it) so a later Void in the same session doesn't lock-fail
+    if (ctRes[0] && ctRes[0].updated_at) inv.updated_at = ctRes[0].updated_at;
 
     await recalcInvoicePaymentStatus(invoiceId);
 
@@ -8806,15 +8682,35 @@ async function invVoidConfirm() {
     var now = new Date().toISOString();
     var grandTotal = parseFloat(inv.grand_total) || 0;
 
-    // 1. Auto-generate a zeroing Credit Note for the full invoice amount
-    if (grandTotal > 0) {
+    // 0a. Re-check payments at confirm time (one may have been recorded since the modal opened)
+    var hasPayments = invoicePayments.some(function(p) { return p.invoice_id === invoiceId; });
+    if (hasPayments) { btnLoading(btn, false, 'Void Invoice'); notify('Cannot void invoice with recorded payments. Remove or refund payments first.', 'error'); return; }
+
+    // 0b. Pre-flight concurrency check. We can't rely on sbUpdateWithLock at the end alone:
+    // our own credit_total write below bumps updated_at (set_sales_invoices_updated_at trigger),
+    // so the lock must be checked BEFORE any destructive write and refreshed after our own writes.
+    var preflight = await sbQuery(sb.from('sales_invoices').select('updated_at,status').eq('id', invoiceId).limit(1));
+    if (preflight === null || !preflight[0]) { btnLoading(btn, false, 'Void Invoice'); return; }
+    if (preflight[0].status !== 'issued' || preflight[0].updated_at !== inv.updated_at) {
+      btnLoading(btn, false, 'Void Invoice');
+      notify('Invoice was modified by another user. Please refresh.', 'warning');
+      return;
+    }
+
+    // 1. Auto-generate a zeroing Credit Note for the not-yet-credited remainder.
+    //    (remainder, not full grand_total — keeps a retry after a mid-flow failure from stacking duplicate CNs)
+    var existingCredits = creditNotes
+      .filter(function(cn) { return cn.invoice_id === invoiceId; })
+      .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
+    var cnAmount = roundMoney(grandTotal - existingCredits);
+    if (cnAmount > 0) {
       var cnId = await dbNextId('CN');
       var cnData = {
         id: cnId,
         invoice_id: invoiceId,
         return_id: null,
         credit_date: todayStr(),
-        amount: grandTotal,
+        amount: cnAmount,
         reason: 'Invoice voided: ' + reason,
         created_by: currentUser ? currentUser.id : null,
         company_id: getCompanyId()
@@ -8823,12 +8719,12 @@ async function invVoidConfirm() {
       if (cnResult === null) { btnLoading(btn, false, 'Void Invoice'); return; }
       creditNotes.unshift(cnResult[0] || cnData);
 
-      // Update credit_total on invoice
-      var totalCredits = creditNotes
-        .filter(function(cn) { return cn.invoice_id === invoiceId; })
-        .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
-      await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+      // Update credit_total on invoice; capture fresh updated_at so the lock below stays valid
+      var totalCredits = roundMoney(existingCredits + cnAmount);
+      var ctResult = await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
+      if (ctResult === null) { btnLoading(btn, false, 'Void Invoice'); notify('Failed to update invoice credit total — refresh and retry.', 'error'); return; }
       inv.credit_total = totalCredits;
+      if (ctResult[0] && ctResult[0].updated_at) inv.updated_at = ctResult[0].updated_at;
     }
 
     // 2. Null out invoice_id on all linked DOs (frees them for re-invoicing)
@@ -8837,7 +8733,8 @@ async function invVoidConfirm() {
     var linkedOrders = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; });
     for (var i = 0; i < linkedOrders.length; i++) {
       var oid = linkedOrders[i].order_id;
-      await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', oid).select());
+      var doResult = await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', oid).select());
+      if (doResult === null) { btnLoading(btn, false, 'Void Invoice'); notify('Failed to release DO ' + oid + ' — refresh and retry.', 'error'); return; }
       var idx = orders.findIndex(function(x) { return x.id === oid; });
       if (idx >= 0) { orders[idx].invoice_id = null; orders[idx].payment_status = 'unpaid'; orders[idx].amount_paid = 0; }
     }
@@ -8879,58 +8776,40 @@ async function invUnlinkDO(invoiceId, orderId) {
   var linkedCount = invoiceOrders.filter(function(io) { return io.invoice_id === invoiceId; }).length;
   if (linkedCount <= 1) { notify('Cannot remove the last DO — use Void Invoice instead', 'warning'); return; }
 
+  // Block when payments exist (same rule as Void) — removing a DO from a part-paid invoice
+  // would desync amount_paid vs the shrunken total. Issue a credit note instead.
+  var hasPayments = invoicePayments.some(function(p) { return p.invoice_id === invoiceId; });
+  if (hasPayments) { notify('Cannot remove a DO from an invoice with recorded payments. Use a credit note instead.', 'warning'); return; }
+
   var o = orders.find(function(x) { return x.id === orderId; });
   var doLabel = o ? (o.doc_number || o.id) : orderId;
   var doAmount = o ? formatRM(parseFloat(o.grand_total) || 0) : '';
 
   confirmAction('Unlink DO from Invoice',
     'Remove <strong>' + esc(doLabel) + '</strong> (' + doAmount + ') from ' + esc(invoiceId) + '?<br><br>' +
-    '<span style="font-size:12px;color:var(--text-muted);">A credit note will be auto-generated for the difference. The DO will be freed for re-invoicing.</span>',
+    '<span style="font-size:12px;color:var(--text-muted);">The invoice items and totals will be recalculated from the remaining DOs. The DO will be freed for re-invoicing.</span>',
     async function() {
       try {
-        var oldTotal = parseFloat(inv.grand_total) || 0;
-
         // 1. Remove junction row
-        await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId).select());
+        var junctionResult = await sbQuery(sb.from('sales_invoice_orders').delete().eq('invoice_id', invoiceId).eq('order_id', orderId).select());
+        if (junctionResult === null) { notify('Failed to unlink DO — refresh and retry.', 'error'); return; }
         invoiceOrders = invoiceOrders.filter(function(io) { return !(io.invoice_id === invoiceId && io.order_id === orderId); });
 
         // 2. Null the invoice_id on the order and reset payment_status
-        await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', orderId).select());
+        var doResult = await sbQuery(sb.from('sales_orders').update({ invoice_id: null, payment_status: 'unpaid', amount_paid: 0 }).eq('id', orderId).select());
+        if (doResult === null) { notify('Failed to release DO ' + doLabel + ' — refresh and retry.', 'error'); return; }
         var idx = orders.findIndex(function(x) { return x.id === orderId; });
         if (idx >= 0) { orders[idx].invoice_id = null; orders[idx].payment_status = 'unpaid'; orders[idx].amount_paid = 0; }
 
-        // 3. Re-aggregate remaining items and update totals
-        var newSubtotal = await invRecomputeInvoice(invoiceId);
+        // 3. Re-aggregate remaining items and update totals.
+        //    No auto-CN: grand_total shrinks to the remaining DOs' value, so a CN on top
+        //    would deduct the removed DO twice (CN is subtracted again by invoiceBalance).
+        await invRecomputeInvoice(invoiceId);
 
-        // 4. Auto-generate CN for the difference
-        var diff = oldTotal - newSubtotal;
-        if (diff > 0) {
-          var cnId = await dbNextId('CN');
-          var cnData = {
-            id: cnId,
-            invoice_id: invoiceId,
-            return_id: null,
-            credit_date: todayStr(),
-            amount: diff,
-            reason: 'DO ' + doLabel + ' unlinked from invoice',
-            created_by: currentUser ? currentUser.id : null,
-            company_id: getCompanyId()
-          };
-          var cnResult = await sbQuery(sb.from('sales_credit_notes').insert(cnData).select());
-          if (cnResult) creditNotes.unshift(cnResult[0] || cnData);
-
-          // Update credit_total on invoice
-          var totalCredits = creditNotes
-            .filter(function(cn) { return cn.invoice_id === invoiceId; })
-            .reduce(function(sum, cn) { return sum + (parseFloat(cn.amount) || 0); }, 0);
-          await sbQuery(sb.from('sales_invoices').update({ credit_total: totalCredits }).eq('id', invoiceId).select());
-          inv.credit_total = totalCredits;
-        }
-
-        // 5. Recalc payment status
+        // 4. Recalc payment status
         await recalcInvoicePaymentStatus(invoiceId);
 
-        notify('DO ' + doLabel + ' removed from ' + invoiceId + (diff > 0 ? '. CN ' + cnId + ' created for ' + formatRM(diff) : ''), 'success');
+        notify('DO ' + doLabel + ' removed from ' + invoiceId + '. Invoice totals recalculated.', 'success');
         renderInvoicing();
       } catch(e) {
         notify('Failed to unlink DO: ' + e.message, 'error');
@@ -8986,8 +8865,18 @@ async function invCreateDraftInvoice() {
   }
 
   var invoiceDateVal = (document.getElementById('inv-date') || {}).value || todayStr();
-  var paymentTermsDays = parseInt((document.getElementById('inv-terms') || {}).value, 10) || 0;
   var notesVal = ((document.getElementById('inv-notes') || {}).value || '').trim();
+  // #inv-terms only exists when the dock preview is expanded. If it was never opened,
+  // fall back to the customer's default terms (matches what the dock advertises) — NOT COD.
+  var termsEl = document.getElementById('inv-terms');
+  var paymentTermsDays;
+  if (termsEl) {
+    paymentTermsDays = parseInt(termsEl.value, 10) || 0;
+  } else {
+    var termsOrder = orders.find(function(o) { return o.id === selectedIds[0]; });
+    var termsCust = termsOrder ? customers.find(function(c) { return c.id === termsOrder.customer_id; }) : null;
+    paymentTermsDays = termsCust ? (parseInt(termsCust.payment_terms_days, 10) || 30) : 30;
+  }
 
   var btn = document.getElementById('inv-create-btn');
   btnLoading(btn, true);
