@@ -1739,12 +1739,20 @@ function getInvoiceDOs(invoiceId) {
   return orders.filter(function(o) { return orderIds.indexOf(o.id) !== -1; });
 }
 
+// A DO is invoiceable only if completed, not already on an invoice, AND carrying no
+// direct payment. amount_paid > 0 with no invoice_id means the DO was paid outside
+// invoicing (e.g. AF-DO026 / AF-DO015 incidents) — pulling such a DO into an invoice
+// would let recalcInvoicePaymentStatus stomp its payment status and double-bill the customer.
+function isInvoiceableDO(o) {
+  return o.doc_type === 'delivery_order'
+    && o.status === 'completed'
+    && !o.invoice_id
+    && !(parseFloat(o.amount_paid) > 0);
+}
+
 function getCustomerUninvoicedDOs(customerId) {
   return orders.filter(function(o) {
-    return o.customer_id === customerId
-      && o.doc_type === 'delivery_order'
-      && o.status === 'completed'
-      && !o.invoice_id;
+    return o.customer_id === customerId && isInvoiceableDO(o);
   });
 }
 
@@ -1845,7 +1853,9 @@ function renderDashboard() {
 
   var uninvoicedDOCount = 0, uninvoicedDOAmount = 0;
   orders.forEach(function(o) {
-    if (o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed') {
+    // isInvoiceableDO also excludes DOs paid directly (outside invoicing) — those
+    // aren't awaiting billing, so they don't belong in this card or Total Owed
+    if (isInvoiceableDO(o)) {
       uninvoicedDOCount++;
       uninvoicedDOAmount += parseFloat(o.grand_total) || 0;
     }
@@ -3318,7 +3328,14 @@ function soRenderDetail() {
     html += '</tbody></table></div>';
   }
 
-  if (payStatus !== 'paid' && o.status === 'completed' && salesCan('payments')) {
+  if (o.doc_type === 'delivery_order') {
+    // DOs are never paid directly — payment lives on the invoice. A direct payment here
+    // bypasses invoicing entirely (AF-DO026 / AF-DO015 incidents) and later invoicing
+    // of the DO would stomp it.
+    if (o.status === 'completed' && payStatus !== 'paid') {
+      html += '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">Delivery Order — payment is recorded through Invoicing' + (o.invoice_id ? ' (' + esc(o.invoice_id) + ')' : ': create an invoice for this DO, then record the payment on the invoice') + '.</div>';
+    }
+  } else if (payStatus !== 'paid' && o.status === 'completed' && salesCan('payments')) {
     html += '<button class="btn btn-outline btn-sm" onclick="payOpenModal(\'' + esc(o.id) + '\')">Record Payment</button>';
   }
   html += '</div>';
@@ -6796,9 +6813,7 @@ function invUpdateSubtabBadges() {
     return i.status !== 'draft';
   }).length;
   var draft = invoices.find(function(i) { return i.status === 'draft'; });
-  var uninvoiced = orders.filter(function(o) {
-    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
-  }).length;
+  var uninvoiced = orders.filter(isInvoiceableDO).length;
 
   var bInv = document.getElementById('inv-tab-invoices-badge');
   var bCreate = document.getElementById('inv-tab-create-badge');
@@ -7120,9 +7135,7 @@ function renderCreateNewView(body) {
   html += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Select DOs to batch into an invoice</div>';
   html += '<input type="text" id="inv-do-search" placeholder="Search by customer or DO number..." oninput="renderInvoicing()" style="width:100%;max-width:320px;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-family:inherit;margin-bottom:12px;">';
 
-  var uninvoicedDOs = orders.filter(function(o) {
-    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed';
-  });
+  var uninvoicedDOs = orders.filter(isInvoiceableDO);
 
   var invSearchTerm2 = _invDoSearchVal.toLowerCase().trim();
   if (invSearchTerm2) {
@@ -7312,7 +7325,7 @@ function invToggleDO(orderId, custId, checked) {
 function invSelectAllCustomer(custId, checked) {
   // Update selection state
   var custOrders = orders.filter(function(o) {
-    return o.doc_type === 'delivery_order' && !o.invoice_id && o.status === 'completed' && o.customer_id === custId;
+    return isInvoiceableDO(o) && o.customer_id === custId;
   });
   custOrders.forEach(function(o) {
     if (checked) invSelectedDOs[o.id] = true;
@@ -8423,6 +8436,16 @@ async function invAddDosConfirm() {
   var addIds = Object.keys(invAddDosSelected).filter(function(k) { return invAddDosSelected[k]; });
   if (!addIds.length) { notify('No DOs selected', 'warning'); return; }
 
+  // Guard: every DO must still be invoiceable (completed, uninvoiced, no direct payment)
+  var nonInvoiceable = addIds.filter(function(id) {
+    var oChk = orders.find(function(x) { return x.id === id; });
+    return !oChk || !isInvoiceableDO(oChk);
+  });
+  if (nonInvoiceable.length) {
+    notify('Cannot add ' + nonInvoiceable.join(', ') + ' — payment was recorded directly on the order, so invoicing it would double-bill the customer.', 'error');
+    return;
+  }
+
   var btn = document.getElementById('inv-adddos-confirm-btn');
   btnLoading(btn, true);
 
@@ -8844,6 +8867,16 @@ async function invCreateDraftInvoice() {
   var custIdSet = invSelectedCustomerIds();
   if (custIdSet.length > 1) {
     notify('Selected DOs belong to multiple customers. Invoices must be per-customer.', 'error');
+    return;
+  }
+
+  // Guard: every selected DO must still be invoiceable (completed, uninvoiced, no direct payment)
+  var nonInvoiceable = selectedIds.filter(function(id) {
+    var oChk = orders.find(function(x) { return x.id === id; });
+    return !oChk || !isInvoiceableDO(oChk);
+  });
+  if (nonInvoiceable.length) {
+    notify('Cannot invoice ' + nonInvoiceable.join(', ') + ' — payment was recorded directly on the order, so invoicing it would double-bill the customer.', 'error');
     return;
   }
 
@@ -9849,11 +9882,13 @@ async function soToggleWalkIn() {
 }
 
 var soEditLockTime = null; // updated_at captured on edit open for optimistic locking
+var soDocMismatchOk = false; // staff confirmed "DO for cash customer" warning for this save
 
 function openNewOrderModal(editOrderId) {
   if (!salesCan('createOrder')) { notify('No permission to create/edit orders', 'warning'); return; }
   soEditOrderId = editOrderId || null;
   soEditLockTime = null;
+  soDocMismatchOk = false;
   soItems = [];
   soSelectedCustomer = null;
   soAppliedDebitNotes = [];
@@ -10955,6 +10990,20 @@ async function soSaveOrder() {
   var deliveryDate = document.getElementById('so-delivery-date').value;
   if (soIsWalkIn && !deliveryDate) deliveryDate = todayStr();
   if (!deliveryDate) { notify('Please set a delivery date', 'warning'); return; }
+
+  // Warn when issuing a Delivery Order for a cash-terms customer. A DO is not a receipt —
+  // it must be invoiced later and paid against the invoice. Cash customers should get
+  // Cash Sales. Staff can override after an explicit confirm (flag resets on modal open).
+  var docTypeChk = (document.getElementById('so-doc-type') || {}).value;
+  var docTypeLocked = (document.getElementById('so-doc-type') || {}).disabled;
+  var custTermsDays = soSelectedCustomer ? (parseInt(soSelectedCustomer.payment_terms_days, 10) || 0) : 0;
+  if (!soDocMismatchOk && !soIsWalkIn && !docTypeLocked && docTypeChk === 'delivery_order' && soSelectedCustomer && custTermsDays === 0) {
+    confirmAction('Delivery Order for a cash customer?',
+      '<strong>' + esc(soSelectedCustomer.name) + '</strong> has no credit terms (cash customer). A Delivery Order is <strong>not a receipt</strong> — it must be invoiced later and paid against the invoice.<br><br>' +
+      'If the customer pays on delivery/collection, change the document type to <strong>Cash Sales</strong> instead.<br><br>Keep Delivery Order anyway?',
+      function() { soDocMismatchOk = true; soSaveOrder(); });
+    return;
+  }
 
   var btn = document.getElementById('so-save-btn');
   var isEdit = !!soEditOrderId;
