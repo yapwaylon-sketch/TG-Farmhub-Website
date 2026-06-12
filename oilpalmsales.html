@@ -89,6 +89,7 @@
     let suppliers = [];          // for batch-row supplier-name lookups (e.g. on booking detail)
     let paymentsByBooking = {};  // {booking_id: total_paid}
     let midCullsByBatch = {};    // {batch_id: total cull-event qty (mid-MN + batch-close, NOT transplant)}
+    let cullEvents = [];         // raw cull event rows (batch_id, qty, event_date) for date-bucketed reports
 
     // Bookings tab filter state (Task 3.4)
     let bookingsFilter = { status: 'all', customer: '', batch: 'all' };
@@ -204,9 +205,10 @@
       // Transplant flow stores transplant-time culls on oilpalm_batches.transplant_culls
       // and emits event_type='transplant' (NOT 'cull'). So summing event_type='cull' here
       // gives ONLY mid-MN + batch-close culls — safe to add to transplant_culls without double-counting.
-      const data = await sbQuery(sb.from('oilpalm_batch_events').select('batch_id, qty, event_type').eq('event_type', 'cull'));
+      const data = await sbQuery(sb.from('oilpalm_batch_events').select('batch_id, qty, event_type, event_date').eq('event_type', 'cull'));
+      cullEvents = data || [];   // raw rows kept for date-bucketed reports (MPOB monthly)
       midCullsByBatch = {};
-      (data || []).forEach(e => {
+      cullEvents.forEach(e => {
         midCullsByBatch[e.batch_id] = (midCullsByBatch[e.batch_id] || 0) + Number(e.qty || 0);
       });
     }
@@ -2633,8 +2635,625 @@ async function shareSlip() {
     }
     // === End booking detail page ===
 
-    // === Render stubs (filled in by Tasks 3.3 — 3.11) ===
-    function renderReportsTab()     { document.getElementById('tab-reports').innerHTML     = '<p class="muted">Reports — TODO Phase 4</p>'; }
+    // ============================================================
+    // === Reports tab (Phase 4, built 2026-06-12) ===
+    // 5 reports: MPOB Monthly · Bookings by Batch · Cash Collection ·
+    // Collections by Customer · Outstanding & Liabilities.
+    // Reports are NEVER cached — every Run recomputes from the live
+    // in-memory data (which is reloaded fresh on tab entry).
+    // ============================================================
+    let opsRpt = { type: 'mpob', month: '' };   // month = 'YYYY-MM'
+    let opsMpobBaseline = null;                 // {as_of:'YYYY-MM-DD', seeds:N, seedlings:N} | null = not set
+    let opsMpobBaselineLoaded = false;
+
+    const OPS_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function opsMonthLabel(ym) {
+      if (!ym) return '';
+      const [y, m] = ym.split('-').map(Number);
+      return OPS_MONTH_NAMES[m - 1] + ' ' + y;
+    }
+    function opsLastMonth() {
+      const d = new Date();
+      d.setDate(1); d.setMonth(d.getMonth() - 1);   // setDate(1) first so 31st doesn't skip months
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    }
+    function opsMonthRange(ym) {  // 'YYYY-MM' -> [firstDay, lastDay] inclusive ISO dates
+      const [y, m] = ym.split('-').map(Number);
+      return [ym + '-01', ym + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0')];
+    }
+    function opsKategori(c)  { return (c && c.entity_type === 'company') ? 'Sykt Sdn Bhd' : 'Pekebun Kecil'; }
+    function opsBilPekebun(c){ return (c && c.entity_type === 'company') ? 0 : 1; }
+
+    function renderReportsTab() {
+      if (!opsRpt.month) opsRpt.month = opsLastMonth();
+      const monthly = opsRpt.type !== 'outstanding';
+      document.getElementById('tab-reports').innerHTML = `
+        <div class="page-header"><h2>Reports</h2></div>
+        <div class="filters-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:14px;">
+          <label>Report
+            <select id="ops-rpt-type" onchange="opsRpt.type=this.value; renderReportsTab()">
+              <option value="mpob"        ${opsRpt.type === 'mpob'        ? 'selected' : ''}>MPOB Monthly (Penyata Bulanan)</option>
+              <option value="bookings"    ${opsRpt.type === 'bookings'    ? 'selected' : ''}>Bookings by Batch</option>
+              <option value="cash"        ${opsRpt.type === 'cash'        ? 'selected' : ''}>Cash Collection</option>
+              <option value="collections" ${opsRpt.type === 'collections' ? 'selected' : ''}>Collections by Customer</option>
+              <option value="outstanding" ${opsRpt.type === 'outstanding' ? 'selected' : ''}>Outstanding &amp; Liabilities</option>
+            </select>
+          </label>
+          ${monthly ? `<label>Month <input type="month" id="ops-rpt-month" value="${opsRpt.month}" onchange="opsRpt.month=this.value" /></label>` : ''}
+          <button class="btn btn-primary" onclick="opsRunReport()">Run</button>
+          <button class="btn" onclick="window.print()">Print</button>
+          <button class="btn" onclick="opsExportReportCsv()">CSV</button>
+        </div>
+        <div id="ops-rpt-output"><p class="muted">Click <strong>Run</strong> to generate. Reports always recompute live from the database — nothing is saved as final.</p></div>
+      `;
+    }
+
+    async function opsRunReport() {
+      if (opsRpt.type !== 'outstanding' && !opsRpt.month) { notify('Pick a month first', 'error'); return; }
+      // Always recompute from the live database — refresh every dataset a report touches
+      // so a report run after a correction (even one made on another device) is current.
+      showLoading('Refreshing data…');
+      try {
+        await Promise.all([loadCustomers(), loadBookings(), loadCollections(), loadPayments(), loadBatches(), loadMidCulls()]);
+      } finally { hideLoading(); }
+      if (opsRpt.type === 'mpob')        await opsRunMpobReport();
+      if (opsRpt.type === 'bookings')    opsRunBookingsReport();
+      if (opsRpt.type === 'cash')        opsRunCashReport();
+      if (opsRpt.type === 'collections') opsRunCollectionsByCustomerReport();
+      if (opsRpt.type === 'outstanding') opsRunOutstandingReport();
+    }
+
+    // --- CSV export: scrapes every table in the output, prefixed by its data-csv title ---
+    function opsExportReportCsv() {
+      const out = document.getElementById('ops-rpt-output');
+      const tables = out ? [...out.querySelectorAll('table')] : [];
+      if (!tables.length) { notify('Run a report first', 'error'); return; }
+      const chunks = tables.map(table => {
+        const title = table.getAttribute('data-csv') || '';
+        const rows = [...table.querySelectorAll('tr')].map(tr =>
+          [...tr.querySelectorAll('th,td')].map(td => `"${(td.textContent || '').replace(/"/g, '""').trim()}"`).join(',')
+        ).join('\n');
+        return (title ? `"${title.replace(/"/g, '""')}"\n` : '') + rows;
+      });
+      const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const suffix = opsRpt.type === 'outstanding' ? new Date().toISOString().slice(0, 10) : opsRpt.month;
+      a.download = `oilpalm-${opsRpt.type}-${suffix}.csv`;
+      a.click();
+    }
+
+    // ============================================================
+    // Report 1: MPOB Monthly (Penyata Bulanan helper)
+    // ============================================================
+    async function opsLoadMpobBaseline() {
+      if (opsMpobBaselineLoaded) return;
+      // app_config has NO company_id column — DO NOT filter by it.
+      // No .single() — zero rows would 406 and sbQuery would swallow it as null.
+      const rows = await sbQuery(sb.from('app_config').select('value').eq('key', 'oilpalm_mpob_baseline'));
+      opsMpobBaseline = null;
+      if (rows && rows[0] && rows[0].value) {
+        try { opsMpobBaseline = JSON.parse(rows[0].value); } catch (e) { opsMpobBaseline = null; }
+      }
+      opsMpobBaselineLoaded = true;
+    }
+
+    async function opsSaveMpobBaseline() {
+      if (!currentUser || currentUser.role !== 'admin') { notify('Admin only', 'error'); return; }
+      const asOf      = document.getElementById('ops-bl-asof').value;
+      const seeds     = parseInt(document.getElementById('ops-bl-seeds').value, 10);
+      const seedlings = parseInt(document.getElementById('ops-bl-sdl').value, 10);
+      if (!asOf) { notify('Baseline date required', 'error'); return; }
+      if (isNaN(seeds) || seeds < 0 || isNaN(seedlings) || seedlings < 0) { notify('Enter valid stock quantities (0 or more)', 'error'); return; }
+      const value = JSON.stringify({ as_of: asOf, seeds, seedlings });
+      const result = await sbMutate(() => sb.from('app_config').upsert({ key: 'oilpalm_mpob_baseline', value }, { onConflict: 'key' }).select());
+      if (result === null) return;
+      opsMpobBaseline = { as_of: asOf, seeds, seedlings };
+      notify('Opening stock baseline saved', 'success');
+      opsRunMpobReport();
+    }
+
+    function opsEditMpobBaseline() {
+      const bl = opsMpobBaseline || { as_of: '', seeds: 0, seedlings: 0 };
+      document.getElementById('ops-mpob-baseline-box').innerHTML = `
+        <strong>Opening stock baseline</strong>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:8px;">
+          <label>Stock counted as of <input type="date" id="ops-bl-asof" value="${esc(bl.as_of || '')}" /></label>
+          <label>Seeds in stock <input type="number" id="ops-bl-seeds" min="0" value="${Number(bl.seeds) || 0}" style="width:110px;" /></label>
+          <label>Seedlings in stock <input type="number" id="ops-bl-sdl" min="0" value="${Number(bl.seedlings) || 0}" style="width:110px;" /></label>
+          <button class="btn btn-primary" onclick="opsSaveMpobBaseline()">Save</button>
+          <button class="btn" onclick="opsRunMpobReport()">Cancel</button>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:6px;">Enter your physical stock count once. Events dated before this date are ignored (they're already inside these numbers); everything after rolls forward automatically.</div>
+      `;
+    }
+
+    // Build the dated stock-movement event list from batches + cull events + collections.
+    // Seed receipts fall back to ordered_qty + seeds_allowance when seeds_received
+    // hasn't been recorded yet (it's only filled in at planting time).
+    function opsMpobFlowEvents() {
+      const ev = [];
+      batches.forEach(b => {
+        if (b.actual_delivery_date) {
+          const recv = Number(b.seeds_received) || ((Number(b.ordered_qty) || 0) + (Number(b.seeds_allowance) || 0));
+          if (recv) ev.push({ date: b.actual_delivery_date, type: 'seed_in', qty: recv });
+        }
+        if (b.date_planted) {
+          const planted = Number(b.qty_planted) || 0;
+          const damaged = Number(b.seeds_damaged) || 0;
+          if (planted) {
+            ev.push({ date: b.date_planted, type: 'seed_used', qty: planted });
+            ev.push({ date: b.date_planted, type: 'sdl_produced', qty: planted });
+          }
+          if (damaged) ev.push({ date: b.date_planted, type: 'seed_damaged', qty: damaged });
+        }
+        if (b.date_transplanted) {
+          const extras = Number(b.transplant_extras) || 0;
+          const culls  = Number(b.transplant_culls)  || 0;
+          if (extras) ev.push({ date: b.date_transplanted, type: 'sdl_extra', qty: extras });
+          if (culls)  ev.push({ date: b.date_transplanted, type: 'sdl_cull',  qty: culls  });
+        }
+      });
+      cullEvents.forEach(e => { if (e.event_date && Number(e.qty)) ev.push({ date: e.event_date, type: 'sdl_cull', qty: Number(e.qty) }); });
+      collections.forEach(c => { if (c.collection_date && Number(c.qty)) ev.push({ date: c.collection_date, type: 'sdl_sold', qty: Number(c.qty) }); });
+      return ev;
+    }
+
+    // Sum flows in [from, to] inclusive (ISO string compare). Pass null from/to to skip a bound.
+    function opsMpobSumFlows(ev, from, to) {
+      const t = { seedIn: 0, seedUsed: 0, seedDamaged: 0, sdlProduced: 0, sdlExtra: 0, sdlSold: 0, sdlCull: 0 };
+      ev.forEach(e => {
+        if (from && e.date < from) return;
+        if (to   && e.date > to)   return;
+        if (e.type === 'seed_in')      t.seedIn      += e.qty;
+        if (e.type === 'seed_used')    t.seedUsed    += e.qty;
+        if (e.type === 'seed_damaged') t.seedDamaged += e.qty;
+        if (e.type === 'sdl_produced') t.sdlProduced += e.qty;
+        if (e.type === 'sdl_extra')    t.sdlExtra    += e.qty;
+        if (e.type === 'sdl_sold')     t.sdlSold     += e.qty;
+        if (e.type === 'sdl_cull')     t.sdlCull     += e.qty;
+      });
+      return t;
+    }
+
+    async function opsRunMpobReport() {
+      await opsLoadMpobBaseline();
+      const ym = opsRpt.month;
+      const [mStart, mEnd] = opsMonthRange(ym);
+      const out = document.getElementById('ops-rpt-output');
+
+      // Baseline box (always shown at top of this report; admin can edit)
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      let baselineHtml;
+      if (!opsMpobBaseline) {
+        baselineHtml = `<div id="ops-mpob-baseline-box" class="ops-baseline-box warn">
+          <strong>⚠ Opening stock baseline not set.</strong> Section 1 opening/closing stock will be wrong until you enter your one-time physical stock count.
+          ${isAdmin ? '<button class="btn btn-sm" style="margin-left:10px;" onclick="opsEditMpobBaseline()">Set baseline</button>' : ' Ask an admin to set it.'}
+        </div>`;
+      } else {
+        baselineHtml = `<div id="ops-mpob-baseline-box" class="ops-baseline-box">
+          <strong>Opening stock baseline:</strong> as of ${fmtDate(opsMpobBaseline.as_of)} — ${fmtNum(opsMpobBaseline.seeds)} seeds, ${fmtNum(opsMpobBaseline.seedlings)} seedlings
+          ${isAdmin ? '<button class="btn btn-sm" style="margin-left:10px;" onclick="opsEditMpobBaseline()">Edit</button>' : ''}
+        </div>`;
+      }
+
+      const ev = opsMpobFlowEvents();
+      const bl = opsMpobBaseline || { as_of: null, seeds: 0, seedlings: 0 };
+      // Opening = baseline + everything between baseline date and the day before month start.
+      // If the report month starts before the baseline date, pre-flows are empty (string compare guards).
+      const dayBeforeStart = new Date(mStart); dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+      const preEnd = dayBeforeStart.toISOString().slice(0, 10);
+      const pre = opsMpobSumFlows(ev, bl.as_of, preEnd < (bl.as_of || '') ? null : preEnd);
+      const openSeeds = (Number(bl.seeds) || 0)     + pre.seedIn - pre.seedUsed - pre.seedDamaged;
+      const openSdl   = (Number(bl.seedlings) || 0) + pre.sdlProduced + pre.sdlExtra - pre.sdlSold - pre.sdlCull;
+
+      const m = opsMpobSumFlows(ev, mStart, mEnd);
+      // Row values per column: [seeds(94), seedlings(93)] — tissue columns always 0 for us.
+      const A = [openSeeds, openSdl];
+      const B = [m.seedIn, 0];
+      const C = [0, m.sdlProduced];
+      const D = [0, m.sdlExtra];
+      const E = [A[0] + B[0] + C[0] + D[0], A[1] + B[1] + C[1] + D[1]];
+      const F = [0, m.sdlSold];
+      const G = [0, 0];
+      const H = [m.seedUsed, 0];
+      const I = [m.seedDamaged, m.sdlCull];
+      const J = [0, 0];
+      const K = [F[0] + G[0] + H[0] + I[0] + J[0], F[1] + G[1] + H[1] + I[1] + J[1]];
+      const L = [E[0] - K[0], E[1] - K[1]];
+
+      const s1Rows = [
+        ['A.', 'Stok Awal Bulan', A], ['B.', 'Pembelian/Penerimaan', B], ['C.', 'Pengeluaran', C],
+        ['D.', "Pelarasan (kira semula, 'doubleton')", D], ['E.', 'Jumlah (A+B+C+D)', E],
+        ['F.', 'Jualan/Hantaran Tempatan', F], ['G.', 'Eksport', G], ['H.', 'Guna Sendiri', H],
+        ['I.', 'Rosak/Hapus/Penakaian', I], ['J.', 'Pelarasan (kira semula)', J],
+        ['K.', 'Jumlah (F+G+H+I+J)', K], ['L.', 'Stok Akhir Bulan (E−K)', L]
+      ];
+      const bold = r => (r === 'E.' || r === 'K.' || r === 'L.') ? 'font-weight:700;' : '';
+
+      // Section 2: receipts in month
+      const supplierMap = Object.fromEntries(suppliers.map(s => [s.id, s.name]));
+      const received = batches.filter(b => b.actual_delivery_date && b.actual_delivery_date >= mStart && b.actual_delivery_date <= mEnd);
+      const recvQty = b => Number(b.seeds_received) || ((Number(b.ordered_qty) || 0) + (Number(b.seeds_allowance) || 0));
+
+      // Section 3: collections in month, with customer MPOB fields
+      const custMap = Object.fromEntries(customers.map(c => [c.id, c]));
+      const monthColl = collections
+        .filter(c => c.collection_date >= mStart && c.collection_date <= mEnd)
+        .sort((a, b2) => (a.collection_date || '').localeCompare(b2.collection_date || ''));
+      const totalSold = monthColl.reduce((s, c) => s + (Number(c.qty) || 0), 0);
+
+      out.innerHTML = `
+        <h3>MPOB Penyata Bulanan — ${opsMonthLabel(ym)}</h3>
+        <p class="muted" style="margin:4px 0 12px;">Copy these figures into the MPOB e-filing portal. Quantities only, organised in the portal's sections. Recomputed live — re-run after any correction.</p>
+        ${baselineHtml}
+
+        <h4>1. Kedudukan Bahan Tanaman Kelapa Sawit</h4>
+        <div class="table-wrap"><table class="data-table" data-csv="Seksyen 1 — Kedudukan Bahan Tanaman (${opsMonthLabel(ym)})">
+          <thead><tr><th></th><th>Butir-Butir</th>
+            <th style="text-align:right;">Biji Benih (94)</th>
+            <th style="text-align:right;">Anak Benih Dari Biji Benih (93)</th>
+            <th style="text-align:right;">Anak Benih Dari Tisu (FV)</th>
+            <th style="text-align:right;">Anak Klon (95)</th></tr></thead>
+          <tbody>
+            ${s1Rows.map(([code, label, v]) => `
+              <tr style="${bold(code)}"><td>${code}</td><td>${label}</td>
+                <td style="text-align:right;">${fmtNum(v[0])}</td>
+                <td style="text-align:right;">${fmtNum(v[1])}</td>
+                <td style="text-align:right;">0</td><td style="text-align:right;">0</td></tr>`).join('')}
+          </tbody>
+        </table></div>
+
+        <h4>2. Pembelian/Penerimaan Bahan Tanaman</h4>
+        ${received.length === 0 ? '<p class="muted">TIADA REKOD — no seed deliveries this month.</p>'
+          : `<div class="table-wrap"><table class="data-table" data-csv="Seksyen 2 — Pembelian/Penerimaan (${opsMonthLabel(ym)})">
+            <thead><tr><th>Bahan Tanaman</th><th>Kod</th><th>Pembekal</th><th>Tarikh Terima</th><th style="text-align:right;">Kuantiti</th></tr></thead>
+            <tbody>${received.map(b => `
+              <tr><td>Biji Benih</td><td>94</td><td>${esc(supplierMap[b.supplier_id] || '—')}</td>
+                <td>${fmtDate(b.actual_delivery_date)}</td>
+                <td style="text-align:right;">${fmtNum(recvQty(b))}</td></tr>`).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="4">Jumlah</td>
+              <td style="text-align:right;">${fmtNum(received.reduce((s, b) => s + recvQty(b), 0))}</td></tr></tfoot>
+          </table></div>`}
+
+        <h4>3. Jualan/Edaran Bahan Tanaman (Borang L3.1)</h4>
+        ${monthColl.length === 0 ? '<p class="muted">TIADA REKOD — no collections this month.</p>'
+          : `<div class="table-wrap"><table class="data-table" data-csv="Seksyen 3 — Jualan/Edaran (${opsMonthLabel(ym)})">
+            <thead><tr><th>Tarikh</th><th>Nama Pembeli</th><th>Kategori</th>
+              <th style="text-align:right;">Bil. Pekebun Kecil</th><th>Daerah</th><th>Negeri</th>
+              <th>Borang L3.1</th><th style="text-align:right;">Kuantiti</th></tr></thead>
+            <tbody>${monthColl.map(c => {
+              const cu = custMap[c.customer_id];
+              return `<tr><td>${fmtDate(c.collection_date)}</td><td>${esc(cu ? cu.name : c.customer_id)}</td>
+                <td>${opsKategori(cu)}</td><td style="text-align:right;">${opsBilPekebun(cu)}</td>
+                <td>${esc((cu && cu.address_district) || '—')}</td><td>${esc((cu && cu.address_state) || '—')}</td>
+                <td>${esc(c.l3_form_no || '—')}</td><td style="text-align:right;">${fmtNum(c.qty || 0)}</td></tr>`;
+            }).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="7">Jumlah</td>
+              <td style="text-align:right;">${fmtNum(totalSold)}</td></tr></tfoot>
+          </table></div>`}
+        <p class="muted" style="font-size:12px;">Seksyen 4 (Eksport): TIADA REKOD — always zero for us. Customers missing Daerah/Negeri show "—"; fill them in on the customer record.</p>
+      `;
+    }
+
+    // ============================================================
+    // Report 2: Bookings by Batch (monthly, by booking date)
+    // ============================================================
+    function opsRunBookingsReport() {
+      const ym = opsRpt.month;
+      const [mStart, mEnd] = opsMonthRange(ym);
+      const custMap  = Object.fromEntries(customers.map(c => [c.id, c.name]));
+      const batchMap = Object.fromEntries(batches.map(b => [b.id, b]));
+      const vMap     = Object.fromEntries(varieties.map(v => [v.id, v.name]));
+
+      const inMonth = bookings.filter(b => b.booking_date >= mStart && b.booking_date <= mEnd);
+      const active    = inMonth.filter(b => b.status !== 'cancelled');
+      const cancelled = inMonth.filter(b => b.status === 'cancelled');
+
+      // Group active by batch
+      const byBatch = {};
+      active.forEach(b => { (byBatch[b.batch_id] = byBatch[b.batch_id] || []).push(b); });
+
+      const bookingRow = b => `
+        <tr><td>${fmtDate(b.booking_date)}</td><td>${esc(b.id)}</td><td>${esc(custMap[b.customer_id] || b.customer_id)}</td>
+          <td style="text-align:right;">${fmtNum(b.booked_qty || 0)}</td>
+          <td style="text-align:right;">${formatRM(b.unit_price || 0)}</td>
+          <td style="text-align:right;">${formatRM(b.total_amount || 0)}</td>
+          <td style="text-align:right;">${formatRM(paymentsByBooking[b.id] || 0)}</td></tr>`;
+
+      const batchBlocks = Object.keys(byBatch).map(bid => {
+        const bt = batchMap[bid];
+        const label = bt ? `${esc(bt.batch_number || bid)} · ${esc(vMap[bt.variety_id] || '—')}` : esc(bid);
+        const csvLabel = String(bt ? (bt.batch_number || bid) : bid).replace(/"/g, '');
+        const rows = byBatch[bid].sort((a, b) => (a.booking_date || '').localeCompare(b.booking_date || ''));
+        const tQty = rows.reduce((s, b) => s + (Number(b.booked_qty) || 0), 0);
+        const tVal = rows.reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
+        const tPaid = rows.reduce((s, b) => s + (paymentsByBooking[b.id] || 0), 0);
+        return `
+          <h4>Batch ${label}</h4>
+          <div class="table-wrap"><table class="data-table" data-csv="Bookings ${opsMonthLabel(ym)} — Batch ${csvLabel}">
+            <thead><tr><th>Date</th><th>Booking</th><th>Customer</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th><th style="text-align:right;">Paid So Far</th></tr></thead>
+            <tbody>${rows.map(bookingRow).join('')}</tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="3">Subtotal (${rows.length} booking${rows.length === 1 ? '' : 's'})</td>
+              <td style="text-align:right;">${fmtNum(tQty)}</td><td></td>
+              <td style="text-align:right;">${formatRM(tVal)}</td>
+              <td style="text-align:right;">${formatRM(tPaid)}</td></tr></tfoot>
+          </table></div>`;
+      }).join('');
+
+      const gQty = active.reduce((s, b) => s + (Number(b.booked_qty) || 0), 0);
+      const gVal = active.reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
+
+      const cancelledHtml = cancelled.length === 0 ? '' : `
+        <h4 style="color:var(--red);">Cancelled Bookings (booked this month, since cancelled)</h4>
+        <div class="table-wrap"><table class="data-table" data-csv="Cancelled bookings booked in ${opsMonthLabel(ym)}">
+          <thead><tr><th>Date</th><th>Booking</th><th>Customer</th><th>Batch</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Total</th><th>Cancelled On</th></tr></thead>
+          <tbody>${cancelled.map(b => {
+            const bt = batchMap[b.batch_id];
+            return `<tr><td>${fmtDate(b.booking_date)}</td><td>${esc(b.id)}</td><td>${esc(custMap[b.customer_id] || b.customer_id)}</td>
+              <td>${esc(bt ? (bt.batch_number || b.batch_id) : b.batch_id)}</td>
+              <td style="text-align:right;">${fmtNum(b.booked_qty || 0)}</td>
+              <td style="text-align:right;">${formatRM(b.total_amount || 0)}</td>
+              <td>${b.cancelled_at ? fmtDate(b.cancelled_at.slice(0, 10)) : '—'}</td></tr>`;
+          }).join('')}
+          </tbody>
+          <tfoot><tr style="font-weight:700;"><td colspan="4">Subtotal (${cancelled.length})</td>
+            <td style="text-align:right;">${fmtNum(cancelled.reduce((s, b) => s + (Number(b.booked_qty) || 0), 0))}</td>
+            <td style="text-align:right;">${formatRM(cancelled.reduce((s, b) => s + (Number(b.total_amount) || 0), 0))}</td><td></td></tr></tfoot>
+        </table></div>`;
+
+      document.getElementById('ops-rpt-output').innerHTML = `
+        <h3>Bookings by Batch — ${opsMonthLabel(ym)}</h3>
+        ${active.length === 0 && cancelled.length === 0 ? '<p class="muted">No bookings made this month.</p>' : `
+          ${batchBlocks}
+          <div class="ops-rpt-grand">Grand total: <strong>${active.length}</strong> booking${active.length === 1 ? '' : 's'} · <strong>${fmtNum(gQty)}</strong> seedlings · <strong>${formatRM(gVal)}</strong></div>
+          ${cancelledHtml}`}
+      `;
+    }
+
+    // ============================================================
+    // Report 3: Cash Collection (monthly, deposits vs final payments)
+    // Classification (agreed 2026-06-12): walk-in payments = Final;
+    // booking payments on the same day as a collection on that booking = Final;
+    // every other booking payment = Deposit.
+    // ============================================================
+    function opsRunCashReport() {
+      const ym = opsRpt.month;
+      const [mStart, mEnd] = opsMonthRange(ym);
+      const custMap = Object.fromEntries(customers.map(c => [c.id, c.name]));
+      const bkMap   = Object.fromEntries(bookings.map(b => [b.id, b]));
+      const collMap = Object.fromEntries(collections.map(c => [c.id, c]));
+
+      // booking_id -> Set of collection dates (for same-day classification)
+      const collDates = {};
+      collections.forEach(c => {
+        if (!c.booking_id) return;
+        (collDates[c.booking_id] = collDates[c.booking_id] || new Set()).add(c.collection_date);
+      });
+
+      const monthPays = payments
+        .filter(p => Number(p.amount) > 0 && p.payment_date >= mStart && p.payment_date <= mEnd)
+        .sort((a, b) => (a.payment_date || '').localeCompare(b.payment_date || ''));
+
+      const deposits = [], finals = [];
+      monthPays.forEach(p => {
+        if (p.collection_id) { finals.push(p); return; }                       // walk-in = paid at collection
+        if (p.booking_id && collDates[p.booking_id] && collDates[p.booking_id].has(p.payment_date)) { finals.push(p); return; }
+        deposits.push(p);
+      });
+
+      const payCustomer = p => {
+        if (p.booking_id)    { const bk = bkMap[p.booking_id];    return bk ? (custMap[bk.customer_id] || bk.customer_id) : '—'; }
+        if (p.collection_id) { const cl = collMap[p.collection_id]; return cl ? (custMap[cl.customer_id] || cl.customer_id) : '—'; }
+        return '—';
+      };
+      const methodLabel = mth => mth === 'bank' ? 'Bank In' : mth === 'cheque' ? 'Cheque' : 'Cash';
+
+      const payTable = (list, title) => list.length === 0 ? `<p class="muted">None this month.</p>` : `
+        <div class="table-wrap"><table class="data-table" data-csv="${title} (${opsMonthLabel(ym)})">
+          <thead><tr><th>Date</th><th>Customer</th><th>Ref</th><th>Method</th><th>Reference No.</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody>${list.map(p => `
+            <tr><td>${fmtDate(p.payment_date)}</td><td>${esc(payCustomer(p))}</td>
+              <td>${esc(p.booking_id || p.collection_id || '—')}</td>
+              <td>${methodLabel(p.method)}</td><td>${esc(p.reference || '—')}</td>
+              <td style="text-align:right;">${formatRM(p.amount || 0)}</td></tr>`).join('')}
+          </tbody>
+          <tfoot><tr style="font-weight:700;"><td colspan="5">Subtotal (${list.length})</td>
+            <td style="text-align:right;">${formatRM(list.reduce((s, p) => s + (Number(p.amount) || 0), 0))}</td></tr></tfoot>
+        </table></div>`;
+
+      // Refunds paid out this month (money going the other way)
+      const refunds = bookings.filter(b =>
+        b.refund_status === 'paid' && b.refund_paid_at && b.refund_paid_at.slice(0, 10) >= mStart && b.refund_paid_at.slice(0, 10) <= mEnd);
+      const refundTotal = refunds.reduce((s, b) => s + (Number(b.refund_amount) || 0), 0);
+
+      const totalIn  = monthPays.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const byMethod = { cash: 0, bank: 0, cheque: 0 };
+      monthPays.forEach(p => { byMethod[p.method] = (byMethod[p.method] || 0) + (Number(p.amount) || 0); });
+
+      document.getElementById('ops-rpt-output').innerHTML = `
+        <h3>Cash Collection — ${opsMonthLabel(ym)}</h3>
+        <h4>Deposits (booking payments, incl. top-ups along the way)</h4>
+        ${payTable(deposits, 'Deposits')}
+        <h4>Final Payments (upon collection — walk-ins + same-day booking payments)</h4>
+        ${payTable(finals, 'Final Payments')}
+        ${refunds.length === 0 ? '' : `
+          <h4 style="color:var(--red);">Refunds Paid Out</h4>
+          <div class="table-wrap"><table class="data-table" data-csv="Refunds paid out (${opsMonthLabel(ym)})">
+            <thead><tr><th>Date Paid</th><th>Customer</th><th>Booking</th><th>Method</th><th style="text-align:right;">Amount</th></tr></thead>
+            <tbody>${refunds.map(b => `
+              <tr><td>${fmtDate(b.refund_paid_at.slice(0, 10))}</td><td>${esc(custMap[b.customer_id] || b.customer_id)}</td>
+                <td>${esc(b.id)}</td><td>${methodLabel(b.refund_method)}</td>
+                <td style="text-align:right;">−${formatRM(b.refund_amount || 0)}</td></tr>`).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="4">Subtotal (${refunds.length})</td>
+              <td style="text-align:right;">−${formatRM(refundTotal)}</td></tr></tfoot>
+          </table></div>`}
+        <div class="ops-rpt-grand" data-csv-skip>
+          Money in: <strong>${formatRM(totalIn)}</strong>
+          (Cash ${formatRM(byMethod.cash || 0)} · Bank In ${formatRM(byMethod.bank || 0)} · Cheque ${formatRM(byMethod.cheque || 0)})
+          ${refundTotal ? ` · Refunds out: <strong>−${formatRM(refundTotal)}</strong> · Net: <strong>${formatRM(totalIn - refundTotal)}</strong>` : ''}
+        </div>
+      `;
+    }
+
+    // ============================================================
+    // Report 4: Collections by Customer (monthly, with RM values)
+    // ============================================================
+    function opsRunCollectionsByCustomerReport() {
+      const ym = opsRpt.month;
+      const [mStart, mEnd] = opsMonthRange(ym);
+      const custMap  = Object.fromEntries(customers.map(c => [c.id, c.name]));
+      const batchMap = Object.fromEntries(batches.map(b => [b.id, b]));
+
+      const monthColl = collections.filter(c => c.collection_date >= mStart && c.collection_date <= mEnd);
+      const byCust = {};
+      monthColl.forEach(c => { (byCust[c.customer_id] = byCust[c.customer_id] || []).push(c); });
+      const custIds = Object.keys(byCust).sort((a, b) => (custMap[a] || a).localeCompare(custMap[b] || b));
+
+      const blocks = custIds.map(cid => {
+        const rows = byCust[cid].sort((a, b) => (a.collection_date || '').localeCompare(b.collection_date || ''));
+        const tQty = rows.reduce((s, c) => s + (Number(c.qty) || 0), 0);
+        const tVal = rows.reduce((s, c) => s + (Number(c.subtotal) || 0), 0);
+        return `
+          <h4>${esc(custMap[cid] || cid)}</h4>
+          <div class="table-wrap"><table class="data-table" data-csv="Collections ${opsMonthLabel(ym)} — ${(custMap[cid] || cid).replace(/"/g, '')}">
+            <thead><tr><th>Date</th><th>Batch</th><th>L3.1 No.</th><th>Type</th>
+              <th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Value</th></tr></thead>
+            <tbody>${rows.map(c => {
+              const bt = batchMap[c.batch_id];
+              return `<tr><td>${fmtDate(c.collection_date)}</td><td>${esc(bt ? (bt.batch_number || c.batch_id) : c.batch_id)}</td>
+                <td>${esc(c.l3_form_no || '—')}</td><td>${c.booking_id ? 'Booking' : 'Walk-in'}</td>
+                <td style="text-align:right;">${fmtNum(c.qty || 0)}</td>
+                <td style="text-align:right;">${formatRM(c.unit_price || 0)}</td>
+                <td style="text-align:right;">${formatRM(c.subtotal || 0)}</td></tr>`;
+            }).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="4">Subtotal (${rows.length})</td>
+              <td style="text-align:right;">${fmtNum(tQty)}</td><td></td>
+              <td style="text-align:right;">${formatRM(tVal)}</td></tr></tfoot>
+          </table></div>`;
+      }).join('');
+
+      const gQty = monthColl.reduce((s, c) => s + (Number(c.qty) || 0), 0);
+      const gVal = monthColl.reduce((s, c) => s + (Number(c.subtotal) || 0), 0);
+
+      document.getElementById('ops-rpt-output').innerHTML = `
+        <h3>Collections by Customer — ${opsMonthLabel(ym)}</h3>
+        ${monthColl.length === 0 ? '<p class="muted">No collections this month.</p>' : `
+          ${blocks}
+          <div class="ops-rpt-grand">Grand total: <strong>${fmtNum(gQty)}</strong> seedlings · <strong>${formatRM(gVal)}</strong> across ${custIds.length} customer${custIds.length === 1 ? '' : 's'}</div>`}
+      `;
+    }
+
+    // ============================================================
+    // Report 5: Outstanding & Liabilities (as-of-now snapshot)
+    // ============================================================
+    function opsRunOutstandingReport() {
+      const custMap  = Object.fromEntries(customers.map(c => [c.id, c.name]));
+      const batchMap = Object.fromEntries(batches.map(b => [b.id, b]));
+
+      // collected qty per booking
+      const collectedByBooking = {};
+      collections.forEach(c => {
+        if (c.booking_id) collectedByBooking[c.booking_id] = (collectedByBooking[c.booking_id] || 0) + (Number(c.qty) || 0);
+      });
+
+      const activeBks = bookings.filter(b => b.status === 'active');
+
+      // Receivables: active bookings with money still owed (cents-safe compare per house rule)
+      const receivables = activeBks.map(b => {
+        const paid = paymentsByBooking[b.id] || 0;
+        const balance = (Number(b.total_amount) || 0) - paid;
+        return { b, paid, balance };
+      }).filter(r => Math.round(r.balance * 100) > 0)
+        .sort((a, b) => b.balance - a.balance);
+
+      // Seedlings owed: active bookings with uncollected qty
+      const owed = activeBks.map(b => {
+        const paid = paymentsByBooking[b.id] || 0;
+        const collected = collectedByBooking[b.id] || 0;
+        const price = Number(b.unit_price) || 0;
+        const entitled = price > 0 ? Math.max(0, Math.floor((paid + 1e-6) / price) - collected) : 0;
+        const uncollected = Math.max(0, (Number(b.booked_qty) || 0) - collected);
+        return { b, collected, entitled, uncollected };
+      }).filter(r => r.uncollected > 0)
+        .sort((a, b) => b.entitled - a.entitled || b.uncollected - a.uncollected);
+
+      // Refunds pending
+      const refundsPending = bookings.filter(b => b.refund_status === 'pending')
+        .sort((a, b) => (Number(b.refund_owed) || 0) - (Number(a.refund_owed) || 0));
+
+      const totalReceivable  = receivables.reduce((s, r) => s + r.balance, 0);
+      const totalEntitled    = owed.reduce((s, r) => s + r.entitled, 0);
+      const totalUncollected = owed.reduce((s, r) => s + r.uncollected, 0);
+      const totalRefunds     = refundsPending.reduce((s, b) => s + (Number(b.refund_owed) || 0), 0);
+
+      const batchLabel = bid => { const bt = batchMap[bid]; return bt ? (bt.batch_number || bid) : bid; };
+
+      document.getElementById('ops-rpt-output').innerHTML = `
+        <h3>Outstanding &amp; Liabilities — as of ${fmtDate(new Date().toISOString().slice(0, 10))}</h3>
+        <div class="ops-rpt-grand" style="margin:8px 0 16px;">
+          Total receivable: <strong>${formatRM(totalReceivable)}</strong> ·
+          Seedlings owed: <strong>${fmtNum(totalUncollected)}</strong> uncollected (<strong>${fmtNum(totalEntitled)}</strong> already paid for) ·
+          Refunds owed: <strong>${formatRM(totalRefunds)}</strong>
+        </div>
+
+        <h4>1. Receivables — customers who owe money</h4>
+        ${receivables.length === 0 ? '<p class="muted">None — all active bookings fully paid.</p>' : `
+          <div class="table-wrap"><table class="data-table" data-csv="Receivables (as of today)">
+            <thead><tr><th>Booking</th><th>Customer</th><th>Batch</th><th style="text-align:right;">Booked Qty</th>
+              <th style="text-align:right;">Total</th><th style="text-align:right;">Paid</th><th style="text-align:right;">Balance Due</th></tr></thead>
+            <tbody>${receivables.map(r => `
+              <tr><td>${esc(r.b.id)}</td><td>${esc(custMap[r.b.customer_id] || r.b.customer_id)}</td>
+                <td>${esc(batchLabel(r.b.batch_id))}</td>
+                <td style="text-align:right;">${fmtNum(r.b.booked_qty || 0)}</td>
+                <td style="text-align:right;">${formatRM(r.b.total_amount || 0)}</td>
+                <td style="text-align:right;">${formatRM(r.paid)}</td>
+                <td style="text-align:right;font-weight:700;color:var(--red);">${formatRM(r.balance)}</td></tr>`).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="6">Total (${receivables.length})</td>
+              <td style="text-align:right;">${formatRM(totalReceivable)}</td></tr></tfoot>
+          </table></div>`}
+
+        <h4>2. Seedlings Owed — paid-for &amp; booked stock not yet collected</h4>
+        ${owed.length === 0 ? '<p class="muted">None — no uncollected bookings.</p>' : `
+          <div class="table-wrap"><table class="data-table" data-csv="Seedlings owed (as of today)">
+            <thead><tr><th>Booking</th><th>Customer</th><th>Batch</th>
+              <th style="text-align:right;">Booked</th><th style="text-align:right;">Collected</th>
+              <th style="text-align:right;">Collectable Now (paid for)</th><th style="text-align:right;">Total Uncollected</th></tr></thead>
+            <tbody>${owed.map(r => `
+              <tr><td>${esc(r.b.id)}</td><td>${esc(custMap[r.b.customer_id] || r.b.customer_id)}</td>
+                <td>${esc(batchLabel(r.b.batch_id))}</td>
+                <td style="text-align:right;">${fmtNum(r.b.booked_qty || 0)}</td>
+                <td style="text-align:right;">${fmtNum(r.collected)}</td>
+                <td style="text-align:right;font-weight:700;">${fmtNum(r.entitled)}</td>
+                <td style="text-align:right;">${fmtNum(r.uncollected)}</td></tr>`).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="5">Total (${owed.length})</td>
+              <td style="text-align:right;">${fmtNum(totalEntitled)}</td>
+              <td style="text-align:right;">${fmtNum(totalUncollected)}</td></tr></tfoot>
+          </table></div>`}
+
+        <h4>3. Refunds Pending — cancelled bookings awaiting payout</h4>
+        ${refundsPending.length === 0 ? '<p class="muted">None.</p>' : `
+          <div class="table-wrap"><table class="data-table" data-csv="Refunds pending (as of today)">
+            <thead><tr><th>Booking</th><th>Customer</th><th>Cancelled On</th><th>Reason</th><th style="text-align:right;">Refund Owed</th></tr></thead>
+            <tbody>${refundsPending.map(b => `
+              <tr><td>${esc(b.id)}</td><td>${esc(custMap[b.customer_id] || b.customer_id)}</td>
+                <td>${b.cancelled_at ? fmtDate(b.cancelled_at.slice(0, 10)) : '—'}</td>
+                <td>${esc(b.cancel_reason || '—')}</td>
+                <td style="text-align:right;font-weight:700;color:var(--red);">${formatRM(b.refund_owed || 0)}</td></tr>`).join('')}
+            </tbody>
+            <tfoot><tr style="font-weight:700;"><td colspan="4">Total (${refundsPending.length})</td>
+              <td style="text-align:right;">${formatRM(totalRefunds)}</td></tr></tfoot>
+          </table></div>`}
+      `;
+    }
+    // === End Reports tab ===
 
     // === Collections tab (Task 3.10) ===
     function renderCollectionsTab() {
