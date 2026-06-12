@@ -83,6 +83,9 @@ Two safe patterns:
 - For `onclick` strings: use `data-*` attributes + event delegation: `<div data-cid="${esc(id)}" onclick="handlerFromEvent(event)">`, then read `event.currentTarget.dataset.cid` in the handler.
 - For attribute values: post-process with `.replace(/"/g, '&quot;')` after `esc()`.
 
+### 7b. `hideLoading(el)` requires the element `showLoading()` returns
+shared.js:286 — `hideLoading()` called with no argument **silently no-ops** and the loading overlay stays on screen forever (UI looks frozen; the content underneath actually rendered). Same silent-no-op family as `closeModal()` without an overlay ID (gotcha #5). Always: `const el = showLoading('...'); try { ... } finally { hideLoading(el); }`. Bit oilpalmsales reports on 2026-06-12 (fix `05bac5e`).
+
 ### 8. `sbMutate` needs a thunk; `sbQuery` accepts the builder directly
 **Asymmetric API in shared.js** — every implementer subagent has tripped on this:
 - `sbQuery(queryPromise, loadingMsg)` — pass the builder/promise directly (re-awaits internally for retry).
