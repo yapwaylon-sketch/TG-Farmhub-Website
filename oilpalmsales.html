@@ -2693,10 +2693,11 @@ async function shareSlip() {
       if (opsRpt.type !== 'outstanding' && !opsRpt.month) { notify('Pick a month first', 'error'); return; }
       // Always recompute from the live database — refresh every dataset a report touches
       // so a report run after a correction (even one made on another device) is current.
-      showLoading('Refreshing data…');
+      // hideLoading REQUIRES the element showLoading returns (no-arg call silently no-ops).
+      const loadingEl = showLoading('Refreshing data…');
       try {
         await Promise.all([loadCustomers(), loadBookings(), loadCollections(), loadPayments(), loadBatches(), loadMidCulls()]);
-      } finally { hideLoading(); }
+      } finally { hideLoading(loadingEl); }
       if (opsRpt.type === 'mpob')        await opsRunMpobReport();
       if (opsRpt.type === 'bookings')    opsRunBookingsReport();
       if (opsRpt.type === 'cash')        opsRunCashReport();
