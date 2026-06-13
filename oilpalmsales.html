@@ -3909,8 +3909,8 @@ async function shareSlip() {
             <td>${i + 1}</td>
             <td><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a>${opsEntityChip(c)}</td>
             <td>${typeBadge}</td>
-            <td>${c.phone ? esc(fmtPhone(c.phone)) : '<span class="muted">—</span>'}</td>
-            <td>${esc(idNo)}</td>
+            <td style="white-space:nowrap;">${c.phone ? esc(fmtPhone(c.phone)) : '<span class="muted">—</span>'}</td>
+            <td style="white-space:nowrap;">${esc(idNo)}</td>
             <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(addrLines.join(', '))}">${addrCell}</td>
             <td style="text-align:right;">${booked.toLocaleString()}</td>
             <td style="text-align:right;">${collected.toLocaleString()}</td>
