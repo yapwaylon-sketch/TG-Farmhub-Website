@@ -1375,8 +1375,11 @@ async function shareSlip() {
     // Netlify function (Netlify env vars) — never in this public source.
     // Failures only warn; they NEVER block or revert a save.
 
-    // POST a payload to the proxy. Never throws to the caller.
-    async function opsTgNotify(payload) {
+    // POST a payload to the proxy. Never throws to the caller. Returns true on
+    // success, false on failure. opts.silent suppresses the auto-toast (used by
+    // the manual "Send to Telegram" button, which shows its own feedback).
+    async function opsTgNotify(payload, opts) {
+      const silent = opts && opts.silent;
       try {
         const res = await fetch('/.netlify/functions/telegram-notify', {
           method: 'POST',
@@ -1389,13 +1392,60 @@ async function shareSlip() {
           console.warn('[ops-tg] notify HTTP ' + res.status + ' ' + detail);
           // Stay silent until the bot is configured (avoids a warning toast on
           // every save before setup). Only surface genuine post-setup failures.
-          if (detail !== 'not configured') {
+          if (!silent && detail !== 'not configured') {
             notify('Telegram notification failed — record still saved', 'warning');
           }
+          return false;
         }
+        return true;
       } catch (e) {
         console.warn('[ops-tg] notify threw:', e);
-        notify('Telegram notification failed — record still saved', 'warning');
+        if (!silent) notify('Telegram notification failed — record still saved', 'warning');
+        return false;
+      }
+    }
+
+    // Shared booking-summary caption builder. `title` is the first-line label.
+    // Returns null if the booking can't be found.
+    function opsBuildBookingCaption(bookingId, title) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) return null;
+      const cust = customers.find(c => c.id === bk.customer_id);
+      const batch = batches.find(b => b.id === bk.batch_id);
+      const variety = batch ? varieties.find(v => v.id === batch.variety_id) : null;
+      const paid = paymentsByBooking[bk.id] || 0;
+      const balance = Math.max(0, Number(bk.total_amount || 0) - paid);
+      return (title || '🌴 New Booking') + ' — ' + bk.id + '\n' +
+        'Customer: ' + ((cust && cust.name) || '—') + '\n' +
+        'Batch: ' + ((batch && batch.batch_number) || bk.batch_id) + (variety ? ' (' + variety.name + ')' : '') + '\n' +
+        'Qty: ' + Number(bk.booked_qty || 0).toLocaleString() + '\n' +
+        'Total: ' + formatRM(bk.total_amount) + ' · Paid: ' + formatRM(paid) + ' · Balance: ' + formatRM(balance);
+    }
+
+    // Manual "Send to Telegram" button on the booking detail page. Confirms
+    // first (outward-facing — posts to a shared group), then re-sends the real
+    // slip image with explicit success/failure feedback.
+    function opsSendBookingTelegram(bookingId) {
+      bookingId = bookingId || selectedBookingId;
+      if (!bookingId) { notify('No booking selected', 'error'); return; }
+      confirmAction('Send to Telegram', 'Send this booking slip image to the Telegram group?', () => opsDoSendBookingTelegram(bookingId), false);
+    }
+    async function opsDoSendBookingTelegram(bookingId) {
+      const el = showLoading('Sending booking slip to Telegram…');
+      try {
+        const caption = opsBuildBookingCaption(bookingId, '📤 Booking (re-sent)');
+        if (!caption) { notify('Booking not found', 'error'); return; }
+        const png = await opsCaptureSlipPng(bookingId);
+        const ok = png
+          ? await opsTgNotify({ kind: 'photo', imageBase64: png, caption: caption }, { silent: true })
+          : await opsTgNotify({ kind: 'message', text: caption }, { silent: true });
+        if (ok) notify(png ? 'Booking slip sent to Telegram' : 'Sent to Telegram as text (image capture failed)', 'success');
+        else    notify('Telegram send failed — check connection and try again', 'error');
+      } catch (e) {
+        console.warn('[ops-tg] manual booking send failed:', e);
+        notify('Telegram send failed', 'error');
+      } finally {
+        hideLoading(el);
       }
     }
 
@@ -1435,19 +1485,8 @@ async function shareSlip() {
     // Booking → send the slip PNG (with a summary caption). Call AFTER state reload.
     async function opsNotifyBookingTelegram(bookingId) {
       try {
-        const bk = bookings.find(x => x.id === bookingId);
-        if (!bk) return;
-        const cust = customers.find(c => c.id === bk.customer_id);
-        const batch = batches.find(b => b.id === bk.batch_id);
-        const variety = batch ? varieties.find(v => v.id === batch.variety_id) : null;
-        const paid = paymentsByBooking[bk.id] || 0;
-        const balance = Math.max(0, Number(bk.total_amount || 0) - paid);
-        const caption =
-          '🌴 New Booking — ' + bk.id + '\n' +
-          'Customer: ' + ((cust && cust.name) || '—') + '\n' +
-          'Batch: ' + ((batch && batch.batch_number) || bk.batch_id) + (variety ? ' (' + variety.name + ')' : '') + '\n' +
-          'Qty: ' + Number(bk.booked_qty || 0).toLocaleString() + '\n' +
-          'Total: ' + formatRM(bk.total_amount) + ' · Paid: ' + formatRM(paid) + ' · Balance: ' + formatRM(balance);
+        const caption = opsBuildBookingCaption(bookingId, '🌴 New Booking');
+        if (!caption) return;
         const png = await opsCaptureSlipPng(bookingId);
         if (png) opsTgNotify({ kind: 'photo', imageBase64: png, caption: caption });
         else     opsTgNotify({ kind: 'message', text: caption });  // graceful fallback to text
@@ -2353,6 +2392,7 @@ async function shareSlip() {
         showCancel         ? `<button class="btn btn-outline" onclick="opsOpenCancelModal('${esc(b.id)}')" style="border-color:var(--red);color:var(--red);">Cancel Booking</button>` : '',
         showMarkRefundPaid ? `<button class="btn btn-primary" onclick="opsOpenMarkRefundPaidModal('${esc(b.id)}')">Mark Refund Paid</button>` : '',
         showPrint          ? `<button class="btn btn-outline" onclick="opsOpenBookingSlip('${esc(b.id)}')">Print Booking Slip</button>` : '',
+        showPrint          ? `<button class="btn btn-outline" onclick="opsSendBookingTelegram('${esc(b.id)}')">📤 Send to Telegram</button>` : '',
         cust               ? `<button class="btn btn-outline" onclick="opsOpenCustomerModal('${esc(cust.id)}')">Edit Customer</button>` : ''
       ].filter(Boolean).join(' ');
 
