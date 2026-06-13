@@ -3907,7 +3907,7 @@ async function shareSlip() {
         return `
           <tr>
             <td>${i + 1}</td>
-            <td><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a>${opsEntityChip(c)}</td>
+            <td style="white-space:nowrap;"><a href="javascript:void(0)" onclick="opsOpenCustomerDetail('${c.id}')" style="color:#6B4C8A;font-weight:600;text-decoration:none;">${esc(c.name)}</a>${opsEntityChip(c)}</td>
             <td>${typeBadge}</td>
             <td style="white-space:nowrap;">${c.phone ? esc(fmtPhone(c.phone)) : '<span class="muted">—</span>'}</td>
             <td style="white-space:nowrap;">${esc(idNo)}</td>
