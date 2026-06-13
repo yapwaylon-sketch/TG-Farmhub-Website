@@ -451,7 +451,7 @@
       const t = (c && c.entity_type) === 'company' ? 'COMP' : 'IND';
       const bg = t === 'COMP' ? 'rgba(107,76,138,0.15)' : 'rgba(212,175,55,0.18)';
       const col = t === 'COMP' ? '#6B4C8A' : '#8A6D1F';
-      return `<span style="display:inline-block;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:0.5px;background:${bg};color:${col};border-radius:2px;margin-left:6px;vertical-align:middle;">${t}</span>`;
+      return `<span style="display:inline-block;white-space:nowrap;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:0.5px;background:${bg};color:${col};border-radius:2px;margin-left:6px;vertical-align:middle;">${t}</span>`;
     }
 
     // === Walk-in Sale modal (Task 3.9) ===
