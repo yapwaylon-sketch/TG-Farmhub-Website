@@ -13,6 +13,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/css/intlTelInput.css" />
   <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.7/build/js/intlTelInputWithUtils.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <!-- html2canvas — used to render the booking slip to a PNG for the Telegram notification
+       (and shared with the booking-slip popup's existing WhatsApp share). -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="shared.js?v=2"></script>
 </head>
 <body>
@@ -787,6 +790,10 @@
       else if (currentTab === 'bookings')    renderBookingsTab();
 
       notify('Walk-in sale recorded — L3.1 ' + l3, 'success');
+
+      // Best-effort Telegram notification — never blocks the save. Walk-in: no
+      // booking, balance = 0. `customers` was reloaded above so the name resolves.
+      opsNotifyCollectionTelegram({ collectionId, bookingId: null, batchId, qty, customerId, walkin: true });
     }
     // === End Walk-in Sale modal ===
 
@@ -1174,6 +1181,9 @@
         else if (currentTab === 'summary')  renderSummaryTab();
         else if (currentTab === 'customers') renderCustomersTab();
         notify('Booking ' + bookingId + ' created', 'success');
+
+        // Best-effort Telegram notification (slip PNG) — never blocks the save.
+        opsNotifyBookingTelegram(bookingId);
       };
 
       // Cap override prompt — confirmAction is callback-based in this codebase
@@ -1230,9 +1240,13 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
 .no-print button { padding: 8px 16px; margin: 0 4px; cursor: pointer; font-size: 11pt; }
 `;
 
-    function opsOpenBookingSlip(bookingId) {
+    // Builds the inner `#slip-content` markup for a booking. Shared by the
+    // Print/Share popup (opsOpenBookingSlip) and the silent PNG capture used
+    // for the Telegram notification (opsCaptureSlipPng). Returns null if the
+    // booking can't be found.
+    function opsBuildSlipHtml(bookingId) {
       const bk = bookings.find(x => x.id === bookingId);
-      if (!bk) { notify('Booking not found', 'error'); return; }
+      if (!bk) return null;
       const cust = customers.find(c => c.id === bk.customer_id);
       const batch = batches.find(b => b.id === bk.batch_id);
       const variety = varieties.find(v => v.id === (batch && batch.variety_id));
@@ -1240,16 +1254,7 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
       const balance = Math.max(0, Number(bk.total_amount) - paid);
       const readyDate = batch && batch.date_planted ? addMonths(batch.date_planted, 10) : null;
 
-      const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Booking ${esc(bk.id)} — ${esc((cust && cust.name) || '')}</title>
-<style>${SLIP_CSS}</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
-</head><body>
-<div class="no-print">
-  <button onclick="window.print()">🖨️ Print</button>
-  <button onclick="shareSlip()">📤 Share via WhatsApp</button>
-</div>
-<div id="slip-content">
+      return `<div id="slip-content">
   <div class="bs-letterhead">
     <h1>TG Agribusiness</h1>
     <div class="addr">Lot 174, Block 9, Lambir Land District, 98000 Miri, Sarawak</div>
@@ -1317,7 +1322,24 @@ body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; background:
     <div class="bs-sig"><div class="line">Authorized By</div><div style="margin-top:8px">Date: ____________</div></div>
   </div>
   <div class="bs-footer">This is a computer-generated document.</div>
+</div>`;
+    }
+
+    function opsOpenBookingSlip(bookingId) {
+      const bk = bookings.find(x => x.id === bookingId);
+      if (!bk) { notify('Booking not found', 'error'); return; }
+      const cust = customers.find(c => c.id === bk.customer_id);
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Booking ${esc(bk.id)} — ${esc((cust && cust.name) || '')}</title>
+<style>${SLIP_CSS}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
+</head><body>
+<div class="no-print">
+  <button onclick="window.print()">🖨️ Print</button>
+  <button onclick="shareSlip()">📤 Share via WhatsApp</button>
 </div>
+${opsBuildSlipHtml(bookingId)}
 <script>
 async function shareSlip() {
   try {
@@ -1346,6 +1368,127 @@ async function shareSlip() {
       if (!w) { notify('Popup blocked. Allow popups to print.', 'error'); return; }
       w.document.write(html);
       w.document.close();
+    }
+
+    // === Telegram notifications (bookings + collections) ===
+    // Fire-and-forget. The token lives server-side in the telegram-notify
+    // Netlify function (Netlify env vars) — never in this public source.
+    // Failures only warn; they NEVER block or revert a save.
+
+    // POST a payload to the proxy. Never throws to the caller.
+    async function opsTgNotify(payload) {
+      try {
+        const res = await fetch('/.netlify/functions/telegram-notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          let detail = '';
+          try { detail = (await res.json()).error || ''; } catch (e) {}
+          console.warn('[ops-tg] notify HTTP ' + res.status + ' ' + detail);
+          // Stay silent until the bot is configured (avoids a warning toast on
+          // every save before setup). Only surface genuine post-setup failures.
+          if (detail !== 'not configured') {
+            notify('Telegram notification failed — record still saved', 'warning');
+          }
+        }
+      } catch (e) {
+        console.warn('[ops-tg] notify threw:', e);
+        notify('Telegram notification failed — record still saved', 'warning');
+      }
+    }
+
+    // Render the booking slip to a PNG (base64, no data-URI prefix) using a
+    // hidden off-screen iframe so SLIP_CSS (which has bare `body`/`@page` rules)
+    // can't bleed into the main page. Returns null on any failure.
+    async function opsCaptureSlipPng(bookingId) {
+      const inner = opsBuildSlipHtml(bookingId);
+      if (!inner) return null;
+      if (typeof html2canvas === 'undefined') {
+        console.warn('[ops-tg] html2canvas not loaded — skipping PNG capture');
+        return null;
+      }
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;';
+      document.body.appendChild(iframe);
+      try {
+        const doc = iframe.contentDocument;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' + SLIP_CSS + '</style></head><body>' + inner + '</body></html>');
+        doc.close();
+        // Let the iframe lay out (Arial system font — no web-font race).
+        await new Promise(r => setTimeout(r, 150));
+        const target = doc.getElementById('slip-content') || doc.body;
+        const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#ffffff', windowWidth: 794 });
+        const dataUrl = canvas.toDataURL('image/png');
+        return (dataUrl.split(',')[1]) || null;
+      } catch (e) {
+        console.warn('[ops-tg] slip capture failed:', e);
+        return null;
+      } finally {
+        iframe.remove();
+      }
+    }
+
+    // Booking → send the slip PNG (with a summary caption). Call AFTER state reload.
+    async function opsNotifyBookingTelegram(bookingId) {
+      try {
+        const bk = bookings.find(x => x.id === bookingId);
+        if (!bk) return;
+        const cust = customers.find(c => c.id === bk.customer_id);
+        const batch = batches.find(b => b.id === bk.batch_id);
+        const variety = batch ? varieties.find(v => v.id === batch.variety_id) : null;
+        const paid = paymentsByBooking[bk.id] || 0;
+        const balance = Math.max(0, Number(bk.total_amount || 0) - paid);
+        const caption =
+          '🌴 New Booking — ' + bk.id + '\n' +
+          'Customer: ' + ((cust && cust.name) || '—') + '\n' +
+          'Batch: ' + ((batch && batch.batch_number) || bk.batch_id) + (variety ? ' (' + variety.name + ')' : '') + '\n' +
+          'Qty: ' + Number(bk.booked_qty || 0).toLocaleString() + '\n' +
+          'Total: ' + formatRM(bk.total_amount) + ' · Paid: ' + formatRM(paid) + ' · Balance: ' + formatRM(balance);
+        const png = await opsCaptureSlipPng(bookingId);
+        if (png) opsTgNotify({ kind: 'photo', imageBase64: png, caption: caption });
+        else     opsTgNotify({ kind: 'message', text: caption });  // graceful fallback to text
+      } catch (e) {
+        console.warn('[ops-tg] booking notify failed:', e);
+      }
+    }
+
+    // Collection → send a text summary. Call AFTER collections state is reloaded
+    // (so the balance reflects the just-inserted row). walkin=true forces
+    // "Walk-in" booking label + 0 balance.
+    function opsNotifyCollectionTelegram(opts) {
+      try {
+        const o = opts || {};
+        const batch = batches.find(b => b.id === o.batchId);
+        const variety = batch ? varieties.find(v => v.id === batch.variety_id) : null;
+        const cust = customers.find(c => c.id === o.customerId);
+        let bookingLabel = 'Walk-in';
+        let balanceToCollect = 0;
+        if (!o.walkin && o.bookingId) {
+          bookingLabel = o.bookingId;
+          const bk = bookings.find(x => x.id === o.bookingId);
+          if (bk) {
+            const booked = Number(bk.booked_qty || 0);
+            const collectedSoFar = collections
+              .filter(c => c.booking_id === o.bookingId)
+              .reduce((s, c) => s + Number(c.qty || 0), 0);
+            balanceToCollect = Math.max(0, booked - collectedSoFar);
+          }
+        }
+        const text =
+          '🌴 New Collection — ' + o.collectionId + '\n\n' +
+          'Booking No: ' + bookingLabel + '\n' +
+          'Batch: ' + ((batch && batch.batch_number) || o.batchId || '—') + (variety ? ' (' + variety.name + ')' : '') + '\n' +
+          'Name: ' + ((cust && cust.name) || '—') + '\n' +
+          'Collected pokok: ' + Number(o.qty || 0).toLocaleString() + '\n' +
+          'Balance to collect: ' + Number(balanceToCollect).toLocaleString();
+        opsTgNotify({ kind: 'message', text: text });
+      } catch (e) {
+        console.warn('[ops-tg] collection notify failed:', e);
+      }
     }
 
     // === Reassign Batch modal (Task 3.8) ===
@@ -2139,6 +2282,10 @@ async function shareSlip() {
       else if (currentTab === 'collections') renderCollectionsTab();
 
       notify('Collection recorded — L3.1 ' + l3, 'success');
+
+      // Best-effort Telegram notification — never blocks the save.
+      // `collections` was reloaded above, so the balance reflects this pickup.
+      opsNotifyCollectionTelegram({ collectionId, bookingId, batchId: bk.batch_id, qty, customerId: bk.customer_id, walkin: false });
     }
     // === End Record Collection modal ===
 
