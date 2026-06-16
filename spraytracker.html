@@ -381,7 +381,7 @@ function navigateTo(page) {
 }
 
 async function renderCurrentPage() {
-  if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadFertilizerApplications(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
+  if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
   else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
   else if(currentPage === 'products') { await Promise.all([loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); renderProductsPage(); renderEnableProductsSection(); renderAIDoseSettings(); renderOverridesSection(); }
@@ -701,9 +701,10 @@ function renderSummary() {
   });
 
   const fertLatest = {};
-  fertilizerApplications.forEach(fa => {
-    const cur = fertLatest[fa.block_id];
-    if(!cur || (fa.date_applied||'') > (cur.date_applied||'')) fertLatest[fa.block_id] = fa;
+  jobs.forEach(j => {
+    if(j.job_type !== 'Fertilizer' || j.status !== 'Completed' || !j.completion_date) return;
+    const cur = fertLatest[j.block_id];
+    if(!cur || (j.completion_date||'') > (cur.completion_date||'')) fertLatest[j.block_id] = j;
   });
 
   summaryCellData = {};
@@ -742,13 +743,13 @@ function renderSummary() {
         let dateStr = '—', daysStr = '—', hasData = false;
         const cellId = block.id + '_' + c.key;
         if(c.key === 'fertilizer') {
-          const fa = fertLatest[block.id];
-          if(fa && fa.date_applied) {
+          const fj = fertLatest[block.id];
+          if(fj && fj.completion_date) {
             hasData = true;
-            dateStr = fmtDateShort(fa.date_applied);
-            const d = daysDiff(fa.date_applied, today);
+            dateStr = fmtDateShort(fj.completion_date);
+            const d = daysDiff(fj.completion_date, today);
             daysStr = d != null ? d + 'd' : '—';
-            summaryCellData[cellId] = { kind:'fert', fa };
+            summaryCellData[cellId] = { kind:'fert', job:fj };
           }
         } else {
           const log = sprayLatest[block.id + '_' + c.key];
@@ -793,17 +794,17 @@ function summaryShowPopup(event) {
   const today = todayStr();
   let html = '';
   if(data.kind === 'fert') {
-    const fa = data.fa;
-    const b = getBlock(fa.block_id);
-    const inv = getInventoryProduct(fa.inventory_product_id);
-    const d = daysDiff(fa.date_applied, today);
+    const fj = data.job;
+    const b = getBlock(fj.block_id);
+    const inv = getInventoryProduct(fj.inventory_product_id);
+    const d = daysDiff(fj.completion_date, today);
     html =
       `<div style="font-weight:700;color:var(--green-light);">Fertilizer — ${esc(b?b.block_name:'—')}</div>` +
-      `<div style="color:var(--text-muted);">Applied ${fmtDate(fa.date_applied)} · ${d!=null?d+' days ago':'—'}</div>` +
+      `<div style="color:var(--text-muted);">Applied ${fmtDate(fj.completion_date)} · ${d!=null?d+' days ago':'—'}</div>` +
       `<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">` +
       `<div><b>Product:</b> ${esc(inv?inv.name:'—')}</div>` +
-      `<div><b>Quantity:</b> ${fa.quantity!=null?esc(fmtNum(fa.quantity)+' '+(fa.quantity_unit||'')):'—'}</div>` +
-      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fa.worker_name||'—')}</div>`;
+      `<div><b>Quantity:</b> ${fj.fertilizer_quantity!=null?esc(fmtNum(fj.fertilizer_quantity)+' '+(fj.fertilizer_quantity_unit||'')):'—'}</div>` +
+      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fj.worker_name||'—')}</div>`;
   } else {
     const log = data.log;
     const prod = getProduct(log.product_id);
