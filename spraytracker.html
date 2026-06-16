@@ -333,13 +333,14 @@ let summaryTypeFilter = 'all'; // 'all' | 'fungicide' | 'pesticide' | ...
 let summaryProductFilter = 'all'; // 'all' or a pnd_products.id (Level 2 drill-in)
 let summarySortDir = 'asc'; // 'asc' (oldest first, default) | 'desc'
 const PRODUCT_TYPES = [
-  { key: 'all',       label: 'All' },
-  { key: 'fungicide', label: 'Fungicide' },
-  { key: 'pesticide', label: 'Pesticide' },
-  { key: 'herbicide', label: 'Herbicide' },
-  { key: 'pgr',       label: 'PGR' },
-  { key: 'adjuvant',  label: 'Adjuvant' },
-  { key: 'carbide',   label: 'Carbide' },
+  { key: 'all',              label: 'All' },
+  { key: 'fungicide',        label: 'Fungicide' },
+  { key: 'pesticide',        label: 'Pesticide' },
+  { key: 'foliar_fertilizer',label: 'Foliar Fertilizer' },
+  { key: 'herbicide',        label: 'Herbicide' },
+  { key: 'pgr',              label: 'PGR' },
+  { key: 'adjuvant',         label: 'Adjuvant' },
+  { key: 'carbide',          label: 'Carbide' },
 ];
 function summaryStorageKey() { return 'tg_spray_watchlist_' + (typeof getCompanyId === 'function' ? getCompanyId() : 'default'); }
 function summaryTypeFilterKey() { return 'tg_spray_type_filter_' + (typeof getCompanyId === 'function' ? getCompanyId() : 'default'); }
@@ -3032,7 +3033,7 @@ async function createInventoryProductAndLink(ingredientId) {
   // Map spray product_type to inventory category
   let category = 'Other';
   if(sprayProduct) {
-    const typeMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'pgr': 'PGR', 'adjuvant': 'Adjuvant' };
+    const typeMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'foliar_fertilizer': 'Foliar Fertilizer', 'pgr': 'PGR', 'adjuvant': 'Adjuvant' };
     category = typeMap[(sprayProduct.product_type||'').toLowerCase()] || 'Other';
   }
 
@@ -3226,7 +3227,7 @@ function renderProductsPage() {
     const pName = inv ? inv.name : p.product_name;
     const ai = inv ? (inv.active_ingredient || '—') : getProductIngredients(p.id).map(i => i.name).join(', ') || '—';
     const formulation = inv ? (inv.formulation || '—') : (p.pnd_formulations ? p.pnd_formulations.name : '—');
-    const ptMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'pgr': 'PGR', 'adjuvant': 'Adjuvant', 'carbide': 'Carbide' };
+    const ptMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'foliar_fertilizer': 'Foliar Fertilizer', 'pgr': 'PGR', 'adjuvant': 'Adjuvant', 'carbide': 'Carbide' };
     const category = inv ? (inv.category || '—') : (ptMap[p.product_type] || p.product_type || '—');
     const packaging = inv ? ((inv.pack_size || '') + (inv.pack_unit || '') + (inv.pack_type ? '/' + inv.pack_type : '')) : (p.packaging_size != null ? p.packaging_size + (p.packaging_unit||'') + '/' + (p.packaging_type||'') : '—');
     const stock = inv ? fmtNum(parseFloat(inv.current_stock) || 0) + ' ' + esc(inv.pack_unit || '') : '—';
@@ -3339,7 +3340,7 @@ async function saveSprayConfig(productId) {
 async function migrateToInventory(pndProductId) {
   const p = products.find(x => x.id === pndProductId);
   if(!p) return;
-  const categoryMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'pgr': 'PGR', 'adjuvant': 'Adjuvant', 'carbide': 'Carbide' };
+  const categoryMap = { 'fungicide': 'Fungicide', 'pesticide': 'Pesticide', 'herbicide': 'Herbicide', 'foliar_fertilizer': 'Foliar Fertilizer', 'pgr': 'PGR', 'adjuvant': 'Adjuvant', 'carbide': 'Carbide' };
   const category = categoryMap[p.product_type] || 'Other';
   const ai = getProductIngredients(p.id).map(i => i.name).join(', ');
   const formulation = p.pnd_formulations ? p.pnd_formulations.name : '';
@@ -3388,7 +3389,7 @@ async function migrateAllToInventory() {
 function renderEnableProductsSection() {
   const container = document.getElementById('enable-products-container');
   if(!container) return;
-  const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'PGR', 'Adjuvant', 'Carbide'];
+  const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'Foliar Fertilizer', 'PGR', 'Adjuvant', 'Carbide'];
   const linkedInvIds = products.map(p => p.inventory_product_id).filter(Boolean);
   const available = inventoryProducts.filter(ip => !ip.archived && sprayCategories.includes(ip.category) && !linkedInvIds.includes(ip.id))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''));
@@ -3413,7 +3414,7 @@ async function enableForSpraying(invProductId) {
   const ip = getInventoryProduct(invProductId);
   if(!ip) return;
   // Determine product_type from inventory category
-  const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'PGR': 'pgr', 'Adjuvant': 'adjuvant', 'Carbide': 'carbide' };
+  const typeMap = { 'Fungicide': 'fungicide', 'Pesticide': 'pesticide', 'Herbicide': 'herbicide', 'Foliar Fertilizer': 'foliar_fertilizer', 'PGR': 'pgr', 'Adjuvant': 'adjuvant', 'Carbide': 'carbide' };
   const productType = typeMap[ip.category] || 'pesticide';
   const data = {
     product_name: ip.name, product_type: productType, inventory_product_id: ip.id,
@@ -3528,7 +3529,7 @@ function openEditProductModal(id) {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-field" style="margin:0;"><label>Interval (days)</label><input id="ep-interval" type="number" value="${p.default_interval_days??""}" placeholder="—" style="width:100%;"></div>
-            <div class="form-field" style="margin:0;"><label>Type</label><div style="padding:8px 0;color:var(--text-muted);font-size:13px;">${{'fungicide':'Fungicide','pesticide':'Pesticide','herbicide':'Herbicide','pgr':'PGR','adjuvant':'Adjuvant','carbide':'Carbide'}[p.product_type]||p.product_type||'—'}</div></div>
+            <div class="form-field" style="margin:0;"><label>Type</label><div style="padding:8px 0;color:var(--text-muted);font-size:13px;">${{'fungicide':'Fungicide','pesticide':'Pesticide','herbicide':'Herbicide','foliar_fertilizer':'Foliar Fertilizer','pgr':'PGR','adjuvant':'Adjuvant','carbide':'Carbide'}[p.product_type]||p.product_type||'—'}</div></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px;">
             <div class="form-field" style="margin:0;"><label>Dose Amount</label><input id="ep-dose-amt" type="number" step="0.001" value="${p.default_dose_amount??""}" placeholder="amt" style="width:100%;"></div>
