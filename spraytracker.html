@@ -86,40 +86,22 @@
 <div id="page-summary" class="page active">
   <div class="print-header"><h2>TG Agro Fruits Sdn Bhd</h2><p>Spray Summary Report — Generated <span class="print-date"></span></p></div>
   <div class="page-header">
-    <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Monitored products and spray status</div></div>
+    <div><div class="page-title">Spray Summary</div><div class="page-subtitle">Last application date + days elapsed, per block</div></div>
   </div>
-  <div id="summary-cards" class="cards-grid"></div>
 
-  <!-- Type filter pills -->
-  <div id="summary-type-pills" style="display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 8px;"></div>
-
-  <!-- Product sub-pills (shown when a specific type is selected) -->
-  <div id="summary-product-pills" style="display:none;gap:6px;flex-wrap:wrap;margin:0 0 10px 0;padding:8px 10px;background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:8px;"></div>
-
-  <!-- Watchlist bar -->
-  <div id="summary-watchlist-bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;">
-    <div id="summary-watchlist-count" style="font-size:12px;color:var(--text-muted);font-weight:600;">Monitoring 0 products</div>
-    <div id="summary-watchlist-chips" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;"></div>
-    <div style="display:flex;gap:6px;margin-left:auto;">
-      <button class="btn btn-primary btn-sm" onclick="openAddToMonitoringModal()" style="font-size:11px;padding:5px 10px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add to Monitoring
-      </button>
-      <button class="btn btn-outline btn-sm" id="summary-clear-watchlist-btn" onclick="clearWatchlist()" style="font-size:11px;padding:5px 10px;display:none;">Clear All</button>
+  <!-- Filters: status + block search -->
+  <div id="summary-filter-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;color:var(--text-muted);">Status</label>
+      <select id="summary-status-filter" onchange="summaryStatusFilter=this.value;renderSummary();" style="font-size:12px;min-width:130px;"></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;color:var(--text-muted);">Search block</label>
+      <input type="text" id="summary-search" oninput="summarySearchInput(this.value)" placeholder="Block name…" style="font-size:12px;min-width:150px;padding:5px 8px;">
     </div>
   </div>
 
-  <!-- Status filter (moved below watchlist) -->
-  <div id="summary-filter-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-    <div style="margin-left:auto;">
-      <select id="summary-status-filter" onchange="summaryStatusFilter=this.value;renderSummary();" style="font-size:11px;min-width:130px;">
-        <option value="">All Statuses</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- Sections container (one per watched AI combo) -->
-  <div id="summary-sections"></div>
+  <div id="summary-matrix"></div>
 </div>
 
 <!-- ===== ADD TO MONITORING MODAL ===== -->
@@ -346,6 +328,13 @@ let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
 let inventoryProducts=[], inventoryTransactions=[];
 let fertilizerApplications=[];
 let summaryStatusFilter = '';
+let summarySearch = '';
+let _summarySearchTO = null;
+function summarySearchInput(v) {
+  summarySearch = v;
+  if(_summarySearchTO) clearTimeout(_summarySearchTO);
+  _summarySearchTO = setTimeout(renderSummary, 200);
+}
 let summaryWatchlist = []; // array of pnd_products.id
 let summaryTypeFilter = 'all'; // 'all' | 'fungicide' | 'pesticide' | ...
 let summaryProductFilter = 'all'; // 'all' or a pnd_products.id (Level 2 drill-in)
@@ -731,114 +720,189 @@ function aiCanonicalUnit(combo) {
   return { family, unit, mixed: false };
 }
 
+// Matrix columns — first three map to pnd_products.product_type; 'fertilizer' = granular log.
+const SUMMARY_COLS = [
+  { key:'fungicide',         label:'Fungicide',        bg:'rgba(74,124,63,0.12)' },
+  { key:'pesticide',         label:'Pesticide',        bg:'rgba(212,175,55,0.12)' },
+  { key:'foliar_fertilizer', label:'Foliar Fertilizer',bg:'rgba(80,140,200,0.12)' },
+  { key:'fertilizer',        label:'Fertilizer',       bg:'rgba(150,110,70,0.14)' },
+];
+let summaryCellData = {}; // `${block_id}_${colKey}` -> popup payload
+
 function renderSummary() {
-  pruneWatchlist();
+  const activeBlocks = blocks.filter(b => b.is_active);
+  const today = todayStr();
 
-  // Type pills — resets product filter when changed
-  document.getElementById('summary-type-pills').innerHTML = PRODUCT_TYPES.map(t =>
-    `<button class="sum-tab${summaryTypeFilter===t.key?' active':''}" onclick="onSummaryTypeClick('${t.key}')">${esc(t.label)}</button>`
-  ).join('');
-
-  // Watchlist bar
-  const watchedProducts = summaryWatchlist.map(id => products.find(p => p.id === id)).filter(Boolean);
-  document.getElementById('summary-watchlist-count').textContent = 'Monitoring ' + watchedProducts.length + ' product' + (watchedProducts.length===1?'':'s');
-  document.getElementById('summary-clear-watchlist-btn').style.display = watchedProducts.length ? '' : 'none';
-  document.getElementById('summary-watchlist-chips').innerHTML = watchedProducts.map(p =>
-    `<span style="background:rgba(74,124,63,0.2);color:#8fcf80;border:1px solid rgba(74,124,63,0.35);border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
-      ${esc(p.product_name)}
-      <button onclick="removeFromWatchlist('${p.id}')" title="Remove from monitoring" style="background:none;border:none;color:#8fcf80;cursor:pointer;font-size:14px;line-height:1;padding:0;">&times;</button>
-    </span>`
-  ).join('');
-
-  // Watched products passing the type filter
-  const visibleWatchedProducts = watchedProducts.filter(p =>
-    summaryTypeFilter === 'all' || (p.product_type||'').toLowerCase() === summaryTypeFilter
-  );
-  const visibleWatchedProductIds = visibleWatchedProducts.map(p => p.id);
-
-  // Sub-pill row (only when a specific type is picked — not "All")
-  const subPillEl = document.getElementById('summary-product-pills');
-  if (summaryTypeFilter !== 'all' && visibleWatchedProducts.length) {
-    subPillEl.style.display = 'flex';
-    const typeLabel = (PRODUCT_TYPES.find(t => t.key === summaryTypeFilter) || {}).label || '';
-    subPillEl.innerHTML =
-      `<button class="sum-tab${summaryProductFilter==='all'?' active':''}" onclick="onSummaryProductClick('all')">All ${esc(typeLabel)}s</button>` +
-      visibleWatchedProducts
-        .sort((a,b) => (a.product_name||'').localeCompare(b.product_name||''))
-        .map(p => `<button class="sum-tab${summaryProductFilter===p.id?' active':''}" onclick="onSummaryProductClick('${p.id}')">${esc(p.product_name)}</button>`)
-        .join('');
-  } else {
-    subPillEl.style.display = 'none';
-    subPillEl.innerHTML = '';
-    if (summaryTypeFilter === 'all') summaryProductFilter = 'all';
+  const filterEl = document.getElementById('summary-status-filter');
+  if(filterEl) {
+    const uniqueStatuses = [...new Set(activeBlocks.map(b => {
+      const bc = getBlockCrop(b.id); return bc ? getCropStatusName(bc.status_id) : '—';
+    }))].sort();
+    filterEl.innerHTML = '<option value="">All Statuses</option>' +
+      uniqueStatuses.map(s => `<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
   }
 
-  const activeBlocks = blocks.filter(b=>b.is_active);
-  const combos = getAICombosForProducts(visibleWatchedProductIds);
-  const today = todayStr();
-  const comboMap = {};
-  latestSpraysByAI.forEach(ls => { comboMap[ls.block_id+"_"+ls.ai_combo_key] = ls; });
-
-  // Overview cards — count block × visible-watched-product combos
-  let overdue=0, dueSoon=0, allClear=0, noData=0;
-  activeBlocks.forEach(b => {
-    combos.forEach(c => {
-      const ls = comboMap[b.id+"_"+c.key];
-      if(!ls || !ls.next_spray_date) { noData++; return; }
-      const dl = daysDiff(today, ls.next_spray_date);
-      if(dl<0) overdue++;
-      else if(dl<=7) dueSoon++;
-      else allClear++;
-    });
+  const sprayCols = ['fungicide','pesticide','foliar_fertilizer'];
+  const sprayLatest = {};
+  sprayLogs.forEach(log => {
+    const prod = getProduct(log.product_id);
+    if(!prod) return;
+    const type = (prod.product_type||'').toLowerCase();
+    if(!sprayCols.includes(type)) return;
+    const k = log.block_id + '_' + type;
+    const cur = sprayLatest[k];
+    if(!cur || (log.date_completed||'') > (cur.date_completed||'')) sprayLatest[k] = log;
   });
 
-  document.getElementById("summary-cards").innerHTML = `
-    <div class="summary-card"><div class="sc-label">Total Blocks</div><div class="sc-value" style="color:var(--white);">${activeBlocks.length}</div><div class="sc-sub">Active blocks</div></div>
-    <div class="summary-card" style="background:rgba(232,96,96,0.08);border-color:rgba(232,96,96,0.3);"><div class="sc-label">Overdue</div><div class="sc-value" style="color:var(--red);">${overdue}</div><div class="sc-sub">Past next spray date</div></div>
-    <div class="summary-card" style="background:rgba(232,160,32,0.08);border-color:rgba(232,160,32,0.3);"><div class="sc-label">Due This Week</div><div class="sc-value" style="color:var(--gold);">${dueSoon}</div><div class="sc-sub">Within 7 days</div></div>
-    <div class="summary-card" style="background:rgba(74,124,63,0.08);border-color:rgba(74,124,63,0.3);"><div class="sc-label">All Clear</div><div class="sc-value" style="color:var(--green-light);">${allClear}</div><div class="sc-sub">8+ days remaining</div></div>
-    <div class="summary-card" style="background:rgba(128,128,128,0.08);border-color:rgba(128,128,128,0.3);"><div class="sc-label">No Data</div><div class="sc-value" style="color:var(--text-dim);">${noData}</div><div class="sc-sub">No spray history</div></div>`;
+  const fertLatest = {};
+  fertilizerApplications.forEach(fa => {
+    const cur = fertLatest[fa.block_id];
+    if(!cur || (fa.date_applied||'') > (cur.date_applied||'')) fertLatest[fa.block_id] = fa;
+  });
 
-  // Status filter dropdown
-  const filterEl = document.getElementById("summary-status-filter");
-  const uniqueStatuses = [...new Set(activeBlocks.map(b => {
+  summaryCellData = {};
+  let rowBlocks = activeBlocks.map(b => {
     const bc = getBlockCrop(b.id);
-    return bc ? getCropStatusName(bc.status_id) : '—';
-  }))].sort();
-  filterEl.innerHTML = '<option value="">All Statuses</option>' + uniqueStatuses.map(s => `<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
-
-  // Empty state checks
-  const sectionsEl = document.getElementById("summary-sections");
-  if (!watchedProducts.length) {
-    sectionsEl.innerHTML = `<div class="empty-state" style="padding:40px 20px;text-align:center;">
-      <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px;">No products being monitored.</div>
-      <div style="font-size:12px;color:var(--text-dim);">Click <strong>Add to Monitoring</strong> above to get started.</div>
-    </div>`;
-    return;
+    return { block:b, statusName: bc ? getCropStatusName(bc.status_id) : '—' };
+  });
+  if(summaryStatusFilter) rowBlocks = rowBlocks.filter(r => r.statusName === summaryStatusFilter);
+  if(summarySearch.trim()) {
+    const q = summarySearch.trim().toLowerCase();
+    rowBlocks = rowBlocks.filter(r => (r.block.block_name||'').toLowerCase().includes(q));
   }
-  if (!visibleWatchedProducts.length) {
-    sectionsEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;">
-      <div style="font-size:13px;color:var(--text-muted);">No monitored products match the selected type filter.</div>
-    </div>`;
-    return;
-  }
+  rowBlocks.sort((a,b) => (a.block.block_name||'').localeCompare(b.block.block_name||'', undefined, {numeric:true}));
 
-  // Decide which view to render:
-  // Level 2 — a specific product is selected → full 9-column block table for its AI combo
-  if (summaryProductFilter !== 'all') {
-    const product = visibleWatchedProducts.find(p => p.id === summaryProductFilter);
-    if (!product) { summaryProductFilter = 'all'; renderSummary(); return; }
-    const combo = getAICombosForProducts([product.id])[0];
-    if (!combo) {
-      sectionsEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;"><div style="font-size:13px;color:var(--text-muted);">This product has no active ingredients configured.</div></div>`;
-      return;
+  let html = '<div class="data-table"><div class="table-wrap"><table style="white-space:nowrap;"><thead>';
+  html += '<tr>' +
+    '<th rowspan="2" style="position:sticky;left:0;z-index:2;background:#1E261E;min-width:90px;text-align:left;">Block</th>';
+  SUMMARY_COLS.forEach(c => {
+    html += `<th colspan="2" style="text-align:center;background:${c.bg};">${esc(c.label)}</th>`;
+  });
+  html += '</tr><tr>';
+  SUMMARY_COLS.forEach(() => {
+    html += '<th style="text-align:center;font-size:10.5px;color:var(--text-dim);text-transform:uppercase;">Date</th>' +
+            '<th style="text-align:center;font-size:10.5px;color:var(--text-dim);text-transform:uppercase;">Days</th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  if(!rowBlocks.length) {
+    html += `<tr><td colspan="${1 + SUMMARY_COLS.length*2}" class="empty-state" style="text-align:center;padding:24px;color:var(--text-muted);">No blocks match the filter.</td></tr>`;
+  } else {
+    rowBlocks.forEach(({block, statusName}) => {
+      html += '<tr>';
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(block.block_name)}` +
+              `<div style="font-size:10px;color:var(--text-dim);font-weight:400;">${esc(statusName)}</div></td>`;
+      SUMMARY_COLS.forEach(c => {
+        let dateStr = '—', daysStr = '—', hasData = false;
+        const cellId = block.id + '_' + c.key;
+        if(c.key === 'fertilizer') {
+          const fa = fertLatest[block.id];
+          if(fa && fa.date_applied) {
+            hasData = true;
+            dateStr = fmtDateShort(fa.date_applied);
+            const d = daysDiff(fa.date_applied, today);
+            daysStr = d != null ? d + 'd' : '—';
+            summaryCellData[cellId] = { kind:'fert', fa };
+          }
+        } else {
+          const log = sprayLatest[block.id + '_' + c.key];
+          if(log && log.date_completed) {
+            hasData = true;
+            dateStr = fmtDateShort(log.date_completed);
+            const d = daysDiff(log.date_completed, today);
+            daysStr = d != null ? d + 'd' : '—';
+            summaryCellData[cellId] = { kind:'spray', log, colLabel:c.label, blockName:block.block_name };
+          }
+        }
+        if(hasData) {
+          html += `<td style="text-align:center;text-decoration:underline dotted;cursor:help;" data-cell="${cellId}" onmouseenter="summaryShowPopup(event)" onmouseleave="summaryHidePopup()">${dateStr}</td>` +
+                  `<td style="text-align:center;">${daysStr}</td>`;
+        } else {
+          html += `<td style="text-align:center;color:var(--text-dim);">—</td><td style="text-align:center;color:var(--text-dim);">—</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div></div>';
+  document.getElementById('summary-matrix').innerHTML = html;
+}
+
+function summaryEnsurePopupEl() {
+  let el = document.getElementById('summary-cell-popup');
+  if(!el) {
+    el = document.createElement('div');
+    el.id = 'summary-cell-popup';
+    el.style.cssText = 'position:fixed;z-index:9999;display:none;max-width:340px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.7;box-shadow:0 8px 24px rgba(0,0,0,0.4);pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function summaryShowPopup(event) {
+  const cellId = event.currentTarget.dataset.cell;
+  const data = summaryCellData[cellId];
+  if(!data) return;
+  const el = summaryEnsurePopupEl();
+  const today = todayStr();
+  let html = '';
+  if(data.kind === 'fert') {
+    const fa = data.fa;
+    const b = getBlock(fa.block_id);
+    const inv = getInventoryProduct(fa.inventory_product_id);
+    const d = daysDiff(fa.date_applied, today);
+    html =
+      `<div style="font-weight:700;color:var(--green-light);">Fertilizer — ${esc(b?b.block_name:'—')}</div>` +
+      `<div style="color:var(--text-muted);">Applied ${fmtDate(fa.date_applied)} · ${d!=null?d+' days ago':'—'}</div>` +
+      `<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">` +
+      `<div><b>Product:</b> ${esc(inv?inv.name:'—')}</div>` +
+      `<div><b>Quantity:</b> ${fa.quantity!=null?esc(fmtNum(fa.quantity)+' '+(fa.quantity_unit||'')):'—'}</div>` +
+      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fa.worker_name||'—')}</div>`;
+  } else {
+    const log = data.log;
+    const prod = getProduct(log.product_id);
+    const d = daysDiff(log.date_completed, today);
+    const job = getSprayLogJob(log.logged_by);
+    let mixHtml = '';
+    if(job) {
+      const jps = getJobProducts(job.id);
+      if(jps.length) {
+        mixHtml = '<div style="margin-top:5px;"><b>Tank mix (sprayed together):</b></div>' +
+          '<div style="padding-left:10px;color:var(--text-muted);">' +
+          jps.map(jp => {
+            const pn = getProduct(jp.product_id); const used = fmtSprayProductUsed(log.logged_by, jp.product_id);
+            return '• ' + esc(pn?pn.product_name:'?') + (used && used !== '—' ? ' — ' + esc(used) : '');
+          }).join('<br>') + '</div>';
+      }
     }
-    sectionsEl.innerHTML = renderSummarySection(combo, activeBlocks, comboMap, today);
-    return;
+    const qty = fmtSprayProductUsed(log.logged_by, log.product_id);
+    const water = fmtSprayWater(log.logged_by);
+    html =
+      `<div style="font-weight:700;color:var(--green-light);">${esc(data.colLabel)} — ${esc(data.blockName)}</div>` +
+      `<div style="color:var(--text-muted);">Sprayed ${fmtDate(log.date_completed)} · ${d!=null?d+' days ago':'—'}</div>` +
+      `<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">` +
+      `<div><b>Product:</b> ${esc(prod?prod.product_name:'—')}</div>` +
+      `<div><b>Quantity used:</b> ${qty && qty!=='—'?esc(qty):'—'}</div>` +
+      mixHtml +
+      (water && water!=='—' ? `<div style="margin-top:5px;"><b>Tank:</b> ${esc(water)} water</div>` : '') +
+      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fmtSprayWorker(log.logged_by))} · Logged by: ${esc(fmtLoggedBy(log.logged_by))}</div>`;
   }
+  el.innerHTML = html;
+  el.style.display = 'block';
+  const r = event.currentTarget.getBoundingClientRect();
+  let top = r.bottom + 8, left = r.left;
+  const pw = el.offsetWidth, ph = el.offsetHeight;
+  if(left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+  if(top + ph > window.innerHeight - 12) top = r.top - ph - 8;
+  if(left < 8) left = 8;
+  if(top < 8) top = 8;
+  el.style.top = top + 'px';
+  el.style.left = left + 'px';
+}
 
-  // Level 1 — simplified per-block view (either "All" top pill OR a type pill with "All Xs" sub-pill)
-  sectionsEl.innerHTML = renderSummaryLevel1(visibleWatchedProductIds, activeBlocks, today);
+function summaryHidePopup() {
+  const el = document.getElementById('summary-cell-popup');
+  if(el) el.style.display = 'none';
 }
 
 // Level 1 simplified per-block view
