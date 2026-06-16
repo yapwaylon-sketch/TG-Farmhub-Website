@@ -1802,6 +1802,80 @@ function njCheckDuplicate() {
   if(warnEl) warnEl.style.display = 'none';
 }
 
+// Fertilizer job edit / complete (dedicated — bypasses spray completion flow)
+function openFertJobModal(jobId) {
+  const j = jobs.find(x => x.id === jobId);
+  if(!j) { notify("Job not found","error"); return; }
+  const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}" ${b.id===j.block_id?'selected':''}>${esc(b.block_name)}</option>`).join("");
+  const prods = njFertProductOptions();
+  const prodOpts = '<option value="">— Select —</option>' + prods.map(p=>`<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}" ${p.id===j.inventory_product_id?'selected':''}>${esc(p.name)}</option>`).join('');
+  const workerOpts = '<option value="">— Select —</option>' + workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?'selected':''}>${esc(w.name)}</option>`).join("");
+  const statusOpts = ['Planned','In Progress','Completed'].map(s=>`<option value="${s}" ${j.status===s?'selected':''}>${s}</option>`).join('');
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay" style="display:flex;">
+      <div class="modal-box" style="max-width:480px;">
+        <div class="modal-header"><div class="modal-title">Fertilizer Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="modal-body">
+          <div class="form-field"><label>Block</label><select id="fj-block" style="width:100%;">${blockOpts}</select></div>
+          <div class="form-field"><label>Granular Fertilizer</label><select id="fj-product" style="width:100%;" onchange="fjSyncUnit()">${prodOpts}</select></div>
+          <div class="form-row">
+            <div class="form-field"><label>Quantity</label><input id="fj-qty" type="number" step="any" min="0" value="${j.fertilizer_quantity!=null?j.fertilizer_quantity:''}" style="width:100%;"></div>
+            <div class="form-field"><label>Unit</label><input id="fj-unit" type="text" value="${esc(j.fertilizer_quantity_unit||'')}" placeholder="kg / bags" style="width:100%;"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>Worker</label><select id="fj-worker" style="width:100%;">${workerOpts}</select></div>
+            <div class="form-field"><label>Planned Date</label><input id="fj-planned" type="date" value="${j.planned_date||''}" style="width:100%;"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>Status</label><select id="fj-status" style="width:100%;" onchange="fjStatusChange()">${statusOpts}</select></div>
+            <div class="form-field" id="fj-compdate-wrap" style="display:${j.status==='Completed'?'block':'none'};"><label>Completed Date</label><input id="fj-compdate" type="date" value="${j.completion_date||todayStr()}" style="width:100%;"></div>
+          </div>
+          <div class="form-field"><label>Notes</label><textarea id="fj-notes" rows="2" style="width:100%;">${esc(j.notes||'')}</textarea></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="fertJobSave('${j.id}')">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fjSyncUnit() {
+  const sel = document.getElementById("fj-product"); const unitEl = document.getElementById("fj-unit");
+  if(!sel || !unitEl) return;
+  if(!unitEl.value) { const opt = sel.options[sel.selectedIndex]; if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit; }
+}
+
+function fjStatusChange() {
+  const st = document.getElementById("fj-status").value;
+  document.getElementById("fj-compdate-wrap").style.display = st === 'Completed' ? 'block' : 'none';
+}
+
+async function fertJobSave(jobId) {
+  const block_id = document.getElementById("fj-block").value;
+  const inventory_product_id = document.getElementById("fj-product").value;
+  const qtyRaw = document.getElementById("fj-qty").value;
+  const fertilizer_quantity_unit = document.getElementById("fj-unit").value.trim() || null;
+  const worker_name = document.getElementById("fj-worker").value;
+  const planned_date = document.getElementById("fj-planned").value;
+  const status = document.getElementById("fj-status").value;
+  const notes = document.getElementById("fj-notes").value.trim() || null;
+  if(!block_id || !inventory_product_id || !worker_name || !planned_date) { notify("Block, product, worker and planned date are required","warning"); return; }
+  const fertilizer_quantity = qtyRaw === '' ? null : parseFloat(qtyRaw);
+  const payload = {
+    block_id, inventory_product_id, fertilizer_quantity, fertilizer_quantity_unit,
+    worker_name, planned_date, status, notes, triggers_countdown:false,
+    completion_date: status === 'Completed' ? (document.getElementById("fj-compdate").value || todayStr()) : null
+  };
+  const result = await sbQuery(sb.from('pnd_jobs').update(payload).eq('id', jobId).select());
+  if(result === null) return;
+  closeModal();
+  await loadJobs();
+  if(currentPage==='jobs') renderJobsTable();
+  if(currentPage==='joblogs') renderJobLogs();
+  notify("Fertilizer job saved");
+}
+
 async function submitNewJob() {
   const blockId = document.getElementById("nj-block").value;
   const worker = document.getElementById("nj-worker").value;
@@ -1891,6 +1965,8 @@ async function submitNewJob() {
 function openEditJobModal(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
+  const _fjGuard = jobs.find(x => x.id === jobId);
+  if(_fjGuard && _fjGuard.job_type === 'Fertilizer') { return openFertJobModal(jobId); }
   const b=getBlock(j.block_id);
   const jps = getJobProducts(j.id);
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
@@ -2352,6 +2428,8 @@ async function jlGoPage(p) {
 function openEditStatusModal(jobId, prefilledStatus) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
+  const _fjGuard = jobs.find(x => x.id === jobId);
+  if(_fjGuard && _fjGuard.job_type === 'Fertilizer') { return openFertJobModal(jobId); }
   window._esCurrentJob = j;
   const b = getBlock(j.block_id), p = j.product_id ? getProduct(j.product_id) : null;
   // AI combo info
