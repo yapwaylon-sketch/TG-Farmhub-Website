@@ -1124,6 +1124,148 @@ function saveMonitoringSelection() {
 }
 
 // ============================================================
+// FERTILIZER APPLICATIONS (granular, broadcast — separate from spray jobs)
+// ============================================================
+let fertFilterBlock = '';
+
+function fertGranularProducts() {
+  // Source of truth = inventory; only Granular Fertilizer category is loggable here.
+  return inventoryProducts
+    .filter(p => p.category === 'Granular Fertilizer')
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+
+function renderFertilizerPage() {
+  const activeBlocks = blocks.filter(b => b.is_active).sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}));
+  const blockOpts = '<option value="">All Blocks</option>' + activeBlocks.map(b => `<option value="${b.id}" ${fertFilterBlock===b.id?'selected':''}>${esc(b.block_name)}</option>`).join('');
+  document.getElementById('fert-filter-row').innerHTML =
+    `<label style="font-size:12px;color:var(--text-muted);">Block</label>
+     <select id="fert-filter-block" onchange="fertFilterBlock=this.value;renderFertilizerPage();" style="min-width:140px;">${blockOpts}</select>`;
+
+  let rows = fertilizerApplications.slice();
+  if(fertFilterBlock) rows = rows.filter(r => r.block_id === fertFilterBlock);
+  rows.sort((a,b) => (b.date_applied||'').localeCompare(a.date_applied||''));
+
+  const listEl = document.getElementById('fert-list');
+  if(!rows.length) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;color:var(--text-muted);font-size:13px;">No fertilizer applications logged yet. Click <strong>Log Application</strong> to add one.</div>`;
+    return;
+  }
+  let html = '<div class="data-table"><div class="table-wrap"><table><thead><tr>' +
+    '<th>Date</th><th>Block</th><th>Product</th><th>Quantity</th><th>Worker</th><th>Notes</th><th></th>' +
+    '</tr></thead><tbody>';
+  rows.forEach(r => {
+    const b = getBlock(r.block_id);
+    const inv = getInventoryProduct(r.inventory_product_id);
+    html += '<tr>' +
+      `<td style="white-space:nowrap;">${fmtDateShort(r.date_applied)}</td>` +
+      `<td style="font-weight:600;white-space:nowrap;">${esc(b ? b.block_name : '—')}</td>` +
+      `<td>${esc(inv ? inv.name : '—')}</td>` +
+      `<td style="white-space:nowrap;">${r.quantity != null ? esc(fmtNum(r.quantity) + ' ' + (r.quantity_unit||'')) : '—'}</td>` +
+      `<td>${esc(r.worker_name || '—')}</td>` +
+      `<td style="font-size:11px;color:var(--text-dim);">${esc(r.notes || '')}</td>` +
+      `<td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" data-fid="${r.id}" onclick="fertEditFromEvent(event)">Edit</button> <button class="btn btn-outline btn-sm" data-fid="${r.id}" onclick="fertDeleteFromEvent(event)">Delete</button></td>` +
+    '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  listEl.innerHTML = html;
+}
+
+function fertOpenForm(existing) {
+  const activeBlocks = blocks.filter(b => b.is_active).sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}));
+  const blockOpts = '<option value="">— Select —</option>' + activeBlocks.map(b => `<option value="${b.id}" ${existing&&existing.block_id===b.id?'selected':''}>${esc(b.block_name)}</option>`).join('');
+  const prods = fertGranularProducts();
+  const prodOpts = '<option value="">— Select —</option>' + prods.map(p => `<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}" ${existing&&existing.inventory_product_id===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+  const workerOpts = '<option value="">— Select —</option>' + workers.map(w => `<option value="${esc(w.name)}" ${existing&&existing.worker_name===w.name?'selected':''}>${esc(w.name)}</option>`).join('');
+  const today = todayStr();
+  const noProducts = prods.length === 0
+    ? `<div style="font-size:11px;color:var(--gold);margin-top:6px;">No Granular Fertilizer products in inventory. Add them in the Inventory module (category "Granular Fertilizer").</div>` : '';
+  document.getElementById('modal-container').innerHTML = `
+    <div class="modal-overlay" style="display:flex;">
+      <div class="modal-box" style="max-width:460px;">
+        <div class="modal-header"><div class="modal-title">${existing?'Edit':'Log'} Fertilizer Application</div>
+          <button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="modal-body">
+          <div class="form-field"><label>Block</label><select id="fert-block" style="width:100%;">${blockOpts}</select></div>
+          <div class="form-field"><label>Granular Fertilizer</label><select id="fert-product" style="width:100%;" onchange="fertSyncUnit()">${prodOpts}</select>${noProducts}</div>
+          <div style="display:flex;gap:10px;">
+            <div class="form-field" style="flex:1;"><label>Quantity</label><input type="number" id="fert-qty" min="0" step="any" value="${existing&&existing.quantity!=null?existing.quantity:''}" style="width:100%;"></div>
+            <div class="form-field" style="flex:1;"><label>Unit</label><input type="text" id="fert-unit" value="${existing?esc(existing.quantity_unit||''):''}" placeholder="kg / bags" style="width:100%;"></div>
+          </div>
+          <div class="form-field"><label>Worker</label><select id="fert-worker" style="width:100%;">${workerOpts}</select></div>
+          <div class="form-field"><label>Date Applied</label><input type="date" id="fert-date" value="${existing?existing.date_applied:today}" style="width:100%;"></div>
+          <div class="form-field"><label>Notes (optional)</label><textarea id="fert-notes" rows="2" style="width:100%;">${existing?esc(existing.notes||''):''}</textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="fertSave(${existing?`'${existing.id}'`:'null'})">Save</button>
+        </div>
+      </div>
+    </div>`;
+  fertSyncUnit();
+}
+
+function fertSyncUnit() {
+  const sel = document.getElementById('fert-product');
+  const unitEl = document.getElementById('fert-unit');
+  if(!sel || !unitEl) return;
+  if(!unitEl.value) {
+    const opt = sel.options[sel.selectedIndex];
+    if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit;
+  }
+}
+
+async function fertSave(id) {
+  const block_id = document.getElementById('fert-block').value;
+  const inventory_product_id = document.getElementById('fert-product').value;
+  const qtyRaw = document.getElementById('fert-qty').value;
+  const quantity_unit = document.getElementById('fert-unit').value.trim() || null;
+  const worker_name = document.getElementById('fert-worker').value || null;
+  const date_applied = document.getElementById('fert-date').value;
+  const notes = document.getElementById('fert-notes').value.trim() || null;
+  if(!block_id) { notify('Please select a block', 'error'); return; }
+  if(!inventory_product_id) { notify('Please select a fertilizer product', 'error'); return; }
+  if(!date_applied) { notify('Please set the date applied', 'error'); return; }
+  const quantity = qtyRaw === '' ? null : parseFloat(qtyRaw);
+  const payload = {
+    block_id, inventory_product_id, quantity, quantity_unit, worker_name, date_applied, notes,
+    logged_by: (currentUser && currentUser.name) ? currentUser.name : null,
+    company_id: getCompanyId()
+  };
+  let result;
+  if(id) {
+    result = await sbQuery(sb.from('pnd_fertilizer_applications').update(payload).eq('id', id).select());
+  } else {
+    result = await sbQuery(sb.from('pnd_fertilizer_applications').insert(payload).select());
+  }
+  if(result === null) return;
+  closeModal();
+  await loadFertilizerApplications();
+  renderFertilizerPage();
+  notify('Fertilizer application saved', 'success');
+}
+
+function fertEditFromEvent(event) {
+  const id = event.currentTarget.dataset.fid;
+  const row = fertilizerApplications.find(r => r.id === id);
+  if(row) fertOpenForm(row);
+}
+
+function fertDeleteFromEvent(event) {
+  const id = event.currentTarget.dataset.fid;
+  const row = fertilizerApplications.find(r => r.id === id);
+  if(!row) return;
+  const b = getBlock(row.block_id);
+  confirmAction('Delete Application', 'Delete this fertilizer application for ' + (b?b.block_name:'this block') + '?', async function() {
+    const result = await sbQuery(sb.from('pnd_fertilizer_applications').delete().eq('id', id).select());
+    if(result === null) return;
+    await loadFertilizerApplications();
+    renderFertilizerPage();
+    notify('Application deleted', 'success');
+  }, true);
+}
+
+// ============================================================
 // JOBS PAGE
 // ============================================================
 function populateJobFilters() {
