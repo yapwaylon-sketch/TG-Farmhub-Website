@@ -428,7 +428,10 @@ async function loadLatestSpraysByAI() {
   if(data) latestSpraysByAI = data;
 }
 async function loadSprayLogs() {
-  const data = await sbQuery(sb.from("pnd_spray_logs").select("*").eq("company_id", getCompanyId()));
+  // NO company_id filter: the auto-spray-log trigger inserts rows without company_id (NULL),
+  // and spray is Agribusiness-only. All other spray-log reads (pnd_latest_sprays*) are company-agnostic too.
+  // Filtering here silently drops trigger-created logs from the Crop Care matrix.
+  const data = await sbQuery(sb.from("pnd_spray_logs").select("*"));
   if(data) sprayLogs = data;
 }
 async function loadAIComboDefaults() {
