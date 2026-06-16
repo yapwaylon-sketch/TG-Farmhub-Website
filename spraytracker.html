@@ -1496,26 +1496,28 @@ function openNewJobModal() {
         <div class="modal-header"><div class="modal-title">New Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-field">
           <label>Job Type</label>
-          <div class="jt-toggle">
-            <button type="button" class="jt-btn active-sched" id="nj-jt-sched" onclick="njSetJobType('Scheduled')">Scheduled</button>
-            <button type="button" class="jt-btn" id="nj-jt-intv" onclick="njSetJobType('Intervention')">Intervention</button>
-          </div>
-          <input type="hidden" id="nj-job-type" value="Scheduled">
+          <select id="nj-job-type" style="width:100%;" onchange="njOnJobTypeChange()">
+            <option value="Scheduled">Scheduled Spray</option>
+            <option value="Intervention">Intervention Spray</option>
+            <option value="Fertilizer">Fertilizer Application</option>
+          </select>
           <div id="nj-intv-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);font-size:11px;color:#E8A020;line-height:1.4;">Intervention jobs are unscheduled emergency sprays. They log the application but handle the spray countdown separately on completion.</div>
+          <div id="nj-fert-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(150,110,70,0.12);border:1px solid rgba(150,110,70,0.3);font-size:11px;color:#b98a5e;line-height:1.4;">Fertilizer applications are broadcast on soil — no tank mix or spray countdown. Plan it, then mark it done when applied.</div>
         </div>
         <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;"><option value="">— Select —</option>${blockOpts}</select></div>
         <div id="nj-dup-warning" style="display:none;"></div>
 
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
+          <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
+        </div>
+
+        <div id="nj-spray-fields">
         <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Active Ingredients</span></div>
         <div id="nj-ai-list"></div>
         <div id="nj-add-ai-row" style="padding:4px 0;">
           <select id="nj-add-ai-sel" style="width:calc(100% - 80px);">${njBuildAIOpts([])}</select>
           <button class="btn btn-primary btn-sm" onclick="njAddAI()" style="margin-left:6px;padding:6px 14px;">+ Add</button>
-        </div>
-
-        <div class="form-row" style="margin-top:12px;">
-          <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
-          <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
         </div>
 
         <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(232,160,32,0.08);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold-light);">Tank & Water</span></div>
@@ -1531,6 +1533,16 @@ function openNewJobModal() {
         <div class="form-field"><label>Total Litres of Water</label><input id="nj-water" type="number" step="any" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" readonly></div>
 
         <div id="nj-totals-breakdown" style="margin:8px 0;"></div>
+        </div>
+
+        <div id="nj-fert-fields" style="display:none;">
+          <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(150,110,70,0.12);border-left:3px solid #966e46;border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#b98a5e;">Fertilizer</span></div>
+          <div class="form-field"><label>Granular Fertilizer</label><select id="nj-fert-product" style="width:100%;" onchange="njFertSyncUnit()"><option value="">— Select —</option></select><div id="nj-fert-noprod" style="display:none;font-size:11px;color:var(--gold);margin-top:6px;">No Granular Fertilizer products in inventory. Add them in the Inventory module (category "Granular Fertilizer").</div></div>
+          <div class="form-row">
+            <div class="form-field"><label>Quantity</label><input id="nj-fert-qty" type="number" step="any" min="0" style="width:100%;"></div>
+            <div class="form-field"><label>Unit</label><input id="nj-fert-unit" type="text" placeholder="kg / bags" style="width:100%;"></div>
+          </div>
+        </div>
 
         <div class="form-field"><label>Notes</label><textarea id="nj-notes" rows="2" style="width:100%;" placeholder="Optional"></textarea></div>
         <div class="form-field"><label>Logged By</label><input id="nj-logged" value="${esc(currentUser?.displayName||"")}" style="width:100%;"></div>
@@ -1725,14 +1737,34 @@ function njUpdateUomLabel(prefix) {
   if(label) label.textContent = '(' + unit + ')';
 }
 
-function njSetJobType(type) {
-  document.getElementById("nj-job-type").value = type;
-  const sBtn = document.getElementById("nj-jt-sched");
-  const iBtn = document.getElementById("nj-jt-intv");
-  sBtn.className = 'jt-btn' + (type==='Scheduled'?' active-sched':'');
-  iBtn.className = 'jt-btn' + (type==='Intervention'?' active-intv':'');
-  document.getElementById("nj-intv-info").style.display = type==='Intervention'?'block':'none';
-  njCheckDuplicate();
+function njFertProductOptions() {
+  const prods = inventoryProducts.filter(p => p.category === 'Granular Fertilizer').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  return prods;
+}
+
+function njOnJobTypeChange() {
+  const type = document.getElementById("nj-job-type").value;
+  const isFert = type === 'Fertilizer';
+  document.getElementById("nj-spray-fields").style.display = isFert ? 'none' : 'block';
+  document.getElementById("nj-fert-fields").style.display = isFert ? 'block' : 'none';
+  document.getElementById("nj-intv-info").style.display = type === 'Intervention' ? 'block' : 'none';
+  document.getElementById("nj-fert-info").style.display = isFert ? 'block' : 'none';
+  if(isFert) {
+    const sel = document.getElementById("nj-fert-product");
+    const prods = njFertProductOptions();
+    sel.innerHTML = '<option value="">— Select —</option>' + prods.map(p=>`<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}">${esc(p.name)}</option>`).join('');
+    document.getElementById("nj-fert-noprod").style.display = prods.length ? 'none' : 'block';
+  }
+}
+
+function njFertSyncUnit() {
+  const sel = document.getElementById("nj-fert-product");
+  const unitEl = document.getElementById("nj-fert-unit");
+  if(!sel || !unitEl) return;
+  if(!unitEl.value) {
+    const opt = sel.options[sel.selectedIndex];
+    if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit;
+  }
 }
 
 function njCheckDuplicate() {
