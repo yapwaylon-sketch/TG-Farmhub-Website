@@ -53,7 +53,7 @@ ALTER TABLE public.pnd_products ADD CONSTRAINT pnd_products_product_type_check
 CREATE TABLE IF NOT EXISTS public.pnd_fertilizer_applications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   block_id uuid NOT NULL REFERENCES public.pnd_blocks(id),
-  inventory_product_id uuid NOT NULL REFERENCES public.products(id),
+  inventory_product_id text NOT NULL REFERENCES public.products(id),  -- products.id is TEXT, not uuid
   quantity numeric,
   quantity_unit text,
   worker_name text,
