@@ -128,6 +128,12 @@
         <option value="all">All</option>
         <option value="Completed">Completed</option>
       </select>
+      <select id="jobs-filter-type" onchange="renderJobsTable()" style="min-width:150px;">
+        <option value="">All Types</option>
+        <option value="Scheduled">Scheduled Spray</option>
+        <option value="Intervention">Intervention Spray</option>
+        <option value="Fertilizer">Fertilizer</option>
+      </select>
       <select id="jobs-filter-block" onchange="renderJobsTable()" style="min-width:120px;">
         <option value="">All Blocks</option>
       </select>
@@ -224,8 +230,9 @@
       </select>
       <select id="jl-filter-type" onchange="jlPage=0;renderJobLogs()" style="min-width:110px;">
         <option value="">All Types</option>
-        <option value="Scheduled">Scheduled</option>
-        <option value="Intervention">Intervention</option>
+        <option value="Scheduled">Scheduled Spray</option>
+        <option value="Intervention">Intervention Spray</option>
+        <option value="Fertilizer">Fertilizer</option>
       </select>
       <input type="date" id="jl-from" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
       <input type="date" id="jl-to" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
@@ -1255,6 +1262,7 @@ function renderJobsTable() {
   const blockF = document.getElementById("jobs-filter-block").value;
   const fromF = document.getElementById("jobs-filter-from").value;
   const toF = document.getElementById("jobs-filter-to").value;
+  const typeF = document.getElementById("jobs-filter-type")?.value || "";
   const activeStatuses = ["Planned","In Progress","Partially Completed","Suspended"];
 
   let filtered = jobs.filter(j => {
@@ -1263,6 +1271,7 @@ function renderJobsTable() {
     if(blockF && j.block_id !== blockF) return false;
     if(fromF && j.planned_date < fromF) return false;
     if(toF && j.planned_date > toF) return false;
+    if(typeF && j.job_type !== typeF) return false;
     return true;
   });
 
@@ -1287,6 +1296,26 @@ function renderJobsTable() {
   tbody.innerHTML = filtered.map(j => {
     const b = getBlock(j.block_id);
     const bname = b?b.block_name:"?";
+    if(j.job_type === 'Fertilizer') {
+      const inv = getInventoryProduct(j.inventory_product_id);
+      const qty = j.fertilizer_quantity != null ? esc(fmtNum(j.fertilizer_quantity) + ' ' + (j.fertilizer_quantity_unit||'')) : '—';
+      const checkedF = selectedJobIds.has(j.id) ? 'checked' : '';
+      let fertActions = `<button class="btn btn-outline btn-sm" onclick="openFertJobModal('${j.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
+      return `<tr>
+        <td style="text-align:center;"><input type="checkbox" class="job-cb" data-id="${j.id}" ${checkedF} onchange="onJobCheckChange()"></td>
+        <td>${fmtDateShort(j.planned_date)}</td>
+        <td style="font-weight:600;">${esc(bname)}</td>
+        <td><span class="badge badge-fert" style="background:rgba(150,110,70,0.2);color:#b98a5e;border:1px solid rgba(150,110,70,0.4);">Fertilizer</span></td>
+        <td style="font-size:11px;color:var(--text-dim);">—</td>
+        <td style="font-size:11px;">${esc(inv?inv.name:'—')}</td>
+        <td>${esc(j.worker_name)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>${qty}</td>
+        <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+        <td>${fertActions}</td>
+      </tr>`;
+    }
     // AI label and Product Used cell — both already return HTML-safe content (escape inside helpers)
     const aiLabel = njJobAIs(j);
     const productUsed = njJobProductNames(j);
@@ -2263,6 +2292,25 @@ async function renderJobLogs() {
 
   tbody.innerHTML = data.map(j => {
     const b = getBlock(j.block_id);
+    if(j.job_type === 'Fertilizer') {
+      const inv = getInventoryProduct(j.inventory_product_id);
+      const qty = j.fertilizer_quantity != null ? esc(fmtNum(j.fertilizer_quantity)+' '+(j.fertilizer_quantity_unit||'')) : '—';
+      return `<tr>
+        <td>${fmtDateShort(j.planned_date)}</td>
+        <td>${fmtDateShort(j.completion_date)}</td>
+        <td style="font-weight:600;">${esc(b?.block_name)}</td>
+        <td><span class="badge badge-fert" style="background:rgba(150,110,70,0.2);color:#b98a5e;border:1px solid rgba(150,110,70,0.4);">Fertilizer</span></td>
+        <td style="font-size:11px;">${esc(inv?inv.name:'—')}</td>
+        <td style="font-size:11px;color:var(--text-dim);">—</td>
+        <td>${esc(j.worker_name)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>${qty}</td>
+        <td>—</td>
+        <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="openFertJobModal('${j.id}')">Edit</button></td>
+      </tr>`;
+    }
     const p = getProduct(j.product_id);
     const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
     return `<tr>
