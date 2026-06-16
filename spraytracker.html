@@ -53,10 +53,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/></svg>
       <span class="nav-label">Manage Products</span>
     </div>
-    <div class="nav-item" data-page="fertilizer" onclick="navigateTo('fertilizer')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C7 7 7 12 12 22 17 12 17 7 12 2z"/><path d="M5 12c2 1 4 3 7 10"/><path d="M19 12c-2 1-4 3-7 10"/></svg>
-      <span class="nav-label">Fertilizer</span>
-    </div>
     <div class="nav-item" data-page="reports" onclick="navigateTo('reports')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
       <span class="nav-label">Reports</span>
@@ -127,6 +123,12 @@
         <option value="Suspended">Suspended</option>
         <option value="all">All</option>
         <option value="Completed">Completed</option>
+      </select>
+      <select id="jobs-filter-type" onchange="renderJobsTable()" style="min-width:150px;">
+        <option value="">All Types</option>
+        <option value="Scheduled">Scheduled Spray</option>
+        <option value="Intervention">Intervention Spray</option>
+        <option value="Fertilizer">Fertilizer</option>
       </select>
       <select id="jobs-filter-block" onchange="renderJobsTable()" style="min-width:120px;">
         <option value="">All Blocks</option>
@@ -224,8 +226,9 @@
       </select>
       <select id="jl-filter-type" onchange="jlPage=0;renderJobLogs()" style="min-width:110px;">
         <option value="">All Types</option>
-        <option value="Scheduled">Scheduled</option>
-        <option value="Intervention">Intervention</option>
+        <option value="Scheduled">Scheduled Spray</option>
+        <option value="Intervention">Intervention Spray</option>
+        <option value="Fertilizer">Fertilizer</option>
       </select>
       <input type="date" id="jl-from" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
       <input type="date" id="jl-to" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
@@ -270,18 +273,6 @@
   </div>
 </div>
 
-<!-- PAGE: FERTILIZER -->
-<div id="page-fertilizer" class="page">
-  <div class="page-header">
-    <div><div class="page-title">Fertilizer Applications</div><div class="page-subtitle">Log granular fertilizer rounds (broadcast on soil)</div></div>
-    <button class="btn btn-primary" onclick="fertOpenForm()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Log Application
-    </button>
-  </div>
-  <div id="fert-filter-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;"></div>
-  <div id="fert-list"></div>
-</div>
 
 </div><!-- /main-content -->
 </div><!-- /app -->
@@ -308,7 +299,6 @@ let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], late
 let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
 let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
 let inventoryProducts=[], inventoryTransactions=[];
-let fertilizerApplications=[];
 let summaryStatusFilter = '';
 let summarySearch = '';
 let _summarySearchTO = null;
@@ -340,7 +330,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs(), loadFertilizerApplications()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs()]);
 }
 
 async function syncAll() {
@@ -355,9 +345,8 @@ async function syncAll() {
 function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
-    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs(), loadFertilizerApplications()]);
+    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs()]);
     if(currentPage === 'summary') renderSummary();
-    if(currentPage === 'fertilizer') renderFertilizerPage();
     if(currentPage === 'jobs') renderJobsTable();
     if(currentPage === 'joblogs') renderJobLogs();
   }, 60000);
@@ -374,11 +363,10 @@ function navigateTo(page) {
 }
 
 async function renderCurrentPage() {
-  if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadFertilizerApplications(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
+  if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
   else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') { await loadJobs(); populateJobLogFilters(); await renderJobLogs(); }
   else if(currentPage === 'products') { await Promise.all([loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); renderProductsPage(); renderEnableProductsSection(); renderAIDoseSettings(); renderOverridesSection(); }
-  else if(currentPage === 'fertilizer') { await Promise.all([loadFertilizerApplications(), loadBlocks(), loadWorkers(), loadInventoryProducts()]); renderFertilizerPage(); }
   else if(currentPage === 'reports') initReports();
 }
 
@@ -442,10 +430,6 @@ async function loadLatestSpraysByAI() {
 async function loadSprayLogs() {
   const data = await sbQuery(sb.from("pnd_spray_logs").select("*").eq("company_id", getCompanyId()));
   if(data) sprayLogs = data;
-}
-async function loadFertilizerApplications() {
-  const data = await sbQuery(sb.from("pnd_fertilizer_applications").select("*").eq("company_id", getCompanyId()).order("date_applied", {ascending:false}));
-  if(data) fertilizerApplications = data;
 }
 async function loadAIComboDefaults() {
   const data = await sbQuery(sb.from("ai_combo_defaults").select("*").eq("company_id", getCompanyId()));
@@ -694,9 +678,10 @@ function renderSummary() {
   });
 
   const fertLatest = {};
-  fertilizerApplications.forEach(fa => {
-    const cur = fertLatest[fa.block_id];
-    if(!cur || (fa.date_applied||'') > (cur.date_applied||'')) fertLatest[fa.block_id] = fa;
+  jobs.forEach(j => {
+    if(j.job_type !== 'Fertilizer' || j.status !== 'Completed' || !j.completion_date) return;
+    const cur = fertLatest[j.block_id];
+    if(!cur || (j.completion_date||'') > (cur.completion_date||'')) fertLatest[j.block_id] = j;
   });
 
   summaryCellData = {};
@@ -735,13 +720,13 @@ function renderSummary() {
         let dateStr = '—', daysStr = '—', hasData = false;
         const cellId = block.id + '_' + c.key;
         if(c.key === 'fertilizer') {
-          const fa = fertLatest[block.id];
-          if(fa && fa.date_applied) {
+          const fj = fertLatest[block.id];
+          if(fj && fj.completion_date) {
             hasData = true;
-            dateStr = fmtDateShort(fa.date_applied);
-            const d = daysDiff(fa.date_applied, today);
+            dateStr = fmtDateShort(fj.completion_date);
+            const d = daysDiff(fj.completion_date, today);
             daysStr = d != null ? d + 'd' : '—';
-            summaryCellData[cellId] = { kind:'fert', fa };
+            summaryCellData[cellId] = { kind:'fert', job:fj };
           }
         } else {
           const log = sprayLatest[block.id + '_' + c.key];
@@ -786,17 +771,17 @@ function summaryShowPopup(event) {
   const today = todayStr();
   let html = '';
   if(data.kind === 'fert') {
-    const fa = data.fa;
-    const b = getBlock(fa.block_id);
-    const inv = getInventoryProduct(fa.inventory_product_id);
-    const d = daysDiff(fa.date_applied, today);
+    const fj = data.job;
+    const b = getBlock(fj.block_id);
+    const inv = getInventoryProduct(fj.inventory_product_id);
+    const d = daysDiff(fj.completion_date, today);
     html =
       `<div style="font-weight:700;color:var(--green-light);">Fertilizer — ${esc(b?b.block_name:'—')}</div>` +
-      `<div style="color:var(--text-muted);">Applied ${fmtDate(fa.date_applied)} · ${d!=null?d+' days ago':'—'}</div>` +
+      `<div style="color:var(--text-muted);">Applied ${fmtDate(fj.completion_date)} · ${d!=null?d+' days ago':'—'}</div>` +
       `<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">` +
       `<div><b>Product:</b> ${esc(inv?inv.name:'—')}</div>` +
-      `<div><b>Quantity:</b> ${fa.quantity!=null?esc(fmtNum(fa.quantity)+' '+(fa.quantity_unit||'')):'—'}</div>` +
-      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fa.worker_name||'—')}</div>`;
+      `<div><b>Quantity:</b> ${fj.fertilizer_quantity!=null?esc(fmtNum(fj.fertilizer_quantity)+' '+(fj.fertilizer_quantity_unit||'')):'—'}</div>` +
+      `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(fj.worker_name||'—')}</div>`;
   } else {
     const log = data.log;
     const prod = getProduct(log.product_id);
@@ -844,148 +829,6 @@ function summaryHidePopup() {
   if(el) el.style.display = 'none';
 }
 
-
-// ============================================================
-// FERTILIZER APPLICATIONS (granular, broadcast — separate from spray jobs)
-// ============================================================
-let fertFilterBlock = '';
-
-function fertGranularProducts() {
-  // Source of truth = inventory; only Granular Fertilizer category is loggable here.
-  return inventoryProducts
-    .filter(p => p.category === 'Granular Fertilizer')
-    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
-}
-
-function renderFertilizerPage() {
-  const activeBlocks = blocks.filter(b => b.is_active).sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}));
-  const blockOpts = '<option value="">All Blocks</option>' + activeBlocks.map(b => `<option value="${b.id}" ${fertFilterBlock===b.id?'selected':''}>${esc(b.block_name)}</option>`).join('');
-  document.getElementById('fert-filter-row').innerHTML =
-    `<label style="font-size:12px;color:var(--text-muted);">Block</label>
-     <select id="fert-filter-block" onchange="fertFilterBlock=this.value;renderFertilizerPage();" style="min-width:140px;">${blockOpts}</select>`;
-
-  let rows = fertilizerApplications.slice();
-  if(fertFilterBlock) rows = rows.filter(r => r.block_id === fertFilterBlock);
-  rows.sort((a,b) => (b.date_applied||'').localeCompare(a.date_applied||''));
-
-  const listEl = document.getElementById('fert-list');
-  if(!rows.length) {
-    listEl.innerHTML = `<div class="empty-state" style="padding:30px 20px;text-align:center;color:var(--text-muted);font-size:13px;">No fertilizer applications logged yet. Click <strong>Log Application</strong> to add one.</div>`;
-    return;
-  }
-  let html = '<div class="data-table"><div class="table-wrap"><table><thead><tr>' +
-    '<th>Date</th><th>Block</th><th>Product</th><th>Quantity</th><th>Worker</th><th>Notes</th><th></th>' +
-    '</tr></thead><tbody>';
-  rows.forEach(r => {
-    const b = getBlock(r.block_id);
-    const inv = getInventoryProduct(r.inventory_product_id);
-    html += '<tr>' +
-      `<td style="white-space:nowrap;">${fmtDateShort(r.date_applied)}</td>` +
-      `<td style="font-weight:600;white-space:nowrap;">${esc(b ? b.block_name : '—')}</td>` +
-      `<td>${esc(inv ? inv.name : '—')}</td>` +
-      `<td style="white-space:nowrap;">${r.quantity != null ? esc(fmtNum(r.quantity) + ' ' + (r.quantity_unit||'')) : '—'}</td>` +
-      `<td>${esc(r.worker_name || '—')}</td>` +
-      `<td style="font-size:11px;color:var(--text-dim);">${esc(r.notes || '')}</td>` +
-      `<td style="white-space:nowrap;"><button class="btn btn-outline btn-sm" data-fid="${r.id}" onclick="fertEditFromEvent(event)">Edit</button> <button class="btn btn-outline btn-sm" data-fid="${r.id}" onclick="fertDeleteFromEvent(event)">Delete</button></td>` +
-    '</tr>';
-  });
-  html += '</tbody></table></div></div>';
-  listEl.innerHTML = html;
-}
-
-function fertOpenForm(existing) {
-  const activeBlocks = blocks.filter(b => b.is_active).sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}));
-  const blockOpts = '<option value="">— Select —</option>' + activeBlocks.map(b => `<option value="${b.id}" ${existing&&existing.block_id===b.id?'selected':''}>${esc(b.block_name)}</option>`).join('');
-  const prods = fertGranularProducts();
-  const prodOpts = '<option value="">— Select —</option>' + prods.map(p => `<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}" ${existing&&existing.inventory_product_id===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
-  const workerOpts = '<option value="">— Select —</option>' + workers.map(w => `<option value="${esc(w.name)}" ${existing&&existing.worker_name===w.name?'selected':''}>${esc(w.name)}</option>`).join('');
-  const today = todayStr();
-  const noProducts = prods.length === 0
-    ? `<div style="font-size:11px;color:var(--gold);margin-top:6px;">No Granular Fertilizer products in inventory. Add them in the Inventory module (category "Granular Fertilizer").</div>` : '';
-  document.getElementById('modal-container').innerHTML = `
-    <div class="modal-overlay" style="display:flex;">
-      <div class="modal-box" style="max-width:460px;">
-        <div class="modal-header"><div class="modal-title">${existing?'Edit':'Log'} Fertilizer Application</div>
-          <button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <div class="modal-body">
-          <div class="form-field"><label>Block</label><select id="fert-block" style="width:100%;">${blockOpts}</select></div>
-          <div class="form-field"><label>Granular Fertilizer</label><select id="fert-product" style="width:100%;" onchange="fertSyncUnit()">${prodOpts}</select>${noProducts}</div>
-          <div style="display:flex;gap:10px;">
-            <div class="form-field" style="flex:1;"><label>Quantity</label><input type="number" id="fert-qty" min="0" step="any" value="${existing&&existing.quantity!=null?existing.quantity:''}" style="width:100%;"></div>
-            <div class="form-field" style="flex:1;"><label>Unit</label><input type="text" id="fert-unit" value="${existing?esc(existing.quantity_unit||''):''}" placeholder="kg / bags" style="width:100%;"></div>
-          </div>
-          <div class="form-field"><label>Worker</label><select id="fert-worker" style="width:100%;">${workerOpts}</select></div>
-          <div class="form-field"><label>Date Applied</label><input type="date" id="fert-date" value="${existing?existing.date_applied:today}" style="width:100%;"></div>
-          <div class="form-field"><label>Notes (optional)</label><textarea id="fert-notes" rows="2" style="width:100%;">${existing?esc(existing.notes||''):''}</textarea></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="fertSave(${existing?`'${existing.id}'`:'null'})">Save</button>
-        </div>
-      </div>
-    </div>`;
-  fertSyncUnit();
-}
-
-function fertSyncUnit() {
-  const sel = document.getElementById('fert-product');
-  const unitEl = document.getElementById('fert-unit');
-  if(!sel || !unitEl) return;
-  if(!unitEl.value) {
-    const opt = sel.options[sel.selectedIndex];
-    if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit;
-  }
-}
-
-async function fertSave(id) {
-  const block_id = document.getElementById('fert-block').value;
-  const inventory_product_id = document.getElementById('fert-product').value;
-  const qtyRaw = document.getElementById('fert-qty').value;
-  const quantity_unit = document.getElementById('fert-unit').value.trim() || null;
-  const worker_name = document.getElementById('fert-worker').value || null;
-  const date_applied = document.getElementById('fert-date').value;
-  const notes = document.getElementById('fert-notes').value.trim() || null;
-  if(!block_id) { notify('Please select a block', 'error'); return; }
-  if(!inventory_product_id) { notify('Please select a fertilizer product', 'error'); return; }
-  if(!date_applied) { notify('Please set the date applied', 'error'); return; }
-  const quantity = qtyRaw === '' ? null : parseFloat(qtyRaw);
-  const payload = {
-    block_id, inventory_product_id, quantity, quantity_unit, worker_name, date_applied, notes,
-    logged_by: (currentUser && currentUser.name) ? currentUser.name : null,
-    company_id: getCompanyId()
-  };
-  let result;
-  if(id) {
-    result = await sbQuery(sb.from('pnd_fertilizer_applications').update(payload).eq('id', id).select());
-  } else {
-    result = await sbQuery(sb.from('pnd_fertilizer_applications').insert(payload).select());
-  }
-  if(result === null) return;
-  closeModal();
-  await loadFertilizerApplications();
-  renderFertilizerPage();
-  notify('Fertilizer application saved', 'success');
-}
-
-function fertEditFromEvent(event) {
-  const id = event.currentTarget.dataset.fid;
-  const row = fertilizerApplications.find(r => r.id === id);
-  if(row) fertOpenForm(row);
-}
-
-function fertDeleteFromEvent(event) {
-  const id = event.currentTarget.dataset.fid;
-  const row = fertilizerApplications.find(r => r.id === id);
-  if(!row) return;
-  const b = getBlock(row.block_id);
-  confirmAction('Delete Application', 'Delete this fertilizer application for ' + (b?b.block_name:'this block') + '?', async function() {
-    const result = await sbQuery(sb.from('pnd_fertilizer_applications').delete().eq('id', id).select());
-    if(result === null) return;
-    await loadFertilizerApplications();
-    renderFertilizerPage();
-    notify('Application deleted', 'success');
-  }, true);
-}
 
 // ============================================================
 // JOBS PAGE
@@ -1255,6 +1098,7 @@ function renderJobsTable() {
   const blockF = document.getElementById("jobs-filter-block").value;
   const fromF = document.getElementById("jobs-filter-from").value;
   const toF = document.getElementById("jobs-filter-to").value;
+  const typeF = document.getElementById("jobs-filter-type")?.value || "";
   const activeStatuses = ["Planned","In Progress","Partially Completed","Suspended"];
 
   let filtered = jobs.filter(j => {
@@ -1263,6 +1107,7 @@ function renderJobsTable() {
     if(blockF && j.block_id !== blockF) return false;
     if(fromF && j.planned_date < fromF) return false;
     if(toF && j.planned_date > toF) return false;
+    if(typeF && j.job_type !== typeF) return false;
     return true;
   });
 
@@ -1287,6 +1132,26 @@ function renderJobsTable() {
   tbody.innerHTML = filtered.map(j => {
     const b = getBlock(j.block_id);
     const bname = b?b.block_name:"?";
+    if(j.job_type === 'Fertilizer') {
+      const inv = getInventoryProduct(j.inventory_product_id);
+      const qty = j.fertilizer_quantity != null ? esc(fmtNum(j.fertilizer_quantity) + ' ' + (j.fertilizer_quantity_unit||'')) : '—';
+      const checkedF = selectedJobIds.has(j.id) ? 'checked' : '';
+      let fertActions = `<button class="btn btn-outline btn-sm" onclick="openFertJobModal('${j.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</button>`;
+      return `<tr>
+        <td style="text-align:center;"><input type="checkbox" class="job-cb" data-id="${j.id}" ${checkedF} onchange="onJobCheckChange()"></td>
+        <td>${fmtDateShort(j.planned_date)}</td>
+        <td style="font-weight:600;">${esc(bname)}</td>
+        <td><span class="badge badge-fert" style="background:rgba(150,110,70,0.2);color:#b98a5e;border:1px solid rgba(150,110,70,0.4);">Fertilizer</span></td>
+        <td style="font-size:11px;color:var(--text-dim);">—</td>
+        <td style="font-size:11px;">${esc(inv?inv.name:'—')}</td>
+        <td>${esc(j.worker_name)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>${qty}</td>
+        <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+        <td>${fertActions}</td>
+      </tr>`;
+    }
     // AI label and Product Used cell — both already return HTML-safe content (escape inside helpers)
     const aiLabel = njJobAIs(j);
     const productUsed = njJobProductNames(j);
@@ -1496,26 +1361,28 @@ function openNewJobModal() {
         <div class="modal-header"><div class="modal-title">New Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="form-field">
           <label>Job Type</label>
-          <div class="jt-toggle">
-            <button type="button" class="jt-btn active-sched" id="nj-jt-sched" onclick="njSetJobType('Scheduled')">Scheduled</button>
-            <button type="button" class="jt-btn" id="nj-jt-intv" onclick="njSetJobType('Intervention')">Intervention</button>
-          </div>
-          <input type="hidden" id="nj-job-type" value="Scheduled">
+          <select id="nj-job-type" style="width:100%;" onchange="njOnJobTypeChange()">
+            <option value="Scheduled">Scheduled Spray</option>
+            <option value="Intervention">Intervention Spray</option>
+            <option value="Fertilizer">Fertilizer Application</option>
+          </select>
           <div id="nj-intv-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);font-size:11px;color:#E8A020;line-height:1.4;">Intervention jobs are unscheduled emergency sprays. They log the application but handle the spray countdown separately on completion.</div>
+          <div id="nj-fert-info" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(150,110,70,0.12);border:1px solid rgba(150,110,70,0.3);font-size:11px;color:#b98a5e;line-height:1.4;">Fertilizer applications are broadcast on soil — no tank mix or spray countdown. Plan it, then mark it done when applied.</div>
         </div>
         <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;"><option value="">— Select —</option>${blockOpts}</select></div>
         <div id="nj-dup-warning" style="display:none;"></div>
 
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
+          <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
+        </div>
+
+        <div id="nj-spray-fields">
         <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(74,124,63,0.12);border-left:3px solid var(--green);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-light,#8fcf80);">Tank Mix — Active Ingredients</span></div>
         <div id="nj-ai-list"></div>
         <div id="nj-add-ai-row" style="padding:4px 0;">
           <select id="nj-add-ai-sel" style="width:calc(100% - 80px);">${njBuildAIOpts([])}</select>
           <button class="btn btn-primary btn-sm" onclick="njAddAI()" style="margin-left:6px;padding:6px 14px;">+ Add</button>
-        </div>
-
-        <div class="form-row" style="margin-top:12px;">
-          <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
-          <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
         </div>
 
         <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(232,160,32,0.08);border-left:3px solid var(--gold);border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gold-light);">Tank & Water</span></div>
@@ -1531,6 +1398,16 @@ function openNewJobModal() {
         <div class="form-field"><label>Total Litres of Water</label><input id="nj-water" type="number" step="any" style="width:100%;font-size:15px;font-weight:700;color:var(--white);background:var(--bg-input);text-align:center;padding:10px;" readonly></div>
 
         <div id="nj-totals-breakdown" style="margin:8px 0;"></div>
+        </div>
+
+        <div id="nj-fert-fields" style="display:none;">
+          <div style="margin:12px 0 4px;padding:6px 10px;background:rgba(150,110,70,0.12);border-left:3px solid #966e46;border-radius:0 6px 6px 0;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#b98a5e;">Fertilizer</span></div>
+          <div class="form-field"><label>Granular Fertilizer</label><select id="nj-fert-product" style="width:100%;" onchange="njFertSyncUnit()"><option value="">— Select —</option></select><div id="nj-fert-noprod" style="display:none;font-size:11px;color:var(--gold);margin-top:6px;">No Granular Fertilizer products in inventory. Add them in the Inventory module (category "Granular Fertilizer").</div></div>
+          <div class="form-row">
+            <div class="form-field"><label>Quantity</label><input id="nj-fert-qty" type="number" step="any" min="0" style="width:100%;"></div>
+            <div class="form-field"><label>Unit</label><input id="nj-fert-unit" type="text" placeholder="kg / bags" style="width:100%;"></div>
+          </div>
+        </div>
 
         <div class="form-field"><label>Notes</label><textarea id="nj-notes" rows="2" style="width:100%;" placeholder="Optional"></textarea></div>
         <div class="form-field"><label>Logged By</label><input id="nj-logged" value="${esc(currentUser?.displayName||"")}" style="width:100%;"></div>
@@ -1725,20 +1602,114 @@ function njUpdateUomLabel(prefix) {
   if(label) label.textContent = '(' + unit + ')';
 }
 
-function njSetJobType(type) {
-  document.getElementById("nj-job-type").value = type;
-  const sBtn = document.getElementById("nj-jt-sched");
-  const iBtn = document.getElementById("nj-jt-intv");
-  sBtn.className = 'jt-btn' + (type==='Scheduled'?' active-sched':'');
-  iBtn.className = 'jt-btn' + (type==='Intervention'?' active-intv':'');
-  document.getElementById("nj-intv-info").style.display = type==='Intervention'?'block':'none';
-  njCheckDuplicate();
+function njFertProductOptions() {
+  const prods = inventoryProducts.filter(p => p.category === 'Granular Fertilizer').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  return prods;
+}
+
+function njOnJobTypeChange() {
+  const type = document.getElementById("nj-job-type").value;
+  const isFert = type === 'Fertilizer';
+  document.getElementById("nj-spray-fields").style.display = isFert ? 'none' : 'block';
+  document.getElementById("nj-fert-fields").style.display = isFert ? 'block' : 'none';
+  document.getElementById("nj-intv-info").style.display = type === 'Intervention' ? 'block' : 'none';
+  document.getElementById("nj-fert-info").style.display = isFert ? 'block' : 'none';
+  if(isFert) {
+    const sel = document.getElementById("nj-fert-product");
+    const prods = njFertProductOptions();
+    sel.innerHTML = '<option value="">— Select —</option>' + prods.map(p=>`<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}">${esc(p.name)}</option>`).join('');
+    document.getElementById("nj-fert-noprod").style.display = prods.length ? 'none' : 'block';
+  }
+}
+
+function njFertSyncUnit() {
+  const sel = document.getElementById("nj-fert-product");
+  const unitEl = document.getElementById("nj-fert-unit");
+  if(!sel || !unitEl) return;
+  if(!unitEl.value) {
+    const opt = sel.options[sel.selectedIndex];
+    if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit;
+  }
 }
 
 function njCheckDuplicate() {
   // Simplified — no blocking, just info
   const warnEl = document.getElementById("nj-dup-warning");
   if(warnEl) warnEl.style.display = 'none';
+}
+
+// Fertilizer job edit / complete (dedicated — bypasses spray completion flow)
+function openFertJobModal(jobId) {
+  const j = jobs.find(x => x.id === jobId);
+  if(!j) { notify("Job not found","error"); return; }
+  const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}" ${b.id===j.block_id?'selected':''}>${esc(b.block_name)}</option>`).join("");
+  const prods = njFertProductOptions();
+  const prodOpts = '<option value="">— Select —</option>' + prods.map(p=>`<option value="${p.id}" data-unit="${esc(p.pack_unit||'')}" ${p.id===j.inventory_product_id?'selected':''}>${esc(p.name)}</option>`).join('');
+  const workerOpts = '<option value="">— Select —</option>' + workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?'selected':''}>${esc(w.name)}</option>`).join("");
+  const statusOpts = ['Planned','In Progress','Completed'].map(s=>`<option value="${s}" ${j.status===s?'selected':''}>${s}</option>`).join('');
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay" style="display:flex;">
+      <div class="modal-box" style="max-width:480px;">
+        <div class="modal-header"><div class="modal-title">Fertilizer Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="modal-body">
+          <div class="form-field"><label>Block</label><select id="fj-block" style="width:100%;">${blockOpts}</select></div>
+          <div class="form-field"><label>Granular Fertilizer</label><select id="fj-product" style="width:100%;" onchange="fjSyncUnit()">${prodOpts}</select></div>
+          <div class="form-row">
+            <div class="form-field"><label>Quantity</label><input id="fj-qty" type="number" step="any" min="0" value="${j.fertilizer_quantity!=null?j.fertilizer_quantity:''}" style="width:100%;"></div>
+            <div class="form-field"><label>Unit</label><input id="fj-unit" type="text" value="${esc(j.fertilizer_quantity_unit||'')}" placeholder="kg / bags" style="width:100%;"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>Worker</label><select id="fj-worker" style="width:100%;">${workerOpts}</select></div>
+            <div class="form-field"><label>Planned Date</label><input id="fj-planned" type="date" value="${j.planned_date||''}" style="width:100%;"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>Status</label><select id="fj-status" style="width:100%;" onchange="fjStatusChange()">${statusOpts}</select></div>
+            <div class="form-field" id="fj-compdate-wrap" style="display:${j.status==='Completed'?'block':'none'};"><label>Completed Date</label><input id="fj-compdate" type="date" value="${j.completion_date||todayStr()}" style="width:100%;"></div>
+          </div>
+          <div class="form-field"><label>Notes</label><textarea id="fj-notes" rows="2" style="width:100%;">${esc(j.notes||'')}</textarea></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="fertJobSave('${j.id}')">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fjSyncUnit() {
+  const sel = document.getElementById("fj-product"); const unitEl = document.getElementById("fj-unit");
+  if(!sel || !unitEl) return;
+  if(!unitEl.value) { const opt = sel.options[sel.selectedIndex]; if(opt && opt.dataset.unit) unitEl.value = opt.dataset.unit; }
+}
+
+function fjStatusChange() {
+  const st = document.getElementById("fj-status").value;
+  document.getElementById("fj-compdate-wrap").style.display = st === 'Completed' ? 'block' : 'none';
+}
+
+async function fertJobSave(jobId) {
+  const block_id = document.getElementById("fj-block").value;
+  const inventory_product_id = document.getElementById("fj-product").value;
+  const qtyRaw = document.getElementById("fj-qty").value;
+  const fertilizer_quantity_unit = document.getElementById("fj-unit").value.trim() || null;
+  const worker_name = document.getElementById("fj-worker").value;
+  const planned_date = document.getElementById("fj-planned").value;
+  const status = document.getElementById("fj-status").value;
+  const notes = document.getElementById("fj-notes").value.trim() || null;
+  if(!block_id || !inventory_product_id || !worker_name || !planned_date) { notify("Block, product, worker and planned date are required","warning"); return; }
+  const fertilizer_quantity = qtyRaw === '' ? null : parseFloat(qtyRaw);
+  const payload = {
+    block_id, inventory_product_id, fertilizer_quantity, fertilizer_quantity_unit,
+    worker_name, planned_date, status, notes, triggers_countdown:false,
+    completion_date: status === 'Completed' ? (document.getElementById("fj-compdate").value || todayStr()) : null
+  };
+  const result = await sbQuery(sb.from('pnd_jobs').update(payload).eq('id', jobId).select());
+  if(result === null) return;
+  closeModal();
+  await loadJobs();
+  if(currentPage==='jobs') renderJobsTable();
+  if(currentPage==='joblogs') renderJobLogs();
+  notify("Fertilizer job saved");
 }
 
 async function submitNewJob() {
@@ -1750,6 +1721,36 @@ async function submitNewJob() {
   const notes = document.getElementById("nj-notes").value.trim()||null;
   const logged = document.getElementById("nj-logged").value.trim()||null;
   const jobType = document.getElementById("nj-job-type")?.value || 'Scheduled';
+
+  if(jobType === 'Fertilizer') {
+    const block_id = document.getElementById("nj-block").value;
+    const inventory_product_id = document.getElementById("nj-fert-product").value;
+    const qtyRaw = document.getElementById("nj-fert-qty").value;
+    const fertilizer_quantity_unit = document.getElementById("nj-fert-unit").value.trim() || null;
+    const worker_name = document.getElementById("nj-worker").value;
+    const planned_date = document.getElementById("nj-date").value;
+    const notes = document.getElementById("nj-notes").value.trim() || null;
+    const logged = document.getElementById("nj-logged").value.trim() || null;
+    if(!block_id) { notify("Select a block","warning"); return; }
+    if(!inventory_product_id) { notify("Select a fertilizer product","warning"); return; }
+    if(!worker_name) { notify("Select a worker","warning"); return; }
+    if(!planned_date) { notify("Set a planned date","warning"); return; }
+    const fertilizer_quantity = qtyRaw === '' ? null : parseFloat(qtyRaw);
+    const btn = document.getElementById("nj-create-btn"); if(btn){ btn.disabled = true; btn.textContent = "Saving…"; }
+    const payload = {
+      block_id, job_type:'Fertilizer', status:'Planned', triggers_countdown:false,
+      inventory_product_id, fertilizer_quantity, fertilizer_quantity_unit,
+      worker_name, planned_date, notes, logged_by: logged,
+      tanks_completed: 0, company_id: getCompanyId()
+    };
+    const result = await sbQuery(sb.from('pnd_jobs').insert(payload).select());
+    if(result === null) { if(btn){ btn.disabled=false; btn.textContent="Create Job"; } return; }
+    closeModal();
+    await loadJobs();
+    if(currentPage==='jobs') renderJobsTable();
+    notify("Fertilizer job created");
+    return;
+  }
 
   if(!blockId) { notify("Block is required","warning"); return; }
   if(!njAIs.length) { notify("Add at least one active ingredient","warning"); return; }
@@ -1800,6 +1801,8 @@ async function submitNewJob() {
 function openEditJobModal(jobId) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
+  const _fjGuard = jobs.find(x => x.id === jobId);
+  if(_fjGuard && _fjGuard.job_type === 'Fertilizer') { return openFertJobModal(jobId); }
   const b=getBlock(j.block_id);
   const jps = getJobProducts(j.id);
   const ejWorkerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${w.name===j.worker_name?"selected":""}>${esc(w.name)}</option>`).join("");
@@ -2201,6 +2204,25 @@ async function renderJobLogs() {
 
   tbody.innerHTML = data.map(j => {
     const b = getBlock(j.block_id);
+    if(j.job_type === 'Fertilizer') {
+      const inv = getInventoryProduct(j.inventory_product_id);
+      const qty = j.fertilizer_quantity != null ? esc(fmtNum(j.fertilizer_quantity)+' '+(j.fertilizer_quantity_unit||'')) : '—';
+      return `<tr>
+        <td>${fmtDateShort(j.planned_date)}</td>
+        <td>${fmtDateShort(j.completion_date)}</td>
+        <td style="font-weight:600;">${esc(b?.block_name)}</td>
+        <td><span class="badge badge-fert" style="background:rgba(150,110,70,0.2);color:#b98a5e;border:1px solid rgba(150,110,70,0.4);">Fertilizer</span></td>
+        <td style="font-size:11px;">${esc(inv?inv.name:'—')}</td>
+        <td style="font-size:11px;color:var(--text-dim);">—</td>
+        <td>${esc(j.worker_name)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>${qty}</td>
+        <td>—</td>
+        <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="openFertJobModal('${j.id}')">Edit</button></td>
+      </tr>`;
+    }
     const p = getProduct(j.product_id);
     const typeBadge = j.job_type==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>';
     return `<tr>
@@ -2242,6 +2264,8 @@ async function jlGoPage(p) {
 function openEditStatusModal(jobId, prefilledStatus) {
   const j = jobs.find(x=>x.id===jobId);
   if(!j) return;
+  const _fjGuard = jobs.find(x => x.id === jobId);
+  if(_fjGuard && _fjGuard.job_type === 'Fertilizer') { return openFertJobModal(jobId); }
   window._esCurrentJob = j;
   const b = getBlock(j.block_id), p = j.product_id ? getProduct(j.product_id) : null;
   // AI combo info
