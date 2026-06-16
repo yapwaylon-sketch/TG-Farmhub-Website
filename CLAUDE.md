@@ -1120,3 +1120,31 @@ First drill ~2026-08-18. Process: pick a random recent dump, restore into a loca
 - `90227c9` docs(backup): docs/RESTORE.md
 - `b60b781` fix(backup): bump pg_dump v16 → v17 (Supabase upgraded to PG 17.6)
 - Plan: `2ec1c0f`
+
+## Pineapple Spray — Summary Matrix + Fertilizer Log + Recategorization (2026-06-16)
+Rebuilt the Pineapple Spray Tracker's Summary tab from the monitoring-watchlist/type-pill/drill-down design into a simple at-a-glance **block × category matrix**, and added a separate granular-fertilizer log to feed it. Brainstormed section-by-section (visual companion used for the matrix + popup mockup); spec doc skipped per `feedback_skip_spec_doc`. Plan: `docs/superpowers/plans/2026-06-16-spray-summary-matrix.md`. Subagent-driven build on branch `feature/spray-summary-matrix`, merged no-ff (`6b9c9c8`), deployed + live-verified.
+
+### Single source of truth = Inventory (confirmed)
+Spray products (`pnd_products`) link to inventory `products` via `inventory_product_id` (text FK); `pnd_products.product_type` is derived from the inventory `category` via the "Enable Inventory Products for Spraying" flow. `products.category`/`subcategory` are **plain text — no enum/CHECK** (only `inventory.html` `CONFIG.categories` constrains the dropdown), so recategorization is config + a data UPDATE, no schema change. **But `pnd_products.product_type` HAS a CHECK constraint** — that's the only structural DB change.
+
+### Recategorization
+- Inventory categories: retired combined `Fertilizer`; added top-level **`Foliar Fertilizer`** (sprayed) + **`Granular Fertilizer`** (broadcast). New full list: Fungicide · Pesticide · Herbicide · Foliar Fertilizer · Granular Fertilizer · PGR · Adjuvant · Carbide · Other.
+- Re-tag (data): **11 → Foliar Fertilizer** (10 ex-"Water Soluble" + the lone no-subcategory "Yara Krista SOP" — it's a water-soluble SOP), **4 → Granular Fertilizer** (ex-"Granular"), subcategory nulled, **0 left** under old "Fertilizer".
+- `pnd_products.product_type` CHECK widened to add **`foliar_fertilizer`** only (granular is never a spray product). Migration ref: `supabase/spray_fertilizer_migration.sql`. **Gotcha hit during migration:** `products.id` is **TEXT not uuid** → the new table's `inventory_product_id` FK had to be `text` (first attempt used uuid and errored "foreign key cannot be implemented").
+- Spray module maps updated in lockstep for `foliar_fertilizer`: `PRODUCT_TYPES`, `sprayCategories` enable-list, `enableForSpraying` typeMap, AND **three** product_type↔category maps (`typeMap`/`ptMap`/`categoryMap` — the link-to-inventory + unlinked-products-display flows). `Foliar Fertilizer` IS spray-eligible; `Granular Fertilizer` is NOT.
+
+### New: `pnd_fertilizer_applications` table + "Fertilizer" tab
+- Table (`id` uuid, `block_id` uuid→pnd_blocks, `inventory_product_id` text→products, `quantity`, `quantity_unit`, `worker_name`, `date_applied`, `notes`, `logged_by`, `company_id`, `created_at`) + 2 indexes + anon/authenticated RLS (`pnd_fert_apps_anon`/`_auth`). HAS `company_id`.
+- New sidebar tab **Fertilizer** (between Manage Products and Reports): "Log Application" form (block, granular product from inventory `category='Granular Fertilizer'`, quantity + unit auto-filled from `pack_unit`, worker, date, notes) — **one block per entry** — plus a block-filterable history list with edit/delete. Granular fertilizer is logged here, NOT through spray jobs.
+
+### Summary matrix
+- One row per active block; 4 category column-pairs (**Fungicide · Pesticide · Foliar Fertilizer · Fertilizer**), each = last application **Date + Days elapsed**, `—` where none. **Plain — no urgency colors, no per-category interval.** Status sub-line under each block name. Status filter + block search (200ms debounce). Sorted by block name (numeric-aware).
+- Data flow: the 3 sprayed columns aggregate **all `pnd_spray_logs`** grouped by `getProduct(log.product_id).product_type` (latest per block+type); the Fertilizer column = latest `pnd_fertilizer_applications` per block. Repurposed the previously-unused `sprayLogs` global; added `loadSprayLogs()`/`loadFertilizerApplications()`.
+- **Hover popup (detailed)**: sprayed cells resolve the job via `getSprayLogJob(log.logged_by)` → product, quantity used (`fmtSprayProductUsed`), full tank mix (`getJobProducts`), tank/water (`fmtSprayWater`), worker + logged-by; granular cells show product, quantity, worker. Floating `#summary-cell-popup`, viewport-clamped, `data-cell` + event delegation (no quote-escaping issues).
+- **Removed** (dead code, 343 lines): watchlist (chips/Add-to-Monitoring/Clear-All + modal), type-filter pills, Level-1/Level-2 drill-down (`renderSummaryLevel1`/`renderSummarySection`), overview cards (Overdue/Due-soon — gone with urgency), `PRODUCT_TYPES`, all watchlist state + `localStorage` helpers. Active Jobs / Job Logs / Manage Products / Reports untouched.
+
+### Deferred (explicitly out of scope)
+Herbicide → its own tab; PGR + Carbide (flowering-induction hormones) → their own tab; Adjuvant placement. All still in the data + Job Logs, just not summarized yet. They'd reuse the same matrix component with different columns when built.
+
+### Commits (branch `feature/spray-summary-matrix`, merged `6b9c9c8`)
+`5c0eb28` plan · `eae09e6` DB migration · `8115aa3` inventory categories · `25dce20` spray type/category maps · `0540909` loaders · `2b973c3` Fertilizer tab · `c2f07ba` Summary matrix+popup · `7b37306` dead-code removal
