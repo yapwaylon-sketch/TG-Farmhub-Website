@@ -147,32 +147,25 @@
         <select id="category-filter" onchange="renderProducts()">
           <option value="all">All Categories</option>
         </select>
-        <select id="status-filter" onchange="renderProducts()">
-          <option value="all">All Status</option>
-          <option value="good">Good</option>
-          <option value="low">Low</option>
-          <option value="critical">Critical</option>
-        </select>
         <select id="sort-by" onchange="renderProducts()">
           <option value="name-asc">Sort: Name A–Z</option>
           <option value="name-desc">Sort: Name Z–A</option>
           <option value="stock-asc">Sort: Stock Low → High</option>
           <option value="stock-desc">Sort: Stock High → Low</option>
-          <option value="status">Sort: Status (Critical first)</option>
           <option value="category">Sort: Category</option>
         </select>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer;white-space:nowrap;">
           <input type="checkbox" id="show-archived" onchange="renderProducts()" style="accent-color:var(--gold);cursor:pointer;">
           Show Archived
         </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gold-light);cursor:pointer;white-space:nowrap;">
-          <input type="checkbox" id="group-by-ingredient" onchange="renderProducts()" style="accent-color:var(--gold);cursor:pointer;">
-          Group by Ingredient
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" id="show-zero-stock" onchange="renderProducts()" style="accent-color:var(--gold);cursor:pointer;">
+          Show 0-stock
         </label>
       </div>
       <div class="data-table">
         <table><thead><tr>
-          <th>Product Name</th><th>Category</th><th>Active Ingredient</th><th>Packaging</th><th>Stock</th><th style="text-align:right;">Value (RM)</th><th>Status</th><th></th>
+          <th>Product Name</th><th>Category</th><th>Active Ingredient</th><th>Packaging</th><th>Stock</th><th style="text-align:right;">Value (RM)</th><th></th>
         </tr></thead><tbody id="products-table"></tbody></table>
         <div id="products-empty" class="empty-state" style="display:none;">No products found matching your search.</div>
       </div>
@@ -875,7 +868,8 @@ async function syncNow() {
 async function dbInsertProduct(p) {
   var result = await sbQuery(sb.from("products").insert({
     id: p.id, name: p.name, category: p.category, subcategory: p.subcategory || "",
-    active_ingredient: p.activeIngredient, formulation: p.formulation,
+    active_ingredient: p.activeIngredient, active_ingredient_id: p.activeIngredientId || null,
+    formulation: p.formulation,
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || "",
@@ -887,7 +881,8 @@ async function dbInsertProduct(p) {
 async function dbUpdateProduct(p) {
   var result = await sbQuery(sb.from("products").update({
     name: p.name, category: p.category, subcategory: p.subcategory || "",
-    active_ingredient: p.activeIngredient, formulation: p.formulation,
+    active_ingredient: p.activeIngredient, active_ingredient_id: p.activeIngredientId || null,
+    formulation: p.formulation,
     pack_type: p.packType || "Bag", pack_size: p.packSize || 0, pack_unit: p.packUnit || "pc",
     reorder_level: p.reorderLevel, current_stock: p.currentStock, opening_stock: p.openingStock || 0,
     supplier_ids: p.supplierIds || [], archived: p.archived || false, image_url: p.imageUrl || ""
@@ -1151,26 +1146,13 @@ function navigateTo(page) {
   injectUserBadge(currentUser);
 }
 
-function jumpToProducts(category, status) {
+function jumpToProducts(category) {
   document.getElementById("category-filter").value = category || "all";
-  document.getElementById("status-filter").value = status || "all";
   navigateTo("products");
 }
 
 // injectUserBadge(currentUser) — from shared.js
 
-function toggleAIGroup(idx) {
-  const sub = document.getElementById("ai-sub-" + idx);
-  const arrow = document.getElementById("ai-arrow-" + idx);
-  if (!sub) return;
-  if (sub.style.display === "none") {
-    sub.style.display = "";
-    if (arrow) arrow.style.transform = "rotate(90deg)";
-  } else {
-    sub.style.display = "none";
-    if (arrow) arrow.style.transform = "";
-  }
-}
 
 function openJournal(productId) {
   selectedProductId = productId;
@@ -1482,18 +1464,31 @@ function _aiPopOutsideClick(ev) {
 // RENDER: PRODUCTS
 // ============================================================
 function renderProductRow(p) {
-  const st = getStockStatus(p);
   const archivedStyle = p.archived ? "opacity:0.5;" : "";
   const archivedBadge = p.archived ? '<span style="background:var(--bg-card);color:var(--text-dim);font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);margin-left:6px;">Archived</span>' : "";
   const stockVal = getProductStockValue(p.id);
+
+  // AI chip — reuses the dashboard chip + popover. Falls back to plain text if
+  // the FK isn't set yet (legacy products that didn't get auto-matched).
+  const ing = p.activeIngredientId ? pndIngredients.find(i => i.id === p.activeIngredientId) : null;
+  const aiCell = ing
+    ? `<span class="inv-ai-chip" onclick="event.stopPropagation();showAIPopover('${ing.id}',event,this)" title="${esc(ing.name)}">${esc(aiChipLabel(ing.name))}</span>`
+    : `<span style="color:var(--text-dim);font-style:italic;font-size:11px;">${esc(p.activeIngredient || "—")}</span>`;
+
+  // Stock cell — packs + canonical sub-label (e.g. "5 packets · 2,500 g").
+  const stockNum = Number(p.currentStock) || 0;
+  const packType = (p.packType || "unit").toLowerCase();
+  const stockLabel = `${stockNum.toLocaleString()} ${packType}${stockNum === 1 ? "" : (packType.endsWith("s") ? "" : "s")}`;
+  const canon = canonicalForProduct(p);
+  const canonLabel = canon ? `<div style="font-size:11px;color:#6B4C8A;font-weight:500;opacity:0.85;">${fmtCanonical(canon.amount, canon.unit)}</div>` : "";
+
   return `<tr class="clickable" onclick="openJournal('${p.id}')" style="${archivedStyle}">
     <td class="td-bold">${p.name}${archivedBadge}</td>
     <td>${p.category}${p.subcategory?" › "+p.subcategory:""}</td>
-    <td class="td-gold">${p.activeIngredient}</td>
+    <td>${aiCell}</td>
     <td>${packFull(p)}</td>
-    <td style="font-weight:700;color:var(--${st});">${p.currentStock.toLocaleString()}</td>
+    <td style="font-weight:700;">${stockLabel}${canonLabel}</td>
     <td style="text-align:right;color:var(--gold-light);font-weight:600;">${stockVal > 0 ? formatRM(stockVal) : "—"}</td>
-    <td><span class="badge badge-${st}">${st==="critical"?'<span class="blink-dot"></span>':""}${st==="good"?"Good":st==="low"?"Low":"Critical"}</span></td>
     <td style="text-align:right;white-space:nowrap;">
       <button class="btn btn-outline" style="padding:4px 8px;" onclick="event.stopPropagation();openReorderModal('${p.id}')" title="Reorder">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1508,31 +1503,22 @@ function renderProductRow(p) {
   </tr>`;
 }
 
-let ingredientGroupState = {}; // track open/closed state of groups
-
-function toggleIngredientGroup(key) {
-  ingredientGroupState[key] = !ingredientGroupState[key];
-  renderProducts();
-}
-
 function renderProducts() {
   const search = document.getElementById("product-search").value.toLowerCase();
   const catFilter = document.getElementById("category-filter").value;
-  const statusFilter = document.getElementById("status-filter").value;
   const sortBy = document.getElementById("sort-by").value;
   const showArchived = document.getElementById("show-archived").checked;
-  const groupByIngredient = document.getElementById("group-by-ingredient").checked;
+  const showZeroStock = document.getElementById("show-zero-stock").checked;
 
   const filtered = products.filter(p => {
     if (!showArchived && p.archived) return false;
-    const matchSearch = !search || p.name.toLowerCase().includes(search) || p.activeIngredient.toLowerCase().includes(search);
+    if (!showZeroStock && Number(p.currentStock) <= 0 && !p.archived) return false;
+    const matchSearch = !search || p.name.toLowerCase().includes(search) || (p.activeIngredient || "").toLowerCase().includes(search);
     const matchCat = catFilter === "all" || p.category === catFilter;
-    const matchStatus = statusFilter === "all" || getStockStatus(p) === statusFilter;
-    return matchSearch && matchCat && matchStatus;
+    return matchSearch && matchCat;
   });
 
   // Sort — archived always at bottom
-  const statusOrder = { critical: 0, low: 1, good: 2 };
   filtered.sort((a, b) => {
     if (a.archived !== b.archived) return a.archived ? 1 : -1;
     switch (sortBy) {
@@ -1540,7 +1526,6 @@ function renderProducts() {
       case "name-desc": return b.name.localeCompare(a.name);
       case "stock-asc": return a.currentStock - b.currentStock;
       case "stock-desc": return b.currentStock - a.currentStock;
-      case "status": return statusOrder[getStockStatus(a)] - statusOrder[getStockStatus(b)];
       case "category": return a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
       default: return 0;
     }
@@ -1556,50 +1541,7 @@ function renderProducts() {
   }
 
   empty.style.display = "none";
-
-  if (!groupByIngredient) {
-    // Normal flat view
-    tbody.innerHTML = filtered.map(p => renderProductRow(p)).join("");
-  } else {
-    // Grouped by active ingredient + unit
-    const groups = {};
-    filtered.forEach(p => {
-      const key = p.activeIngredient.trim().toLowerCase() + "|" + p.packType;
-      if (!groups[key]) groups[key] = { ingredient: p.activeIngredient, packType: p.packType, packSize: p.packSize, packUnit: p.packUnit, products: [], totalStock: 0 };
-      groups[key].products.push(p);
-      groups[key].totalStock += p.currentStock;
-    });
-
-    const groupKeys = Object.keys(groups).sort((a, b) => groups[a].ingredient.localeCompare(groups[b].ingredient));
-    let html = "";
-
-    groupKeys.forEach(key => {
-      const g = groups[key];
-      const isOpen = ingredientGroupState[key] !== false; // default open
-      const chevronClass = isOpen ? "ingredient-group-chevron open" : "ingredient-group-chevron";
-      const count = g.products.length;
-
-      if (count === 1) {
-        // Single product — no group header needed, just show the row
-        html += renderProductRow(g.products[0]);
-      } else {
-        // Group header
-        html += `<tr class="ingredient-group-header" onclick="toggleIngredientGroup('${key}')">
-          <td colspan="8">
-            <span class="${chevronClass}">▶</span>
-            ${g.ingredient}
-            <span class="ingredient-group-count">(${count} products)</span>
-            <span class="ingredient-group-total">${g.totalStock.toLocaleString()} ${g.packType || "unit"} combined</span>
-          </td>
-        </tr>`;
-        if (isOpen) {
-          html += g.products.map(p => renderProductRow(p)).join("");
-        }
-      }
-    });
-
-    tbody.innerHTML = html;
-  }
+  tbody.innerHTML = filtered.map(p => renderProductRow(p)).join("");
 }
 
 // ============================================================
@@ -2788,6 +2730,9 @@ async function saveProduct() {
   const category = document.getElementById("prod-category").value;
   const subcategory = document.getElementById("prod-subcategory").value || "";
   const activeIngredient = prodSelectedIngredients.map(i => i.name).join(' + ');
+  // First selected AI is the "primary" for the FK used by dashboard rollup + analytics.
+  // The full multi-AI list still lives in pnd_product_ingredients for spray products.
+  const activeIngredientId = prodSelectedIngredients.length > 0 ? prodSelectedIngredients[0].id : null;
   const formulation = document.getElementById("prod-formulation").value;
   const packType = document.getElementById("prod-pack-type").value;
   const packSize = parseFloat(document.getElementById("prod-pack-size").value) || 0;
@@ -2813,7 +2758,7 @@ async function saveProduct() {
       } else if (imageCleared && !document.getElementById("prod-image-img").src) {
         imageUrl = "";
       }
-      Object.assign(p, { name, category, subcategory, activeIngredient, formulation, packType, packSize, packUnit, reorderLevel, supplierIds, imageUrl });
+      Object.assign(p, { name, category, subcategory, activeIngredient, activeIngredientId, formulation, packType, packSize, packUnit, reorderLevel, supplierIds, imageUrl });
       await dbUpdateProduct(p);
       // Cascade: update product_name in all transactions
       if (oldName !== name) {
@@ -2855,7 +2800,7 @@ async function saveProduct() {
     }
     const openingQty = parseFloat(document.getElementById("prod-opening-qty").value) || 0;
     const openingCost = parseFloat(document.getElementById("prod-opening-cost").value) || 0;
-    const p = { id: newId, name, category, subcategory, activeIngredient, formulation, packType, packSize, packUnit, reorderLevel, currentStock: openingQty, openingStock: openingQty, archived: false, supplierIds, imageUrl };
+    const p = { id: newId, name, category, subcategory, activeIngredient, activeIngredientId, formulation, packType, packSize, packUnit, reorderLevel, currentStock: openingQty, openingStock: openingQty, archived: false, supplierIds, imageUrl };
     await dbInsertProduct(p);
     products.push(p);
     // Create opening transaction if qty > 0
