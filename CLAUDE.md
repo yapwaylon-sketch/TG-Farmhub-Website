@@ -1200,3 +1200,87 @@ DB introspection (all FK targets uuid; 0 herbicide jobs). Both module files `nod
 
 ### Deferred (unchanged)
 Manage Areas UI + area-based jobs (schema ready). Herbicide tab / Flowering (PGR+Carbide) tab / Adjuvant placement in Crop Care still their own future work. Permissions: weedcontrol MODULES entry has `view`/`log`/`manageProducts` perms but is admin-only until exposed in User Management (same as other recent modules).
+
+## Inventory Rework — Dashboard around 6 category cards + AI as FK (2026-06-18)
+Full Inventory module rework after the user reported "the dashboard is very confusing." Five sequential phases shipped in one session, each deployed + live-verified + committed before the next. Brainstormed section-by-section via the brainstorming skill (visual companion used for layout questions, terminal for conceptual ones). Spec doc skipped per `feedback_skip_spec_doc`; design decisions captured in the per-phase commit messages and this entry.
+
+### What's locked from the design discussion
+- **AI is now a normalized FK, never free text.** New column `products.active_ingredient_id UUID NULL REFERENCES pnd_ingredients(id) ON DELETE SET NULL`. Old `products.active_ingredient` text column **stays alongside** during transition — rollback path preserved, drop deferred to a later session once stability is confirmed.
+- **No auto-decrement on jobs.** Inventory stays the single writer. Stock changes always go through Transactions. Spray Tracker / Weed Control / Fertilizer jobs read inventory but never mutate it. The user was explicit: "I will always manage inventory separately."
+- **Stock-low / Crit / Low / Good status pills DROPPED entirely.** User's reasoning: products churn faster than stock cycles ("I keep changing my products"), so a "Low" alert is noise, not signal. No more reorder-level threshold logic anywhere on dashboard or Products tab. `getStockStatus()` is kept (still used inside Reports — Phase 5 deferred deeper Reports work) but Phase 2/3 stopped calling it from dashboard + product table.
+- **Dashboard answers "what do I have right now," not "what's wrong."** No alerts, no summary metric strip, no Recent Transactions section. Just six category cards.
+- **6 dashboard categories** (collapses richer DB categories at render time): Fungicide · Pesticide · Herbicide · Foliar Fertilizer · Granular Fertilizer · Other. PGR, Adjuvant, and Carbide collapse into "Other" for display via `dashboardCategoryFor(p)`; `products.category` keeps its granular value for Products tab + Add Product modal.
+- **Single FK on inventory, not multi-AI per product.** The Add Product modal still allows multi-AI pills (used by 3 real pre-mix products: Contego 80WG · Diuron+Ametryn, Khoros 300 · Acetamiprid+Pyriproxyfen, Tapisan · Buprofezin+Cartap), but the **first selected AI becomes the FK** stored in `active_ingredient_id`. The full multi-AI list lives in `pnd_product_ingredients` junction for spray products only — that's the source of truth for tank-mix analytics. Dashboard chip shows the primary AI from the FK; popover can later append "+ also contains X" from the junction if desired (deferred — not implemented this session).
+- **Sidebar collapsed from 5 tabs to 5 different tabs:** Dashboard · Products · Suppliers · Transactions (new) · Reports. Analytics tab DROPPED, its monthly usage chart moved into Reports.
+
+### Phase 1 — DB migration + auto-match (commit `434557b`)
+- `supabase/inventory_ai_fk_migration.sql` adds the column + FK + index `idx_products_active_ingredient_id`.
+- `scripts/inventory-schema-check.mjs` — one-shot recon (read-only) before writing migration. Confirmed `pnd_ingredients.id` is UUID, `products.id` is TEXT, all 43 products are `tg_agribusiness` (Agro Fruits has zero inventory products).
+- `scripts/inventory-ai-automatch-dryrun.mjs` — 3-tier auto-match strategy:
+  1. **Spray junction lookup** — if product has `pnd_products` link via `inventory_product_id` AND that pnd_product has rows in `pnd_product_ingredients`, use the FIRST AI from the junction. Highest confidence (this is what spray system already trusts for tank-mix).
+  2. **Exact name match** — case-insensitive, whitespace-collapsed match of `products.active_ingredient` against `pnd_ingredients.name` within the same `company_id`.
+  3. **Fuzzy (Levenshtein ≤ 2)** — only if exactly ONE candidate qualifies; multi-candidate = "needs review."
+- Production result: **30 via junction + 11 via exact = 41/43 matched**, 0 fuzzy needed, 0 ambiguous. 2 left NULL (Yara Krista SOP, Yara Tera Krista Mgs — both fertilizers with legitimately empty `active_ingredient`).
+- `scripts/inventory-ai-automatch-apply.mjs` — mirror of dry-run with writes, wrapped in a transaction (begin → updates → commit, rollback on any error).
+
+### Phase 2 — Dashboard rebuild (commit `e8355b1`)
+- Stripped `dashboard-cards` (5 metric cards) + `dashboard-alert` + `dashboard-ingredient-summary` + `dashboard-low-stock` + `dashboard-transactions`. Single new wrapper: `<div id="dashboard-category-grid">`.
+- `renderDashboard()` rewritten to render the 6 category cards in a 3-col responsive grid (2-col @ ≤1100px, 1-col @ ≤700px). Each card has a gold-tinted header (name + "N active" count), product rows below.
+- **Each product row**: name + AI chip + pack-size sub-label on the left, `current_stock` + canonical mass/volume on the right. E.g. `5 packets · 2,500 g`. Canonical math via `canonicalForProduct(p)` — `kg→×1000g`, `g→×1g`, `L→×1000mL`, `mL→×1mL`, anything else returns null (no canonical for "pieces"/"bags"/"bottles" without internal size).
+- **Zero-stock products hidden by default.** Each card has a footer toggle "Show N with no stock ▾" that reveals dimmed phased-out rows.
+- **AI chip pattern** (the load-bearing new UI primitive — reused by Phase 3 + Phase 4): small purple pill next to each product name. Tap → `showAIPopover(ingredientId, ev, anchorEl)` opens a dark-themed popover near the chip. Popover content (Option 2 from the brainstorm):
+  - AI name + "Across N products"
+  - Big canonical total (handles mixed g + mL — "X g + Y mL")
+  - Per-product breakdown lines: "↳ Benocide 50 WP · 5 × 500g = 2,500 g"
+  - "Used last 30d: 1,200 g" line from `thirtyDayUsageCanonical(productList)` summing `transactions` rows with `type='out'` and `date >= today-30`.
+- Popover positions itself near the chip, clamps to viewport edges, flips up if no room below. Closes on outside click via one-shot `document.addEventListener("click", _aiPopOutsideClick)`. Re-tapping the same chip toggles closed.
+- Long AI names truncated with ellipsis after 18 chars via `aiChipLabel(name)`; full name in the popover.
+
+### Phase 3 — Products tab tweaks (commit `1495a4b`)
+Light-touch — user explicitly didn't want the Products tab to look like the dashboard ("just as it is is better"). Table layout kept; data display switched.
+- **Filter bar:** drop Status filter (Critical/Low/Good) + Group-by-Ingredient toggle + "Status (Critical first)" sort option. Add "Show 0-stock" toggle (off by default, matches dashboard hide-zero behavior).
+- **Table column:** drop the Status column entirely.
+- **AI column cell:** renders the same `inv-ai-chip` as the dashboard. Falls back to italic muted legacy text if `active_ingredient_id` is NULL (the 2 fertilizers without AI).
+- **Stock cell:** pack count + canonical sub-label inline (`5 packets` over `2,500 g` in purple).
+- **Add Product / Edit Product modal:** multi-AI pill selector left UNCHANGED (user said "leave it"). `saveProduct` now also writes `active_ingredient_id` (the first selected AI becomes primary FK). `dbInsertProduct` + `dbUpdateProduct` include the new column.
+- **Dead code purged:** `toggleAIGroup()` (old ingredient rollup arrow), `toggleIngredientGroup()` + `ingredientGroupState` (old group-by-ingredient state), `jumpToProducts` dropped its now-unused `status` argument.
+
+### Phase 4 — Transactions tab (commit `22ff34e`)
+- New sidebar entry between Suppliers and Reports (two-arrow swap icon).
+- New `<div id="page-transactions">` page. Toolbar: free-text search · From/To date range · Type filter (all/in/out/check/opening) · AI dropdown (from `pnd_ingredients`) · Clear button.
+- Summary line above table: `N transactions · ↓ IN N (RM X) · ↑ OUT N (RM Y)` — recomputes on every filter change.
+- Table columns: Date · Product+AI chip · Type badge · Qty (pack-aware via `packQty`) · Value (uses `txn.total_cost` or computes from `getProductAvgCost` for OUT rows without explicit cost) · Supplier · Taken By · Recorded By · Notes (truncated muted text).
+- All 4 txn mutation paths (`syncNow`, `saveTransaction`, `updateTransaction`, `deleteTransaction`) re-render the Transactions tab when it's `currentPage`, mirroring how they already handle dashboard + products.
+- AI chip popover behavior identical to dashboard — same `showAIPopover` function.
+
+### Phase 5 — Analytics → Reports merge (commit `98fd718`)
+- Removed Analytics sidebar entry + `<div id="page-analytics">` standalone page + `if (page === "analytics") renderAnalytics();` route.
+- Chart UI (mode/product/category/AI/year dropdowns + canvas + cards-grid) moved verbatim into a new boxed section at the top of `<div id="page-reports">`. Same element IDs, same `renderAnalytics()` function — only the parent div changed.
+- `initReportsPage()` now calls `renderAnalytics()` on entry so the chart renders immediately when Reports opens. Analytics-* dropdowns are still populated once at app startup (existing code, unchanged).
+- `generateReportFromAnalytics()` lost its `navigateTo("reports")` (we're already there); now scrolls the report-type buttons into view via `scrollIntoView({behavior:"smooth"})`. Button label changed from "Generate Report" to "Apply to report below ↓".
+- Stock / Reorder / Usage report types untouched. Deeper Reports work parked for a separate brainstorm per user.
+
+### Files touched
+- `inventory.html` (across all 5 phases) — ~600 net lines changed
+- `inventory.css` (Phase 2) — ~140 lines added under "INVENTORY DASHBOARD" section, all classes prefixed `.inv-*` to avoid collisions
+- `supabase/inventory_ai_fk_migration.sql` (Phase 1) — 11 lines
+- `scripts/inventory-schema-check.mjs` + `scripts/inventory-ai-automatch-dryrun.mjs` + `scripts/inventory-ai-automatch-apply.mjs` + `scripts/run-inventory-ai-fk-migration.mjs` — one-shot migration tooling
+
+### Lessons / gotchas worth keeping
+- **The brainstorming visual companion was load-bearing for this session.** The user pivoted twice during design: first from B (toggle) → C (master-detail) when reminded the product list will grow, then from C → flat-card-per-category-with-products-inside once they realized the "AI summary using AI" view was the actual source of confusion (not the master-detail layout). Browser mockups made it fast to redirect; would have been painful in text-only.
+- **The original "AI summary is confusing" wasn't about layout — it was about the math being wrong.** Three root causes I diagnosed during the brainstorm:
+  1. Pack counts summed across products with different pack sizes ("8 / 10 packet" can mean 5 packets × 500g + 3 bottles × 1kg = nonsensical sum)
+  2. AI matched by free-text string ("Benomyl" vs "benomyl" vs "Benomyl 50%" became 3 separate rows for the same chemical)
+  3. Reorder level summed across products (the `/ 10` denominator wasn't a real threshold, just summed per-product thresholds)
+  Fixing the math (FK + canonical units) was more important than the visual layout. The visual rebuild was downstream of that.
+- **`getStockStatus` is dead on the dashboard + Products tab but ALIVE in Reports.** Phase 2/3 stopped calling it from dashboard render + product row, but Reports' Stock Summary / Reorder / Usage report types still use it. Don't delete it — Phase 5 deferred deeper Reports work.
+- **Multi-AI strategy: single FK + spray junction for richness.** For the 3 pre-mix products (Contego, Khoros, Tapisan), the FK gets the FIRST AI as primary. The full multi-AI list lives in `pnd_product_ingredients` for spray products (existing, unchanged). For inventory analytics "how much Ametryn did I use?", the report layer can union: products with FK = Ametryn UNION pnd_product_ingredients with ingredient = Ametryn. Not built yet — deferred to whenever multi-AI analytics is needed.
+- **Canonical units are dead-simple but easy to get wrong.** Pack size × current stock × {1, 1000} based on whether pack_unit is g/kg/mL/L. Anything else returns null (no canonical for discrete units like "pieces"). Mixed-unit AIs (rare in practice) display as "X g + Y mL" in the popover. If you ever add a new unit type, update `canonicalForProduct` AND `fmtCanonical`.
+- **Verification before claiming done: deploy + curl-grep, not "try it."** Each phase's commit message documents what was checked: file IDs present, route logic present, no orphan references. Per the 2026-05-08 oil palm session: never put the verification burden on the user as a substitute.
+
+### Deferred (next time inventory comes up)
+- **Drop the legacy `products.active_ingredient` text column.** Stays for rollback safety. Drop after a month of stable operation.
+- **AI master list management UI.** Adding a new AI inline during product entry works (existing `prod-ingredient-new` flow). A standalone "Manage Ingredients" tab/modal for renaming/merging AIs would be useful. The "Manage Ingredients" button on Products tab still exists — it does merging — but the UX hasn't been audited.
+- **Multi-AI popover annotation** ("+ also contains Cymoxanil"). Schema is in place via `pnd_product_ingredients`; the chip popover just needs to query it. Skipped because the 3 multi-AI products aren't load-bearing for daily work.
+- **Permission gates on the new Transactions tab.** Mirrors Products today — viewable to anyone with Inventory access. Add a `viewTransactions` perm key when User Management gets revisited.
+- **Reports tab deep restructure.** User explicitly parked this: "reports is something I will discuss with you in depth later. As of now just do what we agreed." Phase 5 only moved the chart in; Stock/Reorder/Usage report types still use the old `getStockStatus` logic.
