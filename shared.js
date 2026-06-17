@@ -430,6 +430,7 @@ const MODULE_COMPANY = {
   inventory: 'tg_agribusiness',
   workers: 'tg_agribusiness',
   spraytracker: 'tg_agribusiness',
+  weedcontrol: 'tg_agribusiness',
   growthtracker: 'tg_agribusiness',
   farmconfig: 'shared',
   oilpalmsales: 'tg_agribusiness',
