@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weed Control — TG FarmHub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="weedcontrol.css">
+<script src="shared.js"></script>
+</head>
+<body>
+<div id="tg-loading" style="position:fixed;inset:0;background:#FAF6EF;z-index:99999;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;"><span style="color:#6B4C8A;font-size:28px;font-weight:800;font-family:sans-serif;letter-spacing:1px;">Loading Module</span><span style="color:#D4AF37;font-size:13px;font-family:sans-serif;">TG Agribusiness</span></div>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="app">
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <a href="index.html" style="display:flex;align-items:center;gap:12px;text-decoration:none;flex:1;min-width:0;" title="Back to TG FarmHub">
+      <div class="sidebar-logo"><img src="assets/logo-agribusiness.png" alt="TG"></div>
+      <div>
+        <div class="sidebar-brand-text">Weed Control</div>
+        <div style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><polyline points="15 18 9 12 15 6"/></svg>
+          TG FarmHub
+        </div>
+      </div>
+    </a>
+    <div class="mobile-logout" style="display:none;margin-left:auto;gap:6px;align-items:center;">
+      <button onclick="localStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline btn-sm" style="padding:4px 8px;font-size:10px;gap:3px;color:var(--red);border-color:var(--red);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </button>
+    </div>
+  </div>
+  <div id="company-switcher"></div>
+  <nav class="sidebar-nav" aria-label="Module navigation">
+    <div class="nav-item active" data-page="summary" onclick="navigateTo('summary')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="nav-label">Summary</span>
+    </div>
+    <div class="nav-item" data-page="jobs" onclick="navigateTo('jobs')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="16" y1="12" x2="8" y2="12"/><line x1="16" y1="16" x2="8" y2="16"/></svg>
+      <span class="nav-label">Jobs</span>
+    </div>
+    <div class="nav-item" data-page="joblogs" onclick="navigateTo('joblogs')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      <span class="nav-label">Job Logs</span>
+    </div>
+    <div class="nav-item" data-page="products" onclick="navigateTo('products')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/></svg>
+      <span class="nav-label">Manage Products</span>
+    </div>
+    <div class="nav-item" data-page="reports" onclick="navigateTo('reports')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span class="nav-label">Reports</span>
+    </div>
+  </nav>
+  <div id="sidebar-user" style="padding:8px 16px;border-top:1px solid var(--border);margin-top:auto;">
+    <div id="sidebar-user-info" style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;font-size:12px;color:var(--text-muted);"></div>
+    <button onclick="location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;margin-bottom:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Change PIN
+    </button>
+    <button onclick="localStorage.removeItem('tgfarmhub_user');location.href='index.html'" class="btn btn-outline" style="width:100%;justify-content:center;padding:6px 0;font-size:11px;gap:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-label">Logout</span>
+    </button>
+  </div>
+  <div class="sidebar-sync" onclick="syncAll()">
+    <svg id="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    <span id="sync-text">Synced just now</span>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content" role="main" id="main-content">
+
+<!-- PAGE: SUMMARY -->
+<div id="page-summary" class="page active">
+  <div class="print-header"><h2>TG Agribusiness</h2><p>Weed Control Summary — Generated <span class="print-date"></span></p></div>
+  <div class="page-header">
+    <div><div class="page-title">Weed Control Summary</div><div class="page-subtitle">Last herbicide application + days elapsed, per block</div></div>
+  </div>
+  <div id="summary-filter-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;color:var(--text-muted);">Status</label>
+      <select id="summary-status-filter" onchange="summaryStatusFilter=this.value;renderSummary();" style="font-size:12px;min-width:130px;"></select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;color:var(--text-muted);">Search block</label>
+      <input type="text" id="summary-search" oninput="summarySearchInput(this.value)" placeholder="Block name…" style="font-size:12px;min-width:150px;padding:5px 8px;">
+    </div>
+  </div>
+  <div id="summary-table"></div>
+</div>
+
+<!-- PAGE: JOBS -->
+<div id="page-jobs" class="page">
+  <div class="page-header">
+    <div><div class="page-title">Jobs</div><div class="page-subtitle">Create and manage weed-spray jobs</div></div>
+    <div class="header-actions">
+      <button class="btn btn-primary" onclick="openNewJobModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Job
+      </button>
+    </div>
+  </div>
+  <div id="jobs-stock-summary" style="display:none;margin-bottom:12px;"></div>
+  <div class="data-table">
+    <div class="table-toolbar" id="jobs-toolbar">
+      <select id="jobs-filter-status" onchange="renderJobsTable()" style="min-width:140px;">
+        <option value="active">All Active</option>
+        <option value="Planned">Planned</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Partially Completed">Partially Completed</option>
+        <option value="Suspended">Suspended</option>
+        <option value="all">All</option>
+        <option value="Completed">Completed</option>
+      </select>
+      <select id="jobs-filter-type" onchange="renderJobsTable()" style="min-width:140px;">
+        <option value="">All Types</option>
+        <option value="Scheduled">Scheduled</option>
+        <option value="Intervention">Intervention</option>
+      </select>
+      <select id="jobs-filter-block" onchange="renderJobsTable()" style="min-width:120px;">
+        <option value="">All Blocks</option>
+      </select>
+      <select id="jobs-sort" onchange="renderJobsTable()" style="min-width:160px;">
+        <option value="date_desc">Planned Date (Newest)</option>
+        <option value="date_asc">Planned Date (Oldest)</option>
+        <option value="block_asc">Block Name (A-Z)</option>
+      </select>
+    </div>
+    <div class="wc-table-wrap">
+      <table class="wc-table">
+        <thead><tr>
+          <th>Planned</th><th>Block</th><th>Type</th><th>Product</th><th>Active Ingredient</th><th>Worker</th><th class="wc-hide-sm">Tank</th><th class="wc-hide-sm">Tanks</th><th class="wc-hide-sm wc-num">Total Req.</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="jobs-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: JOB LOGS -->
+<div id="page-joblogs" class="page">
+  <div class="page-header">
+    <div><div class="page-title">Job Logs</div><div class="page-subtitle">Full history of weed-spray jobs</div></div>
+  </div>
+  <div class="data-table">
+    <div class="table-toolbar" id="joblogs-toolbar">
+      <select id="jl-sort" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
+        <option value="date">Sort: Date (Newest)</option>
+        <option value="date_asc">Sort: Date (Oldest)</option>
+        <option value="worker">Sort: Worker</option>
+      </select>
+      <select id="jl-filter-block" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
+        <option value="">All Blocks</option>
+      </select>
+      <select id="jl-filter-worker" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
+        <option value="">All Workers</option>
+      </select>
+      <select id="jl-filter-status" onchange="jlPage=0;renderJobLogs()" style="min-width:140px;">
+        <option value="">All Statuses</option>
+        <option value="Planned">Planned</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Partially Completed">Partially Completed</option>
+        <option value="Suspended">Suspended</option>
+        <option value="Completed">Completed</option>
+      </select>
+      <select id="jl-filter-type" onchange="jlPage=0;renderJobLogs()" style="min-width:120px;">
+        <option value="">All Types</option>
+        <option value="Scheduled">Scheduled</option>
+        <option value="Intervention">Intervention</option>
+      </select>
+      <input type="date" id="jl-from" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
+      <input type="date" id="jl-to" onchange="jlPage=0;renderJobLogs()" style="width:130px;">
+      <button class="btn btn-outline btn-sm" onclick="clearJobLogFilters()">Clear Filters</button>
+      <div style="flex:1;"></div>
+      <span style="font-size:11px;color:var(--text-muted);">Rows:</span>
+      <select id="jl-pagesize" onchange="jlPageSize=parseInt(this.value);jlPage=0;renderJobLogs()" style="width:65px;padding:5px 8px;font-size:11px;">
+        <option value="50">50</option>
+        <option value="100" selected>100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+    <div class="wc-table-wrap">
+      <table class="wc-table">
+        <thead><tr>
+          <th>Planned</th><th>Completed</th><th>Block</th><th class="wc-hide-sm">Type</th><th>Product</th><th>Active Ingredient</th><th>Worker</th><th class="wc-hide-sm">Tank</th><th class="wc-hide-sm">Tanks</th><th class="wc-hide-sm wc-num">Total Req.</th><th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="joblogs-body"></tbody>
+      </table>
+    </div>
+    <div id="jl-pagination" style="padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);"></div>
+  </div>
+</div>
+
+<!-- PAGE: PRODUCTS -->
+<div id="page-products" class="page">
+  <div class="page-header">
+    <div><div class="page-title">Herbicide Products</div><div class="page-subtitle">Products live in Inventory. Enable herbicides for weed spraying + set default dose here.</div></div>
+  </div>
+  <div id="missing-ai-banner" style="display:none;margin-bottom:12px;"></div>
+  <div class="data-table" style="margin-bottom:18px;">
+    <div class="table-header">Enabled Herbicides</div>
+    <div class="wc-table-wrap">
+      <table class="wc-table">
+        <thead><tr><th>Product</th><th>Active Ingredient</th><th class="wc-hide-sm">Packaging</th><th class="wc-num">Stock</th><th class="wc-hide-sm">Default Dose</th><th>Active</th><th></th></tr></thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="data-table">
+    <div class="table-header">Enable Herbicides for Weed Spraying</div>
+    <div style="padding:16px;">
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Only inventory products in the <b>Herbicide</b> category are shown. Enabling one makes it available in the New Job tank mix.</div>
+      <div id="enable-products-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: REPORTS -->
+<div id="page-reports" class="page">
+  <div class="print-header"><h2>TG Agribusiness</h2><p id="print-report-info"></p></div>
+  <div class="page-header">
+    <div><div class="page-title">Reports</div><div class="page-subtitle">Generate and export weed-spray data</div></div>
+  </div>
+  <div class="report-btns" id="report-btns"></div>
+  <div id="report-filters" style="margin-bottom:14px;"></div>
+  <div id="report-actions" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <button class="btn btn-primary" onclick="generateReport()">Generate Report</button>
+    <span id="report-count" style="font-size:12px;color:var(--text-muted);"></span>
+    <div style="flex:1;"></div>
+    <button class="btn btn-outline btn-sm" id="btn-export-csv" onclick="exportCSV()" style="display:none;">Export CSV</button>
+    <button class="btn btn-outline btn-sm" id="btn-export-pdf" onclick="exportPDF()" style="display:none;">Print / PDF</button>
+  </div>
+  <div class="data-table" id="report-results" style="display:none;">
+    <div class="wc-table-wrap"><div id="wc-report-table"></div></div>
+  </div>
+</div>
+
+</div><!-- /main-content -->
+</div><!-- /app -->
+
+<div id="modal-container"></div>
+
+<script>
+// shared.js provides: sb, esc, notify, fmtDate, fmtDateShort, fmtNum, getCompanyId,
+// sbQuery, confirmAction, btnLoading, injectCompanySwitcher, startInactivityTimer.
+
+// ── SESSION ───────────────────────────────────────────────
+let currentUser = null;
+try { const s = localStorage.getItem("tgfarmhub_user"); if(s) currentUser = JSON.parse(s); } catch(e){}
+if(!currentUser) { location.href = "index.html"; }
+
+// ── GLOBAL DATA ───────────────────────────────────────────
+let blocks=[], products=[], workers=[], weedJobs=[], weedJobProducts=[];
+let productIngredients=[], blockCrops=[], cropStatuses=[];
+let inventoryProducts=[], inventoryTransactions=[];
+let currentPage='summary', refreshTimer=null;
+let jlPage=0, jlPageSize=100;
+let summaryStatusFilter='', summarySearch='', _summarySearchTO=null;
+function summarySearchInput(v){ summarySearch=v; if(_summarySearchTO) clearTimeout(_summarySearchTO); _summarySearchTO=setTimeout(renderSummary,200); }
+
+// ── INIT ──────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  if(!currentUser) return;
+  const ui = document.getElementById("sidebar-user-info");
+  if(ui && currentUser.displayName) ui.textContent = currentUser.displayName;
+  await loadAll();
+  renderCurrentPage();
+  document.getElementById("tg-loading").style.display = "none";
+  injectCompanySwitcher();
+  startAutoRefresh();
+  startInactivityTimer();
+  window.addEventListener('scroll', repositionFloatScroll, true);
+  window.addEventListener('resize', repositionFloatScroll);
+});
+
+async function loadAll() {
+  await Promise.all([loadBlocks(), loadProducts(), loadWorkers(), loadWeedJobs(),
+    loadWeedJobProducts(), loadProductIngredients(), loadBlockCrops(), loadCropStatuses(),
+    loadInventoryProducts(), loadInventoryTransactions()]);
+}
+
+async function syncAll() {
+  const icon = document.getElementById("sync-icon");
+  icon.classList.add("spin");
+  await loadAll();
+  renderCurrentPage();
+  icon.classList.remove("spin");
+  document.getElementById("sync-text").textContent = "Synced just now";
+}
+
+function startAutoRefresh() {
+  if(refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    await Promise.all([loadWeedJobs(), loadWeedJobProducts()]);
+    if(currentPage==='summary') renderSummary();
+    if(currentPage==='jobs') renderJobsTable();
+    if(currentPage==='joblogs') renderJobLogs();
+  }, 60000);
+}
+
+// ── NAVIGATION ────────────────────────────────────────────
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-"+page));
+  renderCurrentPage();
+}
+
+async function renderCurrentPage() {
+  if(currentPage==='summary') { renderSummary(); }
+  else if(currentPage==='jobs') { populateJobFilters(); renderJobsTable(); }
+  else if(currentPage==='joblogs') { populateJobLogFilters(); renderJobLogs(); }
+  else if(currentPage==='products') { renderProductsPage(); renderEnableProductsSection(); }
+  else if(currentPage==='reports') initReports();
+}
+
+// ── DATA LOADING ──────────────────────────────────────────
+async function loadBlocks() {
+  const data = await sbQuery(sb.from("pnd_blocks").select("*").order("sort_order"));
+  if(data) blocks = data;
+}
+async function loadProducts() {
+  const data = await sbQuery(sb.from("pnd_products").select("*").eq("company_id", getCompanyId()).eq("product_type","herbicide").order("sort_order"));
+  if(data) products = data;
+}
+async function loadWorkers() {
+  const data = await sbQuery(sb.from("workers").select("id,name").eq("active", true).order("name"));
+  if(data) workers = data;
+}
+async function loadWeedJobs() {
+  const data = await sbQuery(sb.from("pnd_weed_jobs").select("*").eq("company_id", getCompanyId()).order("planned_date",{ascending:false}));
+  if(data) weedJobs = data;
+}
+async function loadWeedJobProducts() {
+  const data = await sbQuery(sb.from("pnd_weed_job_products").select("*").eq("company_id", getCompanyId()));
+  if(data) weedJobProducts = data;
+}
+async function loadProductIngredients() {
+  const data = await sbQuery(sb.from("pnd_product_ingredients").select("*,pnd_ingredients(id,name)").eq("company_id", getCompanyId()));
+  if(data) productIngredients = data;
+}
+async function loadBlockCrops() {
+  const data = await sbQuery(sb.from("block_crops").select("*,crop_varieties(id,name)").eq("is_current",true));
+  if(data) blockCrops = data;
+}
+async function loadCropStatuses() {
+  const data = await sbQuery(sb.from("crop_statuses").select("*").order("sort_order"));
+  if(data) cropStatuses = data;
+}
+async function loadInventoryProducts() {
+  const data = await sbQuery(sb.from("products").select("id,name,category,active_ingredient,current_stock,pack_size,pack_unit,pack_type,archived").eq("archived", false).eq("company_id", getCompanyId()));
+  if(data) inventoryProducts = data;
+}
+async function loadInventoryTransactions() {
+  const data = await sbQuery(sb.from("transactions").select("product_id,type,quantity,total_cost").in("type",["in"]).eq("company_id", getCompanyId()));
+  if(data) inventoryTransactions = data;
+}
+
+// ── LOOKUP HELPERS ────────────────────────────────────────
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function daysDiff(from,to){ if(!from||!to) return null; return Math.floor((new Date(to)-new Date(from))/86400000); }
+function getBlock(id){ return blocks.find(b=>b.id===id); }
+function getProduct(id){ return products.find(p=>p.id===id); }
+function getInventoryProduct(id){ return inventoryProducts.find(p=>p.id===id); }
+function getBlockCrop(blockId){ return blockCrops.find(bc=>bc.block_id===blockId); }
+function getCropStatusName(statusId){ const s=cropStatuses.find(x=>x.id===statusId); return s?s.name:'—'; }
+function getWeedJobProducts(jobId){ return weedJobProducts.filter(jp=>jp.weed_job_id===jobId); }
+function getProductIngredientNames(productId){ return productIngredients.filter(pi=>pi.product_id===productId && pi.pnd_ingredients).map(pi=>pi.pnd_ingredients.name); }
+
+// AI string for a product: prefer linked pnd_ingredients, fall back to inventory active_ingredient text.
+function productAIString(productId){
+  const names = getProductIngredientNames(productId);
+  if(names.length) return names.join(', ');
+  const p = getProduct(productId);
+  if(p && p.inventory_product_id){ const inv=getInventoryProduct(p.inventory_product_id); if(inv && inv.active_ingredient) return inv.active_ingredient; }
+  return '';
+}
+function productName(productId){ const p=getProduct(productId); if(p) return p.product_name; return '?'; }
+
+// Job-level display helpers
+function jobLocationName(j){ if(j.block_id){ const b=getBlock(j.block_id); return b?b.block_name:'?'; } return '(area)'; }
+function jobProductsLabel(j){
+  const jps = getWeedJobProducts(j.id);
+  if(jps.length){
+    if(jps.length===1) return esc(productName(jps[0].product_id));
+    return jps.map(jp=>'<div class="wc-ellipsis-sm" title="'+esc(productName(jp.product_id))+'">'+esc(productName(jp.product_id))+'</div>').join('');
+  }
+  if(j.product_id) return esc(productName(j.product_id));
+  return '<span class="wc-muted">—</span>';
+}
+function jobAILabel(j){
+  const jps = getWeedJobProducts(j.id);
+  const set = [];
+  jps.forEach(jp=>{ const ai = jp.ai_snapshot || productAIString(jp.product_id); if(ai) ai.split(/[+,]/).map(s=>s.trim()).filter(Boolean).forEach(n=>{ if(!set.includes(n)) set.push(n); }); });
+  if(!set.length && j.product_id){ const ai=productAIString(j.product_id); if(ai) ai.split(/[+,]/).map(s=>s.trim()).filter(Boolean).forEach(n=>{ if(!set.includes(n)) set.push(n); }); }
+  return set.length ? esc(set.join(', ')) : '<span class="wc-muted">—</span>';
+}
+function jobWater(j){ return (parseFloat(j.tank_size_litres)||0) * (parseFloat(j.tanks_planned)||0); }
+function jobTotalsHtml(j){
+  const jps = getWeedJobProducts(j.id);
+  const W = jobWater(j);
+  if(!jps.length) return '<span class="wc-muted">—</span>';
+  if(jps.length===1){
+    const jp=jps[0]; const t=(jp.dose_amount&&jp.dose_per_litres&&W)?(W/jp.dose_per_litres)*jp.dose_amount:0;
+    return fmtNum(t)+' '+esc(jp.dose_unit||'');
+  }
+  return jps.map(jp=>{ const t=(jp.dose_amount&&jp.dose_per_litres&&W)?(W/jp.dose_per_litres)*jp.dose_amount:0; return '<div style="font-size:11px;">'+esc(productName(jp.product_id))+': <b>'+fmtNum(t)+' '+esc(jp.dose_unit||'')+'</b></div>'; }).join('');
+}
+function statusBadgeClass(s){ const m={"Planned":"badge-planned","In Progress":"badge-inprogress","Partially Completed":"badge-partial","Suspended":"badge-suspended","Completed":"badge-completed"}; return m[s]||"badge-planned"; }
+function jobTypeBadge(t){ return t==='Intervention'?'<span class="badge badge-intv">Intervention</span>':'<span class="badge badge-sched">Scheduled</span>'; }
+function blockStatusBadgeClass(name){ const map={'growing':'badge-growing','induced':'badge-induced','suckers':'badge-suckers','to replant':'badge-to-replant','to induce':'badge-to-induce','tunggu buah':'badge-tunggu-buah','abandoned':'badge-abandoned','harvesting':'badge-harvesting'}; return map[(name||'').toLowerCase()]||'badge-block-status'; }
+function allowedTransitions(cur){ const m={'Planned':['In Progress','Suspended','Completed'],'In Progress':['Planned','Partially Completed','Suspended','Completed'],'Partially Completed':['In Progress','Suspended','Completed'],'Suspended':['Planned','In Progress','Completed'],'Completed':['Completed']}; return m[cur]||[]; }
+
+// Override shared closeModal — module clears modal-container
+function closeModal(){ document.getElementById("modal-container").innerHTML=""; }
+
+// ── UNIT HELPERS (mass: g/kg → g; volume: ml/L → ml) ──────
+function unitFamily(u){ if(!u) return null; const s=String(u); if(s==='g'||s==='kg') return 'mass'; if(s==='ml'||s==='L') return 'volume'; return null; }
+function toCanonical(qty,unit){ const fam=unitFamily(unit); if(!fam) return null; const q=parseFloat(qty)||0; if(unit==='kg') return {amount:q*1000,unit:'g'}; if(unit==='L') return {amount:q*1000,unit:'ml'}; return {amount:q,unit}; }
+function getInventoryWAC(invId){ const txns=inventoryTransactions.filter(t=>t.product_id===invId && parseFloat(t.total_cost)>0); const c=txns.reduce((s,t)=>s+(parseFloat(t.total_cost)||0),0); const q=txns.reduce((s,t)=>s+(parseFloat(t.quantity)||0),0); return q>0?c/q:0; }
+
+// ── FLOATING HORIZONTAL SCROLLBAR ─────────────────────────
+function setupFloatingScroll(){
+  removeFloatScroll();
+  const wrap = document.querySelector('.page.active .wc-table-wrap');
+  if(!wrap) return;
+  const table = wrap.querySelector('table');
+  if(!table || table.scrollWidth <= wrap.clientWidth + 2) return;
+  const bar = document.createElement('div');
+  bar.className='wc-float-scroll'; bar.id='wc-float-scroll';
+  const inner=document.createElement('div'); inner.className='wc-float-scroll-inner'; inner.style.width=table.scrollWidth+'px';
+  bar.appendChild(inner); document.body.appendChild(bar);
+  let lock=false;
+  bar.addEventListener('scroll',()=>{ if(lock)return; lock=true; wrap.scrollLeft=bar.scrollLeft; lock=false; });
+  wrap.addEventListener('scroll',()=>{ if(lock)return; lock=true; bar.scrollLeft=wrap.scrollLeft; lock=false; });
+  bar._wrap = wrap;
+  repositionFloatScroll();
+}
+function removeFloatScroll(){ const b=document.getElementById('wc-float-scroll'); if(b) b.remove(); }
+function repositionFloatScroll(){
+  const bar=document.getElementById('wc-float-scroll'); if(!bar) return;
+  const wrap=bar._wrap; if(!wrap || !document.body.contains(wrap)){ removeFloatScroll(); return; }
+  const r=wrap.getBoundingClientRect();
+  const vh=window.innerHeight;
+  // hide when the wrap's native bottom is already on-screen, or the wrap is off-screen
+  const nativeBottomVisible = r.bottom <= vh + 1;
+  const offScreen = r.bottom < 60 || r.top > vh;
+  if(nativeBottomVisible || offScreen){ bar.style.display='none'; return; }
+  bar.style.display='block';
+  bar.style.left = r.left+'px';
+  bar.style.width = wrap.clientWidth+'px';
+}
+
+// ============================================================
+// SUMMARY
+// ============================================================
+let summaryCellData = {};
+function renderSummary(){
+  const activeBlocks = blocks.filter(b=>b.is_active);
+  const today = todayStr();
+  // status filter options
+  const filterEl = document.getElementById('summary-status-filter');
+  if(filterEl){
+    const uniq = [...new Set(activeBlocks.map(b=>{ const bc=getBlockCrop(b.id); return bc?getCropStatusName(bc.status_id):'—'; }))].sort();
+    filterEl.innerHTML = '<option value="">All Statuses</option>' + uniq.map(s=>`<option value="${esc(s)}" ${summaryStatusFilter===s?'selected':''}>${esc(s)}</option>`).join('');
+  }
+  // latest completed weed job per block
+  const latest = {};
+  weedJobs.forEach(j=>{ if(j.status!=='Completed'||!j.completion_date||!j.block_id) return; const cur=latest[j.block_id]; if(!cur||(j.completion_date||'')>(cur.completion_date||'')) latest[j.block_id]=j; });
+
+  summaryCellData={};
+  let rows = activeBlocks.map(b=>{ const bc=getBlockCrop(b.id); return { block:b, statusName: bc?getCropStatusName(bc.status_id):'—' }; });
+  if(summaryStatusFilter) rows = rows.filter(r=>r.statusName===summaryStatusFilter);
+  if(summarySearch.trim()){ const q=summarySearch.trim().toLowerCase(); rows = rows.filter(r=>(r.block.block_name||'').toLowerCase().includes(q)); }
+  rows.sort((a,b)=>(a.block.block_name||'').localeCompare(b.block.block_name||'',undefined,{numeric:true}));
+
+  let html = '<div class="data-table"><div class="wc-table-wrap"><table class="wc-table"><thead><tr>'+
+    '<th>Block</th><th>Status</th><th>Last Sprayed</th><th class="wc-center">Days Ago</th><th>Product</th><th class="wc-hide-sm">Active Ingredient</th><th class="wc-hide-sm">Worker</th>'+
+    '</tr></thead><tbody>';
+  if(!rows.length){ html += '<tr><td colspan="7" class="empty-state">No blocks match the filter.</td></tr>'; }
+  else {
+    rows.forEach(({block,statusName})=>{
+      const j = latest[block.id];
+      let dateCell='<span class="wc-muted">—</span>', daysCell='<span class="wc-muted">—</span>', prodCell='<span class="wc-muted">—</span>', aiCell='<span class="wc-muted">—</span>', workerCell='<span class="wc-muted">—</span>';
+      if(j){
+        summaryCellData[block.id] = j.id;
+        const d = daysDiff(j.completion_date, today);
+        dateCell = `<span style="text-decoration:underline dotted;cursor:help;" data-job="${j.id}" onmouseenter="summaryShowPopup(event)" onmouseleave="summaryHidePopup()">${fmtDateShort(j.completion_date)}</span>`;
+        daysCell = d!=null ? d+'d' : '—';
+        prodCell = jobProductsLabel(j);
+        aiCell = jobAILabel(j);
+        workerCell = esc(j.worker_name||'—');
+      }
+      const badge = `<span class="badge ${blockStatusBadgeClass(statusName)}">${esc(statusName)}</span>`;
+      html += `<tr>`+
+        `<td class="wc-block-name wc-ellipsis-sm" title="${esc(block.block_name)}">${esc(block.block_name)}</td>`+
+        `<td>${badge}</td>`+
+        `<td>${dateCell}</td>`+
+        `<td class="wc-center">${daysCell}</td>`+
+        `<td class="wc-ellipsis">${prodCell}</td>`+
+        `<td class="wc-hide-sm wc-ai wc-ellipsis">${aiCell}</td>`+
+        `<td class="wc-hide-sm wc-ellipsis-sm">${workerCell}</td>`+
+      `</tr>`;
+    });
+  }
+  html += '</tbody></table></div></div>';
+  document.getElementById('summary-table').innerHTML = html;
+  setupFloatingScroll();
+}
+
+function wcEnsurePopup(){ let el=document.getElementById('wc-popup'); if(!el){ el=document.createElement('div'); el.id='wc-popup'; document.body.appendChild(el); } return el; }
+function jobPopupHtml(j){
+  const today=todayStr();
+  const b=getBlock(j.block_id);
+  const d=daysDiff(j.completion_date,today);
+  const jps=getWeedJobProducts(j.id);
+  const W=(parseFloat(j.tank_size_litres)||0)*(parseFloat(j.tanks_completed||j.tanks_planned)||0);
+  let mix='';
+  if(jps.length){
+    mix = '<div style="margin-top:5px;"><b>Tank mix:</b></div><div style="padding-left:10px;color:var(--text-muted);">'+
+      jps.map(jp=>{ const t=(jp.dose_amount&&jp.dose_per_litres&&W)?(W/jp.dose_per_litres)*jp.dose_amount:0; const ai=jp.ai_snapshot||productAIString(jp.product_id); return '• '+esc(productName(jp.product_id))+(ai?' <span style="color:#3E7A33;">['+esc(ai)+']</span>':'')+(t?' — '+fmtNum(t)+' '+esc(jp.dose_unit||''):''); }).join('<br>')+'</div>';
+  }
+  const water = W ? fmtNum(W)+'L ('+fmtNum(parseFloat(j.tanks_completed||j.tanks_planned)||0)+' × '+fmtNum(parseFloat(j.tank_size_litres)||0)+'L)' : '—';
+  return `<div style="font-weight:700;color:#3E7A33;">Weed Spray — ${esc(b?b.block_name:'—')}</div>`+
+    `<div style="color:var(--text-muted);">Sprayed ${fmtDate(j.completion_date)} · ${d!=null?d+' days ago':'—'}</div>`+
+    `<hr style="border:none;border-top:1px solid var(--border);margin:8px 0;">`+
+    mix +
+    (water!=='—'?`<div style="margin-top:5px;"><b>Tank:</b> ${esc(water)} water</div>`:'')+
+    `<div style="color:var(--text-muted);margin-top:5px;">Worker: ${esc(j.worker_name||'—')} · Logged by: ${esc(j.logged_by||'—')}</div>`+
+    (j.notes?`<div style="color:var(--text-muted);margin-top:3px;">Notes: ${esc(j.notes)}</div>`:'');
+}
+function summaryShowPopup(event){
+  const jid = event.currentTarget.dataset.job;
+  const j = weedJobs.find(x=>x.id===jid); if(!j) return;
+  const el=wcEnsurePopup(); el.innerHTML=jobPopupHtml(j); el.style.display='block';
+  const r=event.currentTarget.getBoundingClientRect();
+  let top=r.bottom+8, left=r.left; const pw=el.offsetWidth, ph=el.offsetHeight;
+  if(left+pw>window.innerWidth-12) left=window.innerWidth-pw-12;
+  if(top+ph>window.innerHeight-12) top=r.top-ph-8;
+  if(left<8) left=8; if(top<8) top=8;
+  el.style.top=top+'px'; el.style.left=left+'px';
+}
+function summaryHidePopup(){ const el=document.getElementById('wc-popup'); if(el) el.style.display='none'; }
+
+// ============================================================
+// JOBS PAGE
+// ============================================================
+function populateJobFilters(){
+  const bs=document.getElementById("jobs-filter-block"); if(!bs) return;
+  const cur=bs.value; bs.innerHTML='<option value="">All Blocks</option>';
+  blocks.filter(b=>b.is_active).forEach(b=>{ bs.innerHTML+=`<option value="${b.id}">${esc(b.block_name)}</option>`; });
+  bs.value=cur;
+}
+
+function renderJobsTable(){
+  const statusF=document.getElementById("jobs-filter-status").value;
+  const blockF=document.getElementById("jobs-filter-block").value;
+  const typeF=document.getElementById("jobs-filter-type").value;
+  const sortVal=document.getElementById("jobs-sort").value;
+  const active=["Planned","In Progress","Partially Completed","Suspended"];
+  let filtered = weedJobs.filter(j=>{
+    if(statusF==="active" && !active.includes(j.status)) return false;
+    if(statusF!=="active" && statusF!=="all" && j.status!==statusF) return false;
+    if(blockF && j.block_id!==blockF) return false;
+    if(typeF && j.job_type!==typeF) return false;
+    return true;
+  });
+  filtered.sort((a,b)=>{
+    if(sortVal==="date_desc") return (b.planned_date||"").localeCompare(a.planned_date||"");
+    if(sortVal==="date_asc") return (a.planned_date||"").localeCompare(b.planned_date||"");
+    if(sortVal==="block_asc"){ const ba=getBlock(a.block_id),bb=getBlock(b.block_id); return (ba?.block_name||"").localeCompare(bb?.block_name||"",undefined,{numeric:true}); }
+    return 0;
+  });
+  const tbody=document.getElementById("jobs-body");
+  if(!filtered.length){ tbody.innerHTML='<tr><td colspan="11" class="empty-state">No jobs. Create a new job to get started.</td></tr>'; renderStockSummary(); setupFloatingScroll(); return; }
+  tbody.innerHTML = filtered.map(j=>{
+    const wa = `<button class="btn btn-outline btn-sm" onclick="shareJobWhatsApp('${j.id}')" title="Send via WhatsApp" style="color:#25D366;border-color:#25D366;padding:4px 8px;"><svg viewBox="0 0 24 24" fill="#25D366" style="width:14px;height:14px;"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884"/></svg></button>`;
+    const del = `<button class="btn btn-danger btn-sm" onclick="confirmDeleteJob('${j.id}')" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`;
+    const edit = `<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button>`;
+    return `<tr>
+      <td>${fmtDateShort(j.planned_date)}</td>
+      <td class="wc-block-name wc-ellipsis-sm" title="${esc(jobLocationName(j))}">${esc(jobLocationName(j))}</td>
+      <td>${jobTypeBadge(j.job_type)}</td>
+      <td class="wc-ellipsis">${jobProductsLabel(j)}</td>
+      <td class="wc-ai wc-ellipsis">${jobAILabel(j)}</td>
+      <td class="wc-ellipsis-sm">${esc(j.worker_name||'—')}</td>
+      <td class="wc-hide-sm">${j.tank_size_litres?fmtNum(j.tank_size_litres)+'L':'—'}</td>
+      <td class="wc-hide-sm">${j.tanks_completed||0}/${j.tanks_planned||0}</td>
+      <td class="wc-hide-sm wc-num">${jobTotalsHtml(j)}</td>
+      <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+      <td><div style="display:flex;gap:4px;">${edit} ${wa} ${del}</div></td>
+    </tr>`;
+  }).join("");
+  renderStockSummary();
+  setupFloatingScroll();
+}
+
+// Per-product stock check across active jobs
+function renderStockSummary(){
+  const el=document.getElementById('jobs-stock-summary'); if(!el) return;
+  const active=["Planned","In Progress","Partially Completed","Suspended"];
+  const activeJobs = weedJobs.filter(j=>active.includes(j.status));
+  if(!activeJobs.length){ el.style.display='none'; return; }
+  const needByProduct = {}; // productId -> {needed, unit}
+  activeJobs.forEach(j=>{ const W=jobWater(j); getWeedJobProducts(j.id).forEach(jp=>{ if(!jp.product_id) return; const amt=(jp.dose_amount&&jp.dose_per_litres&&W)?(W/jp.dose_per_litres)*jp.dose_amount:0; if(!needByProduct[jp.product_id]) needByProduct[jp.product_id]={needed:0,unit:jp.dose_unit||''}; needByProduct[jp.product_id].needed+=amt; }); });
+  const keys=Object.keys(needByProduct);
+  if(!keys.length){ el.style.display='none'; return; }
+  const cards = keys.map(pid=>{
+    const p=getProduct(pid); const info=needByProduct[pid];
+    const inv = p&&p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
+    const ai = productAIString(pid);
+    const needCanon = toCanonical(info.needed, info.unit);
+    let haveStr='—', enough=null, costStr='';
+    if(inv && inv.pack_unit){
+      const stockCanon = toCanonical((parseFloat(inv.current_stock)||0)*(parseFloat(inv.pack_size)||0), inv.pack_unit);
+      if(needCanon && stockCanon && unitFamily(needCanon.unit)===unitFamily(stockCanon.unit)){
+        haveStr = fmtNum(stockCanon.amount)+' '+stockCanon.unit;
+        enough = stockCanon.amount >= needCanon.amount;
+        const wac=getInventoryWAC(inv.id); const packCanon=toCanonical(parseFloat(inv.pack_size)||0,inv.pack_unit);
+        if(wac>0 && packCanon && packCanon.amount>0){ const per=wac/packCanon.amount; costStr='<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Est. cost: RM '+fmtNum(needCanon.amount*per)+'</div>'; }
+      } else { haveStr = fmtNum(parseFloat(inv.current_stock)||0)+' '+(inv.pack_unit||''); }
+    }
+    const border = enough===null?'var(--border)':enough?'rgba(74,124,63,0.4)':'rgba(232,96,96,0.4)';
+    const stat = enough===null?'<span class="wc-muted" style="font-size:11px;">Stock unknown</span>':enough?'<span style="color:#3E7A33;font-weight:700;font-size:12px;">✓ Sufficient</span>':'<span style="color:#C84444;font-weight:700;font-size:12px;">⚠ Short '+fmtNum((needCanon?needCanon.amount:0)-(toCanonical((parseFloat(inv.current_stock)||0)*(parseFloat(inv.pack_size)||0),inv?inv.pack_unit:'')?.amount||0))+' '+(needCanon?needCanon.unit:'')+'</span>';
+    return `<div class="wc-stock-card" style="border-color:${border};">`+
+      `<div class="wc-stock-prod wc-ellipsis" title="${esc(productName(pid))}">${esc(productName(pid))}</div>`+
+      (ai?`<div class="wc-stock-ai">${esc(ai)}</div>`:'')+
+      `<div style="font-size:14px;font-weight:700;color:var(--white);">Need: ${fmtNum(needCanon?needCanon.amount:info.needed)} ${esc(needCanon?needCanon.unit:info.unit)}</div>`+
+      `<div style="font-size:12px;color:var(--text-dim);">Have: ${haveStr}</div>`+
+      `<div style="margin-top:3px;">${stat}</div>`+costStr+
+    `</div>`;
+  }).join('');
+  el.style.display='block';
+  el.innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Stock Check — '+activeJobs.length+' active job'+(activeJobs.length!==1?'s':'')+'</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'+cards+'</div>';
+}
+
+// ── NEW JOB MODAL (product-first) ─────────────────────────
+let wcMix=[]; let wcMixNext=0;
+function openNewJobModal(){
+  wcMix=[]; wcMixNext=0;
+  const blockOpts = blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join("");
+  const workerOpts = workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-box" style="max-width:600px;">
+        <div class="modal-header"><div class="modal-title">New Weed-Spray Job</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="form-field"><label>Job Type</label>
+          <select id="nj-type" style="width:100%;">
+            <option value="Scheduled">Scheduled</option>
+            <option value="Intervention">Intervention</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Block</label><select id="nj-block" style="width:100%;"><option value="">— Select —</option>${blockOpts}</select></div>
+        <div class="form-row" style="margin-top:4px;">
+          <div class="form-field"><label>Worker</label><select id="nj-worker" style="width:100%;"><option value="">— Select —</option>${workerOpts}</select></div>
+          <div class="form-field"><label>Planned Date</label><input id="nj-date" type="date" value="${todayStr()}" style="width:100%;"></div>
+        </div>
+
+        <div class="wc-section-label">Tank Mix — Herbicides</div>
+        <div id="nj-mix-list"></div>
+        <div style="display:flex;gap:6px;align-items:center;padding:4px 0;">
+          <select id="nj-add-prod" style="flex:1;min-width:0;">${njProductOpts()}</select>
+          <button class="btn btn-primary btn-sm" onclick="njAddProduct()" style="white-space:nowrap;">+ Add</button>
+        </div>
+        <div id="nj-noprod" style="display:none;font-size:11px;color:var(--gold);margin-top:4px;">No herbicides enabled. Go to Manage Products to enable inventory herbicides first.</div>
+
+        <div class="wc-section-label" style="border-left-color:var(--gold);background:rgba(212,175,55,0.10);color:#8A6D1F;">Tank &amp; Water</div>
+        <div class="form-row">
+          <div class="form-field"><label>Tank Size</label>
+            <select id="nj-tank-sel" style="width:100%;" onchange="njTankChange()">
+              <option value="200">200L</option><option value="500">500L</option><option value="1000" selected>1000L</option><option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="form-field" id="nj-tank-custom-wrap" style="display:none;"><label>Custom Litres</label><input id="nj-tank-custom" type="number" step="any" min="1" style="width:100%;" oninput="njCalcTotals()"></div>
+          <div class="form-field"><label>Tanks Planned</label><input id="nj-tanks" type="number" step="any" min="0.1" value="1" style="width:100%;" oninput="njCalcTotals()"></div>
+        </div>
+        <div class="form-field"><label>Total Litres of Water</label><input id="nj-water" type="number" class="wc-water-readout" readonly></div>
+
+        <div class="form-field"><label>Notes</label><textarea id="nj-notes" rows="2" style="width:100%;" placeholder="Optional"></textarea></div>
+        <div class="form-field"><label>Logged By</label><input id="nj-logged" value="${esc(currentUser?.displayName||"")}" style="width:100%;"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" id="nj-create-btn" onclick="submitNewJob()">Create Job</button>
+        </div>
+      </div>
+    </div>`;
+  if(!products.filter(p=>p.is_active).length) document.getElementById('nj-noprod').style.display='block';
+  njCalcTotals();
+}
+function njProductOpts(excludeIds){
+  excludeIds = excludeIds||[];
+  return '<option value="">— Select herbicide —</option>' + products.filter(p=>p.is_active && !excludeIds.includes(p.id)).map(p=>{
+    const ai=productAIString(p.id); return `<option value="${p.id}">${esc(p.product_name)}${ai?' — '+esc(ai):''}</option>`;
+  }).join("");
+}
+function njTankChange(){
+  const sel=document.getElementById("nj-tank-sel").value;
+  document.getElementById("nj-tank-custom-wrap").style.display = sel==='custom'?'block':'none';
+  njCalcTotals();
+}
+function njTankSize(){ const sel=document.getElementById("nj-tank-sel").value; return sel==='custom'?(parseFloat(document.getElementById("nj-tank-custom").value)||0):(parseFloat(sel)||0); }
+function njAddProduct(){
+  const sel=document.getElementById("nj-add-prod"); const pid=sel.value;
+  if(!pid){ notify("Select a herbicide first","warning"); return; }
+  if(wcMix.some(m=>m.productId===pid)){ notify("Already added","warning"); return; }
+  const p=getProduct(pid);
+  wcMix.push({ rowId:wcMixNext++, productId:pid, doseAmt:p&&p.default_dose_amount?parseFloat(p.default_dose_amount):'', doseUnit:p&&p.default_dose_unit?p.default_dose_unit:'ml', dosePer:p&&p.default_dose_per_litres?parseFloat(p.default_dose_per_litres):'' });
+  njRenderMix(); njCalcTotals();
+}
+function njRemoveProduct(rowId){ wcMix=wcMix.filter(m=>m.rowId!==rowId); njRenderMix(); njCalcTotals(); document.getElementById("nj-add-prod").innerHTML=njProductOpts(wcMix.map(m=>m.productId)); }
+function njRenderMix(){
+  const el=document.getElementById("nj-mix-list");
+  if(!wcMix.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">No herbicides added yet.</div>'; document.getElementById("nj-add-prod").innerHTML=njProductOpts([]); return; }
+  el.innerHTML = wcMix.map(m=>{
+    const ai=productAIString(m.productId);
+    return `<div class="wc-mix-row">
+      <div class="wc-mix-name wc-ellipsis" title="${esc(productName(m.productId))}">${esc(productName(m.productId))}${ai?`<div class="wc-mix-ai">${esc(ai)}</div>`:''}</div>
+      <input type="number" step="any" min="0" value="${m.doseAmt}" placeholder="Dose" style="width:70px;" oninput="njSetMix(${m.rowId},'doseAmt',this.value)">
+      <select style="width:60px;" onchange="njSetMix(${m.rowId},'doseUnit',this.value)">
+        ${['g','ml','kg','L'].map(u=>`<option value="${u}" ${m.doseUnit===u?'selected':''}>${u}</option>`).join('')}
+      </select>
+      <span style="font-size:11px;color:var(--text-muted);">per</span>
+      <input type="number" step="any" min="1" value="${m.dosePer}" placeholder="L" style="width:60px;" oninput="njSetMix(${m.rowId},'dosePer',this.value)">
+      <span style="font-size:11px;color:var(--text-muted);">L</span>
+      <button class="btn btn-danger btn-sm" onclick="njRemoveProduct(${m.rowId})" style="padding:4px 8px;">✕</button>
+    </div>`;
+  }).join('');
+  document.getElementById("nj-add-prod").innerHTML=njProductOpts(wcMix.map(m=>m.productId));
+}
+function njSetMix(rowId,field,val){ const m=wcMix.find(x=>x.rowId===rowId); if(!m) return; m[field]=(field==='doseUnit')?val:(parseFloat(val)||''); njCalcTotals(); }
+function njCalcTotals(){
+  const size=njTankSize(); const tanks=parseFloat(document.getElementById("nj-tanks")?.value)||0;
+  const water=size*tanks;
+  const wf=document.getElementById("nj-water"); if(wf) wf.value=water||'';
+}
+async function submitNewJob(){
+  const type=document.getElementById("nj-type").value;
+  const blockId=document.getElementById("nj-block").value;
+  const worker=document.getElementById("nj-worker").value;
+  const date=document.getElementById("nj-date").value;
+  const size=njTankSize();
+  const tanks=parseFloat(document.getElementById("nj-tanks").value)||0;
+  const notes=document.getElementById("nj-notes").value.trim();
+  const logged=document.getElementById("nj-logged").value.trim();
+  if(!blockId){ notify("Block is required","warning"); return; }
+  if(!wcMix.length){ notify("Add at least one herbicide","warning"); return; }
+  if(!worker){ notify("Worker is required","warning"); return; }
+  if(!date){ notify("Planned date is required","warning"); return; }
+  if(!size||!tanks){ notify("Tank size and tanks planned are required","warning"); return; }
+  for(const m of wcMix){ if(!m.doseAmt||!m.dosePer){ notify("Fill dose fields for all herbicides","warning"); return; } }
+
+  const btn=document.getElementById("nj-create-btn"); if(btn) btnLoading(btn,true);
+  const primary=wcMix[0];
+  const jobRes = await sbQuery(sb.from("pnd_weed_jobs").insert({
+    block_id:blockId, area_id:null, job_type:type, worker_name:worker, planned_date:date,
+    tank_size_litres:size, tanks_planned:tanks, product_id:primary.productId, status:'Planned',
+    notes:notes||null, logged_by:logged||null, company_id:getCompanyId()
+  }).select());
+  if(jobRes===null){ if(btn) btnLoading(btn,false,"Create Job"); return; }
+  const jobId=jobRes[0].id;
+  const jpRows = wcMix.map(m=>({ weed_job_id:jobId, product_id:m.productId, dose_amount:m.doseAmt, dose_unit:m.doseUnit, dose_per_litres:m.dosePer, ai_snapshot:productAIString(m.productId)||null, company_id:getCompanyId() }));
+  const jpRes = await sbQuery(sb.from("pnd_weed_job_products").insert(jpRows).select());
+  if(jpRes===null){ if(btn) btnLoading(btn,false,"Create Job"); notify("Job created but products failed — edit the job to retry","warning"); }
+  await Promise.all([loadWeedJobs(), loadWeedJobProducts()]);
+  closeModal();
+  notify("Job created");
+  if(currentPage==='jobs') renderJobsTable();
+}
+
+// ── EDIT / COMPLETE JOB MODAL ─────────────────────────────
+function openEditJobModal(jobId){
+  const j=weedJobs.find(x=>x.id===jobId); if(!j) return;
+  const workerOpts = workers.map(w=>`<option value="${esc(w.name)}" ${j.worker_name===w.name?'selected':''}>${esc(w.name)}</option>`).join("");
+  const transitions = allowedTransitions(j.status);
+  const statusOpts = [j.status, ...transitions.filter(s=>s!==j.status)].map(s=>`<option value="${esc(s)}" ${j.status===s?'selected':''}>${esc(s)}</option>`).join("");
+  const jps=getWeedJobProducts(j.id);
+  const mixHtml = jps.length ? jps.map(jp=>{ const ai=jp.ai_snapshot||productAIString(jp.product_id); return `<div style="font-size:12px;padding:3px 0;">• ${esc(productName(jp.product_id))} — ${fmtNum(jp.dose_amount)}${esc(jp.dose_unit||'')}/${fmtNum(jp.dose_per_litres)}L${ai?` <span style="color:#3E7A33;">[${esc(ai)}]</span>`:''}</div>`; }).join('') : '<div class="wc-muted" style="font-size:12px;">No products</div>';
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-box" style="max-width:520px;">
+        <div class="modal-header"><div class="modal-title">Edit Job — ${esc(jobLocationName(j))}</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;">Tank Mix (set at creation)</div>
+          ${mixHtml}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Tank: ${fmtNum(j.tank_size_litres)}L · ${fmtNum(j.tanks_planned)} tanks planned</div>
+        </div>
+        <div class="form-row">
+          <div class="form-field"><label>Worker</label><select id="ej-worker" style="width:100%;">${workerOpts}</select></div>
+          <div class="form-field"><label>Planned Date</label><input id="ej-date" type="date" value="${j.planned_date||''}" style="width:100%;"></div>
+        </div>
+        <div class="form-field"><label>Status</label><select id="ej-status" style="width:100%;" onchange="ejStatusChange()">${statusOpts}</select></div>
+        <div id="ej-complete-fields" style="display:${j.status==='Completed'?'block':'none'};">
+          <div class="form-row">
+            <div class="form-field"><label>Completion Date</label><input id="ej-comp-date" type="date" value="${j.completion_date||todayStr()}" style="width:100%;"></div>
+            <div class="form-field"><label>Tanks Completed</label><input id="ej-tanks-done" type="number" step="any" min="0" value="${j.tanks_completed!=null?j.tanks_completed:j.tanks_planned}" style="width:100%;"></div>
+          </div>
+        </div>
+        <div class="form-field"><label>Notes</label><textarea id="ej-notes" rows="2" style="width:100%;">${esc(j.notes||'')}</textarea></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" id="ej-save-btn" onclick="saveEditJob('${j.id}')">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+function ejStatusChange(){ const v=document.getElementById("ej-status").value; document.getElementById("ej-complete-fields").style.display = v==='Completed'?'block':'none'; }
+async function saveEditJob(jobId){
+  const j=weedJobs.find(x=>x.id===jobId); if(!j) return;
+  const worker=document.getElementById("ej-worker").value;
+  const date=document.getElementById("ej-date").value;
+  const status=document.getElementById("ej-status").value;
+  const notes=document.getElementById("ej-notes").value.trim();
+  const payload={ worker_name:worker||null, planned_date:date||null, status, notes:notes||null };
+  if(status==='Completed'){
+    const cd=document.getElementById("ej-comp-date").value;
+    const td=parseFloat(document.getElementById("ej-tanks-done").value);
+    if(!cd){ notify("Completion date is required","warning"); return; }
+    payload.completion_date=cd;
+    payload.tanks_completed=isNaN(td)?j.tanks_planned:td;
+  }
+  const btn=document.getElementById("ej-save-btn"); if(btn) btnLoading(btn,true);
+  const res=await sbQuery(sb.from("pnd_weed_jobs").update(payload).eq("id",jobId).select());
+  if(res===null){ if(btn) btnLoading(btn,false,"Save"); return; }
+  await loadWeedJobs();
+  closeModal(); notify("Job updated");
+  renderCurrentPage();
+}
+function confirmDeleteJob(jobId){
+  const j=weedJobs.find(x=>x.id===jobId); if(!j) return;
+  confirmAction("Delete Job","Delete this weed-spray job for <b>"+esc(jobLocationName(j))+"</b>? This cannot be undone.", async function(){
+    const res=await sbQuery(sb.from("pnd_weed_jobs").delete().eq("id",jobId).select());
+    if(res===null) return;
+    await Promise.all([loadWeedJobs(), loadWeedJobProducts()]);
+    notify("Job deleted");
+    renderCurrentPage();
+  }, true);
+}
+
+// ── WHATSAPP SHARE (product-first, BM) ────────────────────
+const MALAY_DAYS=['Ahad','Isnin','Selasa','Rabu','Khamis','Jumaat','Sabtu'];
+const MALAY_MONTHS=['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+const MALAY_PKG={packet:'Bungkus',box:'Kotak',bottle:'Botol',drum:'Dram',bag:'Beg',can:'Tin'};
+function fmtDateMalay(s){ if(!s) return '—'; const d=new Date(s+'T00:00:00'); return `${d.getDate()} ${MALAY_MONTHS[d.getMonth()]} ${d.getFullYear()} (${MALAY_DAYS[d.getDay()]})`; }
+function buildJobMessage(jobId){
+  const j=weedJobs.find(x=>x.id===jobId); if(!j) return '';
+  const bname=jobLocationName(j);
+  const size=parseFloat(j.tank_size_litres)||0, tanks=parseFloat(j.tanks_planned)||0;
+  const jps=getWeedJobProducts(j.id);
+  const lines = jps.map(jp=>{
+    const amt=parseFloat(jp.dose_amount)||0, per=parseFloat(jp.dose_per_litres)||0, unit=jp.dose_unit||'';
+    const perTank=(amt&&per&&size)?(size/per)*amt:0;
+    const p=getProduct(jp.product_id);
+    let line='• '+fmtNum(perTank)+unit+' '+(p?p.product_name:'?');
+    const ai=jp.ai_snapshot||productAIString(jp.product_id); if(ai) line+=' ['+ai+']';
+    if(p && p.packaging_size && p.packaging_unit && p.packaging_type && perTank>0){ const cnt=Math.ceil(perTank/p.packaging_size); line+=' ('+cnt+' '+(MALAY_PKG[p.packaging_type]||p.packaging_type)+' x '+p.packaging_size+p.packaging_unit+')'; }
+    return line;
+  });
+  lines.push('• 💧 '+size+'L Air');
+  let msg='*🌱 Kerja Semburan Rumpai*\n━━━━━━━━━━━━━━━\n';
+  msg+='👷 Pekerja: '+(j.worker_name||'—')+'\n';
+  msg+='📅 Tarikh: '+fmtDateMalay(j.planned_date)+'\n';
+  msg+='📍 Blok: '+bname+'\n\n';
+  msg+='💊 Racun (setiap tangki '+size+'L):\n'+lines.join('\n')+'\n\n';
+  msg+='🔢 Jumlah tangki: '+tanks+'\n';
+  msg+='━━━━━━━━━━━━━━━';
+  return msg;
+}
+function shareJobWhatsApp(jobId){
+  const msg=buildJobMessage(jobId); if(!msg) return;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:400px;">
+      <div class="modal-header"><div class="modal-title">Send Job Summary</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div style="padding:16px;"><pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;white-space:pre-wrap;word-break:break-word;color:var(--text);font-family:inherit;max-height:300px;overflow-y:auto;">${esc(msg)}</pre></div>
+      <div class="modal-actions" style="gap:8px;">
+        <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-outline" onclick="copyJobText('${jobId}')">Copy Text</button>
+        <button class="btn btn-primary" onclick="sendJobWhatsApp('${jobId}')" style="background:#25D366;">WhatsApp</button>
+      </div>
+    </div></div>`;
+}
+function sendJobWhatsApp(jobId){ const msg=buildJobMessage(jobId); closeModal(); window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
+function copyJobText(jobId){ const msg=buildJobMessage(jobId); navigator.clipboard.writeText(msg).then(()=>{ notify('Copied to clipboard!'); closeModal(); }).catch(()=>notify('Failed to copy','warning')); }
+
+// ============================================================
+// JOB LOGS
+// ============================================================
+function populateJobLogFilters(){
+  const bs=document.getElementById("jl-filter-block");
+  if(bs){ const cur=bs.value; bs.innerHTML='<option value="">All Blocks</option>'+blocks.filter(b=>b.is_active).map(b=>`<option value="${b.id}">${esc(b.block_name)}</option>`).join(""); bs.value=cur; }
+  const ws=document.getElementById("jl-filter-worker");
+  if(ws){ const cur=ws.value; ws.innerHTML='<option value="">All Workers</option>'+workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join(""); ws.value=cur; }
+}
+function clearJobLogFilters(){ ["jl-filter-block","jl-filter-worker","jl-filter-status","jl-filter-type","jl-from","jl-to"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); jlPage=0; renderJobLogs(); }
+function renderJobLogs(){
+  const blockF=document.getElementById("jl-filter-block").value;
+  const workerF=document.getElementById("jl-filter-worker").value;
+  const statusF=document.getElementById("jl-filter-status").value;
+  const typeF=document.getElementById("jl-filter-type").value;
+  const fromF=document.getElementById("jl-from").value, toF=document.getElementById("jl-to").value;
+  const sortV=document.getElementById("jl-sort").value;
+  let rows = weedJobs.filter(j=>{
+    if(blockF && j.block_id!==blockF) return false;
+    if(workerF && j.worker_name!==workerF) return false;
+    if(statusF && j.status!==statusF) return false;
+    if(typeF && j.job_type!==typeF) return false;
+    const ref=j.completion_date||j.planned_date||'';
+    if(fromF && ref<fromF) return false;
+    if(toF && ref>toF) return false;
+    return true;
+  });
+  rows.sort((a,b)=>{
+    if(sortV==='worker') return (a.worker_name||'').localeCompare(b.worker_name||'');
+    const da=a.completion_date||a.planned_date||'', db=b.completion_date||b.planned_date||'';
+    return sortV==='date_asc' ? da.localeCompare(db) : db.localeCompare(da);
+  });
+  const total=rows.length;
+  const start=jlPage*jlPageSize;
+  const pageRows=rows.slice(start,start+jlPageSize);
+  const tbody=document.getElementById("joblogs-body");
+  if(!total){ tbody.innerHTML='<tr><td colspan="12" class="empty-state">No jobs match the filter.</td></tr>'; document.getElementById("jl-pagination").innerHTML=''; setupFloatingScroll(); return; }
+  tbody.innerHTML = pageRows.map(j=>{
+    const edit=`<button class="btn btn-outline btn-sm" onclick="openEditJobModal('${j.id}')">Edit</button>`;
+    return `<tr>
+      <td>${fmtDateShort(j.planned_date)}</td>
+      <td>${j.completion_date?fmtDateShort(j.completion_date):'<span class="wc-muted">—</span>'}</td>
+      <td class="wc-block-name wc-ellipsis-sm" title="${esc(jobLocationName(j))}">${esc(jobLocationName(j))}</td>
+      <td class="wc-hide-sm">${jobTypeBadge(j.job_type)}</td>
+      <td class="wc-ellipsis">${jobProductsLabel(j)}</td>
+      <td class="wc-ai wc-ellipsis">${jobAILabel(j)}</td>
+      <td class="wc-ellipsis-sm">${esc(j.worker_name||'—')}</td>
+      <td class="wc-hide-sm">${j.tank_size_litres?fmtNum(j.tank_size_litres)+'L':'—'}</td>
+      <td class="wc-hide-sm">${j.tanks_completed||0}/${j.tanks_planned||0}</td>
+      <td class="wc-hide-sm wc-num">${jobTotalsHtml(j)}</td>
+      <td><span class="badge ${statusBadgeClass(j.status)}">${esc(j.status)}</span></td>
+      <td>${edit}</td>
+    </tr>`;
+  }).join("");
+  const pages=Math.ceil(total/jlPageSize);
+  let pag=`Showing ${start+1}–${Math.min(start+jlPageSize,total)} of ${total}`;
+  if(pages>1){ pag+=` &nbsp; <button class="btn btn-outline btn-sm" ${jlPage===0?'disabled':''} onclick="jlPage--;renderJobLogs()">← Prev</button> Page ${jlPage+1}/${pages} <button class="btn btn-outline btn-sm" ${jlPage>=pages-1?'disabled':''} onclick="jlPage++;renderJobLogs()">Next →</button>`; }
+  document.getElementById("jl-pagination").innerHTML=pag;
+  setupFloatingScroll();
+}
+
+// ============================================================
+// MANAGE PRODUCTS
+// ============================================================
+function renderProductsPage(){
+  const tbody=document.getElementById("products-body");
+  // missing-AI banner
+  const missing = products.filter(p=>p.is_active && !productAIString(p.id));
+  const banner=document.getElementById("missing-ai-banner");
+  if(missing.length){
+    banner.style.display='block';
+    banner.innerHTML='<div style="background:rgba(232,160,32,0.10);border:1px solid rgba(232,160,32,0.3);border-radius:10px;padding:14px 18px;">'+
+      '<div style="font-weight:600;color:#B5780F;margin-bottom:6px;">'+missing.length+' herbicide'+(missing.length>1?'s':'')+' missing an active ingredient</div>'+
+      '<div style="font-size:12px;color:var(--text-dim);">Set the Active Ingredient on these products in the <b>Inventory</b> module so resistance tracking + the AI report work. Without it the AI column shows "—".</div>'+
+      '<div style="margin-top:6px;font-size:12px;">'+missing.map(p=>esc(p.product_name)).join(' · ')+'</div></div>';
+  } else { banner.style.display='none'; }
+
+  if(!products.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-state">No herbicides enabled yet. Enable inventory herbicides below.</td></tr>'; setupFloatingScroll(); return; }
+  tbody.innerHTML = products.map(p=>{
+    const inv = p.inventory_product_id ? getInventoryProduct(p.inventory_product_id) : null;
+    const ai = productAIString(p.id);
+    const aiCell = ai ? esc(ai) : '<span class="wc-muted">—</span><span class="wc-no-ai" title="No active ingredient set in Inventory">⚠</span>';
+    const pkg = inv ? ((inv.pack_size||'')+(inv.pack_unit||'')+(inv.pack_type?'/'+inv.pack_type:'')) : (p.packaging_size!=null?p.packaging_size+(p.packaging_unit||'')+'/'+(p.packaging_type||''):'—');
+    const stock = inv ? fmtNum(parseFloat(inv.current_stock)||0)+' '+esc(inv.pack_unit||'') : '—';
+    const stockColor = inv ? ((parseFloat(inv.current_stock)||0)>0?'#3E7A33':'#C84444') : 'var(--text-muted)';
+    const dose = (p.default_dose_amount&&p.default_dose_per_litres) ? `${fmtNum(p.default_dose_amount)}${esc(p.default_dose_unit||'')}/${fmtNum(p.default_dose_per_litres)}L` : '<span class="wc-muted">not set</span>';
+    return `<tr>
+      <td class="wc-block-name wc-ellipsis" title="${esc(p.product_name)}">${esc(p.product_name)}</td>
+      <td class="wc-ai wc-ellipsis">${aiCell}</td>
+      <td class="wc-hide-sm">${pkg==='—'?'—':esc(pkg)}</td>
+      <td class="wc-num" style="color:${stockColor};font-weight:600;">${stock}</td>
+      <td class="wc-hide-sm">${dose} <button class="btn btn-outline btn-sm" onclick="openDoseModal('${p.id}')" style="padding:2px 8px;font-size:10px;">Edit</button></td>
+      <td><label class="toggle"><input type="checkbox" ${p.is_active?'checked':''} onchange="toggleProductActive('${p.id}',this.checked)"><span class="toggle-slider"></span></label></td>
+      <td><span class="save-tick" id="tick-p-${p.id}">✓</span></td>
+    </tr>`;
+  }).join("");
+  setupFloatingScroll();
+}
+async function toggleProductActive(pid,val){
+  const res=await sbQuery(sb.from("pnd_products").update({is_active:val}).eq("id",pid).select());
+  if(res===null) return;
+  const p=getProduct(pid); if(p) p.is_active=val;
+  const tick=document.getElementById("tick-p-"+pid); if(tick){ tick.classList.add("show"); setTimeout(()=>tick.classList.remove("show"),1200); }
+}
+function openDoseModal(pid){
+  const p=getProduct(pid); if(!p) return;
+  document.getElementById("modal-container").innerHTML=`
+    <div class="modal-overlay"><div class="modal-box" style="max-width:380px;">
+      <div class="modal-header"><div class="modal-title">Default Dose — ${esc(p.product_name)}</div><button class="modal-close" onclick="closeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Optional. Pre-fills the dose when this herbicide is added to a new job's tank mix.</div>
+      <div class="form-row">
+        <div class="form-field"><label>Dose Amount</label><input id="dm-amt" type="number" step="any" value="${p.default_dose_amount||''}" style="width:100%;"></div>
+        <div class="form-field"><label>Unit</label><select id="dm-unit" style="width:100%;">${['g','ml','kg','L'].map(u=>`<option value="${u}" ${p.default_dose_unit===u?'selected':''}>${u}</option>`).join('')}</select></div>
+        <div class="form-field"><label>Per Litres</label><input id="dm-per" type="number" step="any" value="${p.default_dose_per_litres||''}" style="width:100%;"></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="dm-save" onclick="saveDose('${pid}')">Save</button></div>
+    </div></div>`;
+}
+async function saveDose(pid){
+  const amt=parseFloat(document.getElementById("dm-amt").value)||null;
+  const unit=document.getElementById("dm-unit").value||null;
+  const per=parseFloat(document.getElementById("dm-per").value)||null;
+  const btn=document.getElementById("dm-save"); if(btn) btnLoading(btn,true);
+  const res=await sbQuery(sb.from("pnd_products").update({default_dose_amount:amt,default_dose_unit:unit,default_dose_per_litres:per}).eq("id",pid).select());
+  if(res===null){ if(btn) btnLoading(btn,false,"Save"); return; }
+  const p=getProduct(pid); if(p){ p.default_dose_amount=amt; p.default_dose_unit=unit; p.default_dose_per_litres=per; }
+  closeModal(); notify("Default dose saved"); renderProductsPage();
+}
+function renderEnableProductsSection(){
+  const container=document.getElementById("enable-products-container"); if(!container) return;
+  const linkedIds = products.map(p=>p.inventory_product_id).filter(Boolean);
+  const available = inventoryProducts.filter(ip=>!ip.archived && (ip.category||'').toLowerCase()==='herbicide' && !linkedIds.includes(ip.id)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!available.length){ container.innerHTML='<div style="color:var(--text-dim);font-size:12px;">All Herbicide inventory products are already enabled. Add new ones in the Inventory module (category "Herbicide").</div>'; return; }
+  container.innerHTML='<div style="display:flex;flex-wrap:wrap;gap:8px;">'+available.map(ip=>
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;">'+
+      '<div><div style="font-size:13px;font-weight:600;color:var(--white);">'+esc(ip.name)+'</div>'+
+      '<div style="font-size:11px;color:var(--text-dim);">'+esc(ip.category||'')+(ip.active_ingredient?' — '+esc(ip.active_ingredient):'')+'</div></div>'+
+      '<button class="btn btn-primary btn-sm" onclick="enableForSpraying(\''+ip.id+'\')" style="white-space:nowrap;">Enable</button>'+
+    '</div>').join('')+'</div>';
+}
+async function enableForSpraying(invId){
+  const ip=getInventoryProduct(invId); if(!ip) return;
+  const data={ product_name:ip.name, product_type:'herbicide', inventory_product_id:ip.id, is_active:true, sort_order:products.length+1, packaging_size:ip.pack_size||null, packaging_unit:ip.pack_unit||null, packaging_type:ip.pack_type||null, company_id:getCompanyId() };
+  const res=await sbQuery(sb.from("pnd_products").insert(data).select());
+  if(res===null) return;
+  const np=res.length?res[0]:null;
+  if(np){
+    products.push(np);
+    if(ip.active_ingredient){
+      const aiNames=ip.active_ingredient.split(/[+\/,]/).map(s=>s.trim()).filter(Boolean);
+      // need full ingredient list to match — fetch on demand
+      const ings = await sbQuery(sb.from("pnd_ingredients").select("id,name").eq("company_id",getCompanyId()));
+      for(const an of aiNames){
+        const ing=(ings||[]).find(i=>i.name.toLowerCase()===an.toLowerCase());
+        if(ing){ const pr=await sbQuery(sb.from("pnd_product_ingredients").insert({product_id:np.id,ingredient_id:ing.id,company_id:getCompanyId()}).select()); if(pr&&pr.length) productIngredients.push({...pr[0],pnd_ingredients:ing}); }
+      }
+    }
+  }
+  notify(ip.name+" enabled for weed spraying");
+  renderProductsPage(); renderEnableProductsSection();
+}
+
+// ============================================================
+// REPORTS
+// ============================================================
+const REPORTS=[
+  {id:1,name:'Last Spray by Block'},
+  {id:2,name:'Spray History'},
+  {id:3,name:'By Product'},
+  {id:4,name:'By Active Ingredient'},
+  {id:5,name:'Worker Activity'},
+];
+let currentReport=null, reportData=[];
+function initReports(){ const el=document.getElementById("report-btns"); el.innerHTML=REPORTS.map(r=>`<button class="report-btn ${currentReport===r.id?'active':''}" onclick="selectReport(${r.id})">${r.name}</button>`).join(""); if(!currentReport) selectReport(1); }
+function selectReport(id){
+  currentReport=id;
+  document.querySelectorAll(".report-btn").forEach((b,i)=>b.classList.toggle("active",REPORTS[i].id===id));
+  document.getElementById("report-results").style.display="none";
+  document.getElementById("btn-export-csv").style.display="none";
+  document.getElementById("btn-export-pdf").style.display="none";
+  document.getElementById("report-count").textContent="";
+  reportData=[]; renderReportFilters(id);
+  if(id===1) generateReport();
+}
+function renderReportFilters(id){
+  const el=document.getElementById("report-filters");
+  const today=todayStr(); const d90=new Date(); d90.setDate(d90.getDate()-90);
+  const d90s=d90.getFullYear()+"-"+String(d90.getMonth()+1).padStart(2,"0")+"-"+String(d90.getDate()).padStart(2,"0");
+  const dateRange=`<div style="display:flex;gap:8px;align-items:center;"><label style="font-size:11px;color:var(--text-muted);white-space:nowrap;">Date range:</label><input type="date" id="rf-from" value="${d90s}"><input type="date" id="rf-to" value="${today}"></div>`;
+  const prodOpts=products.map(p=>`<option value="${p.id}">${esc(p.product_name)}</option>`).join("");
+  const workerOpts=workers.map(w=>`<option value="${esc(w.name)}">${esc(w.name)}</option>`).join("");
+  // unique AIs across herbicide products
+  const aiSet=[...new Set(products.flatMap(p=>productAIString(p.id).split(/[+,]/).map(s=>s.trim()).filter(Boolean)))].sort();
+  const aiOpts=aiSet.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join("");
+  const blockCbs=`<div style="margin-bottom:4px;"><label style="display:inline-flex;align-items:center;font-size:12px;font-weight:700;cursor:pointer;color:#3E7A33;"><input type="checkbox" id="rf-blocks-all" onchange="document.querySelectorAll('.rf-blocks-cb').forEach(c=>c.checked=this.checked)"> Select All</label></div><div style="max-height:180px;overflow-y:auto;background:var(--bg-input);padding:8px;border-radius:8px;border:1px solid var(--border);">${blocks.filter(b=>b.is_active).map(b=>`<label style="display:block;font-size:12px;padding:2px 0;cursor:pointer;"><input type="checkbox" class="rf-blocks-cb" value="${b.id}"> ${esc(b.block_name)}</label>`).join("")}</div>`;
+  const filters={
+    1:'',
+    2:blockCbs+'<div style="margin-top:8px;">'+dateRange+'</div>',
+    3:`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="rf-product"><option value="__all__">All Products</option>${prodOpts}</select></div><div style="margin-top:8px;">${dateRange}</div>`,
+    4:`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="rf-ai"><option value="__all__">All Active Ingredients</option>${aiOpts}</select></div><div style="margin-top:8px;">${dateRange}</div>`,
+    5:`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><select id="rf-worker"><option value="__all__">All Workers</option>${workerOpts}</select></div><div style="margin-top:8px;">${dateRange}</div>`,
+  };
+  el.innerHTML=filters[id]||'';
+}
+// expand completed jobs into per-product rows
+function completedJobRows(){
+  const rows=[];
+  weedJobs.filter(j=>j.status==='Completed').forEach(j=>{
+    const jps=getWeedJobProducts(j.id);
+    if(!jps.length){ rows.push({j,jp:null}); return; }
+    jps.forEach(jp=>rows.push({j,jp}));
+  });
+  return rows;
+}
+function rowDate(j){ return j.completion_date||j.planned_date||''; }
+function generateReport(){
+  const id=currentReport; let cols=[], rows=[], title=REPORTS.find(r=>r.id===id).name;
+  const today=todayStr();
+  if(id===1){
+    const latest={}; weedJobs.forEach(j=>{ if(j.status!=='Completed'||!j.completion_date||!j.block_id) return; const c=latest[j.block_id]; if(!c||(j.completion_date||'')>(c.completion_date||'')) latest[j.block_id]=j; });
+    cols=["Block","Status","Last Sprayed","Days Ago","Product(s)","Active Ingredient(s)","Worker"];
+    rows=blocks.filter(b=>b.is_active).map(b=>{
+      const j=latest[b.id]; const bc=getBlockCrop(b.id); const st=bc?getCropStatusName(bc.status_id):'—';
+      if(!j) return [b.block_name,st,'—','—','—','—','—'];
+      const jps=getWeedJobProducts(j.id);
+      const prods=jps.map(jp=>productName(jp.product_id)).join(', ');
+      const ais=[...new Set(jps.flatMap(jp=>(jp.ai_snapshot||productAIString(jp.product_id)).split(/[+,]/).map(s=>s.trim()).filter(Boolean)))].join(', ');
+      return [b.block_name,st,fmtDate(j.completion_date),daysDiff(j.completion_date,today),prods,ais||'—',j.worker_name||'—'];
+    }).sort((a,b)=>String(a[0]).localeCompare(String(b[0]),undefined,{numeric:true}));
+  } else if(id===2){
+    const cbs=[...document.querySelectorAll(".rf-blocks-cb:checked")].map(c=>c.value);
+    if(!cbs.length){ notify("Select at least one block","warning"); return; }
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    cols=["Completed","Block","Type","Product","Active Ingredient(s)","Dose","Total Used","Worker","Water","Notes"];
+    rows=completedJobRows().filter(({j})=>cbs.includes(j.block_id) && (!from||rowDate(j)>=from) && (!to||rowDate(j)<=to))
+      .sort((a,b)=>rowDate(b.j).localeCompare(rowDate(a.j)))
+      .map(({j,jp})=>{
+        const W=(parseFloat(j.tank_size_litres)||0)*(parseFloat(j.tanks_completed||j.tanks_planned)||0);
+        const used=jp&&jp.dose_amount&&jp.dose_per_litres&&W?(W/jp.dose_per_litres)*jp.dose_amount:0;
+        return [fmtDate(j.completion_date),jobLocationName(j),j.job_type,jp?productName(jp.product_id):'—',jp?(jp.ai_snapshot||productAIString(jp.product_id)||'—'):'—',jp?`${fmtNum(jp.dose_amount)}${jp.dose_unit||''}/${fmtNum(jp.dose_per_litres)}L`:'—',jp?fmtNum(used)+' '+(jp.dose_unit||''):'—',j.worker_name||'—',W?fmtNum(W)+'L':'—',j.notes||''];
+      });
+  } else if(id===3){
+    const pid=document.getElementById("rf-product").value;
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    cols=["Completed","Block","Product","Active Ingredient(s)","Total Used","Worker"];
+    rows=completedJobRows().filter(({j,jp})=>jp && (pid==='__all__'||jp.product_id===pid) && (!from||rowDate(j)>=from) && (!to||rowDate(j)<=to))
+      .sort((a,b)=>rowDate(b.j).localeCompare(rowDate(a.j)))
+      .map(({j,jp})=>{ const W=(parseFloat(j.tank_size_litres)||0)*(parseFloat(j.tanks_completed||j.tanks_planned)||0); const used=jp.dose_amount&&jp.dose_per_litres&&W?(W/jp.dose_per_litres)*jp.dose_amount:0; return [fmtDate(j.completion_date),jobLocationName(j),productName(jp.product_id),jp.ai_snapshot||productAIString(jp.product_id)||'—',fmtNum(used)+' '+(jp.dose_unit||''),j.worker_name||'—']; });
+  } else if(id===4){
+    const ai=document.getElementById("rf-ai").value;
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    if(ai!=='__all__') title="By Active Ingredient: "+ai;
+    cols=["Completed","Block","Active Ingredient","Product","Worker"];
+    rows=completedJobRows().filter(({j,jp})=>{ if(!jp) return false; const aiStr=(jp.ai_snapshot||productAIString(jp.product_id)||''); const has = ai==='__all__' ? !!aiStr : aiStr.split(/[+,]/).map(s=>s.trim().toLowerCase()).includes(ai.toLowerCase()); return has && (!from||rowDate(j)>=from) && (!to||rowDate(j)<=to); })
+      .sort((a,b)=>{ const c=String(jobLocationName(a.j)).localeCompare(String(jobLocationName(b.j)),undefined,{numeric:true}); return c!==0?c:rowDate(b.j).localeCompare(rowDate(a.j)); })
+      .map(({j,jp})=>[fmtDate(j.completion_date),jobLocationName(j),jp.ai_snapshot||productAIString(jp.product_id)||'—',productName(jp.product_id),j.worker_name||'—']);
+  } else if(id===5){
+    const w=document.getElementById("rf-worker").value;
+    const from=document.getElementById("rf-from").value, to=document.getElementById("rf-to").value;
+    cols=["Completed","Block","Type","Product(s)","Tanks Done","Worker"];
+    rows=weedJobs.filter(j=>j.status==='Completed' && (w==='__all__'||j.worker_name===w) && (!from||rowDate(j)>=from) && (!to||rowDate(j)<=to))
+      .sort((a,b)=>rowDate(b).localeCompare(rowDate(a)))
+      .map(j=>{ const jps=getWeedJobProducts(j.id); return [fmtDate(j.completion_date),jobLocationName(j),j.job_type,jps.map(jp=>productName(jp.product_id)).join(', ')||'—',j.tanks_completed||0,j.worker_name||'—']; });
+  }
+  reportData={cols,rows,title};
+  document.getElementById("report-count").textContent=rows.length+" result"+(rows.length!==1?"s":"");
+  let html='<table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join("")+'</tr></thead><tbody>';
+  if(!rows.length) html+='<tr><td colspan="'+cols.length+'" class="empty-state">No data found</td></tr>';
+  else rows.forEach(r=>{ html+='<tr>'+r.map(c=>'<td>'+esc(String(c??""))+'</td>').join("")+'</tr>'; });
+  html+='</tbody></table>';
+  document.getElementById("wc-report-table").innerHTML=html;
+  document.getElementById("report-results").style.display="block";
+  document.getElementById("btn-export-csv").style.display="inline-flex";
+  document.getElementById("btn-export-pdf").style.display="inline-flex";
+  document.getElementById("print-report-info").textContent=title+" — Generated "+new Date().toLocaleDateString();
+  setupFloatingScroll();
+}
+function exportCSV(){
+  if(!reportData||!reportData.rows) return;
+  const escq=v=>{const s=String(v??"");return s.includes(",")||s.includes('"')||s.includes("\n")?'"'+s.replace(/"/g,'""')+'"':s;};
+  let csv=reportData.cols.map(escq).join(",")+"\n";
+  reportData.rows.forEach(r=>{ csv+=r.map(escq).join(",")+"\n"; });
+  const blob=new Blob([csv],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="weed-control-"+reportData.title.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+"-"+todayStr()+".csv"; a.click();
+}
+function exportPDF(){ document.querySelectorAll(".print-date").forEach(el=>el.textContent=new Date().toLocaleDateString()); window.print(); }
+</script>
+</body>
+</html>

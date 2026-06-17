@@ -1,0 +1,153 @@
+/* ============================================================
+   Weed Control module styles
+   Stays true to Crop Care's visual identity (light cream theme,
+   shared.css sidebar/cards/badges) but engineered to avoid the
+   audited layout flaws: deliberate column widths, no mid-word
+   wrapping, a floating horizontal scrollbar, light-theme-correct
+   sticky headers, and mobile column-hiding.
+   ============================================================ */
+
+/* ── Status badges (job lifecycle) ─────────────────────────── */
+.badge-planned    { background:rgba(96,160,232,0.15);  color:#3D7AC2; }
+.badge-inprogress { background:rgba(232,160,32,0.15);  color:#B5780F; }
+.badge-partial    { background:rgba(232,128,32,0.15);  color:#C96A1A; }
+.badge-suspended  { background:rgba(232,96,96,0.15);   color:#C84444; }
+.badge-completed  { background:rgba(74,124,63,0.18);   color:#3E7A33; }
+
+/* Job-type badges */
+.badge-sched { background:rgba(74,124,63,0.15);  color:#3E7A33; }
+.badge-intv  { background:rgba(232,160,32,0.18); color:#B5780F; }
+
+/* Block (crop) status badges — match Growth Tracker palette */
+.badge-growing    { background:rgba(74,124,63,0.18);  color:#3E7A33; }
+.badge-to-induce  { background:rgba(212,175,55,0.20); color:#8A6D1F; }
+.badge-induced    { background:rgba(100,149,237,0.18);color:#3D7AC2; }
+.badge-harvesting { background:rgba(255,140,40,0.18); color:#C96A1A; }
+.badge-suckers    { background:rgba(150,110,70,0.20); color:#8B6F47; }
+.badge-to-replant { background:rgba(232,96,96,0.15);  color:#C84444; }
+.badge-tunggu-buah{ background:rgba(160,120,230,0.18);color:#6B4C8A; }
+.badge-abandoned  { background:rgba(128,128,128,0.18);color:#777; }
+.badge-block-status { background:var(--bg-hover); color:var(--text-muted); }
+
+/* AI presence flag */
+.wc-no-ai { color:#C96A1A; font-size:10px; margin-left:4px; cursor:help; }
+
+/* ── Tables: column discipline (the core polish) ───────────── */
+/* No mid-word wrapping anywhere; identifier cells truncate with
+   an ellipsis + title tooltip instead of spilling to a 2nd row.  */
+.wc-table { width:100%; border-collapse:collapse; }
+.wc-table th, .wc-table td { white-space:nowrap; }
+.wc-table th { text-align:left; }
+/* truncating identifier cells */
+.wc-ellipsis { max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+.wc-ellipsis-sm { max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+.wc-num { text-align:right; font-variant-numeric:tabular-nums; }
+.wc-center { text-align:center; }
+.wc-muted { color:var(--text-dim); }
+.wc-ai { color:#3E7A33; font-size:11px; }
+
+/* Wrap that hosts a wide table — native scrollbar hidden, floating bar used instead */
+.wc-table-wrap { overflow-x:auto; scrollbar-width:none; }
+.wc-table-wrap::-webkit-scrollbar { height:0; display:none; }
+
+/* Floating horizontal scrollbar — follows the viewport bottom while a wide table is in view */
+.wc-float-scroll {
+  position:fixed; bottom:0; height:14px; overflow-x:auto; overflow-y:hidden;
+  z-index:50; background:rgba(250,246,239,0.92); border-top:1px solid var(--border);
+  scrollbar-width:thin;
+}
+.wc-float-scroll::-webkit-scrollbar { height:10px; }
+.wc-float-scroll::-webkit-scrollbar-thumb { background:var(--green); border-radius:6px; }
+.wc-float-scroll::-webkit-scrollbar-track { background:transparent; }
+.wc-float-scroll-inner { height:1px; }
+
+/* ── Summary ───────────────────────────────────────────────── */
+.wc-block-name { font-weight:600; color:var(--white); }
+.wc-block-sub  { font-size:10px; color:var(--text-dim); font-weight:400; margin-top:1px; }
+.wc-days-pill  { display:inline-block; min-width:30px; }
+
+/* Hover popup (summary cells + job rows) */
+#wc-popup {
+  position:fixed; z-index:9999; display:none; max-width:340px;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; font-size:12px; line-height:1.7;
+  box-shadow:0 8px 24px rgba(42,26,62,0.18); pointer-events:none;
+}
+
+/* ── Tank-mix product rows (new-job modal) ─────────────────── */
+.wc-mix-row {
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+  background:var(--bg-card); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; margin-bottom:8px;
+}
+.wc-mix-row .wc-mix-name { flex:1; min-width:120px; font-weight:600; font-size:13px; }
+.wc-mix-row .wc-mix-ai   { font-size:10px; color:#3E7A33; }
+
+/* Section label inside modals */
+.wc-section-label {
+  margin:14px 0 6px; padding:6px 10px; border-left:3px solid var(--green);
+  background:rgba(74,124,63,0.10); border-radius:0 6px 6px 0;
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.5px; color:#3E7A33;
+}
+
+/* Total water readout */
+.wc-water-readout {
+  width:100%; font-size:15px; font-weight:700; color:var(--white);
+  background:var(--bg-input); text-align:center; padding:10px;
+}
+
+/* ── Stock check cards (jobs page) ─────────────────────────── */
+.wc-stock-card {
+  background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+  padding:10px 14px; min-width:200px; max-width:300px;
+}
+.wc-stock-card .wc-stock-prod { font-size:13px; font-weight:700; color:var(--white); }
+.wc-stock-card .wc-stock-ai   { font-size:10px; color:#3E7A33; margin-bottom:4px; }
+
+/* ── Reports ───────────────────────────────────────────────── */
+.report-btns { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
+.report-btn {
+  padding:6px 14px; border-radius:8px; font-size:12px; font-weight:700;
+  border:1px solid var(--border); background:transparent; color:var(--text-muted);
+  cursor:pointer; font-family:inherit; transition:all 0.15s;
+}
+.report-btn:hover { border-color:var(--green); color:var(--text); }
+.report-btn.active { border-color:var(--green); background:var(--green-pale); color:#3E7A33; }
+#wc-report-table table { width:100%; border-collapse:collapse; }
+#wc-report-table th, #wc-report-table td { white-space:nowrap; }
+
+/* ── Empty state ───────────────────────────────────────────── */
+.empty-state { padding:40px; text-align:center; color:var(--text-dim); font-size:14px; }
+
+/* Spin animation for the sync icon */
+.spin { animation:spin 1s linear infinite; }
+
+/* ── Mobile: hide low-priority columns instead of squashing ─── */
+@media (max-width: 768px) {
+  .wc-hide-sm { display:none !important; }
+  .wc-ellipsis { max-width:130px; }
+  .wc-ellipsis-sm { max-width:100px; }
+}
+
+/* ── Desktop sizing (match Crop Care's 1024px breakpoint) ──── */
+@media (min-width: 1024px) {
+  .page-title { font-size:28px; }
+  td, th { font-size:14px; }
+  .report-btn { font-size:13px; }
+}
+
+/* ── Print ─────────────────────────────────────────────────── */
+@media print {
+  .report-btns, .table-toolbar, #wc-float-scroll { display:none !important; }
+  .page { display:none !important; }
+  .page.active { display:block !important; }
+  .data-table { border-color:#ccc !important; background:white !important; }
+  td, th, .page-title { color:black !important; }
+  table { font-size:10px !important; }
+  th { background:#f0f0f0 !important; }
+  .print-header { display:block !important; text-align:center; margin-bottom:16px; }
+  .print-header h2 { font-size:18px; margin-bottom:4px; }
+  .print-header p { font-size:11px; color:#666; }
+}
+.print-header { display:none; }
