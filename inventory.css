@@ -325,3 +325,154 @@ select { min-width: 140px; }
   .summary-card, .data-table, .journal-entry { border-color: #ccc !important; background: white !important; }
   .sc-value, .td-bold, .je-detail, .page-title { color: black !important; }
 }
+
+/* ============================================================
+   INVENTORY DASHBOARD — category cards + AI chip + popover
+   ============================================================ */
+.inv-cat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1100px) { .inv-cat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px)  { .inv-cat-grid { grid-template-columns: 1fr; } }
+
+.inv-cat-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.inv-cat-card-h {
+  padding: 12px 16px;
+  background: rgba(212, 175, 55, 0.08);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.18);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.inv-cat-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2A1A3E;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.inv-cat-card-meta {
+  font-size: 11px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+.inv-cat-card-body { padding: 4px 0; }
+
+.inv-prod-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+}
+.inv-prod-line:last-child { border-bottom: none; }
+.inv-prod-line.inv-phased { opacity: 0.55; }
+
+.inv-prod-left { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.inv-prod-name {
+  color: #2A1A3E;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.inv-prod-name:hover { color: #6B4C8A; text-decoration: underline; }
+.inv-prod-sub { font-size: 11px; color: #888; font-weight: 400; }
+
+.inv-prod-stock {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #2A1A3E;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.inv-prod-canon {
+  font-weight: 500;
+  font-size: 11px;
+  color: #6B4C8A;
+  opacity: 0.85;
+}
+
+.inv-prod-empty {
+  padding: 16px;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+}
+
+.inv-prod-phased { background: rgba(0, 0, 0, 0.015); border-top: 1px dashed rgba(0, 0, 0, 0.08); }
+
+.inv-expand-toggle {
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 11px;
+  color: #6B4C8A;
+  cursor: pointer;
+  text-align: center;
+  font-weight: 600;
+  user-select: none;
+}
+.inv-expand-toggle:hover { background: rgba(107, 76, 138, 0.06); }
+
+/* AI chip */
+.inv-ai-chip {
+  display: inline-block;
+  background: rgba(107, 76, 138, 0.10);
+  color: #6B4C8A;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inv-ai-chip:hover { background: rgba(107, 76, 138, 0.18); border-color: #6B4C8A; }
+
+/* AI popover (attached to body, positioned with JS) */
+.inv-ai-pop {
+  position: absolute;
+  display: none;
+  background: #2A1A3E;
+  color: #FFFFFF;
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  max-width: 320px;
+  min-width: 220px;
+  z-index: 1100;
+}
+.inv-ai-pop .pop-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.inv-ai-pop .pop-sub { font-size: 11px; opacity: 0.75; margin-bottom: 10px; }
+.inv-ai-pop .pop-big { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.inv-ai-pop .pop-big-unit { font-size: 12px; opacity: 0.7; font-weight: 400; margin-left: 4px; }
+.inv-ai-pop .pop-breakdown {
+  font-size: 11px;
+  opacity: 0.88;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 8px;
+  line-height: 1.7;
+}
+.inv-ai-pop .pop-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-ai-pop .pop-usage {
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: 0.9;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 8px;
+}

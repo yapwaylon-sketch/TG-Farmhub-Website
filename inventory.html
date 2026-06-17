@@ -121,16 +121,7 @@
           </button>
         </div>
       </div>
-      <div class="cards-grid" id="dashboard-cards"></div>
-      <div id="dashboard-alert"></div>
-      <div id="dashboard-ingredient-summary" style="margin-bottom:18px;"></div>
-      <div id="dashboard-low-stock" style="margin-bottom:18px;"></div>
-      <div class="data-table">
-        <div class="table-header">Recent Transactions</div>
-        <table><thead><tr>
-          <th>Date</th><th>Product</th><th>Type</th><th>Qty</th><th style="text-align:right;">Value (RM)</th><th>Supplier / Destination</th><th>Taken By</th><th>Recorded By</th>
-        </tr></thead><tbody id="dashboard-transactions"></tbody></table>
-      </div>
+      <div id="dashboard-category-grid"></div>
     </div>
 
     <!-- ===== PRODUCTS ===== -->
@@ -809,6 +800,7 @@ let suppliers = [];
 let workers = [];
 let transactions = [];
 let pndIngredients = [];
+let pndProductIngredients = []; // junction: spray products with multiple AIs (used for "+ also contains" in chip popover)
 let pndFormulations = [];
 let prodSelectedIngredients = []; // [{id, name}]
 
@@ -822,7 +814,7 @@ function mapUserFromDb(row) {
   return { id: row.id, username: row.username, pin: row.pin, displayName: row.display_name, role: row.role, permissions: row.permissions || {} };
 }
 function mapProductFromDb(row) {
-  return { id: row.id, name: row.name, category: row.category, subcategory: row.subcategory || "", activeIngredient: row.active_ingredient, formulation: row.formulation, packType: row.pack_type || "Bag", packSize: Number(row.pack_size) || 0, packUnit: row.pack_unit || "pc", reorderLevel: Number(row.reorder_level), currentStock: Number(row.current_stock), openingStock: Number(row.opening_stock) || 0, supplierIds: row.supplier_ids || [], archived: row.archived || false, imageUrl: row.image_url || "" };
+  return { id: row.id, name: row.name, category: row.category, subcategory: row.subcategory || "", activeIngredient: row.active_ingredient, activeIngredientId: row.active_ingredient_id || null, formulation: row.formulation, packType: row.pack_type || "Bag", packSize: Number(row.pack_size) || 0, packUnit: row.pack_unit || "pc", reorderLevel: Number(row.reorder_level), currentStock: Number(row.current_stock), openingStock: Number(row.opening_stock) || 0, supplierIds: row.supplier_ids || [], archived: row.archived || false, imageUrl: row.image_url || "" };
 }
 function mapSupplierFromDb(row) {
   return { id: row.id, name: row.name, contact: row.contact || "", phone: row.phone || "", email: row.email || "", notes: row.notes || "", productIds: row.product_ids || [] };
@@ -838,7 +830,7 @@ function mapTxnFromDb(row) {
 // SUPABASE DATA LOADING
 // ============================================================
 async function loadAllData() {
-  const [uData, pData, sData, wData, tData, iData, fData] = await Promise.all([
+  const [uData, pData, sData, wData, tData, iData, fData, jData] = await Promise.all([
     sbQuery(sb.from("users").select("*")),
     sbQuery(sb.from("products").select("*").eq("company_id", getCompanyId())),
     sbQuery(sb.from("suppliers").select("*").eq("company_id", getCompanyId())),
@@ -846,6 +838,7 @@ async function loadAllData() {
     sbQuery(sb.from("transactions").select("*").eq("company_id", getCompanyId()).order("date", { ascending: false })),
     sbQuery(sb.from("pnd_ingredients").select("*").eq("company_id", getCompanyId()).order("name")),
     sbQuery(sb.from("pnd_formulations").select("*").eq("company_id", getCompanyId()).order("name")),
+    sbQuery(sb.from("pnd_product_ingredients").select("product_id, ingredient_id").eq("company_id", getCompanyId())),
   ]);
 
   if (!uData || !pData || !sData || !wData || !tData) return;
@@ -857,6 +850,7 @@ async function loadAllData() {
   transactions = tData.map(mapTxnFromDb);
   if (iData) pndIngredients = iData;
   if (fData) pndFormulations = fData;
+  if (jData) pndProductIngredients = jData;
   dbReady = true;
   console.log("✅ Data loaded from Supabase:", { users: users.length, products: products.length, suppliers: suppliers.length, workers: workers.length, transactions: transactions.length, ingredients: pndIngredients.length });
 }
@@ -1215,188 +1209,273 @@ function toggleSidebar() {
 // ============================================================
 // RENDER: DASHBOARD
 // ============================================================
+// Dashboard category buckets — collapses PGR / Adjuvant / Carbide into "Other" for display.
+// Underlying products.category keeps its granular value; this is render-time mapping only.
+const DASHBOARD_CATEGORIES = ["Fungicide", "Pesticide", "Herbicide", "Foliar Fertilizer", "Granular Fertilizer", "Other"];
+function dashboardCategoryFor(p) {
+  const c = p.category || "";
+  if (DASHBOARD_CATEGORIES.includes(c)) return c;
+  return "Other";
+}
+
+// Canonical mass/volume per product.
+// Returns {amount, unit: 'g'|'mL'} or null if pack_unit is discrete (pieces/bags/bottles with no contents metric).
+function canonicalForProduct(p) {
+  const u = (p.packUnit || "").toLowerCase();
+  const size = Number(p.packSize) || 0;
+  const stock = Number(p.currentStock) || 0;
+  if (!size) return null;
+  if (u === "kg") return { amount: stock * size * 1000, unit: "g" };
+  if (u === "g")  return { amount: stock * size,        unit: "g" };
+  if (u === "l")  return { amount: stock * size * 1000, unit: "mL" };
+  if (u === "ml") return { amount: stock * size,        unit: "mL" };
+  return null;
+}
+function fmtCanonical(amount, unit) {
+  if (amount == null) return "";
+  if (unit === "g"  && amount >= 1000) return (amount / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " kg";
+  if (unit === "mL" && amount >= 1000) return (amount / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " L";
+  return amount.toLocaleString() + " " + unit;
+}
+
+// Sum canonical mass+volume across a set of products. Returns {g, mL}.
+function canonicalTotals(productList) {
+  let g = 0, mL = 0;
+  for (const p of productList) {
+    const c = canonicalForProduct(p);
+    if (!c) continue;
+    if (c.unit === "g")  g  += c.amount;
+    if (c.unit === "mL") mL += c.amount;
+  }
+  return { g, mL };
+}
+
+// 30-day "out" totals for a set of products, returned in canonical units.
+function thirtyDayUsageCanonical(productList) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  let g = 0, mL = 0;
+  const byProduct = new Map();
+  for (const p of productList) byProduct.set(p.id, p);
+  for (const t of transactions) {
+    if (t.type !== "out") continue;
+    if (t.date < cutoffStr) continue;
+    const p = byProduct.get(t.productId);
+    if (!p) continue;
+    const u = (p.packUnit || "").toLowerCase();
+    const size = Number(p.packSize) || 0;
+    const qty  = Number(t.quantity) || 0;
+    if (!size) continue;
+    if (u === "kg") g  += qty * size * 1000;
+    else if (u === "g")  g  += qty * size;
+    else if (u === "l")  mL += qty * size * 1000;
+    else if (u === "ml") mL += qty * size;
+  }
+  return { g, mL };
+}
+
+// AI chip label — truncate long names. Full name lives in the popover.
+function aiChipLabel(name) {
+  if (!name) return "";
+  return name.length > 18 ? name.slice(0, 16) + "…" : name;
+}
+
 function renderDashboard() {
-  // Date
   document.getElementById("dashboard-date").textContent = "Inventory overview — " + new Date().toLocaleDateString("en-GB", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
 
-  // Stats (exclude archived)
   const activeProducts = products.filter(p => !p.archived);
-  const total = activeProducts.length;
-  const goodCount = activeProducts.filter(p => getStockStatus(p)==="good").length;
-  const healthyPct = total > 0 ? Math.round((goodCount / total) * 100) : 0;
-  const lowCount = activeProducts.filter(p => getStockStatus(p)==="low").length;
-  const outCount = activeProducts.filter(p => p.currentStock===0).length;
-  const healthyColor = healthyPct >= 75 ? "var(--good)" : healthyPct >= 50 ? "var(--low)" : "var(--critical)";
 
-  const totalInventoryValue = activeProducts.reduce((sum, p) => sum + getProductStockValue(p.id), 0);
+  // Bucket by dashboard category.
+  const byCat = {};
+  for (const cat of DASHBOARD_CATEGORIES) byCat[cat] = [];
+  for (const p of activeProducts) byCat[dashboardCategoryFor(p)].push(p);
 
-  document.getElementById("dashboard-cards").innerHTML = `
-    <div class="summary-card" style="cursor:pointer;" onclick="jumpToProducts('all','all')"><div class="sc-label">Total Products</div><div class="sc-value" style="color:var(--green-light);">${total}</div><div class="sc-sub">${Object.keys(CONFIG.categories).length} categories</div></div>
-    <div class="summary-card" style="cursor:pointer;" onclick="jumpToProducts('all','good')"><div class="sc-label">Healthy Stock</div><div class="sc-value" style="color:${healthyColor};">${healthyPct}%</div><div class="sc-sub">${goodCount} of ${total} products good</div></div>
-    <div class="summary-card" style="cursor:pointer;" onclick="jumpToProducts('all','low')"><div class="sc-label">Low Stock</div><div class="sc-value" style="color:var(--low);">${lowCount}</div><div class="sc-sub">Below reorder level</div></div>
-    <div class="summary-card" style="cursor:pointer;" onclick="jumpToProducts('all','critical')"><div class="sc-label">Out of Stock</div><div class="sc-value" style="color:var(--critical);">${outCount}</div><div class="sc-sub">Need immediate reorder</div></div>
-    <div class="summary-card"><div class="sc-label">Inventory Value</div><div class="sc-value" style="color:var(--gold-light);font-size:18px;">${formatRM(totalInventoryValue)}</div><div class="sc-sub">Total stock value</div></div>
+  // Within each bucket, sort by name for stable layout.
+  for (const cat of DASHBOARD_CATEGORIES) {
+    byCat[cat].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  document.getElementById("dashboard-category-grid").innerHTML = `
+    <div class="inv-cat-grid">
+      ${DASHBOARD_CATEGORIES.map(cat => renderCategoryCard(cat, byCat[cat])).join("")}
+    </div>
+  `;
+}
+
+function renderCategoryCard(catName, productList) {
+  const inStock = productList.filter(p => Number(p.currentStock) > 0);
+  const phasedOut = productList.filter(p => Number(p.currentStock) <= 0);
+  const cardKey = catName.replace(/\s+/g, "-").toLowerCase();
+
+  const activeRowsHtml = inStock.length === 0
+    ? `<div class="inv-prod-empty">No active stock in this category</div>`
+    : inStock.map(p => renderProductLine(p, false)).join("");
+
+  const phasedRowsHtml = phasedOut.map(p => renderProductLine(p, true)).join("");
+  const expandHtml = phasedOut.length === 0 ? "" : `
+    <div class="inv-expand-toggle" id="inv-expand-${cardKey}" onclick="togglePhasedOut('${cardKey}')">
+      Show ${phasedOut.length} with no stock ▾
+    </div>
+    <div class="inv-prod-phased" id="inv-phased-${cardKey}" style="display:none">${phasedRowsHtml}</div>
   `;
 
-  // Alert
-  const alertProducts = activeProducts.filter(p => getStockStatus(p) !== "good");
-  if (alertProducts.length > 0) {
-    document.getElementById("dashboard-alert").innerHTML = `
-      <div class="alert-banner">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span><strong>${alertProducts.length} product${alertProducts.length>1?"s":""}</strong> need attention — ${alertProducts.map(p=>esc(p.name)).join(", ")}</span>
+  return `
+    <div class="inv-cat-card">
+      <div class="inv-cat-card-h">
+        <div class="inv-cat-card-name">${catName}</div>
+        <div class="inv-cat-card-meta">${inStock.length} active</div>
       </div>
-    `;
+      <div class="inv-cat-card-body">${activeRowsHtml}</div>
+      ${expandHtml}
+    </div>
+  `;
+}
+
+function renderProductLine(p, isPhased) {
+  const ing = p.activeIngredientId ? pndIngredients.find(i => i.id === p.activeIngredientId) : null;
+  const chipHtml = ing
+    ? `<span class="inv-ai-chip" onclick="event.stopPropagation();showAIPopover('${ing.id}',event,this)" title="${esc(ing.name)}">${esc(aiChipLabel(ing.name))}</span>`
+    : "";
+
+  // Stock display: "5 bottles · 5,000 g"
+  const stockNum = Number(p.currentStock) || 0;
+  const packType = (p.packType || "unit").toLowerCase();
+  const stockLabel = `${stockNum.toLocaleString()} ${packType}${stockNum === 1 ? "" : (packType.endsWith("s") ? "" : "s")}`;
+  const canon = canonicalForProduct(p);
+  const canonLabel = canon ? ` · <span class="inv-prod-canon">${fmtCanonical(canon.amount, canon.unit)}</span>` : "";
+
+  const phasedClass = isPhased ? " inv-phased" : "";
+  return `
+    <div class="inv-prod-line${phasedClass}">
+      <div class="inv-prod-left">
+        <span class="inv-prod-name" onclick="openJournal('${p.id}')">${esc(p.name)}</span>
+        ${chipHtml}
+        <span class="inv-prod-sub">· ${p.packSize ? esc(String(p.packSize)) : ""}${esc(p.packUnit || "")}</span>
+      </div>
+      <div class="inv-prod-stock">${stockLabel}${canonLabel}</div>
+    </div>
+  `;
+}
+
+function togglePhasedOut(cardKey) {
+  const box = document.getElementById("inv-phased-" + cardKey);
+  const toggle = document.getElementById("inv-expand-" + cardKey);
+  if (!box || !toggle) return;
+  const showing = box.style.display !== "none";
+  box.style.display = showing ? "none" : "block";
+  const count = box.querySelectorAll(".inv-prod-line").length;
+  toggle.innerHTML = showing
+    ? `Show ${count} with no stock ▾`
+    : `Hide ${count} with no stock ▴`;
+}
+
+// AI chip popover — Option 2 content (total + per-product breakdown + 30d usage).
+// Click chip → opens. Click outside → closes. Re-clicking same chip toggles.
+let _aiPopOpenFor = null;
+function showAIPopover(ingredientId, ev, anchorEl) {
+  if (_aiPopOpenFor === ingredientId) { hideAIPopover(); return; }
+  const ing = pndIngredients.find(i => i.id === ingredientId);
+  if (!ing) return;
+
+  const productsForAI = products.filter(p => !p.archived && p.activeIngredientId === ingredientId);
+  const totals = canonicalTotals(productsForAI);
+  const usage = thirtyDayUsageCanonical(productsForAI);
+
+  // Determine display unit: prefer the one with the larger nonzero total.
+  let mainUnit = null;
+  if (totals.g > 0 && totals.mL > 0) mainUnit = "mixed";
+  else if (totals.g > 0)  mainUnit = "g";
+  else if (totals.mL > 0) mainUnit = "mL";
+
+  let totalLine;
+  if (mainUnit === "mixed") {
+    totalLine = `${fmtCanonical(totals.g, "g")} + ${fmtCanonical(totals.mL, "mL")}<span class="pop-big-unit"> total</span>`;
+  } else if (mainUnit) {
+    totalLine = `${fmtCanonical(totals[mainUnit], mainUnit)}<span class="pop-big-unit"> total</span>`;
   } else {
-    document.getElementById("dashboard-alert").innerHTML = "";
+    totalLine = `<span class="pop-big-unit">No canonical mass/volume — discrete units only</span>`;
   }
 
-  // Stock Health Overview — grouped by Active Ingredient with click-to-expand
-  const thisYear = new Date().getFullYear();
-
-  // Get usage data
-  const productUsageForChart = {};
-  transactions.forEach(t => {
-    if (t.type !== "out") return;
-    const tYear = new Date(t.date + "T00:00:00").getFullYear();
-    if (tYear !== thisYear) return;
-    productUsageForChart[t.productId] = (productUsageForChart[t.productId] || 0) + t.quantity;
-  });
-
-  // Group by active ingredient — match to pnd_ingredients for normalized grouping
-  const aiGroups = {};
-  activeProducts.filter(p => p.activeIngredient && p.activeIngredient.trim()).forEach(p => {
-    // Try to match to a pnd_ingredients entry (normalized name)
-    const rawAI = p.activeIngredient.trim();
-    const match = pndIngredients.find(i => i.name.toLowerCase() === rawAI.toLowerCase() || i.name.replace(/\s+/g,' ').toLowerCase() === rawAI.replace(/\s+/g,' ').toLowerCase());
-    const key = match ? match.id : rawAI.replace(/\s+/g,' ').toLowerCase();
-    const displayName = match ? match.name : rawAI;
-    if (!aiGroups[key]) aiGroups[key] = { name: displayName, packType: p.packType, packSize: p.packSize, packUnit: p.packUnit, totalStock: 0, totalReorder: 0, products: [] };
-    aiGroups[key].totalStock += p.currentStock;
-    aiGroups[key].totalReorder += p.reorderLevel;
-    aiGroups[key].products.push({ ...p, usage: productUsageForChart[p.id] || 0 });
-  });
-
-  // Sort: most critical first
-  const aiList = Object.values(aiGroups)
-    .map(g => ({ ...g, ratio: g.totalReorder > 0 ? g.totalStock / g.totalReorder : 999 }))
-    .sort((a, b) => a.ratio - b.ratio)
-    .slice(0, 12);
-
-  let healthHtml = "";
-  if (aiList.length > 0) {
-    const bars = aiList.map((g, idx) => {
-      const maxVal = g.totalReorder * 2;
-      const barWidth = Math.max(Math.min(Math.round((g.totalStock / maxVal) * 100), 100), 2);
-      const barColor = g.totalStock === 0 ? "var(--critical)" : g.totalStock < g.totalReorder ? "var(--low)" : "var(--good)";
-      const valColor = g.totalStock === 0 ? "critical" : g.totalStock < g.totalReorder ? "low" : "good";
-      const dot = g.totalStock === 0 ? '<span class="blink-dot" style="margin-right:4px;"></span>' : "";
-      const countLabel = g.products.length > 1 ? ` <span style="color:var(--text-dim);font-weight:400;font-size:10px;">(${g.products.length} products)</span>` : "";
-      const arrow = g.products.length > 1 ? `<span class="ai-expand-arrow" id="ai-arrow-${idx}" style="font-size:10px;color:var(--text-dim);margin-right:4px;transition:transform 0.2s;">▶</span>` : "";
-
-      // Sub-products (hidden by default)
-      let subRows = "";
-      if (g.products.length > 1) {
-        const subBars = g.products.sort((a,b) => (a.currentStock/a.reorderLevel) - (b.currentStock/b.reorderLevel)).map(p => {
-          const pMaxVal = p.reorderLevel * 2;
-          const pBarWidth = Math.max(Math.min(Math.round((p.currentStock / pMaxVal) * 100), 100), 2);
-          const pBarColor = p.currentStock === 0 ? "var(--critical)" : p.currentStock < p.reorderLevel ? "var(--low)" : "var(--good)";
-          const pValColor = p.currentStock === 0 ? "critical" : p.currentStock < p.reorderLevel ? "low" : "good";
-          const pDot = p.currentStock === 0 ? '<span class="blink-dot" style="margin-right:4px;"></span>' : "";
-          const usageTag = p.usage > 0 ? ` <span style="color:var(--text-dim);font-weight:400;font-size:10px;">↑${p.usage}</span>` : "";
-          return `<div class="ingredient-bar-row clickable" onclick="event.stopPropagation();openJournal('${p.id}')" style="cursor:pointer;padding-left:20px;opacity:0.85;">
-            <div class="ingredient-bar-label" style="font-size:11px;">${pDot}${p.name}${usageTag}</div>
-            <div class="ingredient-bar-track" style="position:relative;">
-              <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--border);z-index:1;"></div>
-              <div class="ingredient-bar-fill" style="width:${pBarWidth}%;background:${pBarColor};"></div>
-            </div>
-            <div class="ingredient-bar-value" style="color:var(--${pValColor});font-size:11px;">${p.currentStock} / ${p.reorderLevel} ${packLabel(p)}</div>
-          </div>`;
-        }).join("");
-        subRows = `<div id="ai-sub-${idx}" style="display:none;border-left:2px solid var(--border);margin-left:8px;margin-top:2px;margin-bottom:4px;">${subBars}</div>`;
-      }
-
-      const clickAction = g.products.length > 1 ? `toggleAIGroup(${idx})` : `openJournal('${g.products[0].id}')`;
-      return `<div>
-        <div class="ingredient-bar-row clickable" onclick="${clickAction}" style="cursor:pointer;">
-          <div class="ingredient-bar-label">${arrow}${dot}${g.name}${countLabel}</div>
-          <div class="ingredient-bar-track" style="position:relative;">
-            <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--border);z-index:1;" title="Reorder level: ${g.totalReorder} ${g.unit}"></div>
-            <div class="ingredient-bar-fill" style="width:${barWidth}%;background:${barColor};"></div>
-          </div>
-          <div class="ingredient-bar-value" style="color:var(--${valColor});">${g.totalStock} / ${g.totalReorder} ${g.packType || "unit"}</div>
-        </div>
-        ${subRows}
-      </div>`;
-    }).join("");
-
-    healthHtml = `<div class="ingredient-summary-card">
-      <div class="ingredient-summary-title">Stock Health by Active Ingredient <span style="font-weight:400;font-size:11px;color:var(--text-dim);">— combined stock on hand vs minimum reorder level</span></div>
-      ${bars}
-    </div>`;
-  }
-  document.getElementById("dashboard-ingredient-summary").innerHTML = healthHtml;
-
-  // Stock Watch — split by usage pattern
-  const lowStockAll = activeProducts.filter(p => getStockStatus(p) !== "good");
-
-  // Reuse usage data from chart
-  const lowWithUsage = lowStockAll.map(p => ({ ...p, usage: productUsageForChart[p.id] || 0 }));
-  const highUsageLow = lowWithUsage.filter(p => p.usage > 0).sort((a, b) => b.usage - a.usage).slice(0, 5);
-  const lowUsageLow = lowWithUsage.filter(p => !highUsageLow.find(h => h.id === p.id)).sort((a, b) => a.currentStock - b.currentStock).slice(0, 5);
-
-  function stockWatchRow(p, showUsage) {
-    const st = getStockStatus(p);
-    const pct = p.reorderLevel > 0 ? Math.round((p.currentStock / (p.reorderLevel * 2)) * 100) : 0;
-    const barColor = st === "critical" ? "var(--critical)" : "var(--low)";
-    const dot = st === "critical" ? '<span class="blink-dot" style="margin-right:8px;"></span>' : "";
-    const usageLabel = showUsage ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px;">▲${p.usage} used</span>` : "";
-    return `<div class="ingredient-bar-row clickable" onclick="openJournal('${p.id}')" style="cursor:pointer;">
-      <div class="ingredient-bar-label" style="color:var(--white);">${dot}${p.name}${usageLabel}</div>
-      <div class="ingredient-bar-track"><div class="ingredient-bar-fill" style="width:${Math.max(pct, 2)}%;background:${barColor};"></div></div>
-      <div class="ingredient-bar-value" style="color:var(--${st});">${p.currentStock} / ${p.reorderLevel} ${packLabel(p)}</div>
-    </div>`;
-  }
-
-  let stockWatchHtml = "";
-  if (highUsageLow.length > 0 || lowUsageLow.length > 0) {
-    let sections = "";
-    if (highUsageLow.length > 0) {
-      sections += `<div style="font-size:12px;font-weight:700;color:var(--critical);margin-bottom:8px;margin-top:4px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Order Now — High Usage, Low Stock</div>`;
-      sections += highUsageLow.map(p => stockWatchRow(p, true)).join("");
-    }
-    if (lowUsageLow.length > 0) {
-      sections += `<div style="font-size:12px;font-weight:700;color:var(--low);margin-bottom:8px;margin-top:${highUsageLow.length > 0 ? "16" : "4"}px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:middle;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Order Soon — Low Usage, Low Stock</div>`;
-      sections += lowUsageLow.map(p => stockWatchRow(p, false)).join("");
-    }
-
-    stockWatchHtml = `<div class="ingredient-summary-card">
-      <div class="ingredient-summary-title" style="color:var(--low);">Stock Watch <span style="font-weight:400;font-size:11px;color:var(--text-dim);">— ${lowStockAll.length} product${lowStockAll.length > 1 ? "s" : ""} need attention</span></div>
-      ${sections}
-    </div>`;
-  }
-  document.getElementById("dashboard-low-stock").innerHTML = stockWatchHtml;
-
-  // Recent transactions
-  const recent = [...transactions].sort((a,b) => b.date.localeCompare(a.date)).slice(0, 8);
-  document.getElementById("dashboard-transactions").innerHTML = recent.map(t => {
-    const p = products.find(pr => pr.id === t.productId);
-    const txnValue = t.totalCost > 0 ? t.totalCost : (t.type === "out" ? t.quantity * getProductAvgCost(t.productId) : 0);
-    return `<tr class="clickable" onclick="openJournal('${t.productId}')">
-      <td>${fmtDateShort(t.date)}</td>
-      <td class="td-bold">${t.productName}</td>
-      <td><span class="badge badge-${t.type}">${t.type==="in"?"▼ IN":"▲ OUT"}</span></td>
-      <td style="font-weight:600;">${p ? packQty(t.quantity, p) : t.quantity}</td>
-      <td style="text-align:right;color:${t.type==="in"?"var(--good)":"var(--critical)"};">${txnValue > 0 ? formatRM(txnValue) : "—"}</td>
-      <td>${t.supplier||"—"}</td>
-      <td>${t.type==="out" && t.takenBy ? getWorkerLabel(t.takenBy) : "—"}</td>
-      <td>${t.recordedBy}</td>
-    </tr>`;
+  const breakdownHtml = productsForAI.map(p => {
+    const c = canonicalForProduct(p);
+    const stockNum = Number(p.currentStock) || 0;
+    const detail = c
+      ? `${stockNum} × ${p.packSize}${p.packUnit} = ${fmtCanonical(c.amount, c.unit)}`
+      : `${stockNum} ${(p.packType || "unit").toLowerCase()}`;
+    return `<div class="pop-row">↳ ${esc(p.name)} · ${esc(detail)}</div>`;
   }).join("");
+
+  // Multi-AI products: gather "also contains" hints from spray junction.
+  const alsoContainsByProduct = {};
+  for (const p of productsForAI) {
+    const links = pndProductIngredients.filter(j => {
+      // pnd_product_ingredients.product_id points at pnd_products, not products.id.
+      // Find the pnd_product linked to this inventory product.
+      return false;
+    });
+  }
+  // The pnd_product_ingredients junction is keyed by pnd_products.id, not products.id.
+  // We don't load pnd_products in inventory.html today; the "+ also contains" hint
+  // is intentionally deferred to Phase 3 (Products tab can show this in the detail view
+  // since it loads more context). For now, popover stays focused on the simple rollup.
+
+  let usageLine = "";
+  if (usage.g > 0 || usage.mL > 0) {
+    const parts = [];
+    if (usage.g > 0)  parts.push(fmtCanonical(usage.g, "g"));
+    if (usage.mL > 0) parts.push(fmtCanonical(usage.mL, "mL"));
+    usageLine = `<div class="pop-usage">Used last 30d: <strong>${parts.join(" + ")}</strong></div>`;
+  } else {
+    usageLine = `<div class="pop-usage" style="opacity:0.6">Used last 30d: none</div>`;
+  }
+
+  let pop = document.getElementById("inv-ai-pop");
+  if (!pop) {
+    pop = document.createElement("div");
+    pop.id = "inv-ai-pop";
+    pop.className = "inv-ai-pop";
+    document.body.appendChild(pop);
+  }
+  pop.innerHTML = `
+    <div class="pop-title">${esc(ing.name)}</div>
+    <div class="pop-sub">Across ${productsForAI.length} product${productsForAI.length === 1 ? "" : "s"}</div>
+    <div class="pop-big">${totalLine}</div>
+    <div class="pop-breakdown">${breakdownHtml}</div>
+    ${usageLine}
+  `;
+
+  // Position near the anchor. Pop floats below if room, else above.
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.display = "block";
+  pop.style.visibility = "hidden";
+  // Force layout to measure popover size, then place it.
+  const popH = pop.offsetHeight;
+  const popW = pop.offsetWidth;
+  let top = r.bottom + window.scrollY + 8;
+  if (r.bottom + popH + 12 > window.innerHeight) top = r.top + window.scrollY - popH - 8;
+  let left = r.left + window.scrollX;
+  if (left + popW + 12 > window.innerWidth + window.scrollX) left = window.innerWidth + window.scrollX - popW - 12;
+  if (left < 8) left = 8;
+  pop.style.top = top + "px";
+  pop.style.left = left + "px";
+  pop.style.visibility = "visible";
+
+  _aiPopOpenFor = ingredientId;
+  // Close on outside click. Use a one-shot listener.
+  setTimeout(() => document.addEventListener("click", _aiPopOutsideClick, { once: false }), 0);
+}
+function hideAIPopover() {
+  const pop = document.getElementById("inv-ai-pop");
+  if (pop) pop.style.display = "none";
+  _aiPopOpenFor = null;
+  document.removeEventListener("click", _aiPopOutsideClick);
+}
+function _aiPopOutsideClick(ev) {
+  const pop = document.getElementById("inv-ai-pop");
+  if (!pop) return;
+  if (pop.contains(ev.target)) return;
+  if (ev.target.classList && ev.target.classList.contains("inv-ai-chip")) return;
+  hideAIPopover();
 }
 
 // ============================================================
