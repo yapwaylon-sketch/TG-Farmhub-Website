@@ -1333,6 +1333,18 @@ function renderCategoryCard(catName, productList) {
   const inStock = productList.filter(p => Number(p.currentStock) > 0);
   const phasedOut = productList.filter(p => Number(p.currentStock) <= 0);
   const cardKey = catName.replace(/\s+/g, "-").toLowerCase();
+  const hasContent = productList.length > 0;
+
+  // Excel-style column header — shown whenever this card has any products
+  // (active or phased), since either can be visible.
+  const headerHtml = hasContent ? `
+    <div class="inv-cat-head-row">
+      <div>Product</div>
+      <div>Pack</div>
+      <div>Qty</div>
+      <div>Total</div>
+    </div>
+  ` : "";
 
   const activeRowsHtml = inStock.length === 0
     ? `<div class="inv-prod-empty">No active stock in this category</div>`
@@ -1352,6 +1364,7 @@ function renderCategoryCard(catName, productList) {
         <div class="inv-cat-card-name">${catName}</div>
         <div class="inv-cat-card-meta">${inStock.length} active</div>
       </div>
+      ${headerHtml}
       <div class="inv-cat-card-body">${activeRowsHtml}</div>
       ${expandHtml}
     </div>
@@ -1361,25 +1374,37 @@ function renderCategoryCard(catName, productList) {
 function renderProductLine(p, isPhased) {
   const ing = p.activeIngredientId ? pndIngredients.find(i => i.id === p.activeIngredientId) : null;
   const chipHtml = ing
-    ? `<span class="inv-ai-chip" onclick="event.stopPropagation();showAIPopover('${ing.id}',event,this)" title="${esc(ing.name)}">${esc(aiChipLabel(ing.name))}</span>`
+    ? `<div class="inv-prod-ai-line"><span class="inv-ai-chip" onclick="event.stopPropagation();showAIPopover('${ing.id}',event,this)" title="${esc(ing.name)}">${esc(aiChipLabel(ing.name))}</span></div>`
     : "";
 
-  // Stock display: "5 bottles · 5,000 g"
-  const stockNum = Number(p.currentStock) || 0;
-  const packType = (p.packType || "unit").toLowerCase();
-  const stockLabel = `${stockNum.toLocaleString()} ${packType}${stockNum === 1 ? "" : (packType.endsWith("s") ? "" : "s")}`;
+  const stockNum  = Number(p.currentStock) || 0;
+  const packSize  = Number(p.packSize) || 0;
+  const packUnit  = p.packUnit || "";
+  const packType  = (p.packType || "unit").toLowerCase();
+
+  // Pack column — what's in one container (e.g. "500g", "1kg", "5L"). "—" if no pack size.
+  const packLabel = (packSize && packUnit) ? `${packSize}${packUnit}` : "—";
+
+  // Total column — canonical mass/volume when available, else "{stockNum} {packType-plural}".
   const canon = canonicalForProduct(p);
-  const canonLabel = canon ? ` · <span class="inv-prod-canon">${fmtCanonical(canon.amount, canon.unit)}</span>` : "";
+  let totalCell;
+  if (canon) {
+    totalCell = `<div class="inv-prod-cell">${fmtCanonical(canon.amount, canon.unit)}</div>`;
+  } else {
+    const plural = packType + (stockNum === 1 || packType.endsWith("s") ? "" : "s");
+    totalCell = `<div class="inv-prod-cell muted">${stockNum.toLocaleString()} ${plural}</div>`;
+  }
 
   const phasedClass = isPhased ? " inv-phased" : "";
   return `
-    <div class="inv-prod-line${phasedClass}">
-      <div class="inv-prod-left">
+    <div class="inv-prod-row${phasedClass}">
+      <div class="inv-prod-name-cell">
         <span class="inv-prod-name" onclick="openJournal('${p.id}')">${esc(p.name)}</span>
         ${chipHtml}
-        <span class="inv-prod-sub">· ${p.packSize ? esc(String(p.packSize)) : ""}${esc(p.packUnit || "")}</span>
       </div>
-      <div class="inv-prod-stock">${stockLabel}${canonLabel}</div>
+      <div class="inv-prod-cell muted">${packLabel}</div>
+      <div class="inv-prod-cell">${stockNum.toLocaleString()}</div>
+      ${totalCell}
     </div>
   `;
 }
@@ -1390,7 +1415,7 @@ function togglePhasedOut(cardKey) {
   if (!box || !toggle) return;
   const showing = box.style.display !== "none";
   box.style.display = showing ? "none" : "block";
-  const count = box.querySelectorAll(".inv-prod-line").length;
+  const count = box.querySelectorAll(".inv-prod-row").length;
   toggle.innerHTML = showing
     ? `Show ${count} with no stock ▾`
     : `Hide ${count} with no stock ▴`;

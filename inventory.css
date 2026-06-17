@@ -361,43 +361,60 @@ select { min-width: 140px; }
   color: #888;
   font-variant-numeric: tabular-nums;
 }
-.inv-cat-card-body { padding: 4px 0; }
+.inv-cat-card-body { padding: 0; }
 
-.inv-prod-line {
+/* Excel-style column header row inside each card */
+.inv-cat-head-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 64px 50px 90px;
   gap: 10px;
-  align-items: center;
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.10);
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+.inv-cat-head-row > div:nth-child(2),
+.inv-cat-head-row > div:nth-child(3),
+.inv-cat-head-row > div:nth-child(4) { text-align: right; }
+
+/* Product row — same 4-col grid as the header so columns line up */
+.inv-prod-row {
+  display: grid;
+  grid-template-columns: 1fr 64px 50px 90px;
+  gap: 10px;
+  align-items: start;
   padding: 8px 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   font-size: 13px;
 }
-.inv-prod-line:last-child { border-bottom: none; }
-.inv-prod-line.inv-phased { opacity: 0.55; }
+.inv-prod-row:last-child { border-bottom: none; }
+.inv-prod-row.inv-phased { opacity: 0.55; }
 
-.inv-prod-left { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.inv-prod-name-cell { min-width: 0; line-height: 1.3; }
 .inv-prod-name {
   color: #2A1A3E;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
 }
 .inv-prod-name:hover { color: #6B4C8A; text-decoration: underline; }
-.inv-prod-sub { font-size: 11px; color: #888; font-weight: 400; }
+.inv-prod-ai-line { display: block; margin-top: 3px; }
 
-.inv-prod-stock {
+.inv-prod-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: #2A1A3E;
   font-weight: 600;
-  font-size: 13px;
+  padding-top: 1px;
   white-space: nowrap;
 }
-.inv-prod-canon {
+.inv-prod-cell.muted {
+  color: #888;
   font-weight: 500;
-  font-size: 11px;
-  color: #6B4C8A;
-  opacity: 0.85;
+  font-size: 12px;
 }
 
 .inv-prod-empty {
