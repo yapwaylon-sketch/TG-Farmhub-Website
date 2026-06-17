@@ -70,10 +70,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         <span class="nav-label">Products</span>
       </div>
-      <div class="nav-item" data-page="analytics" onclick="navigateTo('analytics')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        <span class="nav-label">Analytics</span>
-      </div>
       <div class="nav-item" data-page="suppliers" onclick="navigateTo('suppliers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="nav-label">Suppliers</span>
@@ -213,36 +209,6 @@
     </div>
 
     <!-- ===== ANALYTICS ===== -->
-    <div id="page-analytics" class="page">
-      <div class="page-header">
-        <h1 class="page-title">Analytics</h1>
-        <div class="header-actions">
-          <select id="analytics-mode" onchange="updateAnalyticsFilter();renderAnalytics()">
-            <option value="product">By Product</option>
-            <option value="category">By Category</option>
-            <option value="ai">By Active Ingredient</option>
-          </select>
-          <select id="analytics-product" onchange="renderAnalytics()"></select>
-          <select id="analytics-category" onchange="renderAnalytics()" style="display:none;"></select>
-          <select id="analytics-ai" onchange="renderAnalytics()" style="display:none;"></select>
-          <select id="analytics-year" onchange="renderAnalytics()">
-            <option value="2024">2024</option>
-            <option value="2025">2025</option>
-            <option value="2026" selected>2026</option>
-          </select>
-          <button class="btn btn-outline" onclick="generateReportFromAnalytics()" style="height:36px;font-size:12px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Generate Report
-          </button>
-        </div>
-      </div>
-      <div class="chart-container">
-        <div class="chart-title" id="analytics-chart-title">Monthly Usage — All Products (2026)</div>
-        <canvas id="analytics-chart" height="280"></canvas>
-      </div>
-      <div class="cards-grid" id="analytics-cards"></div>
-    </div>
-
     <!-- ===== SUPPLIERS ===== -->
     <div id="page-suppliers" class="page">
       <div class="page-header">
@@ -383,8 +349,38 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Reports</h1>
-          <p class="page-subtitle">Generate and export inventory reports</p>
+          <p class="page-subtitle">Monthly usage chart + Stock / Reorder / Usage tables</p>
         </div>
+      </div>
+
+      <!-- Monthly Usage Chart (moved from the old Analytics tab) -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;color:var(--white);">Monthly Usage Chart</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="analytics-mode" onchange="updateAnalyticsFilter();renderAnalytics()" style="font-size:12px;">
+              <option value="product">By Product</option>
+              <option value="category">By Category</option>
+              <option value="ai">By Active Ingredient</option>
+            </select>
+            <select id="analytics-product" onchange="renderAnalytics()" style="font-size:12px;"></select>
+            <select id="analytics-category" onchange="renderAnalytics()" style="display:none;font-size:12px;"></select>
+            <select id="analytics-ai" onchange="renderAnalytics()" style="display:none;font-size:12px;"></select>
+            <select id="analytics-year" onchange="renderAnalytics()" style="font-size:12px;">
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+            </select>
+            <button class="btn btn-outline" onclick="generateReportFromAnalytics()" style="font-size:11px;padding:4px 8px;">
+              Apply to report below ↓
+            </button>
+          </div>
+        </div>
+        <div class="chart-container" style="background:transparent;padding:0;border:none;">
+          <div class="chart-title" id="analytics-chart-title" style="margin-bottom:12px;">Monthly Usage — All Products (2026)</div>
+          <canvas id="analytics-chart" height="280"></canvas>
+        </div>
+        <div class="cards-grid" id="analytics-cards" style="margin-top:12px;"></div>
       </div>
 
       <!-- Report Type Selector -->
@@ -1189,7 +1185,6 @@ function navigateTo(page) {
   if (navItem) navItem.classList.add("active");
   if (page === "dashboard") renderDashboard();
   if (page === "products") renderProducts();
-  if (page === "analytics") renderAnalytics();
   if (page === "suppliers") renderSuppliers();
   if (page === "transactions") renderTransactions();
   if (page === "reports") initReportsPage();
@@ -3430,16 +3425,21 @@ function initReportsPage() {
   // Populate report filter dropdowns
   const rfProduct = document.getElementById("report-filter-product");
   rfProduct.innerHTML = products.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
-  
+
   const rfCategory = document.getElementById("report-filter-category");
   rfCategory.innerHTML = Object.keys(CONFIG.categories).map(c => `<option value="${c}">${c}</option>`).join("");
-  
+
   const aiSet = new Set(products.map(p => p.activeIngredient).filter(Boolean));
   const rfAi = document.getElementById("report-filter-ai");
   rfAi.innerHTML = [...aiSet].sort().map(a => `<option value="${a}">${a}</option>`).join("");
 
   updateReportFilterDropdowns();
   selectReport("stock");
+
+  // Render the monthly usage chart (was the standalone Analytics tab before Phase 5).
+  // The analytics-* dropdowns are already populated at app startup; just re-render
+  // the chart against the current selections.
+  renderAnalytics();
 }
 
 function updateReportFilterDropdowns() {
@@ -3789,8 +3789,9 @@ function generateReportFromAnalytics() {
   const mode = document.getElementById("analytics-mode").value;
   const year = document.getElementById("analytics-year").value;
 
-  // Navigate to reports page
-  navigateTo("reports");
+  // Phase 5 — Analytics now lives inside Reports, so we don't navigate; we just
+  // mirror the chart's selection into the report filter bar below and scroll
+  // the report section into view.
 
   // Set report filter to match analytics
   const reportMode = document.getElementById("report-filter-mode");
@@ -3829,6 +3830,11 @@ function generateReportFromAnalytics() {
   document.getElementById("report-date-to").value = year + "-12-31";
   document.getElementById("report-custom-dates").style.display = "none";
   renderReportPreview();
+
+  // Scroll the report section into view (since both Analytics chart + report
+  // section live on the same page now).
+  const reportBtns = document.getElementById("btn-report-stock");
+  if (reportBtns && reportBtns.scrollIntoView) reportBtns.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 // ============================================================
