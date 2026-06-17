@@ -178,7 +178,7 @@
   <div class="data-table" style="margin-bottom:18px;">
     <div class="table-header">Enable Inventory Products for Spraying</div>
     <div style="padding:16px;">
-      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Select products from Inventory to use in spray jobs. Only Pesticide, Fungicide, Herbicide, PGR, Adjuvant, and Carbide categories are shown.</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">Select products from Inventory to use in spray jobs. Only Pesticide, Fungicide, PGR, Adjuvant, and Carbide categories are shown. (Herbicides are managed in the Weed Control module.)</div>
       <div id="enable-products-container"></div>
     </div>
   </div>
@@ -579,7 +579,10 @@ function allowedTransitions(current) {
 // ============================================================
 // Build AI combos from all active products (used by jobs, reports, joblogs, etc.)
 function getAICombos() {
-  return getAICombosForProducts(products.filter(p => p.is_active).map(p => p.id));
+  // Herbicides are tracked in the dedicated Weed Control module — exclude them from
+  // Crop Care's AI picker, stock check, and reports so weed/herbicide work doesn't
+  // pollute pineapple plant-health analysis.
+  return getAICombosForProducts(products.filter(p => p.is_active && p.product_type !== 'herbicide').map(p => p.id));
 }
 
 // Build AI combos from a given product ID list (not all products)
@@ -3308,7 +3311,8 @@ async function migrateAllToInventory() {
 function renderEnableProductsSection() {
   const container = document.getElementById('enable-products-container');
   if(!container) return;
-  const sprayCategories = ['Pesticide', 'Fungicide', 'Herbicide', 'Foliar Fertilizer', 'PGR', 'Adjuvant', 'Carbide'];
+  // Herbicide intentionally excluded — herbicides are enabled in the Weed Control module.
+  const sprayCategories = ['Pesticide', 'Fungicide', 'Foliar Fertilizer', 'PGR', 'Adjuvant', 'Carbide'];
   const linkedInvIds = products.map(p => p.inventory_product_id).filter(Boolean);
   const available = inventoryProducts.filter(ip => !ip.archived && sprayCategories.includes(ip.category) && !linkedInvIds.includes(ip.id))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''));
