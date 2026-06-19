@@ -4086,10 +4086,12 @@ async function shareSlip() {
             const stateBadges =
               (b.booking_locked ? '<span class="ops-bk-badge locked">🔒 Locked</span>' : '<span class="ops-bk-badge open">Open</span>') +
               (b.buffer_released ? ' <span class="ops-bk-badge released">Buffer released</span>' : '');
+            // Pass batch id via data-* (esc() is adequate for attribute context) and read it
+            // off the element — avoids interpolating into the onclick JS-string context (gotcha #7).
             const adminBtns = isAdmin ? `
               <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">
-                <button class="btn-tiny" onclick="opsToggleBatchLock('${esc(b.id)}')">${b.booking_locked ? '🔓 Unlock' : '🔒 Lock'}</button>
-                <button class="btn-tiny" onclick="opsToggleBatchBuffer('${esc(b.id)}')">${b.buffer_released ? 'Restore buffer' : 'Release buffer'}</button>
+                <button class="btn-tiny" data-batch-id="${esc(b.id)}" onclick="opsToggleBatchLock(this.dataset.batchId)">${b.booking_locked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                <button class="btn-tiny" data-batch-id="${esc(b.id)}" onclick="opsToggleBatchBuffer(this.dataset.batchId)">${b.buffer_released ? 'Restore buffer' : 'Release buffer'}</button>
               </div>` : '';
             bookingCell = `<div>${stateBadges}</div>${adminBtns}`;
           }
