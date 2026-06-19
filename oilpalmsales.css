@@ -98,6 +98,35 @@
   line-height: 1.5;
 }
 
+/* Hard-block message (lock / 90% cap) — red, stronger than the amber soft warning. */
+.ops-block-box {
+  background: rgba(200, 68, 68, 0.10);
+  border: 1px solid rgba(200, 68, 68, 0.45);
+  color: #B23A3A;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+/* Booking-state badges in the Summary batch table. */
+.ops-bk-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.ops-bk-badge.open     { background: rgba(74, 124, 63, 0.12); color: #3A6B30; }
+.ops-bk-badge.locked   { background: rgba(200, 68, 68, 0.12); color: #B23A3A; }
+.ops-bk-badge.released { background: rgba(212, 175, 55, 0.18); color: #8A6D1F; }
+
 /* Customer search dropdown rows (New Booking modal) */
 .ops-bk-cust-row:hover { background: var(--overlay-subtle); }
 

@@ -248,6 +248,60 @@
       return totalPlanted - (transplantCulls + midCulls) + extras - walkIn - bookedOutstanding;
     }
 
+    // Hard ceiling as a % of physical stock. The 10% held back is a culling buffer;
+    // admin can release it per-batch (buffer_released) to lift the cap to 100% physical.
+    const OPS_HARD_CAP_PCT = 90;
+
+    // Single source of truth for booking/walk-in cap math on a batch.
+    // Returns null if the batch isn't loaded. All callers (booking modal, walk-in modal,
+    // and both save paths) use this so the rules stay consistent.
+    //
+    //   stock      = physical living plants (qty_planted − culls + extras)
+    //   remaining  = physical free now (opsBatchRemaining: nets walk-ins, collected, outstanding bookings)
+    //   committed  = stock − remaining (everything already sold or reserved)
+    //   bookedOut  = outstanding active-booking qty (for the soft 50% check only)
+    //   softCap    = floor(stock × bookable_pct/100) — overridable warning, bookings only
+    //   hardCap    = floor(stock × 90/100), OR stock when buffer_released — NEVER above stock
+    //   hardHeadroom = max new qty allowed (committed-aware). Capping at this can never oversell.
+    function opsBatchCaps(batchId) {
+      const b = batches.find(x => x.id === batchId);
+      if (!b) return null;
+
+      const totalPlanted = Number(b.qty_planted) || 0;
+      const culls  = (Number(b.transplant_culls) || 0) + (midCullsByBatch[batchId] || 0);
+      const extras = Number(b.transplant_extras) || 0;
+      const stock  = totalPlanted - culls + extras;        // physical living plants
+
+      const remaining = opsBatchRemaining(batchId);        // physical free now
+      const committed = stock - remaining;                 // sold + reserved
+
+      // Outstanding active-booking qty (soft 50% check is bookings-only).
+      const collectedByBooking = {};
+      collections.forEach(c => {
+        if (c.batch_id === batchId && c.booking_id) {
+          collectedByBooking[c.booking_id] = (collectedByBooking[c.booking_id] || 0) + (Number(c.qty) || 0);
+        }
+      });
+      let bookedOut = 0;
+      bookings.forEach(bk => {
+        if (bk.batch_id !== batchId || bk.status !== 'active') return;
+        bookedOut += Math.max(0, (Number(bk.booked_qty) || 0) - (collectedByBooking[bk.id] || 0));
+      });
+
+      const released = b.buffer_released === true;
+      const softPct  = Number(b.bookable_pct) || 50;
+      const softCap  = Math.floor(stock * softPct / 100);
+      const hardCap  = released ? stock : Math.floor(stock * OPS_HARD_CAP_PCT / 100);
+
+      return {
+        stock, remaining, committed, bookedOut,
+        softPct, softCap, hardCap, released,
+        locked: b.booking_locked === true,
+        hardHeadroom: Math.max(0, hardCap - committed),   // max new qty under the hard cap
+        physHeadroom: Math.max(0, remaining)              // absolute physical ceiling
+      };
+    }
+
     async function loadVarieties() {
       // crop_varieties is shared. Filter by oil palm crop.
       const crops = await sbQuery(sb.from('crops').select('id,name'));
@@ -469,8 +523,9 @@
       const batchOpts = sellingBatches.map(b => {
         const vname = varietyMap[b.variety_id] || '—';
         const remaining = opsBatchRemaining(b.id);
-        return `<option value="${esc(b.id)}"
-          data-price="${Number(b.default_price || 0)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${remaining.toLocaleString()} left</option>`;
+        const locked = b.booking_locked === true;
+        const label = `${esc(b.batch_number || b.id)} · ${esc(vname)} · ${remaining.toLocaleString()} left${locked ? ' · 🔒 LOCKED' : ''}`;
+        return `<option value="${esc(b.id)}" data-price="${Number(b.default_price || 0)}"${locked ? ' disabled' : ''}>${label}</option>`;
       }).join('');
 
       const today = new Date().toISOString().slice(0, 10);
@@ -513,10 +568,12 @@
           </label>
           <label>Reference <input id="ops-wi-pay-ref" /></label>
           <label class="full">Slip (optional) <input type="file" id="ops-wi-pay-slip" accept="image/*,application/pdf" /></label>
+
+          <div class="full"><div id="ops-wi-hardblock" class="ops-block-box" style="display:none;"></div></div>
         </div>
         <div class="modal-actions">
           <button class="btn" onclick="opsCloseWalkInModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="opsSaveWalkIn()">Save Walk-in Sale</button>
+          <button class="btn btn-primary" id="ops-wi-save-btn" onclick="opsSaveWalkIn()">Save Walk-in Sale</button>
         </div>
       `, 'ops-walkin-overlay');
 
@@ -573,6 +630,32 @@
       // Auto-fill payment amount to match total (allow override)
       const payEl = document.getElementById('ops-wi-pay-amt');
       if (payEl) payEl.value = total > 0 ? total.toFixed(2) : '';
+
+      // Hard gate (lock + 90%/physical cap). Walk-ins get NO soft 50% warning.
+      const sel     = document.getElementById('ops-wi-batch');
+      const batchId = sel ? sel.value : '';
+      const block   = document.getElementById('ops-wi-hardblock');
+      const btn     = document.getElementById('ops-wi-save-btn');
+      if (block) { block.style.display = 'none'; block.innerHTML = ''; }
+      if (btn) btn.disabled = false;
+      if (!batchId || !block) return;
+
+      const caps = opsBatchCaps(batchId);
+      if (!caps) return;
+      if (caps.locked) {
+        block.style.display = 'block';
+        block.innerHTML = '🔒 This batch is locked for sale. Ask an admin to unlock it.';
+        if (btn) btn.disabled = true;
+        return;
+      }
+      if (qty > 0 && qty > caps.hardHeadroom) {
+        block.style.display = 'block';
+        const capLabel = caps.released ? 'physical stock' : '90% cap (keeps a 10% cull buffer)';
+        block.innerHTML = `❌ Only <strong>${caps.hardHeadroom.toLocaleString()}</strong> more can be sold on this batch — ${capLabel}. `
+          + `Stock ${caps.stock.toLocaleString()}, already committed ${caps.committed.toLocaleString()}.`
+          + (caps.released ? '' : ' An admin can release the buffer.');
+        if (btn) btn.disabled = true;
+      }
     }
 
     async function opsSaveWalkIn() {
@@ -623,6 +706,18 @@
       const batch = batches.find(b => b.id === batchId);
       if (!batch || batch.status !== 'selling') {
         notify('Batch must be in Selling stage to collect', 'error');
+        return;
+      }
+
+      // === Cap gates (recompute from state — never trust the modal's display flags) ===
+      const caps = opsBatchCaps(batchId);
+      if (!caps) { notify('Batch not found — reload and retry', 'error'); return; }
+      if (caps.locked) {
+        notify('This batch is locked for sale. Ask an admin to unlock it.', 'error');
+        return;
+      }
+      if (qty > caps.hardHeadroom) {
+        notify('Only ' + caps.hardHeadroom.toLocaleString() + ' more can be sold on this batch (cannot oversell physical stock). Reduce the quantity.', 'error');
         return;
       }
 
@@ -815,11 +910,11 @@
       const batchOpts = eligibleBatches.map(b => {
         const vname = varietyMap[b.variety_id] || '—';
         const remaining = opsBatchRemaining(b.id);
-        // Embed price + cap math on data-* so opsBkRecalc can read without batches[] lookup
-        return `<option value="${esc(b.id)}"
-          data-price="${Number(b.default_price || 0)}"
-          data-mn="${Number(b.qty_mn_start || 0)}"
-          data-pct="${Number(b.bookable_pct || 50)}">${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)} · ${remaining.toLocaleString()} left</option>`;
+        const locked = b.booking_locked === true;
+        // Only data-price is read off the option now; all cap math goes through opsBatchCaps().
+        // Locked batches render disabled so they can't be picked.
+        const label = `${esc(b.batch_number || b.id)} · ${esc(vname)} · ${stageLabel(b.status)} · ${remaining.toLocaleString()} left${locked ? ' · 🔒 LOCKED' : ''}`;
+        return `<option value="${esc(b.id)}" data-price="${Number(b.default_price || 0)}"${locked ? ' disabled' : ''}>${label}</option>`;
       }).join('');
 
       showModal(`
@@ -866,11 +961,12 @@
             <textarea id="ops-bk-notes" rows="3" placeholder="e.g. old paper booking ref, special instructions, anything to remember"></textarea>
           </label>
 
+          <div id="ops-bk-hardblock" class="ops-block-box" style="display:none;"></div>
           <div id="ops-bk-warning" class="warn-box" style="display:none;"></div>
         </div>
         <div class="modal-actions">
           <button class="btn" onclick="closeModal('ops-newbk-overlay')">Cancel</button>
-          <button class="btn btn-primary" onclick="opsSaveNewBooking()">Create Booking</button>
+          <button class="btn btn-primary" id="ops-bk-create-btn" onclick="opsSaveNewBooking()">Create Booking</button>
         </div>
       `, 'ops-newbk-overlay');
     }
@@ -1047,40 +1143,48 @@
     }
 
     function opsBkRecalc() {
-      const sel  = document.getElementById('ops-bk-batch');
-      const opt  = sel ? sel.options[sel.selectedIndex] : null;
-      const mn   = opt ? (parseFloat(opt.dataset.mn) || 0) : 0;
-      const pct  = opt ? (parseFloat(opt.dataset.pct) || 50) : 50;
-      const cap  = Math.floor(mn * pct / 100);
-
-      const qty   = parseFloat(document.getElementById('ops-bk-qty').value) || 0;
-      const price = parseFloat(document.getElementById('ops-bk-price').value) || 0;
-      const total = qty * price;
-      document.getElementById('ops-bk-total').value = total.toFixed(2);
-
-      // Cap warning — only meaningful when a batch is picked + qty > 0
-      const warn = document.getElementById('ops-bk-warning');
+      const sel     = document.getElementById('ops-bk-batch');
       const batchId = sel ? sel.value : '';
-      if (batchId && qty > 0 && mn > 0) {
-        // Existing not-yet-collected booked qty for this batch (active bookings only)
-        const existing = bookings.filter(b => b.batch_id === batchId && b.status === 'active')
-          .reduce((s, bk) => {
-            const collected = collections
-              .filter(c => c.booking_id === bk.id)
-              .reduce((a, c) => a + (Number(c.qty) || 0), 0);
-            return s + Math.max(0, (Number(bk.booked_qty) || 0) - collected);
-          }, 0);
-        const totalIfThis = existing + qty;
-        if (totalIfThis > cap) {
-          warn.style.display = 'block';
-          warn.innerHTML = `⚠️ This booking would push total bookings to <strong>${totalIfThis}</strong> on a batch with cap <strong>${cap}</strong> (${pct}% of ${mn}). Save will require confirmation.`;
-        } else {
-          warn.style.display = 'none';
-          warn.innerHTML = '';
-        }
-      } else {
-        warn.style.display = 'none';
-        warn.innerHTML = '';
+      const qty     = parseFloat(document.getElementById('ops-bk-qty').value) || 0;
+      const price   = parseFloat(document.getElementById('ops-bk-price').value) || 0;
+      document.getElementById('ops-bk-total').value = (qty * price).toFixed(2);
+
+      const warn  = document.getElementById('ops-bk-warning');
+      const block = document.getElementById('ops-bk-hardblock');
+      const btn   = document.getElementById('ops-bk-create-btn');
+      const hide  = (el) => { if (el) { el.style.display = 'none'; el.innerHTML = ''; } };
+
+      hide(warn); hide(block);
+      if (btn) btn.disabled = false;
+      if (!batchId) return;
+
+      const caps = opsBatchCaps(batchId);
+      if (!caps) return;
+
+      // Hard gate 1 — batch locked for booking (admin lever).
+      if (caps.locked) {
+        block.style.display = 'block';
+        block.innerHTML = '🔒 This batch is locked for booking. Ask an admin to unlock it.';
+        if (btn) btn.disabled = true;
+        return;
+      }
+      if (qty <= 0) return;
+
+      // Hard gate 2 — 90% cap / physical ceiling. NEVER overridable here; can't oversell.
+      if (qty > caps.hardHeadroom) {
+        block.style.display = 'block';
+        const capLabel = caps.released ? 'physical stock' : '90% cap (keeps a 10% cull buffer)';
+        block.innerHTML = `❌ Only <strong>${caps.hardHeadroom.toLocaleString()}</strong> more can be booked on this batch — ${capLabel}. `
+          + `Stock ${caps.stock.toLocaleString()}, already committed ${caps.committed.toLocaleString()}.`
+          + (caps.released ? '' : ' An admin can release the buffer.');
+        if (btn) btn.disabled = true;
+        return;
+      }
+
+      // Soft gate — 50% bookings-only warning (overridable at save).
+      if (caps.bookedOut + qty > caps.softCap) {
+        warn.style.display = 'block';
+        warn.innerHTML = `⚠️ This pushes total bookings to <strong>${(caps.bookedOut + qty).toLocaleString()}</strong>, over the ${caps.softPct}% soft cap of <strong>${caps.softCap.toLocaleString()}</strong> (stock ${caps.stock.toLocaleString()}). Save will ask you to confirm.`;
       }
     }
 
@@ -1113,8 +1217,20 @@
       if (!payAmt || payAmt <= 0){ notify('Initial payment must be > 0 (zero-deposit not allowed)', 'error'); return; }
       if (!isFinite(total) || total <= 0) { notify('Total amount invalid', 'error'); return; }
 
-      const warn = document.getElementById('ops-bk-warning');
-      const capExceeded = warn && warn.style.display === 'block';
+      // === Cap gates (recompute from state — never trust the modal's display flags) ===
+      const caps = opsBatchCaps(batchId);
+      if (!caps) { notify('Batch not found — reload and retry', 'error'); return; }
+      if (caps.locked) {
+        notify('This batch is locked for booking. Ask an admin to unlock it.', 'error');
+        return;
+      }
+      // Hard cap — cannot oversell physical stock. Not overridable.
+      if (qty > caps.hardHeadroom) {
+        notify('Only ' + caps.hardHeadroom.toLocaleString() + ' more can be booked on this batch (cannot oversell physical stock). Reduce the quantity.', 'error');
+        return;
+      }
+      // Soft 50% cap — overridable warning (bookings only).
+      const capExceeded = (caps.bookedOut + qty) > caps.softCap;
 
       // Helper that runs the actual save (reused by the cap-override callback path)
       const doSave = async () => {
@@ -1186,9 +1302,11 @@
         opsNotifyBookingTelegram(bookingId);
       };
 
-      // Cap override prompt — confirmAction is callback-based in this codebase
+      // Soft 50% cap override prompt — confirmAction is callback-based in this codebase
       if (capExceeded) {
-        confirmAction('Override Cap', 'This booking exceeds the bookable cap. Continue anyway?', () => { doSave(); });
+        confirmAction('Over soft cap',
+          'This pushes total bookings over the ' + caps.softPct + '% soft cap (' + caps.softCap.toLocaleString() + ' of ' + caps.stock.toLocaleString() + '). Continue anyway?',
+          () => { doSave(); });
         return;
       }
       await doSave();
@@ -3932,8 +4050,9 @@ async function shareSlip() {
 
       let batchRows = '';
       if (sortedBatches.length === 0) {
-        batchRows = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No batches yet. Create one in Oil Palm Growth.</td></tr>';
+        batchRows = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted);">No batches yet. Create one in Oil Palm Growth.</td></tr>';
       } else {
+        const isAdmin = currentUser && currentUser.role === 'admin';
         batchRows = sortedBatches.map(b => {
           const isPrePlanted = (b.status === 'ordered' || b.status === 'received');
           const totalPlanted = Number(b.qty_planted) || 0;
@@ -3959,6 +4078,22 @@ async function shareSlip() {
 
           const dash = '<span class="muted">—</span>';
 
+          // Booking column — lock + cull-buffer state, with admin toggles.
+          // Only meaningful for bookable/selling stages (PN, MN, Selling).
+          const bookable = ['pre_nursery', 'main_nursery', 'selling'].includes(b.status);
+          let bookingCell = dash;
+          if (bookable) {
+            const stateBadges =
+              (b.booking_locked ? '<span class="ops-bk-badge locked">🔒 Locked</span>' : '<span class="ops-bk-badge open">Open</span>') +
+              (b.buffer_released ? ' <span class="ops-bk-badge released">Buffer released</span>' : '');
+            const adminBtns = isAdmin ? `
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">
+                <button class="btn-tiny" onclick="opsToggleBatchLock('${esc(b.id)}')">${b.booking_locked ? '🔓 Unlock' : '🔒 Lock'}</button>
+                <button class="btn-tiny" onclick="opsToggleBatchBuffer('${esc(b.id)}')">${b.buffer_released ? 'Restore buffer' : 'Release buffer'}</button>
+              </div>` : '';
+            bookingCell = `<div>${stateBadges}</div>${adminBtns}`;
+          }
+
           return `
             <tr>
               <td>${esc(b.batch_number || '—')}</td>
@@ -3968,6 +4103,7 @@ async function shareSlip() {
               <td style="text-align:right;">${isPrePlanted ? dash : booked.toLocaleString()}</td>
               <td style="text-align:right;">${isPrePlanted ? dash : balanceLessBooking.toLocaleString()}</td>
               <td style="text-align:right;font-weight:600;">${isPrePlanted ? dash : actualBalance.toLocaleString()}</td>
+              <td>${bookingCell}</td>
             </tr>
           `;
         }).join('');
@@ -4023,6 +4159,7 @@ async function shareSlip() {
                   <th style="text-align:right;">Booked</th>
                   <th style="text-align:right;">Balance (less booking)</th>
                   <th style="text-align:right;">Actual Balance</th>
+                  <th>Booking</th>
                 </tr>
               </thead>
               <tbody>${batchRows}</tbody>
@@ -4030,6 +4167,47 @@ async function shareSlip() {
           </div>
         </div>
       `;
+    }
+
+    // Admin-only — lock/unlock a batch for new bookings + walk-in sales.
+    function opsToggleBatchLock(batchId) {
+      if (!currentUser || currentUser.role !== 'admin') { notify('Admin only', 'error'); return; }
+      const b = batches.find(x => x.id === batchId);
+      if (!b) { notify('Batch not found', 'error'); return; }
+      const next = !(b.booking_locked === true);
+      const verb = next ? 'Lock' : 'Unlock';
+      const msg = next
+        ? 'Lock batch ' + esc(b.batch_number || b.id) + ' — no new bookings or walk-in sales until unlocked. Existing collections still allowed. Continue?'
+        : 'Unlock batch ' + esc(b.batch_number || b.id) + ' — new bookings and walk-in sales allowed again. Continue?';
+      confirmAction(verb + ' batch', msg, async () => {
+        const res = await sbMutate(() => sb.from('oilpalm_batches').update({ booking_locked: next }).eq('id', batchId).select());
+        if (res === null) return;
+        if (b) b.booking_locked = next;          // keep in-memory state in sync
+        await loadBatches();
+        renderSummaryTab();
+        notify('Batch ' + (next ? 'locked' : 'unlocked'), 'success');
+      });
+    }
+
+    // Admin-only — release/restore the 10% cull buffer (lifts the 90% hard cap to 100%
+    // physical stock). Never lets a sale exceed physical stock — opsBatchCaps enforces that.
+    function opsToggleBatchBuffer(batchId) {
+      if (!currentUser || currentUser.role !== 'admin') { notify('Admin only', 'error'); return; }
+      const b = batches.find(x => x.id === batchId);
+      if (!b) { notify('Batch not found', 'error'); return; }
+      const next = !(b.buffer_released === true);
+      const verb = next ? 'Release buffer' : 'Restore buffer';
+      const msg = next
+        ? 'Release the 10% cull buffer on batch ' + esc(b.batch_number || b.id) + ' — bookings/sales can use the full physical stock (still cannot oversell). Continue?'
+        : 'Restore the 10% cull buffer on batch ' + esc(b.batch_number || b.id) + ' — bookings/sales capped at 90% of stock again. Continue?';
+      confirmAction(verb, msg, async () => {
+        const res = await sbMutate(() => sb.from('oilpalm_batches').update({ buffer_released: next }).eq('id', batchId).select());
+        if (res === null) return;
+        if (b) b.buffer_released = next;
+        await loadBatches();
+        renderSummaryTab();
+        notify(next ? 'Buffer released' : 'Buffer restored', 'success');
+      });
     }
 
     // === Customers tab (Task 3.2) ===
