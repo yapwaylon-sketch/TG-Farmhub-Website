@@ -216,10 +216,15 @@
       });
     }
 
-    // Plants available for a new booking/walk-in on this batch.
-    // = (planted − culls + doubleton extras) − walk-in collected − outstanding bookings
-    // Booking-collected portions are NOT subtracted separately — they're already
-    // netted out of "outstanding bookings" (active booked_qty minus their collected).
+    // Plants still free to commit (book or walk-in sell) on this batch.
+    //   = physical stock (planted − culls + doubleton extras)
+    //     − ALL collections already handed over (walk-in AND booking)
+    //     − outstanding active-booking reservations (booked_qty − that booking's collected)
+    // Subtracting ALL collections (not just walk-ins) is essential: a collected booking plant
+    // has physically LEFT, so it must reduce availability while its reservation simultaneously
+    // drops to the booking's remaining outstanding. (Previously only walk-ins were subtracted,
+    // which over-reported free stock once booking collections existed — a latent oversell hole.)
+    // This matches the DB-side oversell trigger (oilpalm_check_no_oversell).
     function opsBatchRemaining(batchId) {
       const b = batches.find(x => x.id === batchId);
       if (!b) return 0;
@@ -229,12 +234,12 @@
       const extras = Number(b.transplant_extras) || 0;
 
       const collectedByBooking = {};
-      let walkIn = 0;
+      let allCollected = 0;
       collections.forEach(c => {
         if (c.batch_id !== batchId) return;
         const q = Number(c.qty || 0);
+        allCollected += q;
         if (c.booking_id) collectedByBooking[c.booking_id] = (collectedByBooking[c.booking_id] || 0) + q;
-        else walkIn += q;
       });
 
       let bookedOutstanding = 0;
@@ -245,7 +250,7 @@
         bookedOutstanding += Math.max(0, Number(bk.booked_qty || 0) - collected);
       });
 
-      return totalPlanted - (transplantCulls + midCulls) + extras - walkIn - bookedOutstanding;
+      return totalPlanted - (transplantCulls + midCulls) + extras - allCollected - bookedOutstanding;
     }
 
     // Hard ceiling as a % of physical stock. The 10% held back is a culling buffer;
