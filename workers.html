@@ -1068,14 +1068,16 @@ function showApp() {
   document.getElementById("app").style.display = "flex";
   injectUserBadge(currentUser);
   injectCompanySwitcher();
-  navigateTo("workers");
+  navigateTo("workers", true);
+  initTabHistory(navigateTo, 'workers');
 }
 
 // ============================================================
 // NAVIGATION
 // ============================================================
-function navigateTo(page) {
+function navigateTo(page, fromHistory) {
   currentPage = page;
+  if(!fromHistory) pushTab(page);
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   document.getElementById("page-" + page).classList.add("active");

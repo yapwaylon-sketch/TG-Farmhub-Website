@@ -147,6 +147,7 @@
         loadMidCulls()
       ]);
       renderSummaryTab();
+      initTabHistory(switchTab, 'summary');
     });
 
     function doLogout() {
@@ -155,10 +156,14 @@
       location.href = 'index.html';
     }
 
-    function switchTab(name) {
+    function switchTab(name, fromHistory, detail) {
       currentTab = name;
+      // Restore (or clear) detail drill-downs so Back/Forward reopens the right view.
+      if (name === 'bookings')  selectedBookingId = detail || null;
+      if (name === 'customers') selectedCustomerId = detail || null;
       document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
       document.querySelectorAll('.main-content > .page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      if(!fromHistory) pushTab(name);
       if (name === 'summary')     renderSummaryTab();
       if (name === 'bookings')    renderBookingsTab();
       if (name === 'collections') renderCollectionsTab();
@@ -1322,6 +1327,7 @@
     // Mirrors the customer detail pattern (selectedCustomerId / opsRenderCustomerDetail).
     function opsOpenBookingDetail(id) {
       selectedBookingId = id;
+      pushView('bookings', id);
       renderBookingsTab();
     }
     function opsCloseBookingDetail() {
@@ -4467,6 +4473,7 @@ async function shareSlip() {
     // ----- Customer detail page (mini) -----
     function opsOpenCustomerDetail(id) {
       selectedCustomerId = id;
+      pushView('customers', id);
       renderCustomersTab();
     }
 

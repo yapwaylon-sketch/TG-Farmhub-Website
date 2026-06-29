@@ -1067,7 +1067,8 @@ function showApp() {
   // Always start on dashboard
   currentPage = "dashboard";
   selectedProductId = null;
-  navigateTo("dashboard");
+  navigateTo("dashboard", true);
+  initTabHistory(navigateTo, 'dashboard');
   updateUserDisplay();
   applyPermissions();
   injectUserBadge(currentUser);
@@ -1175,9 +1176,12 @@ function genId(prefix) { return prefix + String(Date.now()).slice(-6); } // fall
 // ============================================================
 // NAVIGATION
 // ============================================================
-function navigateTo(page) {
+function navigateTo(page, fromHistory, detail) {
   currentPage = page;
   selectedProductId = null;
+  if(!fromHistory) pushTab(page);
+  // Restore a product-journal drill-down (Back/Forward / deep link) without re-pushing.
+  if(page === "products" && detail) { openJournalView(detail); return; }
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.getElementById("page-" + page).classList.add("active");
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
@@ -1200,6 +1204,10 @@ function jumpToProducts(category) {
 
 
 function openJournal(productId) {
+  pushView('products', productId);   // make the drill-down back-able (Back → products list)
+  openJournalView(productId);
+}
+function openJournalView(productId) {
   selectedProductId = productId;
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.getElementById("page-journal").classList.add("active");

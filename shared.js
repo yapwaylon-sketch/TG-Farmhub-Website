@@ -703,3 +703,45 @@ function recordFailedLogin() {
 function clearLoginAttempts() {
   sessionStorage.removeItem("tgfarmhub_login_attempts");
 }
+
+// ============================================================
+// TAB HISTORY — browser Back/Forward navigates between a module's tabs
+// AND in-tab detail drill-downs (so Back from a detail returns to its list,
+// not out to the hub).
+// ============================================================
+// A module calls initTabHistory(navFn, defaultPage) once after its first render.
+// navFn signature: navFn(page, fromHistory, detail).
+//  - When fromHistory is true, switch WITHOUT pushing a history entry (don't call pushTab/pushView).
+//  - `detail` (optional) is the drill-down id to reopen on that page, or null for the list view.
+//    A module that has no detail views can simply ignore the 3rd arg.
+// Tabs are pushed via pushTab(page); detail drill-downs via pushView(page, detailId).
+let _tabNavFn = null, _tabDefaultPage = null;
+function initTabHistory(navFn, defaultPage) {
+  _tabNavFn = navFn;
+  _tabDefaultPage = defaultPage;
+  window.addEventListener("popstate", function(e) {
+    if(!_tabNavFn) return;
+    var st = e.state || {};
+    _tabNavFn(st.page || _tabDefaultPage, true, st.detail || null);
+  });
+  var initial = location.hash ? location.hash.slice(1) : "";
+  if(initial) {
+    var t = initial.indexOf("~");
+    var ip = t >= 0 ? initial.slice(0, t) : initial;
+    var idet = t >= 0 ? initial.slice(t + 1) : null;
+    history.replaceState({page: ip, detail: idet}, "", "#" + initial);
+    if(ip !== defaultPage || idet) _tabNavFn(ip, true, idet);
+  } else {
+    history.replaceState({page: defaultPage}, "", location.pathname + location.search);
+  }
+}
+// Push a history entry for a tab switch (no-op if already on that tab).
+function pushTab(page) {
+  if(location.hash.slice(1) === page) return;
+  history.pushState({page: page}, "", "#" + page);
+}
+// Push a history entry for opening a detail/drill-down within a tab.
+// Back from here lands on the tab's previous (list) entry. detailId must not contain "~".
+function pushView(page, detailId) {
+  history.pushState({page: page, detail: detailId}, "", "#" + page + "~" + detailId);
+}

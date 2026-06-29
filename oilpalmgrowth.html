@@ -133,6 +133,7 @@
       await autoFlipSoldOut();
       await loadBatches();
       renderBatchesTab();
+      initTabHistory(switchTab, 'batches');
     });
 
     function doLogout() {
@@ -141,10 +142,13 @@
       location.href = 'index.html';
     }
 
-    function switchTab(name) {
+    function switchTab(name, fromHistory, detail) {
       currentTab = name;
+      // Restore (or clear) the batch-detail drill-down so Back/Forward reopens the right view.
+      if (name === 'batches') selectedBatchId = detail || null;
       document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === name));
       document.querySelectorAll('.main-content > .page').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      if(!fromHistory) pushTab(name);
       if (name === 'batches')   renderBatchesTab();
       if (name === 'suppliers') renderSuppliersTab();
       if (name === 'reports')   renderReportsTab();
@@ -279,6 +283,7 @@
     // selectedBatchId state var drives the renderBatchesTab delegation at the top of that function.
     function opgOpenBatchDetail(id) {
       selectedBatchId = id;
+      pushView('batches', id);
       renderBatchesTab();
     }
     function opgCloseDetail() {

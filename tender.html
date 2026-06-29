@@ -379,6 +379,7 @@ var DOC_TYPE_LABELS = {
     await loadAllData();
     renderTenderSelector();
     renderCurrentTab();
+    initTabHistory(navigateTo, 'dashboard');
   } catch(e) {
     console.error('Init error:', e);
     notify('Failed to initialize', 'error');
@@ -463,7 +464,7 @@ async function syncAll() {
 // ============================================================
 // NAVIGATION
 // ============================================================
-function navigateTo(page) {
+function navigateTo(page, fromHistory) {
   currentTab = page;
   document.querySelectorAll('.nav-item').forEach(function(el) {
     el.classList.toggle('active', el.dataset.page === page);
@@ -472,7 +473,7 @@ function navigateTo(page) {
     el.classList.toggle('active', el.id === 'page-' + page);
   });
   renderCurrentTab();
-  history.replaceState(null, '', '#' + page);
+  if(!fromHistory) pushTab(page);
 }
 
 function renderCurrentTab() {
@@ -2204,15 +2205,7 @@ async function saveImportedLOs() {
   finally { btnLoading(btn, false); }
 }
 
-// ============================================================
-// HASH ROUTING
-// ============================================================
-(function() {
-  var hash = location.hash.replace('#','');
-  if (['dashboard','los','suppliers','documents','reports','upload'].indexOf(hash) >= 0) {
-    navigateTo(hash);
-  }
-})();
+// Hash routing is handled by initTabHistory() in init() (shared.js).
 </script>
 </body>
 </html>
