@@ -236,6 +236,7 @@ function isInGround(s) { return IN_GROUND_STATUSES.includes((s || '').toLowerCas
 let blocks = [], blockCrops = [], varieties = [], statuses = [], growthRecords = [];
 let currentPage = 'overview';
 let sortField = 'block_name', sortDir = 'asc';
+let blockIssues = [];
 let filterStatus = 'all', filterVariety = 'all', filterHarvest30 = false, filterOverdue = false;
 let searchTerm = '';
 let refreshTimer = null;
@@ -265,7 +266,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 // DATA LOADING
 // ============================================================
 async function loadAll() {
-  await Promise.all([loadBlocks(), loadBlockCrops(), loadVarieties(), loadStatuses(), loadGrowthRecords()]);
+  await Promise.all([loadBlocks(), loadBlockCrops(), loadVarieties(), loadStatuses(), loadGrowthRecords(), loadBlockIssues()]);
+}
+
+async function loadBlockIssues() {
+  const data = await sbQuery(sb.from("block_issues").select("block_id,severity,status").eq("status","active"));
+  blockIssues = data || [];
 }
 
 async function loadBlocks() {
@@ -545,6 +551,17 @@ function updateSortIndicators() {
   });
 }
 
+function gtBlockSeverity(blockId) {
+  const a = blockIssues.filter(i => i.block_id === blockId);
+  if(!a.length) return null;
+  return a.some(i => i.severity === 'critical') ? 'critical' : 'watch';
+}
+function gtIssueBadge(sev) {
+  if(sev==='critical') return ' <span style="background:#C0392B;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;">CRITICAL</span>';
+  if(sev==='watch')    return ' <span style="background:#E88A1A;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;">WATCH</span>';
+  return '';
+}
+
 // ============================================================
 // RENDER OVERVIEW
 // ============================================================
@@ -619,6 +636,18 @@ function renderOverview() {
 
   // Table
   const tbody = document.getElementById("growth-body");
+  // Flagged-blocks banner (read-only; managed in Crop Care → Watchlist)
+  (function(){
+    const wrap = document.getElementById('growth-table-wrap');
+    if(!wrap) return;
+    let ban = document.getElementById('growth-flag-banner');
+    const flg = blockIssues.length;
+    const critN = blockIssues.filter(i=>i.severity==='critical').length;
+    if(!flg) { if(ban) ban.remove(); return; }
+    if(!ban) { ban = document.createElement('div'); ban.id = 'growth-flag-banner'; wrap.parentNode.insertBefore(ban, wrap); }
+    ban.style.cssText = 'background:rgba(192,57,43,.10);border:1px solid rgba(192,57,43,.35);border-left:4px solid #C0392B;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:600;color:#C0392B;';
+    ban.textContent = `⚠ ${flg} block(s) flagged in Crop Care — ${critN} Critical. Manage in Crop Care → Watchlist.`;
+  })();
   if(!rows.length) {
     tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No blocks match the current filters</td></tr>';
     return;
@@ -682,7 +711,7 @@ function renderOverview() {
     const mDTH = phase === 2 ? '' : ' cell-muted';
 
     return '<tr class="' + rowClass + '">' +
-      '<td class="td-bold">' + esc(r.block_name) + '</td>' +
+      '<td class="td-bold">' + esc(r.block_name) + gtIssueBadge(gtBlockSeverity(r.block_id)) + '</td>' +
       '<td><span class="badge ' + statusBadgeClass(r.status_name) + '">' + esc(r.status_name) + '</span></td>' +
       '<td style="white-space:nowrap;" title="' + esc(ageTitle) + '">' + ageCell + '</td>' +
       '<td title="' + esc(varietyTitle) + '">' + varietyDisplay + '</td>' +
