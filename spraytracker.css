@@ -164,6 +164,17 @@ td.spray-cell.pg-divider { border-left:2px solid var(--border); }
 @keyframes wl-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
 .wl-badge.wl-crit { animation: wl-blink 1.2s ease-in-out infinite; }
 .wl-h-crit { animation: wl-blink 1.2s ease-in-out infinite; }
+/* Summary "⚠ WATCHLIST" pill — clickable link to the block's log */
+.wl-summary-pill { cursor:pointer; }
+.wl-summary-pill:hover { filter:brightness(1.08); text-decoration:underline; }
+
+/* Severity switch on the issue detail (Critical <-> Watch) */
+.wl-sev-switch { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.wl-sev-switch-label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; }
+.wl-sevopt { font-size:12px; font-weight:600; padding:4px 11px; border-radius:20px; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; }
+.wl-sevopt:hover { border-color:var(--text-dim); }
+.wl-sevopt.on.crit { background:rgba(192,57,43,.10); border-color:#C0392B; color:#C0392B; }
+.wl-sevopt.on.watch { background:rgba(232,138,26,.12); border-color:#E88A1A; color:#C77A15; }
 
 /* Card: block number is the prominent headline, issue title secondary */
 .wl-card-block { font-weight:800; font-size:16px; color:var(--text); }

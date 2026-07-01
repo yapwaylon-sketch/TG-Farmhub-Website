@@ -555,6 +555,25 @@ function issueBadgeHtml(sev) {
   if(sev === 'watch')    return '<span class="wl-badge wl-watch">WATCH</span>';
   return '';
 }
+// Summary-matrix pill — reads "⚠ WATCHLIST", colored/blinking by severity, links to the block's log.
+function summaryWatchlistPill(blockId, sev) {
+  if(!sev) return '';
+  const cls = sev === 'critical' ? 'wl-crit' : 'wl-watch';
+  return `<span class="wl-badge wl-summary-pill ${cls}" data-block="${blockId}" title="Open this block's watchlist log" onclick="wlJumpFromSummary(event)">⚠ WATCHLIST</span>`;
+}
+// Jump from the Summary pill straight to the block's issue log in the Watchlist tab.
+function wlJumpFromSummary(ev) {
+  ev.stopPropagation();
+  const blockId = ev.currentTarget.dataset.block;
+  const active = blockIssues.filter(i => i.block_id === blockId && i.status === 'active');
+  const targetId = active.length === 1 ? active[0].id : null;  // one issue → open it; else land on the list
+  wlSelectedIssueId = targetId;
+  currentPage = 'watchlist';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === 'watchlist'));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-watchlist'));
+  if(targetId) pushView('watchlist', targetId); else pushTab('watchlist');
+  renderCurrentPage();
+}
 // Jobs auto-pulled for an issue: same block, job date within [opened_at, resolved_at|now]
 function jobsForIssue(issue) {
   const start = issue.opened_at;
@@ -851,7 +870,7 @@ function renderSummary() {
       const sev = blockFlagSeverity(block.id);
       html += `<tr class="${sev==='critical'?'wl-row-crit':sev==='watch'?'wl-row-watch':''}">`;
       const flagIco = `<span class="wl-flag-ico" data-block="${block.id}" title="Flag this block" onclick="wlFlagIcoClick(event)">⚑</span>`;
-      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${flagIco} ${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''} ${issueBadgeHtml(sev)}` +
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${flagIco} ${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''} ${summaryWatchlistPill(block.id, sev)}` +
               `<div style="font-size:10px;color:var(--text-dim);font-weight:400;">${esc(statusName)}</div></td>`;
       SUMMARY_COLS.forEach(c => {
         let dateStr = '—', daysStr = '—', hasData = false;
@@ -1123,6 +1142,14 @@ function paintIssueDetail(i, body) {
     schedHtml = `<div class="wl-sched"><div class="wl-tl-h">Scheduled jobs on this block</div>${rows}</div>`;
   }
 
+  // Severity switch — Critical <-> Watch, instant-save (active issues only)
+  const sevSwitch = i.status==='active' ? `
+    <div class="wl-sev-switch">
+      <span class="wl-sev-switch-label">Severity</span>
+      <span class="wl-sevopt${i.severity==='critical'?' on crit':''}" data-sev="critical" onclick="wlSetSeverity(event)">🔴 Critical</span>
+      <span class="wl-sevopt${i.severity==='watch'?' on watch':''}" data-sev="watch" onclick="wlSetSeverity(event)">🟠 Watch</span>
+    </div>` : '';
+
   body.innerHTML = `
     <div class="wl-detail-head ${i.severity==='critical'&&i.status==='active'?'wl-hd-crit':i.status==='active'?'wl-hd-watch':'wl-hd-resolved'}">
       <button class="btn btn-outline btn-sm" onclick="wlBackToList()">← Watchlist</button>
@@ -1130,6 +1157,7 @@ function paintIssueDetail(i, body) {
       <div class="wl-detail-sub">${esc(i.title)}</div>
       <div class="wl-detail-meta">Opened ${wlFmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
       ${i.description?`<div class="wl-detail-desc">${esc(i.description)}</div>`:''}
+      ${sevSwitch}
     </div>
     <div class="wl-detail-actions">${actions}</div>
     ${remedialHtml}
@@ -1138,6 +1166,17 @@ function paintIssueDetail(i, body) {
 }
 
 function wlBackToList() { wlSelectedIssueId = null; pushView('watchlist', null); renderWatchlist(); }
+
+async function wlSetSeverity(ev) {
+  const sev = ev.currentTarget.dataset.sev;
+  const i = blockIssues.find(x => x.id === wlSelectedIssueId);
+  if(!i || i.severity === sev) return;
+  const res = await sbMutate(() => sb.from('block_issues').update({ severity: sev }).eq('id', wlSelectedIssueId).select());
+  if(!res) { notify('Could not change severity','error'); return; }
+  await loadBlockIssues();
+  notify('Severity changed to ' + (sev==='critical'?'Critical':'Watch'), 'success');
+  renderWatchlist();
+}
 
 function wlEditRemedial() {
   const i = blockIssues.find(x => x.id === wlSelectedIssueId);
