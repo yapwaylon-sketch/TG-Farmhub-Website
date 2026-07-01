@@ -909,20 +909,36 @@ function wlBlockLabel(blockId) {
   return (b ? esc(b.block_name) : '—') + v;
 }
 
+// Upcoming/scheduled Crop Care jobs for a block — not yet completed, soonest planned first.
+function upcomingJobsForBlock(blockId) {
+  return jobs.filter(j => j.block_id === blockId && j.status !== 'Completed')
+    .sort((a,b) => (a.planned_date||'') < (b.planned_date||'') ? -1 : 1);
+}
+
 function wlIssueCard(i) {
   const jobsN = jobsForIssue(i).length;
+  const upcoming = i.status === 'active' ? upcomingJobsForBlock(i.block_id).length : 0;
   const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
   const sevCls = i.severity === 'critical' ? 'wl-card-crit' : 'wl-card-watch';
   const meta = i.status === 'resolved'
     ? `Resolved ${wlFmtDate(i.resolved_at)}`
     : `Opened ${wlFmtDate(i.opened_at)} · ${days}d active · ${jobsN} job(s)`;
+  let tags = '';
+  if(i.status === 'active') {
+    tags += (i.remedial_action && i.remedial_action.trim())
+      ? `<span class="wl-tag wl-tag-ok">✓ action set</span>`
+      : `<span class="wl-tag wl-tag-warn">⚠ no action yet</span>`;
+    if(upcoming) tags += `<span class="wl-tag wl-tag-job">🌫 ${upcoming} job scheduled</span>`;
+  }
   return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
     <div class="wl-card-top">
       ${issueBadgeHtml(i.status==='active'?i.severity:null)}
-      <span class="wl-card-title">${esc(i.title)}</span>
+      <span class="wl-card-block">${wlBlockLabel(i.block_id)}</span>
       <span class="wl-cat">${esc(i.category)}</span>
     </div>
-    <div class="wl-card-meta">${wlBlockLabel(i.block_id)} · ${meta}</div>
+    <div class="wl-card-title2">${esc(i.title)}</div>
+    <div class="wl-card-meta">${meta}</div>
+    ${tags ? `<div class="wl-card-tags">${tags}</div>` : ''}
   </div>`;
 }
 
@@ -978,6 +994,7 @@ function openFlagModal(preBlockId) {
       <div class="form-field"><label>Category</label><div class="wl-chips" id="flag-cats">${chips}</div></div>
       <div class="form-field"><label>Short title</label><input id="flag-title" style="width:100%;" placeholder="e.g. Mealybug, north corner"></div>
       <div class="form-field"><label>Description (optional)</label><textarea id="flag-desc" style="width:100%;min-height:56px;" placeholder="What did you see?"></textarea></div>
+      <div class="form-field"><label>Remedial action (if decided)</label><textarea id="flag-remedial" style="width:100%;min-height:48px;" placeholder="Leave blank if not decided yet — you can add it later"></textarea></div>
       <div class="form-field"><label>Photos</label>
         <input type="file" id="flag-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
         <button class="btn btn-outline" onclick="document.getElementById('flag-photo-input').click()">📷 Add Photo</button>
@@ -1015,6 +1032,7 @@ async function wlSaveFlag() {
   const payload = {
     block_id: blockId, title, description: document.getElementById('flag-desc').value.trim() || null,
     category: flagCategory, severity: flagSeverity, status: 'active',
+    remedial_action: document.getElementById('flag-remedial').value.trim() || null,
     opened_by: currentUser.displayName || 'unknown', company_id: 'tg_agribusiness'
   };
   const res = await sbMutate(() => sb.from('block_issues').insert(payload).select());
@@ -1080,18 +1098,65 @@ function paintIssueDetail(i, body) {
        <button class="btn btn-success" onclick="wlResolveIssue()">✓ Mark Resolved</button>`
     : `<div class="wl-resolved-note">Resolved ${wlFmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
 
+  // Remedial action — a single editable notebox (the current planned course of action)
+  const hasRemedial = i.remedial_action && i.remedial_action.trim();
+  const remedialHtml = `
+    <div class="wl-remedial${hasRemedial?'':' wl-remedial-empty'}">
+      <div class="wl-remedial-head"><span class="wl-remedial-label">🛠 Remedial Action</span>
+        ${i.status==='active'?`<button class="btn btn-outline btn-sm" onclick="wlEditRemedial()">${hasRemedial?'Edit':'Add'}</button>`:''}</div>
+      <div class="wl-remedial-body">${hasRemedial?esc(i.remedial_action):'<span class="wl-remedial-none">No remedial action decided yet.</span>'}</div>
+    </div>`;
+
+  // Scheduled jobs — upcoming/not-yet-done Crop Care jobs on this block (is remedial work booked?)
+  let schedHtml = '';
+  if(i.status === 'active') {
+    const up = upcomingJobsForBlock(i.block_id);
+    const rows = up.length ? up.map(j => {
+      const p = getProduct(j.product_id);
+      const pname = p ? esc(p.product_name) : (j.job_type==='Fertilizer' ? 'Fertilizer' : '—');
+      const worker = j.worker_name ? ` · ${esc(j.worker_name)}` : '';
+      return `<div class="wl-sched-row"><span class="wl-sched-prod">🌫 ${pname}</span><span class="wl-sched-meta">${esc(j.job_type||'')} · ${esc(j.status||'')} · ${fmtDate(j.planned_date)}${worker}</span></div>`;
+    }).join('') : `<div class="wl-sched-none">No upcoming jobs scheduled for this block — schedule one in the Jobs tab.</div>`;
+    schedHtml = `<div class="wl-sched"><div class="wl-tl-h">Scheduled jobs on this block</div>${rows}</div>`;
+  }
+
   body.innerHTML = `
     <div class="wl-detail-head ${i.severity==='critical'&&i.status==='active'?'wl-hd-crit':i.status==='active'?'wl-hd-watch':'wl-hd-resolved'}">
       <button class="btn btn-outline btn-sm" onclick="wlBackToList()">← Watchlist</button>
-      <div class="wl-detail-top">${sevBadge}<span class="wl-detail-title">${esc(i.title)}</span><span class="wl-cat">${esc(i.category)}</span>${statusPill}</div>
-      <div class="wl-detail-meta">Block <b>${wlBlockLabel(i.block_id)}</b> · Opened ${wlFmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
+      <div class="wl-detail-top">${sevBadge}<span class="wl-detail-title">${wlBlockLabel(i.block_id)}</span><span class="wl-cat">${esc(i.category)}</span>${statusPill}</div>
+      <div class="wl-detail-sub">${esc(i.title)}</div>
+      <div class="wl-detail-meta">Opened ${wlFmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
       ${i.description?`<div class="wl-detail-desc">${esc(i.description)}</div>`:''}
     </div>
     <div class="wl-detail-actions">${actions}</div>
+    ${remedialHtml}
+    ${schedHtml}
     <div class="wl-timeline"><div class="wl-tl-h">Timeline — newest first</div>${evHtml}</div>`;
 }
 
 function wlBackToList() { wlSelectedIssueId = null; pushView('watchlist', null); renderWatchlist(); }
+
+function wlEditRemedial() {
+  const i = blockIssues.find(x => x.id === wlSelectedIssueId);
+  if(!i) return;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:440px;">
+      <div class="modal-header"><div class="modal-title">🛠 Remedial Action</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>What's the plan for this block?</label>
+        <textarea id="rem-note" style="width:100%;min-height:90px;" placeholder="e.g. Second Movento spray next week, then reassess">${i.remedial_action?esc(i.remedial_action):''}</textarea></div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSaveRemedial()">Save</button></div>
+    </div></div>`;
+}
+async function wlSaveRemedial() {
+  const val = document.getElementById('rem-note').value.trim() || null;
+  const res = await sbMutate(() => sb.from('block_issues').update({ remedial_action: val }).eq('id', wlSelectedIssueId).select());
+  if(!res) { notify('Could not save','error'); return; }
+  closeModal();
+  await loadBlockIssues();
+  notify('Remedial action saved','success');
+  renderWatchlist();
+}
 
 function openAddUpdateModal() {
   wlFlagPhotos = []; ciStageKey = null;

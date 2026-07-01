@@ -150,3 +150,36 @@ td.spray-cell.pg-divider { border-left:2px solid var(--border); }
 .wl-ev-text { font-size:13px; line-height:1.45; }
 .wl-ev-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
 .wl-mini { width:46px; height:46px; object-fit:cover; border-radius:6px; margin:8px 6px 0 0; }
+
+/* ----- Watchlist enhancements (2026-07-01) ----- */
+/* Blink the Critical badge on the Summary matrix only (scoped to #page-summary) */
+@keyframes wl-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
+#page-summary .wl-badge.wl-crit { animation: wl-blink 1.2s ease-in-out infinite; }
+
+/* Card: block number is the prominent headline, issue title secondary */
+.wl-card-block { font-weight:800; font-size:16px; color:var(--text); }
+.wl-card-title2 { font-size:13px; color:var(--text-dim); margin-top:3px; }
+.wl-card-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.wl-tag { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; }
+.wl-tag-ok { background:rgba(59,122,59,.14); color:#3B7A3B; }
+.wl-tag-warn { background:rgba(232,138,26,.16); color:#C77A15; }
+.wl-tag-job { background:rgba(107,76,138,.14); color:#6B4C8A; }
+
+/* Detail header: block is the title, issue title is the sub-line */
+.wl-detail-sub { font-size:14px; font-weight:600; color:var(--text-dim); margin:2px 0 4px; }
+
+/* Remedial action box */
+.wl-remedial { background:var(--bg-card); border:1px solid var(--border); border-left:4px solid #6B4C8A; border-radius:11px; padding:12px 16px; margin-bottom:12px; }
+.wl-remedial-empty { border-left-color:#E88A1A; }
+.wl-remedial-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.wl-remedial-label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; }
+.wl-remedial-body { font-size:13.5px; line-height:1.5; white-space:pre-wrap; }
+.wl-remedial-none { color:var(--text-muted); font-style:italic; }
+
+/* Scheduled jobs on the block */
+.wl-sched { background:var(--bg-card); border:1px solid var(--border); border-radius:11px; padding:8px 16px 14px; margin-bottom:12px; }
+.wl-sched-row { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--border); }
+.wl-sched-row:last-child { border-bottom:none; }
+.wl-sched-prod { font-weight:600; font-size:13.5px; }
+.wl-sched-meta { font-size:12px; color:var(--text-muted); text-align:right; white-space:nowrap; }
+.wl-sched-none { font-size:12.5px; color:var(--text-muted); font-style:italic; padding:6px 0; }
