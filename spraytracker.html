@@ -41,6 +41,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span class="nav-label">Summary</span>
     </div>
+    <div class="nav-item" data-page="watchlist" onclick="navigateTo('watchlist')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span class="nav-label">Watchlist</span>
+    </div>
     <div class="nav-item" data-page="jobs" onclick="navigateTo('jobs')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="16" y1="12" x2="8" y2="12"/><line x1="16" y1="16" x2="8" y2="16"/></svg>
       <span class="nav-label">Jobs</span>
@@ -98,6 +102,11 @@
   </div>
 
   <div id="summary-matrix"></div>
+</div>
+
+<!-- PAGE: WATCHLIST -->
+<div id="page-watchlist" class="page">
+  <div id="watchlist-body"></div>
 </div>
 
 
@@ -306,6 +315,11 @@ let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], late
 let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
 let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
 let inventoryProducts=[], inventoryTransactions=[];
+let blockIssues = [];        // active + resolved issues
+let issueUpdates = [];       // timeline updates for the open issue-detail
+let wlSelectedIssueId = null;// which issue detail is open (null = list view)
+let wlFlagPhotos = [];       // staged photo URLs during flag/add-update modal
+const ISSUE_CATEGORIES = ['Pest','Disease','Nutrient','Water','Weather','Other'];
 let summaryStatusSet = new Set(); // empty = all statuses
 let summarySearch = '';
 let _summarySearchTO = null;
@@ -351,7 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs(), loadBlockIssues()]);
 }
 
 async function syncAll() {
@@ -366,18 +380,20 @@ async function syncAll() {
 function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
-    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs()]);
+    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs(), loadBlockIssues()]);
     if(currentPage === 'summary') renderSummary();
     if(currentPage === 'jobs') renderJobsTable();
     if(currentPage === 'joblogs') renderJobLogs();
+    if(currentPage === 'watchlist') renderWatchlist();
   }, 60000);
 }
 
 // ============================================================
 // NAVIGATION
 // ============================================================
-function navigateTo(page, fromHistory) {
+function navigateTo(page, fromHistory, detail) {
   currentPage = page;
+  if(page === 'watchlist') wlSelectedIssueId = detail || null;
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-"+page));
   if(!fromHistory) pushTab(page);
@@ -386,6 +402,7 @@ function navigateTo(page, fromHistory) {
 
 async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
+  else if(currentPage === 'watchlist') { await Promise.all([loadBlockIssues(), loadBlocks(), loadBlockCrops(), loadCropStatuses(), loadJobs(), loadProducts()]); renderWatchlist(); }
   else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') {
     await Promise.all([loadJobs(), loadJobProducts(), loadProducts()]);
@@ -505,6 +522,73 @@ function getBlockCrop(blockId) {
 function getCropStatusName(statusId) {
   const s = cropStatuses.find(x => x.id === statusId);
   return s ? s.name : '—';
+}
+async function loadBlockIssues() {
+  const data = await sbQuery(sb.from("block_issues").select("*").order("opened_at", { ascending:false }));
+  if(data) blockIssues = data;
+}
+async function loadIssueUpdates(issueId) {
+  const data = await sbQuery(sb.from("block_issue_updates").select("*").eq("issue_id", issueId).order("created_at", { ascending:false }));
+  issueUpdates = data || [];
+}
+// Format a timestamptz (e.g. "2026-07-01T06:03:40+00:00") as DD/MM/YY — fmtDate expects a
+// plain YYYY-MM-DD, so slice the date portion off the ISO timestamp first.
+function wlFmtDate(ts) { return fmtDate((ts || '').slice(0, 10)); }
+// Attribute-safe photo URL: only allow http(s) storage URLs; escape attribute-breaking chars.
+// Defense-in-depth — photo URLs today are system-generated Supabase getPublicUrl() values,
+// but the photos jsonb column could in theory hold arbitrary text.
+function ciSafeUrl(u) {
+  if(!/^https?:\/\//i.test(u || '')) return '';
+  return String(u).replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]));
+}
+// A block's active issues (severity drives its badge). Critical outranks watch.
+function activeIssuesForBlock(blockId) {
+  return blockIssues.filter(i => i.block_id === blockId && i.status === 'active');
+}
+function blockFlagSeverity(blockId) {
+  const act = activeIssuesForBlock(blockId);
+  if(!act.length) return null;
+  return act.some(i => i.severity === 'critical') ? 'critical' : 'watch';
+}
+function issueBadgeHtml(sev) {
+  if(sev === 'critical') return '<span class="wl-badge wl-crit">CRITICAL</span>';
+  if(sev === 'watch')    return '<span class="wl-badge wl-watch">WATCH</span>';
+  return '';
+}
+// Jobs auto-pulled for an issue: same block, job date within [opened_at, resolved_at|now]
+function jobsForIssue(issue) {
+  const start = issue.opened_at;
+  const end = issue.resolved_at || new Date().toISOString();
+  return jobs.filter(j => {
+    if(j.block_id !== issue.block_id) return false;
+    const d = j.completion_date || j.planned_date;
+    if(!d) return false;
+    const iso = d.length <= 10 ? d + 'T00:00:00Z' : d;
+    return iso >= start && iso <= end;
+  });
+}
+// Resize to max 1200px JPEG q0.8, upload to crop-issue-photos, return public URL.
+function ciResizeToBlob(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1200, scale = Math.min(1, maxW / img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.8);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function ciUploadPhoto(issueId, file) {
+  const blob = await ciResizeToBlob(file);
+  const path = `issues/${issueId}/${Date.now()}.jpg`;
+  const res = await sbUpload(() => sb.storage.from('crop-issue-photos').upload(path, blob, { contentType:'image/jpeg', upsert:true }), 'Uploading photo…');
+  if(!res) return null;
+  return sb.storage.from('crop-issue-photos').getPublicUrl(path).data.publicUrl;
 }
 
 // ============================================================
@@ -731,7 +815,7 @@ function renderSummary() {
   summaryCellData = {};
   let rowBlocks = activeBlocks.map(b => {
     const bc = getBlockCrop(b.id);
-    return { block:b, statusName: bc ? getCropStatusName(bc.status_id) : '—' };
+    return { block:b, statusName: bc ? getCropStatusName(bc.status_id) : '—', variety: bc && bc.crop_varieties ? bc.crop_varieties.name : '' };
   });
   if(summaryStatusSet.size) rowBlocks = rowBlocks.filter(r => summaryStatusSet.has(r.statusName));
   if(summarySearch.trim()) {
@@ -740,7 +824,14 @@ function renderSummary() {
   }
   rowBlocks.sort((a,b) => (a.block.block_name||'').localeCompare(b.block.block_name||'', undefined, {numeric:true}));
 
-  let html = '<div class="data-table"><div class="table-wrap"><table style="white-space:nowrap;"><thead>';
+  const flaggedActive = blockIssues.filter(i => i.status === 'active');
+  const critN = flaggedActive.filter(i => i.severity === 'critical').length;
+  const watchN = flaggedActive.filter(i => i.severity === 'watch').length;
+  let bannerHtml = '';
+  if(flaggedActive.length) {
+    bannerHtml = `<div class="wl-banner" onclick="navigateTo('watchlist')">⚠ ${flaggedActive.length} block(s) need attention — ${critN} Critical, ${watchN} Watch</div>`;
+  }
+  let html = bannerHtml + '<div class="data-table"><div class="table-wrap"><table style="white-space:nowrap;"><thead>';
   html += '<tr>' +
     '<th rowspan="2" style="position:sticky;left:0;z-index:2;background:#E8E2EC;color:var(--text);min-width:90px;text-align:left;">Block</th>';
   SUMMARY_COLS.forEach(c => {
@@ -756,9 +847,11 @@ function renderSummary() {
   if(!rowBlocks.length) {
     html += `<tr><td colspan="${1 + SUMMARY_COLS.length*2}" class="empty-state" style="text-align:center;padding:24px;color:var(--text-muted);">No blocks match the filter.</td></tr>`;
   } else {
-    rowBlocks.forEach(({block, statusName}) => {
-      html += '<tr>';
-      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(block.block_name)}` +
+    rowBlocks.forEach(({block, statusName, variety}) => {
+      const sev = blockFlagSeverity(block.id);
+      html += `<tr class="${sev==='critical'?'wl-row-crit':sev==='watch'?'wl-row-watch':''}">`;
+      const flagIco = `<span class="wl-flag-ico" data-block="${block.id}" title="Flag this block" onclick="wlFlagIcoClick(event)">⚑</span>`;
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${flagIco} ${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''} ${issueBadgeHtml(sev)}` +
               `<div style="font-size:10px;color:var(--text-dim);font-weight:400;">${esc(statusName)}</div></td>`;
       SUMMARY_COLS.forEach(c => {
         let dateStr = '—', daysStr = '—', hasData = false;
@@ -795,6 +888,250 @@ function renderSummary() {
   }
   html += '</tbody></table></div></div>';
   document.getElementById('summary-matrix').innerHTML = html;
+}
+
+function wlFlagIcoClick(ev) {
+  ev.stopPropagation();  // don't trigger cell drill-down
+  openFlagModal(ev.currentTarget.dataset.block);
+}
+
+function renderWatchlist() {
+  const body = document.getElementById('watchlist-body');
+  if(!body) return;
+  if(wlSelectedIssueId) { renderIssueDetail(); return; }
+  renderWatchlistList(body);
+}
+
+function wlBlockLabel(blockId) {
+  const b = blocks.find(x => x.id === blockId);
+  const bc = getBlockCrop(blockId);
+  const v = bc && bc.crop_varieties ? ` (${esc(bc.crop_varieties.name)})` : '';
+  return (b ? esc(b.block_name) : '—') + v;
+}
+
+function wlIssueCard(i) {
+  const jobsN = jobsForIssue(i).length;
+  const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
+  const sevCls = i.severity === 'critical' ? 'wl-card-crit' : 'wl-card-watch';
+  const meta = i.status === 'resolved'
+    ? `Resolved ${wlFmtDate(i.resolved_at)}`
+    : `Opened ${wlFmtDate(i.opened_at)} · ${days}d active · ${jobsN} job(s)`;
+  return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
+    <div class="wl-card-top">
+      ${issueBadgeHtml(i.status==='active'?i.severity:null)}
+      <span class="wl-card-title">${esc(i.title)}</span>
+      <span class="wl-cat">${esc(i.category)}</span>
+    </div>
+    <div class="wl-card-meta">${wlBlockLabel(i.block_id)} · ${meta}</div>
+  </div>`;
+}
+
+function renderWatchlistList(body) {
+  const active = blockIssues.filter(i => i.status === 'active');
+  const crit = active.filter(i => i.severity === 'critical');
+  const watch = active.filter(i => i.severity === 'watch');
+  const resolved = blockIssues.filter(i => i.status === 'resolved');
+
+  let html = `<div class="page-header"><h1>Watchlist</h1>
+    <button class="btn btn-primary" onclick="openFlagModal()">⚑ Flag a Block</button></div>`;
+
+  if(!active.length) {
+    html += `<div class="empty-state" style="padding:32px;text-align:center;color:var(--text-muted);">No blocks flagged. When you spot a problem, hit <b>⚑ Flag a Block</b>.</div>`;
+  } else {
+    if(crit.length)  html += `<div class="wl-section-h wl-h-crit">🔴 Critical (${crit.length})</div>` + crit.map(wlIssueCard).join('');
+    if(watch.length) html += `<div class="wl-section-h wl-h-watch">🟠 Watch (${watch.length})</div>` + watch.map(wlIssueCard).join('');
+  }
+  if(resolved.length) {
+    html += `<div class="wl-section-h wl-h-resolved" onclick="wlToggleResolved()" style="cursor:pointer;">✓ Resolved (${resolved.length}) <span id="wl-resolved-caret">${wlResolvedOpen?'▾':'▸'}</span></div>`;
+    html += `<div id="wl-resolved-list" style="display:${wlResolvedOpen?'block':'none'};">` + resolved.map(wlIssueCard).join('') + `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+let wlResolvedOpen = false;
+function wlToggleResolved() { wlResolvedOpen = !wlResolvedOpen; renderWatchlist(); }
+function wlOpenIssue(ev) {
+  const id = ev.currentTarget.dataset.issue;
+  wlSelectedIssueId = id;
+  pushView('watchlist', id);   // browser-back returns to the list
+  renderWatchlist();
+}
+
+let flagSeverity = 'critical', flagCategory = 'Pest';
+
+function openFlagModal(preBlockId) {
+  flagSeverity = 'critical'; flagCategory = 'Pest'; wlFlagPhotos = [];
+  const opts = blocks.filter(b => b.is_active)
+    .sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}))
+    .map(b => `<option value="${b.id}" ${b.id===preBlockId?'selected':''}>${esc(b.block_name)}</option>`).join('');
+  const chips = ISSUE_CATEGORIES.map(c => `<span class="wl-chip ${c==='Pest'?'on':''}" data-cat="${c}" onclick="flagSetCategory(event)">${c}</span>`).join('');
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:460px;">
+      <div class="modal-header"><div class="modal-title">⚑ Flag a Block</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>Block</label><select id="flag-block" style="width:100%;">${opts}</select></div>
+      <div class="form-field"><label>Severity</label>
+        <div class="wl-sev-toggle">
+          <div class="wl-sev crit on" data-sev="critical" onclick="flagSetSeverity(event)">🔴 Critical</div>
+          <div class="wl-sev watch" data-sev="watch" onclick="flagSetSeverity(event)">🟠 Watch</div>
+        </div>
+      </div>
+      <div class="form-field"><label>Category</label><div class="wl-chips" id="flag-cats">${chips}</div></div>
+      <div class="form-field"><label>Short title</label><input id="flag-title" style="width:100%;" placeholder="e.g. Mealybug, north corner"></div>
+      <div class="form-field"><label>Description (optional)</label><textarea id="flag-desc" style="width:100%;min-height:56px;" placeholder="What did you see?"></textarea></div>
+      <div class="form-field"><label>Photos</label>
+        <input type="file" id="flag-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('flag-photo-input').click()">📷 Add Photo</button>
+        <div id="flag-photo-preview" class="wl-photo-preview"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSaveFlag()">⚑ Flag Block</button></div>
+    </div></div>`;
+}
+function flagSetSeverity(ev) {
+  flagSeverity = ev.currentTarget.dataset.sev;
+  document.querySelectorAll('.wl-sev').forEach(e => e.classList.toggle('on', e.dataset.sev === flagSeverity));
+}
+function flagSetCategory(ev) {
+  flagCategory = ev.currentTarget.dataset.cat;
+  document.querySelectorAll('#flag-cats .wl-chip').forEach(e => e.classList.toggle('on', e.dataset.cat === flagCategory));
+}
+// stage photos: uploads immediately to a temp path, renders thumbnails. Uses a synthetic id until the issue exists.
+let ciStageKey = null;
+async function ciStagePhoto(ev, previewId) {
+  const files = [...ev.target.files]; ev.target.value = '';
+  if(!ciStageKey) ciStageKey = 'stage-' + Date.now();
+  for(const f of files) {
+    const url = await ciUploadPhoto(ciStageKey, f);
+    if(url) wlFlagPhotos.push(url);
+  }
+  const prev = document.getElementById(previewId);
+  if(prev) prev.innerHTML = wlFlagPhotos.map(u => `<img src="${ciSafeUrl(u)}" class="wl-thumb">`).join('');
+}
+async function wlSaveFlag() {
+  const blockId = document.getElementById('flag-block').value;
+  const title = document.getElementById('flag-title').value.trim();
+  if(!blockId) { notify('Pick a block','error'); return; }
+  if(!title)   { notify('Enter a short title','error'); return; }
+  const payload = {
+    block_id: blockId, title, description: document.getElementById('flag-desc').value.trim() || null,
+    category: flagCategory, severity: flagSeverity, status: 'active',
+    opened_by: currentUser.displayName || 'unknown', company_id: 'tg_agribusiness'
+  };
+  const res = await sbMutate(() => sb.from('block_issues').insert(payload).select());
+  if(!res || !res[0]) { notify('Could not save flag','error'); return; }
+  const issue = res[0];
+  if(wlFlagPhotos.length) {
+    await sbMutate(() => sb.from('block_issue_updates').insert({
+      issue_id: issue.id, note: 'Issue opened', photos: wlFlagPhotos, created_by: currentUser.displayName || 'unknown'
+    }).select());
+  }
+  wlFlagPhotos = []; ciStageKey = null;
+  closeModal();
+  await loadBlockIssues();
+  notify('Block flagged','success');
+  renderCurrentPage();  // refreshes whatever tab you flagged from (watchlist or summary)
+}
+
+function renderIssueDetail() {
+  const body = document.getElementById('watchlist-body');
+  const i = blockIssues.find(x => x.id === wlSelectedIssueId);
+  if(!i) { wlSelectedIssueId = null; renderWatchlist(); return; }
+  // fetch updates (async) then paint
+  loadIssueUpdates(i.id).then(() => paintIssueDetail(i, body));
+  body.innerHTML = `<div class="empty-state" style="padding:24px;color:var(--text-muted);">Loading…</div>`;
+}
+
+function paintIssueDetail(i, body) {
+  const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
+  const sevBadge = issueBadgeHtml(i.status==='active'?i.severity:null);
+  const statusPill = i.status==='resolved'
+    ? `<span class="wl-status-resolved">✓ Resolved</span>`
+    : `<span class="wl-status-active">● Active</span>`;
+
+  const events = [];
+  issueUpdates.forEach(u => events.push({ ts:u.created_at, kind:'note', u }));
+  jobsForIssue(i).forEach(j => events.push({ ts:(j.completion_date||j.planned_date), kind:'job', j }));
+  events.push({ ts:i.opened_at, kind:'open' });
+  events.sort((a,b) => (b.ts>a.ts?1:b.ts<a.ts?-1:0));  // newest first
+
+  const evHtml = events.map(e => {
+    if(e.kind === 'note') {
+      const photos = (e.u.photos||[]).map(u => `<img src="${ciSafeUrl(u)}" class="wl-mini">`).join('');
+      return `<div class="wl-ev"><div class="wl-dot wl-dot-note">📝</div><div class="wl-ev-body">
+        <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${wlFmtDate(e.u.created_at)}</span></div>
+        <div class="wl-ev-text">${esc(e.u.note)}</div>${photos?`<div>${photos}</div>`:''}</div></div>`;
+    }
+    if(e.kind === 'job') {
+      const p = getProduct(e.j.product_id);
+      const pname = p ? esc(p.product_name) : (e.j.job_type==='Fertilizer' ? 'Fertilizer' : '—');
+      const worker = e.j.worker_name ? ` · ${esc(e.j.worker_name)}` : '';
+      const done = e.j.completion_date ? 'done' : 'planned';
+      return `<div class="wl-ev"><div class="wl-dot wl-dot-job">🌫</div><div class="wl-ev-body">
+        <div class="wl-ev-top"><span class="wl-ev-title">${pname}</span><span class="wl-job-tag">Job · from Crop Care</span><span class="wl-ev-date">${fmtDate(e.j.completion_date||e.j.planned_date)}</span></div>
+        <div class="wl-ev-sub">${esc(e.j.job_type||'')} · ${done}${worker}</div></div></div>`;
+    }
+    return `<div class="wl-ev"><div class="wl-dot wl-dot-open">🚩</div><div class="wl-ev-body">
+      <div class="wl-ev-top"><span class="wl-ev-title">Issue opened — ${esc(i.opened_by||'—')}</span><span class="wl-ev-date">${wlFmtDate(i.opened_at)}</span></div>
+      <div class="wl-ev-text">${esc(i.title)}${i.description?' — '+esc(i.description):''}</div></div></div>`;
+  }).join('');
+
+  const actions = i.status==='active'
+    ? `<button class="btn btn-primary" onclick="openAddUpdateModal()">＋ Add Update</button>
+       <button class="btn btn-success" onclick="wlResolveIssue()">✓ Mark Resolved</button>`
+    : `<div class="wl-resolved-note">Resolved ${wlFmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
+
+  body.innerHTML = `
+    <div class="wl-detail-head ${i.severity==='critical'&&i.status==='active'?'wl-hd-crit':i.status==='active'?'wl-hd-watch':'wl-hd-resolved'}">
+      <button class="btn btn-outline btn-sm" onclick="wlBackToList()">← Watchlist</button>
+      <div class="wl-detail-top">${sevBadge}<span class="wl-detail-title">${esc(i.title)}</span><span class="wl-cat">${esc(i.category)}</span>${statusPill}</div>
+      <div class="wl-detail-meta">Block <b>${wlBlockLabel(i.block_id)}</b> · Opened ${wlFmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
+      ${i.description?`<div class="wl-detail-desc">${esc(i.description)}</div>`:''}
+    </div>
+    <div class="wl-detail-actions">${actions}</div>
+    <div class="wl-timeline"><div class="wl-tl-h">Timeline — newest first</div>${evHtml}</div>`;
+}
+
+function wlBackToList() { wlSelectedIssueId = null; pushView('watchlist', null); renderWatchlist(); }
+
+function openAddUpdateModal() {
+  wlFlagPhotos = []; ciStageKey = null;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:440px;">
+      <div class="modal-header"><div class="modal-title">＋ Add Update</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>Observation</label><textarea id="upd-note" style="width:100%;min-height:70px;" placeholder="e.g. Still spreading / responding to treatment"></textarea></div>
+      <div class="form-field"><label>Photos</label>
+        <input type="file" id="upd-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'upd-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('upd-photo-input').click()">📷 Add Photo</button>
+        <div id="upd-photo-preview" class="wl-photo-preview"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSaveUpdate()">Save Update</button></div>
+    </div></div>`;
+}
+async function wlSaveUpdate() {
+  const note = document.getElementById('upd-note').value.trim();
+  if(!note && !wlFlagPhotos.length) { notify('Add a note or photo','error'); return; }
+  const res = await sbMutate(() => sb.from('block_issue_updates').insert({
+    issue_id: wlSelectedIssueId, note: note || '(photo)', photos: wlFlagPhotos, created_by: currentUser.displayName || 'unknown'
+  }).select());
+  if(!res) { notify('Could not save update','error'); return; }
+  wlFlagPhotos = []; ciStageKey = null;
+  closeModal();
+  renderWatchlist();  // re-paints detail (loadIssueUpdates re-fetches)
+  notify('Update added','success');
+}
+
+function wlResolveIssue() {
+  confirmAction('Mark Resolved', 'Close this issue? The block\'s badge clears everywhere; history is kept.', async () => {
+    const note = prompt('Closing note (optional):') || null;
+    const res = await sbMutate(() => sb.from('block_issues').update({
+      status:'resolved', resolved_at: new Date().toISOString(), resolved_note: note
+    }).eq('id', wlSelectedIssueId).select());
+    if(!res) { notify('Could not resolve','error'); return; }
+    await loadBlockIssues();
+    notify('Issue resolved','success');
+    renderWatchlist();
+  }, false);
 }
 
 function summaryEnsurePopupEl() {

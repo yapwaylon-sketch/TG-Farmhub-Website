@@ -838,6 +838,7 @@ function showHub() {
 
   showHubPage("modules");
   renderModuleCards();
+  loadCropCareFlags();
   if (currentUser.role === "admin") {
     document.getElementById('company-overview').style.display = 'block';
     loadCompanyOverview();
@@ -955,12 +956,20 @@ function renderModuleCard(m) {
       onclick="${clickable ? "window.location.href='" + m.url + "?session=" + currentUser.id + "'" : ""}"
       title="${!m.active ? "Coming soon" : !hasAccess ? "No access — contact admin" : "Open " + m.name}">
       <span class="module-badge ${badgeClass}">${badgeText}</span>
+      ${m.key === 'spraytracker' && cropCareFlagCount > 0 ? `<span class="module-flag-badge" style="position:absolute;top:10px;left:10px;background:#C0392B;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">⚠ ${cropCareFlagCount}</span>` : ''}
       <span class="module-icon">${m.iconImg ? '<img src="'+m.iconImg+'" alt="">' : m.icon}</span>
       <div class="module-name">${m.name}</div>
       <div class="module-desc">${m.desc}</div>
       ${!hasAccess && m.active ? '<div style="font-size:11px;color:var(--critical);margin-top:10px;">🔒 No access — contact admin</div>' : ""}
     </div>
   `;
+}
+
+let cropCareFlagCount = 0;
+async function loadCropCareFlags() {
+  const { data } = await sb.from('block_issues').select('id').eq('status','active');
+  cropCareFlagCount = (data || []).length;
+  renderModuleCards();
 }
 
 function renderModuleCards() {
