@@ -531,6 +531,13 @@ async function loadIssueUpdates(issueId) {
   const data = await sbQuery(sb.from("block_issue_updates").select("*").eq("issue_id", issueId).order("created_at", { ascending:false }));
   issueUpdates = data || [];
 }
+// Attribute-safe photo URL: only allow http(s) storage URLs; escape attribute-breaking chars.
+// Defense-in-depth — photo URLs today are system-generated Supabase getPublicUrl() values,
+// but the photos jsonb column could in theory hold arbitrary text.
+function ciSafeUrl(u) {
+  if(!/^https?:\/\//i.test(u || '')) return '';
+  return String(u).replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]));
+}
 // A block's active issues (severity drives its badge). Critical outranks watch.
 function activeIssuesForBlock(blockId) {
   return blockIssues.filter(i => i.block_id === blockId && i.status === 'active');
@@ -995,7 +1002,7 @@ async function ciStagePhoto(ev, previewId) {
     if(url) wlFlagPhotos.push(url);
   }
   const prev = document.getElementById(previewId);
-  if(prev) prev.innerHTML = wlFlagPhotos.map(u => `<img src="${u}" class="wl-thumb">`).join('');
+  if(prev) prev.innerHTML = wlFlagPhotos.map(u => `<img src="${ciSafeUrl(u)}" class="wl-thumb">`).join('');
 }
 async function wlSaveFlag() {
   const blockId = document.getElementById('flag-block').value;
@@ -1046,7 +1053,7 @@ function paintIssueDetail(i, body) {
 
   const evHtml = events.map(e => {
     if(e.kind === 'note') {
-      const photos = (e.u.photos||[]).map(u => `<img src="${u}" class="wl-mini">`).join('');
+      const photos = (e.u.photos||[]).map(u => `<img src="${ciSafeUrl(u)}" class="wl-mini">`).join('');
       return `<div class="wl-ev"><div class="wl-dot wl-dot-note">📝</div><div class="wl-ev-body">
         <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${fmtDate(e.u.created_at)}</span></div>
         <div class="wl-ev-text">${esc(e.u.note)}</div>${photos?`<div>${photos}</div>`:''}</div></div>`;
