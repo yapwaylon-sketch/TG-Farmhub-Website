@@ -149,12 +149,21 @@ td.spray-cell.pg-divider { border-left:2px solid var(--border); }
 .wl-job-tag { background:rgba(59,122,59,.13); color:#3B7A3B; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:4px; text-transform:uppercase; }
 .wl-ev-text { font-size:13px; line-height:1.45; }
 .wl-ev-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
-.wl-mini { width:46px; height:46px; object-fit:cover; border-radius:6px; margin:8px 6px 0 0; }
+.wl-mini { width:140px; height:140px; object-fit:cover; border-radius:8px; margin:8px 8px 0 0; cursor:zoom-in; border:1px solid var(--border); transition:transform .1s; }
+.wl-mini:hover { transform:scale(1.02); }
+
+/* Full-screen photo lightbox */
+.wl-lightbox { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; cursor:zoom-out; }
+.wl-lightbox img { max-width:94vw; max-height:92vh; border-radius:6px; box-shadow:0 10px 50px rgba(0,0,0,.6); }
+.wl-lightbox-close { position:absolute; top:18px; right:22px; background:rgba(255,255,255,.15); color:#fff; border:none; width:40px; height:40px; border-radius:50%; font-size:20px; cursor:pointer; }
+.wl-lightbox-close:hover { background:rgba(255,255,255,.3); }
 
 /* ----- Watchlist enhancements (2026-07-01) ----- */
-/* Blink the Critical badge on the Summary matrix only (scoped to #page-summary) */
+/* Blink the Critical badge (Summary matrix + Watchlist cards + detail) and the
+   Watchlist "Critical" section header, so critical items are the only thing moving. */
 @keyframes wl-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
-#page-summary .wl-badge.wl-crit { animation: wl-blink 1.2s ease-in-out infinite; }
+.wl-badge.wl-crit { animation: wl-blink 1.2s ease-in-out infinite; }
+.wl-h-crit { animation: wl-blink 1.2s ease-in-out infinite; }
 
 /* Card: block number is the prominent headline, issue title secondary */
 .wl-card-block { font-weight:800; font-size:16px; color:var(--text); }

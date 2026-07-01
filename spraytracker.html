@@ -1074,7 +1074,7 @@ function paintIssueDetail(i, body) {
 
   const evHtml = events.map(e => {
     if(e.kind === 'note') {
-      const photos = (e.u.photos||[]).map(u => `<img src="${ciSafeUrl(u)}" class="wl-mini">`).join('');
+      const photos = (e.u.photos||[]).map(u => `<img src="${ciSafeUrl(u)}" class="wl-mini" onclick="wlLightbox(this.src)">`).join('');
       return `<div class="wl-ev"><div class="wl-dot wl-dot-note">📝</div><div class="wl-ev-body">
         <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${wlFmtDate(e.u.created_at)}</span></div>
         <div class="wl-ev-text">${esc(e.u.note)}</div>${photos?`<div>${photos}</div>`:''}</div></div>`;
@@ -1095,6 +1095,7 @@ function paintIssueDetail(i, body) {
 
   const actions = i.status==='active'
     ? `<button class="btn btn-primary" onclick="openAddUpdateModal()">＋ Add Update</button>
+       <button class="btn btn-outline" onclick="openAddPhotosModal()">📷 Add Photos</button>
        <button class="btn btn-success" onclick="wlResolveIssue()">✓ Mark Resolved</button>`
     : `<div class="wl-resolved-note">Resolved ${wlFmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
 
@@ -1184,6 +1185,42 @@ async function wlSaveUpdate() {
   closeModal();
   renderWatchlist();  // re-paints detail (loadIssueUpdates re-fetches)
   notify('Update added','success');
+}
+
+// Full-screen photo viewer — click any timeline photo to enlarge.
+function wlLightbox(src) {
+  const ov = document.createElement('div');
+  ov.className = 'wl-lightbox';
+  ov.onclick = () => ov.remove();
+  ov.innerHTML = `<img src="${ciSafeUrl(src)}"><button class="wl-lightbox-close" aria-label="Close">✕</button>`;
+  document.body.appendChild(ov);
+}
+
+// Add photos later — photo-only entry (no observation note required). Multiple allowed.
+function openAddPhotosModal() {
+  wlFlagPhotos = []; ciStageKey = null;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:440px;">
+      <div class="modal-header"><div class="modal-title">📷 Add Photos</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>Photos <span style="text-transform:none;color:var(--text-muted);font-weight:400;">(pick one or several)</span></label>
+        <input type="file" id="ap-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'ap-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('ap-photo-input').click()">📷 Choose Photos</button>
+        <div id="ap-photo-preview" class="wl-photo-preview"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSavePhotos()">Save Photos</button></div>
+    </div></div>`;
+}
+async function wlSavePhotos() {
+  if(!wlFlagPhotos.length) { notify('Choose at least one photo','error'); return; }
+  const res = await sbMutate(() => sb.from('block_issue_updates').insert({
+    issue_id: wlSelectedIssueId, note: 'Added photos', photos: wlFlagPhotos, created_by: currentUser.displayName || 'unknown'
+  }).select());
+  if(!res) { notify('Could not save photos','error'); return; }
+  wlFlagPhotos = []; ciStageKey = null;
+  closeModal();
+  renderWatchlist();
+  notify('Photos added','success');
 }
 
 function wlResolveIssue() {
