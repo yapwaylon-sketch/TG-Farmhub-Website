@@ -871,6 +871,68 @@ function renderSummary() {
   document.getElementById('summary-matrix').innerHTML = html;
 }
 
+function renderWatchlist() {
+  const body = document.getElementById('watchlist-body');
+  if(!body) return;
+  if(wlSelectedIssueId) { renderIssueDetail(); return; }
+  renderWatchlistList(body);
+}
+
+function wlBlockLabel(blockId) {
+  const b = blocks.find(x => x.id === blockId);
+  const bc = getBlockCrop(blockId);
+  const v = bc && bc.crop_varieties ? ` (${esc(bc.crop_varieties.name)})` : '';
+  return (b ? esc(b.block_name) : '—') + v;
+}
+
+function wlIssueCard(i) {
+  const jobsN = jobsForIssue(i).length;
+  const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
+  const sevCls = i.severity === 'critical' ? 'wl-card-crit' : 'wl-card-watch';
+  const meta = i.status === 'resolved'
+    ? `Resolved ${fmtDate(i.resolved_at)}`
+    : `Opened ${fmtDate(i.opened_at)} · ${days}d active · ${jobsN} job(s)`;
+  return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
+    <div class="wl-card-top">
+      ${issueBadgeHtml(i.status==='active'?i.severity:null)}
+      <span class="wl-card-title">${esc(i.title)}</span>
+      <span class="wl-cat">${esc(i.category)}</span>
+    </div>
+    <div class="wl-card-meta">${wlBlockLabel(i.block_id)} · ${meta}</div>
+  </div>`;
+}
+
+function renderWatchlistList(body) {
+  const active = blockIssues.filter(i => i.status === 'active');
+  const crit = active.filter(i => i.severity === 'critical');
+  const watch = active.filter(i => i.severity === 'watch');
+  const resolved = blockIssues.filter(i => i.status === 'resolved');
+
+  let html = `<div class="page-header"><h1>Watchlist</h1>
+    <button class="btn btn-primary" onclick="openFlagModal()">⚑ Flag a Block</button></div>`;
+
+  if(!active.length) {
+    html += `<div class="empty-state" style="padding:32px;text-align:center;color:var(--text-muted);">No blocks flagged. When you spot a problem, hit <b>⚑ Flag a Block</b>.</div>`;
+  } else {
+    if(crit.length)  html += `<div class="wl-section-h wl-h-crit">🔴 Critical (${crit.length})</div>` + crit.map(wlIssueCard).join('');
+    if(watch.length) html += `<div class="wl-section-h wl-h-watch">🟠 Watch (${watch.length})</div>` + watch.map(wlIssueCard).join('');
+  }
+  if(resolved.length) {
+    html += `<div class="wl-section-h wl-h-resolved" onclick="wlToggleResolved()" style="cursor:pointer;">✓ Resolved (${resolved.length}) <span id="wl-resolved-caret">${wlResolvedOpen?'▾':'▸'}</span></div>`;
+    html += `<div id="wl-resolved-list" style="display:${wlResolvedOpen?'block':'none'};">` + resolved.map(wlIssueCard).join('') + `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+let wlResolvedOpen = false;
+function wlToggleResolved() { wlResolvedOpen = !wlResolvedOpen; renderWatchlist(); }
+function wlOpenIssue(ev) {
+  const id = ev.currentTarget.dataset.issue;
+  wlSelectedIssueId = id;
+  pushView('watchlist', id);   // browser-back returns to the list
+  renderWatchlist();
+}
+
 function summaryEnsurePopupEl() {
   let el = document.getElementById('summary-cell-popup');
   if(!el) {
