@@ -933,6 +933,81 @@ function wlOpenIssue(ev) {
   renderWatchlist();
 }
 
+let flagSeverity = 'critical', flagCategory = 'Pest';
+
+function openFlagModal(preBlockId) {
+  flagSeverity = 'critical'; flagCategory = 'Pest'; wlFlagPhotos = [];
+  const opts = blocks.filter(b => b.is_active)
+    .sort((a,b)=>(a.block_name||'').localeCompare(b.block_name||'',undefined,{numeric:true}))
+    .map(b => `<option value="${b.id}" ${b.id===preBlockId?'selected':''}>${esc(b.block_name)}</option>`).join('');
+  const chips = ISSUE_CATEGORIES.map(c => `<span class="wl-chip ${c==='Pest'?'on':''}" data-cat="${c}" onclick="flagSetCategory(event)">${c}</span>`).join('');
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:460px;">
+      <div class="modal-header"><div class="modal-title">⚑ Flag a Block</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>Block</label><select id="flag-block" style="width:100%;">${opts}</select></div>
+      <div class="form-field"><label>Severity</label>
+        <div class="wl-sev-toggle">
+          <div class="wl-sev crit on" data-sev="critical" onclick="flagSetSeverity(event)">🔴 Critical</div>
+          <div class="wl-sev watch" data-sev="watch" onclick="flagSetSeverity(event)">🟠 Watch</div>
+        </div>
+      </div>
+      <div class="form-field"><label>Category</label><div class="wl-chips" id="flag-cats">${chips}</div></div>
+      <div class="form-field"><label>Short title</label><input id="flag-title" style="width:100%;" placeholder="e.g. Mealybug, north corner"></div>
+      <div class="form-field"><label>Description (optional)</label><textarea id="flag-desc" style="width:100%;min-height:56px;" placeholder="What did you see?"></textarea></div>
+      <div class="form-field"><label>Photos</label>
+        <input type="file" id="flag-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('flag-photo-input').click()">📷 Add Photo</button>
+        <div id="flag-photo-preview" class="wl-photo-preview"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSaveFlag()">⚑ Flag Block</button></div>
+    </div></div>`;
+}
+function flagSetSeverity(ev) {
+  flagSeverity = ev.currentTarget.dataset.sev;
+  document.querySelectorAll('.wl-sev').forEach(e => e.classList.toggle('on', e.dataset.sev === flagSeverity));
+}
+function flagSetCategory(ev) {
+  flagCategory = ev.currentTarget.dataset.cat;
+  document.querySelectorAll('#flag-cats .wl-chip').forEach(e => e.classList.toggle('on', e.dataset.cat === flagCategory));
+}
+// stage photos: uploads immediately to a temp path, renders thumbnails. Uses a synthetic id until the issue exists.
+let ciStageKey = null;
+async function ciStagePhoto(ev, previewId) {
+  const files = [...ev.target.files]; ev.target.value = '';
+  if(!ciStageKey) ciStageKey = 'stage-' + Date.now();
+  for(const f of files) {
+    const url = await ciUploadPhoto(ciStageKey, f);
+    if(url) wlFlagPhotos.push(url);
+  }
+  const prev = document.getElementById(previewId);
+  if(prev) prev.innerHTML = wlFlagPhotos.map(u => `<img src="${u}" class="wl-thumb">`).join('');
+}
+async function wlSaveFlag() {
+  const blockId = document.getElementById('flag-block').value;
+  const title = document.getElementById('flag-title').value.trim();
+  if(!blockId) { notify('Pick a block','error'); return; }
+  if(!title)   { notify('Enter a short title','error'); return; }
+  const payload = {
+    block_id: blockId, title, description: document.getElementById('flag-desc').value.trim() || null,
+    category: flagCategory, severity: flagSeverity, status: 'active',
+    opened_by: currentUser.displayName || 'unknown', company_id: 'tg_agribusiness'
+  };
+  const res = await sbMutate(() => sb.from('block_issues').insert(payload).select());
+  if(!res || !res[0]) { notify('Could not save flag','error'); return; }
+  const issue = res[0];
+  if(wlFlagPhotos.length) {
+    await sbMutate(() => sb.from('block_issue_updates').insert({
+      issue_id: issue.id, note: 'Issue opened', photos: wlFlagPhotos, created_by: currentUser.displayName || 'unknown'
+    }).select());
+  }
+  wlFlagPhotos = []; ciStageKey = null;
+  closeModal();
+  await loadBlockIssues();
+  notify('Block flagged','success');
+  renderCurrentPage();  // refreshes whatever tab you flagged from (watchlist or summary)
+}
+
 function summaryEnsurePopupEl() {
   let el = document.getElementById('summary-cell-popup');
   if(!el) {
