@@ -306,6 +306,11 @@ let blocks=[], products=[], statuses=[], workers=[], jobs=[], overrides=[], late
 let ingredients=[], formulations=[], productIngredients=[], jobProducts=[];
 let blockCrops=[], cropStatuses=[], latestSpraysByAI=[], aiComboDefaults=[];
 let inventoryProducts=[], inventoryTransactions=[];
+let blockIssues = [];        // active + resolved issues
+let issueUpdates = [];       // timeline updates for the open issue-detail
+let wlSelectedIssueId = null;// which issue detail is open (null = list view)
+let wlFlagPhotos = [];       // staged photo URLs during flag/add-update modal
+const ISSUE_CATEGORIES = ['Pest','Disease','Nutrient','Water','Weather','Other'];
 let summaryStatusSet = new Set(); // empty = all statuses
 let summarySearch = '';
 let _summarySearchTO = null;
@@ -351,7 +356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs()]);
+  await Promise.all([loadStatuses(), loadBlocks(), loadProducts(), loadWorkers(), loadJobs(), loadOverrides(), loadLatestSprays(), loadLatestSpraysByAI(), loadIngredients(), loadFormulations(), loadProductIngredients(), loadJobProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults(), loadSprayLogs(), loadBlockIssues()]);
 }
 
 async function syncAll() {
@@ -366,10 +371,11 @@ async function syncAll() {
 function startAutoRefresh() {
   if(refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(async () => {
-    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs()]);
+    await Promise.all([loadLatestSprays(), loadLatestSpraysByAI(), loadJobs(), loadOverrides(), loadSprayLogs(), loadBlockIssues()]);
     if(currentPage === 'summary') renderSummary();
     if(currentPage === 'jobs') renderJobsTable();
     if(currentPage === 'joblogs') renderJobLogs();
+    if(currentPage === 'watchlist') renderWatchlist();
   }, 60000);
 }
 
@@ -505,6 +511,63 @@ function getBlockCrop(blockId) {
 function getCropStatusName(statusId) {
   const s = cropStatuses.find(x => x.id === statusId);
   return s ? s.name : '—';
+}
+async function loadBlockIssues() {
+  const data = await sbQuery(sb.from("block_issues").select("*").order("opened_at", { ascending:false }));
+  if(data) blockIssues = data;
+}
+async function loadIssueUpdates(issueId) {
+  const data = await sbQuery(sb.from("block_issue_updates").select("*").eq("issue_id", issueId).order("created_at", { ascending:false }));
+  issueUpdates = data || [];
+}
+// A block's active issues (severity drives its badge). Critical outranks watch.
+function activeIssuesForBlock(blockId) {
+  return blockIssues.filter(i => i.block_id === blockId && i.status === 'active');
+}
+function blockFlagSeverity(blockId) {
+  const act = activeIssuesForBlock(blockId);
+  if(!act.length) return null;
+  return act.some(i => i.severity === 'critical') ? 'critical' : 'watch';
+}
+function issueBadgeHtml(sev) {
+  if(sev === 'critical') return '<span class="wl-badge wl-crit">CRITICAL</span>';
+  if(sev === 'watch')    return '<span class="wl-badge wl-watch">WATCH</span>';
+  return '';
+}
+// Jobs auto-pulled for an issue: same block, job date within [opened_at, resolved_at|now]
+function jobsForIssue(issue) {
+  const start = issue.opened_at;
+  const end = issue.resolved_at || new Date().toISOString();
+  return jobs.filter(j => {
+    if(j.block_id !== issue.block_id) return false;
+    const d = j.completion_date || j.planned_date;
+    if(!d) return false;
+    const iso = d.length <= 10 ? d + 'T00:00:00Z' : d;
+    return iso >= start && iso <= end;
+  });
+}
+// Resize to max 1200px JPEG q0.8, upload to crop-issue-photos, return public URL.
+function ciResizeToBlob(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1200, scale = Math.min(1, maxW / img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.8);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function ciUploadPhoto(issueId, file) {
+  const blob = await ciResizeToBlob(file);
+  const path = `issues/${issueId}/${Date.now()}.jpg`;
+  const res = await sbUpload(() => sb.storage.from('crop-issue-photos').upload(path, blob, { contentType:'image/jpeg', upsert:true }), 'Uploading photo…');
+  if(!res) return null;
+  return sb.storage.from('crop-issue-photos').getPublicUrl(path).data.publicUrl;
 }
 
 // ============================================================
@@ -731,7 +794,7 @@ function renderSummary() {
   summaryCellData = {};
   let rowBlocks = activeBlocks.map(b => {
     const bc = getBlockCrop(b.id);
-    return { block:b, statusName: bc ? getCropStatusName(bc.status_id) : '—' };
+    return { block:b, statusName: bc ? getCropStatusName(bc.status_id) : '—', variety: bc && bc.crop_varieties ? bc.crop_varieties.name : '' };
   });
   if(summaryStatusSet.size) rowBlocks = rowBlocks.filter(r => summaryStatusSet.has(r.statusName));
   if(summarySearch.trim()) {
@@ -756,9 +819,9 @@ function renderSummary() {
   if(!rowBlocks.length) {
     html += `<tr><td colspan="${1 + SUMMARY_COLS.length*2}" class="empty-state" style="text-align:center;padding:24px;color:var(--text-muted);">No blocks match the filter.</td></tr>`;
   } else {
-    rowBlocks.forEach(({block, statusName}) => {
+    rowBlocks.forEach(({block, statusName, variety}) => {
       html += '<tr>';
-      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(block.block_name)}` +
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''}` +
               `<div style="font-size:10px;color:var(--text-dim);font-weight:400;">${esc(statusName)}</div></td>`;
       SUMMARY_COLS.forEach(c => {
         let dateStr = '—', daysStr = '—', hasData = false;
