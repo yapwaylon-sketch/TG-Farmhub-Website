@@ -319,6 +319,7 @@ let blockIssues = [];        // active + resolved issues
 let issueUpdates = [];       // timeline updates for the open issue-detail
 let wlSelectedIssueId = null;// which issue detail is open (null = list view)
 let wlFlagPhotos = [];       // staged photo URLs during flag/add-update modal
+let issueThumbs = {};        // issue_id -> first photo URL (for the Watchlist card thumbnail)
 const ISSUE_CATEGORIES = ['Pest','Disease','Nutrient','Water','Weather','Other'];
 let summaryStatusSet = new Set(); // empty = all statuses
 let summarySearch = '';
@@ -402,7 +403,7 @@ function navigateTo(page, fromHistory, detail) {
 
 async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
-  else if(currentPage === 'watchlist') { await Promise.all([loadBlockIssues(), loadBlocks(), loadBlockCrops(), loadCropStatuses(), loadJobs(), loadProducts()]); renderWatchlist(); }
+  else if(currentPage === 'watchlist') { await Promise.all([loadBlockIssues(), loadBlocks(), loadBlockCrops(), loadCropStatuses(), loadJobs(), loadProducts()]); await loadIssueThumbs(); renderWatchlist(); }
   else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') {
     await Promise.all([loadJobs(), loadJobProducts(), loadProducts()]);
@@ -530,6 +531,18 @@ async function loadBlockIssues() {
 async function loadIssueUpdates(issueId) {
   const data = await sbQuery(sb.from("block_issue_updates").select("*").eq("issue_id", issueId).order("created_at", { ascending:false }));
   issueUpdates = data || [];
+}
+// First photo per issue (earliest update that has a photo) — for the Watchlist card thumbnail.
+async function loadIssueThumbs() {
+  issueThumbs = {};
+  const ids = blockIssues.map(i => i.id);
+  if(!ids.length) return;
+  const data = await sbQuery(sb.from("block_issue_updates").select("issue_id,photos,created_at").in("issue_id", ids).order("created_at", { ascending:true }));
+  (data || []).forEach(u => {
+    if(issueThumbs[u.issue_id]) return;
+    const ph = u.photos || [];
+    if(ph.length) issueThumbs[u.issue_id] = ph[0];
+  });
 }
 // Format a timestamptz (e.g. "2026-07-01T06:03:40+00:00") as DD/MM/YY — fmtDate expects a
 // plain YYYY-MM-DD, so slice the date portion off the ISO timestamp first.
@@ -949,7 +962,8 @@ function wlIssueCard(i) {
       : `<span class="wl-tag wl-tag-warn">⚠ no action yet</span>`;
     if(upcoming) tags += `<span class="wl-tag wl-tag-job">🌫 ${upcoming} job scheduled</span>`;
   }
-  return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
+  const thumb = issueThumbs[i.id];
+  return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}${thumb?' has-photo':''}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
     <div class="wl-card-top">
       ${issueBadgeHtml(i.status==='active'?i.severity:null)}
       <span class="wl-card-block">${wlBlockLabel(i.block_id)}</span>
@@ -958,6 +972,7 @@ function wlIssueCard(i) {
     <div class="wl-card-title2">${esc(i.title)}</div>
     <div class="wl-card-meta">${meta}</div>
     ${tags ? `<div class="wl-card-tags">${tags}</div>` : ''}
+    ${thumb ? `<div class="wl-card-photo" style="background-image:url('${ciSafeUrl(thumb)}')"></div>` : ''}
   </div>`;
 }
 
@@ -1226,6 +1241,7 @@ async function wlSaveUpdate() {
   if(!res) { notify('Could not save update','error'); return; }
   wlFlagPhotos = []; ciStageKey = null;
   closeModal();
+  await loadIssueThumbs();
   renderWatchlist();  // re-paints detail (loadIssueUpdates re-fetches)
   notify('Update added','success');
 }
@@ -1264,6 +1280,7 @@ async function wlSavePhotos() {
   if(!res) { notify('Could not save photos','error'); return; }
   wlFlagPhotos = []; ciStageKey = null;
   closeModal();
+  await loadIssueThumbs();
   renderWatchlist();
   notify('Photos added','success');
 }

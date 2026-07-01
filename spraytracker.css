@@ -180,6 +180,13 @@ td.spray-cell.pg-divider { border-left:2px solid var(--border); }
 .wl-card-block { font-weight:800; font-size:16px; color:var(--text); }
 .wl-card-title2 { font-size:13px; color:var(--text-dim); margin-top:3px; }
 .wl-card-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+/* First-photo thumbnail on the card — fills the right side at full card height (desktop only) */
+.wl-card.has-photo { position:relative; padding-right:190px; min-height:104px; }
+.wl-card-photo { position:absolute; top:0; right:0; bottom:0; width:174px; background-size:cover; background-position:center; background-repeat:no-repeat; border-radius:0 9px 9px 0; border-left:1px solid var(--border); background-color:var(--bg-input,#f0eaf6); }
+@media (max-width:768px) {
+  .wl-card.has-photo { padding-right:14px; min-height:0; }
+  .wl-card-photo { display:none; }
+}
 .wl-tag { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; }
 .wl-tag-ok { background:rgba(59,122,59,.14); color:#3B7A3B; }
 .wl-tag-warn { background:rgba(232,138,26,.16); color:#C77A15; }
