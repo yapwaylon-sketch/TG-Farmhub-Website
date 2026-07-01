@@ -531,6 +531,9 @@ async function loadIssueUpdates(issueId) {
   const data = await sbQuery(sb.from("block_issue_updates").select("*").eq("issue_id", issueId).order("created_at", { ascending:false }));
   issueUpdates = data || [];
 }
+// Format a timestamptz (e.g. "2026-07-01T06:03:40+00:00") as DD/MM/YY — fmtDate expects a
+// plain YYYY-MM-DD, so slice the date portion off the ISO timestamp first.
+function wlFmtDate(ts) { return fmtDate((ts || '').slice(0, 10)); }
 // Attribute-safe photo URL: only allow http(s) storage URLs; escape attribute-breaking chars.
 // Defense-in-depth — photo URLs today are system-generated Supabase getPublicUrl() values,
 // but the photos jsonb column could in theory hold arbitrary text.
@@ -911,8 +914,8 @@ function wlIssueCard(i) {
   const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
   const sevCls = i.severity === 'critical' ? 'wl-card-crit' : 'wl-card-watch';
   const meta = i.status === 'resolved'
-    ? `Resolved ${fmtDate(i.resolved_at)}`
-    : `Opened ${fmtDate(i.opened_at)} · ${days}d active · ${jobsN} job(s)`;
+    ? `Resolved ${wlFmtDate(i.resolved_at)}`
+    : `Opened ${wlFmtDate(i.opened_at)} · ${days}d active · ${jobsN} job(s)`;
   return `<div class="wl-card ${i.status==='resolved'?'wl-card-resolved':sevCls}" data-issue="${i.id}" onclick="wlOpenIssue(event)">
     <div class="wl-card-top">
       ${issueBadgeHtml(i.status==='active'?i.severity:null)}
@@ -1055,7 +1058,7 @@ function paintIssueDetail(i, body) {
     if(e.kind === 'note') {
       const photos = (e.u.photos||[]).map(u => `<img src="${ciSafeUrl(u)}" class="wl-mini">`).join('');
       return `<div class="wl-ev"><div class="wl-dot wl-dot-note">📝</div><div class="wl-ev-body">
-        <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${fmtDate(e.u.created_at)}</span></div>
+        <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${wlFmtDate(e.u.created_at)}</span></div>
         <div class="wl-ev-text">${esc(e.u.note)}</div>${photos?`<div>${photos}</div>`:''}</div></div>`;
     }
     if(e.kind === 'job') {
@@ -1068,20 +1071,20 @@ function paintIssueDetail(i, body) {
         <div class="wl-ev-sub">${esc(e.j.job_type||'')} · ${done}${worker}</div></div></div>`;
     }
     return `<div class="wl-ev"><div class="wl-dot wl-dot-open">🚩</div><div class="wl-ev-body">
-      <div class="wl-ev-top"><span class="wl-ev-title">Issue opened — ${esc(i.opened_by||'—')}</span><span class="wl-ev-date">${fmtDate(i.opened_at)}</span></div>
+      <div class="wl-ev-top"><span class="wl-ev-title">Issue opened — ${esc(i.opened_by||'—')}</span><span class="wl-ev-date">${wlFmtDate(i.opened_at)}</span></div>
       <div class="wl-ev-text">${esc(i.title)}${i.description?' — '+esc(i.description):''}</div></div></div>`;
   }).join('');
 
   const actions = i.status==='active'
     ? `<button class="btn btn-primary" onclick="openAddUpdateModal()">＋ Add Update</button>
        <button class="btn btn-success" onclick="wlResolveIssue()">✓ Mark Resolved</button>`
-    : `<div class="wl-resolved-note">Resolved ${fmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
+    : `<div class="wl-resolved-note">Resolved ${wlFmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
 
   body.innerHTML = `
     <div class="wl-detail-head ${i.severity==='critical'&&i.status==='active'?'wl-hd-crit':i.status==='active'?'wl-hd-watch':'wl-hd-resolved'}">
       <button class="btn btn-outline btn-sm" onclick="wlBackToList()">← Watchlist</button>
       <div class="wl-detail-top">${sevBadge}<span class="wl-detail-title">${esc(i.title)}</span><span class="wl-cat">${esc(i.category)}</span>${statusPill}</div>
-      <div class="wl-detail-meta">Block <b>${wlBlockLabel(i.block_id)}</b> · Opened ${fmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
+      <div class="wl-detail-meta">Block <b>${wlBlockLabel(i.block_id)}</b> · Opened ${wlFmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
       ${i.description?`<div class="wl-detail-desc">${esc(i.description)}</div>`:''}
     </div>
     <div class="wl-detail-actions">${actions}</div>
