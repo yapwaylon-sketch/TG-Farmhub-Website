@@ -814,7 +814,14 @@ function renderSummary() {
   }
   rowBlocks.sort((a,b) => (a.block.block_name||'').localeCompare(b.block.block_name||'', undefined, {numeric:true}));
 
-  let html = '<div class="data-table"><div class="table-wrap"><table style="white-space:nowrap;"><thead>';
+  const flaggedActive = blockIssues.filter(i => i.status === 'active');
+  const critN = flaggedActive.filter(i => i.severity === 'critical').length;
+  const watchN = flaggedActive.filter(i => i.severity === 'watch').length;
+  let bannerHtml = '';
+  if(flaggedActive.length) {
+    bannerHtml = `<div class="wl-banner" onclick="navigateTo('watchlist')">⚠ ${flaggedActive.length} block(s) need attention — ${critN} Critical, ${watchN} Watch</div>`;
+  }
+  let html = bannerHtml + '<div class="data-table"><div class="table-wrap"><table style="white-space:nowrap;"><thead>';
   html += '<tr>' +
     '<th rowspan="2" style="position:sticky;left:0;z-index:2;background:#E8E2EC;color:var(--text);min-width:90px;text-align:left;">Block</th>';
   SUMMARY_COLS.forEach(c => {
@@ -831,8 +838,10 @@ function renderSummary() {
     html += `<tr><td colspan="${1 + SUMMARY_COLS.length*2}" class="empty-state" style="text-align:center;padding:24px;color:var(--text-muted);">No blocks match the filter.</td></tr>`;
   } else {
     rowBlocks.forEach(({block, statusName, variety}) => {
-      html += '<tr>';
-      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''}` +
+      const sev = blockFlagSeverity(block.id);
+      html += `<tr class="${sev==='critical'?'wl-row-crit':sev==='watch'?'wl-row-watch':''}">`;
+      const flagIco = `<span class="wl-flag-ico" data-block="${block.id}" title="Flag this block" onclick="wlFlagIcoClick(event)">⚑</span>`;
+      html += `<td style="position:sticky;left:0;background:var(--bg-card);z-index:1;font-weight:600;white-space:nowrap;">${flagIco} ${esc(block.block_name)}${variety ? ` <span style="font-weight:400;color:var(--text-dim);">(${esc(variety)})</span>` : ''} ${issueBadgeHtml(sev)}` +
               `<div style="font-size:10px;color:var(--text-dim);font-weight:400;">${esc(statusName)}</div></td>`;
       SUMMARY_COLS.forEach(c => {
         let dateStr = '—', daysStr = '—', hasData = false;
@@ -869,6 +878,11 @@ function renderSummary() {
   }
   html += '</tbody></table></div></div>';
   document.getElementById('summary-matrix').innerHTML = html;
+}
+
+function wlFlagIcoClick(ev) {
+  ev.stopPropagation();  // don't trigger cell drill-down
+  openFlagModal(ev.currentTarget.dataset.block);
 }
 
 function renderWatchlist() {
