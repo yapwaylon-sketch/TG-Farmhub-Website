@@ -996,8 +996,10 @@ function openFlagModal(preBlockId) {
       <div class="form-field"><label>Description (optional)</label><textarea id="flag-desc" style="width:100%;min-height:56px;" placeholder="What did you see?"></textarea></div>
       <div class="form-field"><label>Remedial action (if decided)</label><textarea id="flag-remedial" style="width:100%;min-height:48px;" placeholder="Leave blank if not decided yet — you can add it later"></textarea></div>
       <div class="form-field"><label>Photos</label>
-        <input type="file" id="flag-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
-        <button class="btn btn-outline" onclick="document.getElementById('flag-photo-input').click()">📷 Add Photo</button>
+        <input type="file" id="flag-photo-cam" accept="image/*" capture="environment" style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
+        <input type="file" id="flag-photo-gal" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'flag-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('flag-photo-cam').click()">📷 Take Photo</button>
+        <button class="btn btn-outline" onclick="document.getElementById('flag-photo-gal').click()">🖼 From Album</button>
         <div id="flag-photo-preview" class="wl-photo-preview"></div>
       </div>
       <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -1166,8 +1168,10 @@ function openAddUpdateModal() {
       <div class="modal-header"><div class="modal-title">＋ Add Update</div><button class="modal-close" onclick="closeModal()">✕</button></div>
       <div class="form-field"><label>Observation</label><textarea id="upd-note" style="width:100%;min-height:70px;" placeholder="e.g. Still spreading / responding to treatment"></textarea></div>
       <div class="form-field"><label>Photos</label>
-        <input type="file" id="upd-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'upd-photo-preview')">
-        <button class="btn btn-outline" onclick="document.getElementById('upd-photo-input').click()">📷 Add Photo</button>
+        <input type="file" id="upd-photo-cam" accept="image/*" capture="environment" style="display:none;" onchange="ciStagePhoto(event,'upd-photo-preview')">
+        <input type="file" id="upd-photo-gal" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'upd-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('upd-photo-cam').click()">📷 Take Photo</button>
+        <button class="btn btn-outline" onclick="document.getElementById('upd-photo-gal').click()">🖼 From Album</button>
         <div id="upd-photo-preview" class="wl-photo-preview"></div>
       </div>
       <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -1203,8 +1207,10 @@ function openAddPhotosModal() {
     <div class="modal-overlay"><div class="modal-box" style="max-width:440px;">
       <div class="modal-header"><div class="modal-title">📷 Add Photos</div><button class="modal-close" onclick="closeModal()">✕</button></div>
       <div class="form-field"><label>Photos <span style="text-transform:none;color:var(--text-muted);font-weight:400;">(pick one or several)</span></label>
-        <input type="file" id="ap-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'ap-photo-preview')">
-        <button class="btn btn-outline" onclick="document.getElementById('ap-photo-input').click()">📷 Choose Photos</button>
+        <input type="file" id="ap-photo-cam" accept="image/*" capture="environment" style="display:none;" onchange="ciStagePhoto(event,'ap-photo-preview')">
+        <input type="file" id="ap-photo-gal" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'ap-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('ap-photo-cam').click()">📷 Take Photo</button>
+        <button class="btn btn-outline" onclick="document.getElementById('ap-photo-gal').click()">🖼 From Album</button>
         <div id="ap-photo-preview" class="wl-photo-preview"></div>
       </div>
       <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
