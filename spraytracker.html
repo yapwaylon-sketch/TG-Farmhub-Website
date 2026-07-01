@@ -1008,6 +1008,108 @@ async function wlSaveFlag() {
   renderCurrentPage();  // refreshes whatever tab you flagged from (watchlist or summary)
 }
 
+function renderIssueDetail() {
+  const body = document.getElementById('watchlist-body');
+  const i = blockIssues.find(x => x.id === wlSelectedIssueId);
+  if(!i) { wlSelectedIssueId = null; renderWatchlist(); return; }
+  // fetch updates (async) then paint
+  loadIssueUpdates(i.id).then(() => paintIssueDetail(i, body));
+  body.innerHTML = `<div class="empty-state" style="padding:24px;color:var(--text-muted);">Loading…</div>`;
+}
+
+function paintIssueDetail(i, body) {
+  const days = Math.max(0, Math.round((Date.now() - new Date(i.opened_at).getTime())/86400000));
+  const sevBadge = issueBadgeHtml(i.status==='active'?i.severity:null);
+  const statusPill = i.status==='resolved'
+    ? `<span class="wl-status-resolved">✓ Resolved</span>`
+    : `<span class="wl-status-active">● Active</span>`;
+
+  const events = [];
+  issueUpdates.forEach(u => events.push({ ts:u.created_at, kind:'note', u }));
+  jobsForIssue(i).forEach(j => events.push({ ts:(j.completion_date||j.planned_date), kind:'job', j }));
+  events.push({ ts:i.opened_at, kind:'open' });
+  events.sort((a,b) => (b.ts>a.ts?1:b.ts<a.ts?-1:0));  // newest first
+
+  const evHtml = events.map(e => {
+    if(e.kind === 'note') {
+      const photos = (e.u.photos||[]).map(u => `<img src="${u}" class="wl-mini">`).join('');
+      return `<div class="wl-ev"><div class="wl-dot wl-dot-note">📝</div><div class="wl-ev-body">
+        <div class="wl-ev-top"><span class="wl-ev-title">${esc(e.u.created_by||'—')}</span><span class="wl-ev-date">${fmtDate(e.u.created_at)}</span></div>
+        <div class="wl-ev-text">${esc(e.u.note)}</div>${photos?`<div>${photos}</div>`:''}</div></div>`;
+    }
+    if(e.kind === 'job') {
+      const p = getProduct(e.j.product_id);
+      const pname = p ? esc(p.product_name) : (e.j.job_type==='Fertilizer' ? 'Fertilizer' : '—');
+      const worker = e.j.worker_name ? ` · ${esc(e.j.worker_name)}` : '';
+      const done = e.j.completion_date ? 'done' : 'planned';
+      return `<div class="wl-ev"><div class="wl-dot wl-dot-job">🌫</div><div class="wl-ev-body">
+        <div class="wl-ev-top"><span class="wl-ev-title">${pname}</span><span class="wl-job-tag">Job · from Crop Care</span><span class="wl-ev-date">${fmtDate(e.j.completion_date||e.j.planned_date)}</span></div>
+        <div class="wl-ev-sub">${esc(e.j.job_type||'')} · ${done}${worker}</div></div></div>`;
+    }
+    return `<div class="wl-ev"><div class="wl-dot wl-dot-open">🚩</div><div class="wl-ev-body">
+      <div class="wl-ev-top"><span class="wl-ev-title">Issue opened — ${esc(i.opened_by||'—')}</span><span class="wl-ev-date">${fmtDate(i.opened_at)}</span></div>
+      <div class="wl-ev-text">${esc(i.title)}${i.description?' — '+esc(i.description):''}</div></div></div>`;
+  }).join('');
+
+  const actions = i.status==='active'
+    ? `<button class="btn btn-primary" onclick="openAddUpdateModal()">＋ Add Update</button>
+       <button class="btn btn-success" onclick="wlResolveIssue()">✓ Mark Resolved</button>`
+    : `<div class="wl-resolved-note">Resolved ${fmtDate(i.resolved_at)}${i.resolved_note?': '+esc(i.resolved_note):''}</div>`;
+
+  body.innerHTML = `
+    <div class="wl-detail-head ${i.severity==='critical'&&i.status==='active'?'wl-hd-crit':i.status==='active'?'wl-hd-watch':'wl-hd-resolved'}">
+      <button class="btn btn-outline btn-sm" onclick="wlBackToList()">← Watchlist</button>
+      <div class="wl-detail-top">${sevBadge}<span class="wl-detail-title">${esc(i.title)}</span><span class="wl-cat">${esc(i.category)}</span>${statusPill}</div>
+      <div class="wl-detail-meta">Block <b>${wlBlockLabel(i.block_id)}</b> · Opened ${fmtDate(i.opened_at)} by ${esc(i.opened_by||'—')} · ${days}d active</div>
+      ${i.description?`<div class="wl-detail-desc">${esc(i.description)}</div>`:''}
+    </div>
+    <div class="wl-detail-actions">${actions}</div>
+    <div class="wl-timeline"><div class="wl-tl-h">Timeline — newest first</div>${evHtml}</div>`;
+}
+
+function wlBackToList() { wlSelectedIssueId = null; pushView('watchlist', null); renderWatchlist(); }
+
+function openAddUpdateModal() {
+  wlFlagPhotos = []; ciStageKey = null;
+  document.getElementById("modal-container").innerHTML = `
+    <div class="modal-overlay"><div class="modal-box" style="max-width:440px;">
+      <div class="modal-header"><div class="modal-title">＋ Add Update</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+      <div class="form-field"><label>Observation</label><textarea id="upd-note" style="width:100%;min-height:70px;" placeholder="e.g. Still spreading / responding to treatment"></textarea></div>
+      <div class="form-field"><label>Photos</label>
+        <input type="file" id="upd-photo-input" accept="image/*" multiple style="display:none;" onchange="ciStagePhoto(event,'upd-photo-preview')">
+        <button class="btn btn-outline" onclick="document.getElementById('upd-photo-input').click()">📷 Add Photo</button>
+        <div id="upd-photo-preview" class="wl-photo-preview"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="wlSaveUpdate()">Save Update</button></div>
+    </div></div>`;
+}
+async function wlSaveUpdate() {
+  const note = document.getElementById('upd-note').value.trim();
+  if(!note && !wlFlagPhotos.length) { notify('Add a note or photo','error'); return; }
+  const res = await sbMutate(() => sb.from('block_issue_updates').insert({
+    issue_id: wlSelectedIssueId, note: note || '(photo)', photos: wlFlagPhotos, created_by: currentUser.displayName || 'unknown'
+  }).select());
+  if(!res) { notify('Could not save update','error'); return; }
+  wlFlagPhotos = []; ciStageKey = null;
+  closeModal();
+  renderWatchlist();  // re-paints detail (loadIssueUpdates re-fetches)
+  notify('Update added','success');
+}
+
+function wlResolveIssue() {
+  confirmAction('Mark Resolved', 'Close this issue? The block\'s badge clears everywhere; history is kept.', async () => {
+    const note = prompt('Closing note (optional):') || null;
+    const res = await sbMutate(() => sb.from('block_issues').update({
+      status:'resolved', resolved_at: new Date().toISOString(), resolved_note: note
+    }).eq('id', wlSelectedIssueId).select());
+    if(!res) { notify('Could not resolve','error'); return; }
+    await loadBlockIssues();
+    notify('Issue resolved','success');
+    renderWatchlist();
+  }, false);
+}
+
 function summaryEnsurePopupEl() {
   let el = document.getElementById('summary-cell-popup');
   if(!el) {
