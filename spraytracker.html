@@ -41,6 +41,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       <span class="nav-label">Summary</span>
     </div>
+    <div class="nav-item" data-page="watchlist" onclick="navigateTo('watchlist')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span class="nav-label">Watchlist</span>
+    </div>
     <div class="nav-item" data-page="jobs" onclick="navigateTo('jobs')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="16" y1="12" x2="8" y2="12"/><line x1="16" y1="16" x2="8" y2="16"/></svg>
       <span class="nav-label">Jobs</span>
@@ -98,6 +102,11 @@
   </div>
 
   <div id="summary-matrix"></div>
+</div>
+
+<!-- PAGE: WATCHLIST -->
+<div id="page-watchlist" class="page">
+  <div id="watchlist-body"></div>
 </div>
 
 
@@ -382,8 +391,9 @@ function startAutoRefresh() {
 // ============================================================
 // NAVIGATION
 // ============================================================
-function navigateTo(page, fromHistory) {
+function navigateTo(page, fromHistory, detail) {
   currentPage = page;
+  if(page === 'watchlist') wlSelectedIssueId = detail || null;
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === page));
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.id === "page-"+page));
   if(!fromHistory) pushTab(page);
@@ -392,6 +402,7 @@ function navigateTo(page, fromHistory) {
 
 async function renderCurrentPage() {
   if(currentPage === 'summary') { await Promise.all([loadSprayLogs(), loadJobs(), loadJobProducts(), loadProducts(), loadBlockCrops(), loadCropStatuses(), loadInventoryProducts()]); renderSummary(); }
+  else if(currentPage === 'watchlist') { await Promise.all([loadBlockIssues(), loadBlocks(), loadBlockCrops(), loadCropStatuses(), loadJobs(), loadProducts()]); renderWatchlist(); }
   else if(currentPage === 'jobs') { await Promise.all([loadJobs(), loadProducts(), loadIngredients(), loadProductIngredients(), loadInventoryProducts(), loadInventoryTransactions(), loadAIComboDefaults()]); populateJobFilters(); renderJobsTable(); }
   else if(currentPage === 'joblogs') {
     await Promise.all([loadJobs(), loadJobProducts(), loadProducts()]);
